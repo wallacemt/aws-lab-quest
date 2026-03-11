@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AWS Lab Quest
 
-## Getting Started
+Aplicacao web para transformar labs AWS em uma jornada gamificada.
 
-First, run the development server:
+## O que este projeto faz
+
+- Gera quests a partir do texto de um laboratorio AWS usando Gemini.
+- Cria tarefas com analogias tematicas para facilitar o aprendizado.
+- Mostra progresso com XP e niveis.
+- Salva tudo localmente no navegador (perfil, quest ativa, historico e rascunho).
+- Bloqueia criacao de nova quest enquanto houver uma em andamento.
+
+## Tecnologias
+
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- Bun
+- Google Gemini API
+
+## Requisitos
+
+- Bun instalado
+- Chave da API Gemini
+
+## Como rodar
+
+1. Instale dependencias:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Crie o arquivo `.env.local` na raiz do projeto com:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+GEMINI_API_KEY=sua_chave_aqui
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Inicie o projeto:
 
-## Learn More
+```bash
+bun run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+4. Abra no navegador:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```text
+http://localhost:3000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts uteis
 
-## Deploy on Vercel
+```bash
+bun run dev     # ambiente de desenvolvimento
+bun run lint    # checagem de codigo
+bun run build   # build de producao
+bun run start   # roda build de producao
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Observacoes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- O historico e progresso ficam no `localStorage` do navegador.
+- Sem banco de dados.
+- A chave Gemini fica no servidor via `.env.local`.
