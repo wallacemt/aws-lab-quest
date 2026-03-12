@@ -1,6 +1,15 @@
-import { Level } from "@/lib/types";
+import { Level, TaskDifficulty } from "@/lib/types";
 
 export const XP_PER_TASK = 100;
+export const TASK_DIFFICULTY_MULTIPLIER: Record<TaskDifficulty, number> = {
+  easy: 0.8,
+  medium: 1,
+  hard: 1.4,
+};
+
+export function getTaskXpByDifficulty(difficulty: TaskDifficulty): number {
+  return Math.round(XP_PER_TASK * TASK_DIFFICULTY_MULTIPLIER[difficulty]);
+}
 
 // Exponential thresholds — each tier is roughly double the previous gap
 export const LEVELS: Level[] = [

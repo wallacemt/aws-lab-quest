@@ -1,4 +1,14 @@
-import { Task } from "@/lib/types";
+import { Task, TaskDifficulty } from "@/lib/types";
+
+function parseDifficulty(value: unknown): TaskDifficulty {
+  const normalized = String(value ?? "")
+    .toLowerCase()
+    .trim();
+  if (normalized === "easy" || normalized === "medium" || normalized === "hard") {
+    return normalized;
+  }
+  return "medium";
+}
 
 function normalizeTask(task: Partial<Task>, index: number): Task {
   return {
@@ -8,6 +18,7 @@ function normalizeTask(task: Partial<Task>, index: number): Task {
     service: String(task.service ?? "AWS"),
     analogy: String(task.analogy ?? "Pense nisso como uma fase importante da jornada."),
     steps: Array.isArray(task.steps) ? task.steps.map((step) => String(step)) : [],
+    difficulty: parseDifficulty(task.difficulty),
     completed: false,
   };
 }

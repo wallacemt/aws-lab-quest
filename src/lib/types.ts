@@ -5,8 +5,11 @@ export type Task = {
   service: string;
   analogy: string;
   steps: string[];
+  difficulty?: TaskDifficulty;
   completed?: boolean;
 };
+
+export type TaskDifficulty = "easy" | "medium" | "hard";
 
 export type LevelTone = "base" | "base-mid" | "mid" | "mid-top" | "top" | "legendary";
 
@@ -28,6 +31,7 @@ export type UserProfile = {
 export type ActiveQuest = {
   title: string;
   theme: string;
+  sourceLabText?: string;
   tasks: Task[];
   xp: number;
   startedAt: string;
@@ -43,6 +47,8 @@ export type QuestHistoryItem = {
   completedAt: string;
   certification: string;
   userName: string;
+  sourceLabText?: string | null;
+  taskSnapshot?: Task[];
 };
 
 export type GenerateQuestInput = {

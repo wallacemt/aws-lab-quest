@@ -2,9 +2,13 @@
 
 import { useMemo } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { XP_PER_TASK } from "@/lib/levels";
+import { getTaskXpByDifficulty } from "@/lib/levels";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { ActiveQuest, Task, UserProfile } from "@/lib/types";
+
+function taskDifficulty(task: Task) {
+  return task.difficulty ?? "medium";
+}
 
 export function useQuest() {
   const active = useLocalStorage<ActiveQuest | null>(STORAGE_KEYS.activeQuest, null);
@@ -16,11 +20,14 @@ export function useQuest() {
   const totalCount = active.value?.tasks.length ?? 0;
   const xp = active.value?.xp ?? 0;
 
-  function startQuest(params: { title: string; theme: string; tasks: Task[] }) {
+  function startQuest(params: { title: string; theme: string; sourceLabText: string; tasks: Task[] }) {
+    const normalizedTasks = params.tasks.map((task) => ({ ...task, difficulty: taskDifficulty(task) }));
+
     active.setValue({
       title: params.title,
       theme: params.theme,
-      tasks: params.tasks,
+      sourceLabText: params.sourceLabText,
+      tasks: normalizedTasks,
       xp: 0,
       startedAt: new Date().toISOString(),
       completed: false,
@@ -30,9 +37,13 @@ export function useQuest() {
   function toggleTask(taskId: number, checked: boolean) {
     if (!active.value) return;
 
-    const tasks = active.value.tasks.map((task) => (task.id === taskId ? { ...task, completed: checked } : task));
+    const tasks = active.value.tasks.map((task) =>
+      task.id === taskId ? { ...task, completed: checked, difficulty: taskDifficulty(task) } : task,
+    );
 
-    const newXP = tasks.filter((t) => t.completed).length * XP_PER_TASK;
+    const newXP = tasks
+      .filter((t) => t.completed)
+      .reduce((sum, task) => sum + getTaskXpByDifficulty(taskDifficulty(task)), 0);
 
     active.setValue({
       ...active.value,
@@ -57,6 +68,8 @@ export function useQuest() {
         theme: active.value.theme,
         xp: active.value.xp,
         tasksCount: active.value.tasks.length,
+        taskSnapshot: active.value.tasks,
+        sourceLabText: active.value.sourceLabText ?? "",
         completedAt: new Date().toISOString(),
         certification: profile.certification,
         userName: profile.name,

@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getLevel } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
+import { Task } from "@/lib/types";
+
+function normalizeTaskSnapshot(tasks: unknown): Task[] {
+  if (!Array.isArray(tasks)) {
+    return [];
+  }
+
+  return tasks
+    .map((task, index) => {
+      const candidate = (task ?? {}) as Partial<Task>;
+      return {
+        id: typeof candidate.id === "number" ? candidate.id : index + 1,
+        title: String(candidate.title ?? `Missao ${index + 1}`),
+        mission: String(candidate.mission ?? "Conclua esta etapa do laboratorio."),
+        service: String(candidate.service ?? "AWS"),
+        analogy: String(candidate.analogy ?? ""),
+        steps: Array.isArray(candidate.steps) ? candidate.steps.map((step) => String(step)) : [],
+        difficulty:
+          candidate.difficulty === "easy" || candidate.difficulty === "medium" || candidate.difficulty === "hard"
+            ? candidate.difficulty
+            : "medium",
+        completed: Boolean(candidate.completed),
+      };
+    })
+    .slice(0, 20);
+}
 
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -29,6 +55,8 @@ export async function POST(request: NextRequest) {
     theme?: string;
     xp?: number;
     tasksCount?: number;
+    taskSnapshot?: unknown;
+    sourceLabText?: string;
     completedAt?: string;
     certification?: string;
     userName?: string;
@@ -38,6 +66,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
+  const taskSnapshot = normalizeTaskSnapshot(body.taskSnapshot);
+
   const item = await prisma.questHistory.create({
     data: {
       userId: session.user.id,
@@ -45,6 +75,8 @@ export async function POST(request: NextRequest) {
       theme: body.theme,
       xp: body.xp,
       tasksCount: body.tasksCount,
+      taskSnapshot,
+      sourceLabText: body.sourceLabText ? String(body.sourceLabText).slice(0, 30000) : null,
       completedAt: new Date(body.completedAt),
       certification: body.certification ?? "",
       userName: body.userName ?? session.user.name,

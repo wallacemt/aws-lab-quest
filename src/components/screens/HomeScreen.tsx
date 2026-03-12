@@ -9,6 +9,7 @@ import { useQuest } from "@/hooks/useQuest";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { extractBoardTitle } from "@/lib/retro";
 import { STORAGE_KEYS } from "@/lib/storage";
+import { Task } from "@/lib/types";
 
 type QuestDraft = {
   theme: string;
@@ -78,12 +79,12 @@ export function HomeScreen() {
         body: JSON.stringify({ theme, labText }),
       });
 
-      const data = (await response.json()) as { tasks?: unknown[]; error?: string };
+      const data = (await response.json()) as { tasks?: Task[]; error?: string };
       if (!response.ok || !data.tasks) {
         throw new Error(data.error ?? "Falha ao gerar quest");
       }
 
-      startQuest({ title: extractBoardTitle(labText), theme, tasks: data.tasks as never[] });
+      startQuest({ title: extractBoardTitle(labText), theme, sourceLabText: labText, tasks: data.tasks });
       void setProfile({ ...profile, favoriteTheme: theme }).catch(() => void 0);
       router.push("/quest");
     } catch (requestError) {

@@ -71,6 +71,7 @@ Regras obrigatorias:
 - Nao inclua crases.
 - Nao inclua texto antes ou depois do JSON.
 - O resultado deve ser um array JSON com objetos no formato abaixo.
+- Cada tarefa deve incluir "difficulty" com apenas um destes valores: "easy", "medium" ou "hard".
 
 [
   {
@@ -78,6 +79,7 @@ Regras obrigatorias:
     "title": "Titulo da tarefa usando metafora do tema",
     "mission": "Descricao curta da missao",
     "service": "Servico AWS utilizado",
+    "difficulty": "medium",
     "analogy": "Analogia criativa em uma frase",
     "steps": ["Dica de passo 1", "Dica de passo 2", "Dica de passo 3"]
   }

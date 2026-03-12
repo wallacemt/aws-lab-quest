@@ -41,8 +41,8 @@ model Session {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("session")
   @@index([userId])
+  @@map("session")
 }
 
 model Account {
@@ -61,8 +61,8 @@ model Account {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  @@map("account")
   @@index([userId])
+  @@map("account")
 }
 
 model Verification {
@@ -73,8 +73,8 @@ model Verification {
   createdAt  DateTime? @default(now())
   updatedAt  DateTime? @updatedAt
 
-  @@map("verification")
   @@index([identifier])
+  @@map("verification")
 }
 
 // ─── App custom tables ─────────────────────────────────────────────────────────
@@ -96,6 +96,8 @@ model QuestHistory {
   theme         String
   xp            Int
   tasksCount    Int
+  taskSnapshot  Json?
+  sourceLabText String?
   completedAt   DateTime
   certification String   @default("")
   userName      String   @default("")
@@ -103,8 +105,8 @@ model QuestHistory {
 }
 
 model LevelBadge {
-  id           String @id @default(cuid())
-  level        Int    @unique
+  id           String      @id @default(cuid())
+  level        Int         @unique
   name         String
   imageUrl     String
   supabasePath String
@@ -112,11 +114,11 @@ model LevelBadge {
 }
 
 model UserBadge {
-  id       String    @id @default(cuid())
+  id       String     @id @default(cuid())
   userId   String
   badgeId  String
-  earnedAt DateTime  @default(now())
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  earnedAt DateTime   @default(now())
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   badge    LevelBadge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeId])
