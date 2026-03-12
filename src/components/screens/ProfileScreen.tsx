@@ -25,6 +25,8 @@ export function ProfileScreen() {
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [totalXp, setTotalXp] = useState(0);
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
+  const [ownedBadgeIds, setOwnedBadgeIds] = useState<string[]>([]);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync local form state when profile loads
@@ -50,11 +52,25 @@ export function ProfileScreen() {
   useEffect(() => {
     fetch("/api/badges")
       .then((r) => r.json())
-      .then((data: { badges?: LevelBadgeModel[] }) => {
+      .then((data: { badges?: LevelBadgeModel[]; ownedBadgeIds?: string[] }) => {
         setLevelBadges(data.badges ?? []);
+        setOwnedBadgeIds(data.ownedBadgeIds ?? []);
       })
       .catch(() => void 0);
   }, []);
+
+  async function handleCopyShareLink() {
+    if (!user?.id || !currentBadge?.id) return;
+    const url = `${window.location.origin}/share/badge/${user.id}/${currentBadge.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareMsg("Link copiado!");
+      setTimeout(() => setShareMsg(null), 2500);
+    } catch {
+      setShareMsg("Nao foi possivel copiar o link.");
+      setTimeout(() => setShareMsg(null), 2500);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -187,6 +203,21 @@ export function ProfileScreen() {
                 <p className="mt-1 text-center font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
                   {currentBadge.name}
                 </p>
+                {ownedBadgeIds.includes(currentBadge.id) && user?.id && (
+                  <div className="mt-2 text-center">
+                    <button
+                      onClick={handleCopyShareLink}
+                      className="border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
+                    >
+                      Compartilhar Badge
+                    </button>
+                  </div>
+                )}
+                {shareMsg && (
+                  <p className="mt-1 text-center font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-accent)]">
+                    {shareMsg}
+                  </p>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

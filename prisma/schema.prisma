@@ -24,6 +24,7 @@ model User {
   accounts     Account[]
   profile      UserProfile?
   questHistory QuestHistory[]
+  userBadges   UserBadge[]
 
   @@map("user")
 }
@@ -107,4 +108,18 @@ model LevelBadge {
   name         String
   imageUrl     String
   supabasePath String
+  userBadges   UserBadge[]
+}
+
+model UserBadge {
+  id       String    @id @default(cuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime  @default(now())
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge    LevelBadge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
 }

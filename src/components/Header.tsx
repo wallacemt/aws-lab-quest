@@ -20,12 +20,14 @@ type HeaderProps = {
 export function Header({ xp }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [totalXp, setTotalXp] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const { user, signOut } = useAuth();
   const router = useRouter();
   const { avatarUrl } = useUserProfile();
   const name = user?.name ?? "Anônimo";
+  const displayedXp = totalXp + (xp ?? 0);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -37,6 +39,17 @@ export function Header({ xp }: HeaderProps) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/quest-history")
+      .then((r) => r.json())
+      .then((data: { history?: { xp: number }[] }) => {
+        const nextTotalXp = (data.history ?? []).reduce((sum, item) => sum + item.xp, 0);
+        setTotalXp(nextTotalXp);
+      })
+      .catch(() => void 0);
+  }, [user]);
 
   async function handleSignOut() {
     setDropdownOpen(false);
@@ -67,12 +80,10 @@ export function Header({ xp }: HeaderProps) {
 
         {/* Desktop: right controls */}
         <div className="hidden items-center gap-2 md:flex">
-          {xp !== undefined && (
-            <div className="flex items-center gap-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
-              <span className="font-[var(--font-pixel)] text-[10px] uppercase">XP {xp}</span>
-              <LevelBadge xp={xp} />
-            </div>
-          )}
+          <div className="flex items-center gap-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
+            <span className="font-[var(--font-pixel)] text-[10px] uppercase">XP {displayedXp}</span>
+            <LevelBadge xp={displayedXp} />
+          </div>
           <FontSizeControl />
           <ThemeToggle className="min-w-28" />
           {/* User dropdown */}
@@ -130,12 +141,10 @@ export function Header({ xp }: HeaderProps) {
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 border-t border-[var(--pixel-border)] px-4 pb-4 pt-3 md:hidden xl:px-8">
-          {xp !== undefined && (
-            <div className="flex items-center gap-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
-              <span className="font-[var(--font-pixel)] text-[10px] uppercase">XP {xp}</span>
-              <LevelBadge xp={xp} />
-            </div>
-          )}
+          <div className="flex items-center gap-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
+            <span className="font-[var(--font-pixel)] text-[10px] uppercase">XP {displayedXp}</span>
+            <LevelBadge xp={displayedXp} />
+          </div>
           <NavBar onNavClick={() => setMobileMenuOpen(false)} />
           <FontSizeControl />
           <ThemeToggle className="w-full justify-center" />

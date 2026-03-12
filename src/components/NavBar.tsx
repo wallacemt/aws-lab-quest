@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/history", label: "Histórico" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/help", label: "Ajuda" },
 ];
 
 export function NavBar({ onNavClick }: { onNavClick?: () => void }) {

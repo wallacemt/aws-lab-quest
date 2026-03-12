@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const AUTH_PAGES = ["/login", "/register"];
-const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon"];
+const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon", "/share", "/icon", "/apple-icon", "/twitter-image", "/og-image"];
+const PUBLIC_EXACT_PATHS = ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest"];
 
 // Better Auth session cookie name (default)
 const SESSION_COOKIE = "better-auth.session_token";
@@ -10,7 +11,7 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Always allow static assets and auth API routes
-  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || PUBLIC_EXACT_PATHS.includes(pathname)) {
     return NextResponse.next();
   }
 
