@@ -2,11 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/Header";
-import { CreatorCredits } from "@/components/CreatorCredits";
-import { QuestHistory } from "@/components/QuestHistory";
+import { AppLayout } from "@/components/AppLayout";
 import { SetupPanel } from "@/components/SetupPanel";
-import { UserProfileModal } from "@/components/UserProfileModal";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { useQuest } from "@/hooks/useQuest";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -21,10 +18,9 @@ type QuestDraft = {
 export function HomeScreen() {
   const router = useRouter();
   const { profile, setProfile, hydrated } = useUserProfile();
-  const { startQuest, history, activeQuest, hydrated: questHydrated } = useQuest();
+  const { startQuest, activeQuest, hydrated: questHydrated } = useQuest();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
 
   const initialTheme = useMemo(() => profile.favoriteTheme || "games", [profile.favoriteTheme]);
@@ -32,7 +28,6 @@ export function HomeScreen() {
 
   useEffect(() => {
     let nextDraft: QuestDraft = { theme: initialTheme, labText: "" };
-
     try {
       const raw = window.localStorage.getItem(STORAGE_KEYS.draftQuest);
       if (raw) {
@@ -45,25 +40,19 @@ export function HomeScreen() {
     } catch {
       nextDraft = { theme: initialTheme, labText: "" };
     }
-
     setDraft(nextDraft);
     setDraftHydrated(true);
   }, [initialTheme]);
 
   useEffect(() => {
-    if (!draftHydrated) {
-      return;
-    }
-
+    if (!draftHydrated) return;
     const hasMeaningfulDraft = Boolean(
       draft.labText.trim() || (draft.theme.trim() && draft.theme.trim() !== initialTheme),
     );
-
     if (!hasMeaningfulDraft) {
       window.localStorage.removeItem(STORAGE_KEYS.draftQuest);
       return;
     }
-
     window.localStorage.setItem(STORAGE_KEYS.draftQuest, JSON.stringify(draft));
   }, [draft, draftHydrated, initialTheme]);
 
@@ -74,9 +63,8 @@ export function HomeScreen() {
       setError("Finalize a quest atual antes de criar uma nova.");
       return;
     }
-
     if (!theme || !labText) {
-      setError("Preencha tema e texto do laboratorio.");
+      setError("Preencha tema e texto do laboratório.");
       return;
     }
 
@@ -96,7 +84,7 @@ export function HomeScreen() {
       }
 
       startQuest({ title: extractBoardTitle(labText), theme, tasks: data.tasks as never[] });
-      setProfile({ ...profile, favoriteTheme: theme });
+      void setProfile({ ...profile, favoriteTheme: theme });
       router.push("/quest");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Falha ao gerar quest.");
@@ -110,60 +98,51 @@ export function HomeScreen() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Header xp={0} name={profile.name} onEditProfile={() => setShowProfileModal(true)}  />
-      <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-8 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
-          <PixelCard>
-            <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">
-              EDN Cloud Academy
-            </h1>
-            <p className="mt-2 font-[var(--font-body)] text-lg">
-              Treine labs AWS em formato de fase retro. Monte seu quest e avance para sua certificacao.
+    <AppLayout credits>
+      <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 xl:px-8">
+        {/* Welcome */}
+        <PixelCard>
+          <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">EDN Cloud Academy</h1>
+          <p className="mt-2 font-[var(--font-body)] text-lg">
+            Treine labs AWS em formato de fase retro. Monte seu quest e avance para sua certificação.
+          </p>
+        </PixelCard>
+
+        {/* Active quest warning */}
+        {hasQuestInProgress && (
+          <PixelCard className="space-y-3 border-yellow-500 bg-yellow-900/10">
+            <p className="font-[var(--font-body)] text-sm text-yellow-300">
+              Você já tem uma quest em andamento. Continue de onde parou para evitar novo consumo de tokens.
             </p>
+            <button
+              type="button"
+              onClick={() => router.replace("/quest")}
+              className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+            >
+              Continuar Quest Atual
+            </button>
           </PixelCard>
-          {hasQuestInProgress ? (
-            <PixelCard className="space-y-3 border-yellow-500">
-              <p className="font-[var(--font-body)] text-sm text-yellow-300">
-                Voce ja tem uma quest em andamento. Continue de onde parou para evitar novo consumo de token.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  router.replace("/quest");
-                }}
-                className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase"
-              >
-                Continuar Quest Atual
-              </button>
-            </PixelCard>
-          ) : null}
-          {!hasQuestInProgress ? (
-            <SetupPanel
-              onGenerate={handleGenerate}
-              theme={draft.theme}
-              labText={draft.labText}
-              onThemeChange={(value) => setDraft((prev) => ({ ...prev, theme: value }))}
-              onLabTextChange={(value) => setDraft((prev) => ({ ...prev, labText: value }))}
-              loading={loading}
-              disabled={false}
-            />
-          ) : null}
-          {error ? (
-            <PixelCard className="border-red-500 text-red-300">
-              <p className="font-[var(--font-body)] text-sm">{error}</p>
-            </PixelCard>
-          ) : null}
-        </div>
-        <QuestHistory history={history} />
+        )}
+
+        {/* Setup panel — hidden while quest is in progress */}
+        {!hasQuestInProgress && (
+          <SetupPanel
+            onGenerate={handleGenerate}
+            theme={draft.theme}
+            labText={draft.labText}
+            onThemeChange={(value) => setDraft((prev) => ({ ...prev, theme: value }))}
+            onLabTextChange={(value) => setDraft((prev) => ({ ...prev, labText: value }))}
+            loading={loading}
+            disabled={false}
+          />
+        )}
+
+        {error && (
+          <PixelCard className="border-red-500 bg-red-900/20">
+            <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>
+          </PixelCard>
+        )}
       </main>
-      <UserProfileModal
-        profile={profile}
-        onSave={setProfile}
-        open={showProfileModal || !profile.name}
-        onClose={() => setShowProfileModal(false)}
-      />
-      <CreatorCredits />
-    </div>
+    </AppLayout>
   );
 }
