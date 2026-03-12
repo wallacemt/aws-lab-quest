@@ -4,13 +4,10 @@ import { useMemo } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { XP_PER_TASK } from "@/lib/levels";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { ActiveQuest, QuestHistoryItem, Task, UserProfile } from "@/lib/types";
-
-const emptyHistory: QuestHistoryItem[] = [];
+import { ActiveQuest, Task, UserProfile } from "@/lib/types";
 
 export function useQuest() {
   const active = useLocalStorage<ActiveQuest | null>(STORAGE_KEYS.activeQuest, null);
-  const history = useLocalStorage<QuestHistoryItem[]>(STORAGE_KEYS.history, emptyHistory);
 
   const completedCount = useMemo(() => {
     return active.value?.tasks.filter((task) => task.completed).length ?? 0;
@@ -31,42 +28,40 @@ export function useQuest() {
   }
 
   function toggleTask(taskId: number, checked: boolean) {
-    if (!active.value) {
-      return;
-    }
+    if (!active.value) return;
 
     const tasks = active.value.tasks.map((task) => (task.id === taskId ? { ...task, completed: checked } : task));
 
-    const newXP = tasks.filter((task) => task.completed).length * XP_PER_TASK;
+    const newXP = tasks.filter((t) => t.completed).length * XP_PER_TASK;
 
     active.setValue({
       ...active.value,
       tasks,
       xp: newXP,
-      // Historico e estado final sao confirmados apenas em finishQuest.
       completed: active.value.completed,
     });
   }
 
   function finishQuest(profile: UserProfile) {
-    if (!active.value || active.value.completed) {
-      return;
-    }
+    if (!active.value || active.value.completed) return;
 
-    const item: QuestHistoryItem = {
-      id: crypto.randomUUID(),
-      title: active.value.title,
-      theme: active.value.theme,
-      xp: active.value.xp,
-      tasksCount: active.value.tasks.length,
-      completedAt: new Date().toISOString(),
-      certification: profile.certification,
-      userName: profile.name,
-    };
-
-    const nextHistory = [item, ...history.value].slice(0, 10);
-    history.setValue(nextHistory);
+    // Mark completed in localStorage
     active.setValue({ ...active.value, completed: true });
+
+    // Persist to database (fire-and-forget)
+    fetch("/api/quest-history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: active.value.title,
+        theme: active.value.theme,
+        xp: active.value.xp,
+        tasksCount: active.value.tasks.length,
+        completedAt: new Date().toISOString(),
+        certification: profile.certification,
+        userName: profile.name,
+      }),
+    }).catch(console.error);
   }
 
   function clearActiveQuest() {
@@ -75,8 +70,7 @@ export function useQuest() {
 
   return {
     activeQuest: active.value,
-    history: history.value,
-    hydrated: active.hydrated && history.hydrated,
+    hydrated: active.hydrated,
     xp,
     completedCount,
     totalCount,

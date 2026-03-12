@@ -8,12 +8,15 @@ export type Task = {
   completed?: boolean;
 };
 
+export type LevelTone = "base" | "base-mid" | "mid" | "mid-top" | "top" | "legendary";
+
 export type Level = {
-  name: "Iniciante" | "Explorador" | "AWS Hero";
+  name: "Recruta" | "Cadete" | "Explorador" | "Especialista" | "Guardião AWS" | "Lendário";
   min: number;
   max: number;
   next: string;
-  tone: "base" | "mid" | "top";
+  tone: LevelTone;
+  number: number;
 };
 
 export type UserProfile = {
