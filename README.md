@@ -1,65 +1,229 @@
 # AWS Lab Quest
 
-Aplicacao web para transformar labs AWS em uma jornada gamificada.
+Aplicacao web para transformar labs AWS em uma jornada gamificada, com autenticacao, progresso por XP, badges, historico e leaderboard.
 
-## O que este projeto faz
+## Implementacoes principais
 
-- Gera quests a partir do texto de um laboratorio AWS usando Gemini.
-- Cria tarefas com analogias tematicas para facilitar o aprendizado.
-- Mostra progresso com XP e niveis.
-- Salva tudo localmente no navegador (perfil, quest ativa, historico e rascunho).
-- Bloqueia criacao de nova quest enquanto houver uma em andamento.
+- Autenticacao com Better Auth (email e senha), sessoes persistidas no banco.
+- Banco PostgreSQL com Prisma 7 (adapter pg).
+- Perfil de usuario com avatar (upload para Supabase Storage).
+- Historico de labs persistido no banco.
+- Leaderboard Top 10 por XP.
+- Tela de perfil publico de outros jogadores.
+- Sistema de niveis com dificuldade exponencial (6 niveis).
+- Badges por nivel, com colecao visual e suspense de desbloqueio.
+- Animacoes com Framer Motion no perfil e badges.
+- Navegacao retro dinamica com telas separadas (Login, Register, Home, Quest, History, Leaderboard, Profile, Public Profile).
 
-## Tecnologias
+## Stack
 
-- Next.js (App Router)
+- Next.js 16 (App Router)
 - TypeScript
 - Tailwind CSS
 - Bun
-- Google Gemini API
+- Better Auth
+- Prisma 7
+- PostgreSQL
+- Supabase Storage
+- Google Gemini API (geracao de quests)
+- Pollinations API (seed de imagens de badge)
+- Framer Motion
 
-## Requisitos
+## Fluxo de paginas
 
-- Bun instalado
-- Chave da API Gemini
+```mermaid
+flowchart TD
+		A[Start] --> B{Sessao valida?}
+		B -- Nao --> C[Login]
+		C --> D[Register]
+		D --> E[Profile Setup]
+		C --> F[Home]
+		B -- Sim --> F[Home]
 
-## Como rodar
+		F --> G[Quest]
+		F --> H[History]
+		F --> I[Leaderboard]
+		F --> J[Meu Profile]
 
-1. Instale dependencias:
+		I --> K[Public Profile de outro usuario]
+		J --> L[Editar profile, avatar e ver badges]
+		G --> M[Completa tasks]
+		M --> H
+```
+
+## Diagrama do banco
+
+```mermaid
+erDiagram
+
+    User {
+        string id PK
+        string name
+        string email UK
+        boolean emailVerified
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Session {
+        string id PK
+        string token UK
+        datetime expiresAt
+        string userId FK
+    }
+
+    Account {
+        string id PK
+        string providerId
+        string accountId
+        string userId FK
+        string password
+    }
+
+    Verification {
+        string id PK
+        string identifier
+        string value
+        datetime expiresAt
+    }
+
+    UserProfile {
+        string id PK
+        string userId FK
+        string certification
+        string favoriteTheme
+        string avatarUrl
+    }
+
+    QuestHistory {
+        string id PK
+        string userId FK
+        string title
+        string theme
+        int xp
+        int tasksCount
+        datetime completedAt
+    }
+
+    LevelBadge {
+        string id PK
+        int level UK
+        string name
+        string imageUrl
+        string supabasePath
+    }
+
+    User ||--o{ Session : has
+    User ||--o{ Account : has
+    User ||--|| UserProfile : owns
+    User ||--o{ QuestHistory : logs
+
+```
+
+## Rotas principais
+
+- Paginas:
+  - /
+  - /login
+  - /register
+  - /quest
+  - /history
+  - /leaderboard
+  - /profile
+  - /players/[userId]
+
+- APIs:
+  - /api/auth/[...all]
+  - /api/health
+  - /api/user/profile
+  - /api/upload-avatar
+  - /api/quest-history
+  - /api/leaderboard
+  - /api/badges
+  - /api/users/[userId]
+
+## Variaveis de ambiente
+
+Crie um arquivo .env com base em .env.local.example:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# PostgreSQL (Docker local)
+DATABASE_URL=postgresql://awlq_user:awlq_pass@localhost:5432/awlq
+
+# Better Auth
+BETTER_AUTH_SECRET=change_this_to_a_random_32_char_secret
+BETTER_AUTH_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Supabase (storage for avatars + badges)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+
+# Optional (seed badge image provider)
+POLLINATIONS_API_KEY=optional_key
+```
+
+## Como rodar localmente
+
+1. Instalar dependencias
 
 ```bash
 bun install
 ```
 
-2. Crie o arquivo `.env.local` na raiz do projeto com:
+2. Subir PostgreSQL local
 
-```env
-GEMINI_API_KEY=sua_chave_aqui
+```bash
+docker compose up -d
 ```
 
-3. Inicie o projeto:
+3. Gerar Prisma Client
+
+```bash
+bun run db:generate
+```
+
+4. Aplicar migracoes
+
+```bash
+bun run db:migrate
+```
+
+5. Popular badges no banco/storage
+
+```bash
+bun run db:seed
+```
+
+6. Rodar app
 
 ```bash
 bun run dev
 ```
 
-4. Abra no navegador:
+7. Abrir no navegador
 
-```text
 http://localhost:3000
-```
 
-## Scripts uteis
+## Scripts
 
 ```bash
-bun run dev     # ambiente de desenvolvimento
-bun run lint    # checagem de codigo
-bun run build   # build de producao
-bun run start   # roda build de producao
+bun run dev
+bun run build
+bun run start
+bun run lint
+bun run db:generate
+bun run db:migrate
+bun run db:seed
+bun run db:studio
 ```
 
 ## Observacoes
 
-- O historico e progresso ficam no `localStorage` do navegador.
-- Sem banco de dados.
-- A chave Gemini fica no servidor via `.env.local`.
+- O proxy protege rotas privadas e redireciona para login quando nao ha sessao.
+- Upload de avatar e badges usam o bucket aws-lab-quest no Supabase Storage.
+- Se ocorrer erro "Invalid Compact JWS" no seed/upload, valide se SUPABASE_SERVICE_ROLE_KEY e uma chave real do projeto.

@@ -20,6 +20,9 @@ export function SetupPanel({
   loading: boolean;
   disabled?: boolean;
 }) {
+  const labTextLimit = 25000;
+  const isNearLimit = labText.length >= labTextLimit * 0.9;
+
   return (
     <PixelCard className="space-y-4">
       <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Configurar Quest</h2>
@@ -34,12 +37,22 @@ export function SetupPanel({
         />
       </label>
       <label className="block text-sm">
-        Texto do laboratorio AWS
+        <div className="flex items-center justify-between">
+          <span>Texto do laboratorio AWS</span>
+          <span
+            className={`font-[var(--font-pixel)] text-[9px] uppercase ${
+              isNearLimit ? "text-yellow-300" : "text-[var(--pixel-subtext)]"
+            }`}
+          >
+            {labText.length}/{labTextLimit}
+          </span>
+        </div>
         <textarea
           className="mt-1 min-h-52 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)]"
           placeholder="Cole o laboratorio completo"
           value={labText}
           onChange={(e) => onLabTextChange(e.target.value)}
+          maxLength={labTextLimit}
           disabled={disabled}
         />
       </label>

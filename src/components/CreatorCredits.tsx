@@ -32,7 +32,6 @@ export function CreatorCredits({ compact = true }: { compact?: boolean }) {
 
         {!compact ? (
           <div className="space-y-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            <p>Stack: Next.js, TypeScript, Gemini API, Tailwind CSS.</p>
             <p>Missao: transformar estudos AWS em jornadas gamificadas, acessiveis e divertidas.</p>
           </div>
         ) : null}

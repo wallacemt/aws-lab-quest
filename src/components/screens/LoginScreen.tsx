@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import appLogo from "@/assets/logo.png";
 
 export function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -47,6 +50,16 @@ export function LoginScreen() {
       <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
         {/* Logo */}
         <div className="mb-8 text-center">
+          <div className="mb-3 flex justify-center">
+            <Image
+              src={appLogo}
+              alt="AWS Lab Quest logo"
+              width={124}
+              height={124}
+              priority
+              className="h-auto w-28 sm:w-32"
+            />
+          </div>
           <h1 className="font-[var(--font-pixel)] text-xl text-[var(--pixel-primary)] drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
             AWS LAB QUEST
           </h1>
@@ -73,14 +86,24 @@ export function LoginScreen() {
 
             <label className="block font-[var(--font-body)] text-sm font-semibold">
               Senha
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="relative mt-1">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  className="w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 pr-16 font-[var(--font-body)] focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? "Ocultar" : "Ver"}
+                </button>
+              </div>
             </label>
 
             {error && (
