@@ -39,20 +39,31 @@ export function useUserProfile() {
   }, []);
 
   const setProfile = useCallback(async (next: UserProfile) => {
-    // Optimistic update
-    setProfileState(next);
-    try {
-      await fetch("/api/user/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
-      });
-    } catch {
-      // Silently fail — the UI state is already updated
+    const response = await fetch("/api/user/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(next),
+    });
+
+    const data = (await response.json()) as ApiProfileResponse & { error?: string };
+
+    if (!response.ok) {
+      throw new Error(data.error ?? "Nao foi possivel salvar o perfil.");
     }
+
+    setProfileState({
+      name: data.user?.name ?? "",
+      certification: data.certification ?? "",
+      favoriteTheme: data.favoriteTheme ?? "",
+    });
+    setAvatarUrl(data.avatarUrl ?? null);
+
+    return data;
   }, []);
 
-  const isProfileComplete = Boolean(profile.name.trim() && profile.certification.trim());
+  const isProfileComplete = Boolean(
+    profile.name.trim() && profile.certification.trim() && profile.favoriteTheme.trim(),
+  );
 
   return {
     profile,

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppLayout } from "@/components/AppLayout";
 import { BadgesView } from "@/components/BadgesView";
@@ -10,10 +11,13 @@ import { PixelCard } from "@/components/ui/PixelCard";
 import { LevelBadge } from "@/components/ui/LevelBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { getProfileValidationError, sanitizeProfileInput } from "@/lib/input-validation";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
+import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
 
 export function ProfileScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const { profile, setProfile, hydrated, avatarUrl, setAvatarUrl } = useUserProfile();
 
@@ -22,12 +26,14 @@ export function ProfileScreen() {
   const [favoriteTheme, setFavoriteTheme] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [totalXp, setTotalXp] = useState(0);
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
   const [ownedBadgeIds, setOwnedBadgeIds] = useState<string[]>([]);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isOnboardingProfile = getOnboardingStep() === "profile";
 
   // Sync local form state when profile loads
   useEffect(() => {
@@ -73,12 +79,37 @@ export function ProfileScreen() {
   }
 
   async function handleSave() {
+    const nextProfile = sanitizeProfileInput({ name, certification, favoriteTheme });
+    const validationError = getProfileValidationError(nextProfile);
+
+    if (validationError) {
+      setSaveError(validationError);
+      setSaveMsg(null);
+      return;
+    }
+
     setSaving(true);
     setSaveMsg(null);
-    await setProfile({ name, certification, favoriteTheme });
-    setSaving(false);
-    setSaveMsg("Perfil salvo!");
-    setTimeout(() => setSaveMsg(null), 2500);
+    setSaveError(null);
+
+    const onboardingStep = getOnboardingStep();
+
+    try {
+      await setProfile(nextProfile);
+      setSaveMsg(isOnboardingProfile ? "Perfil concluido!" : "Perfil salvo!");
+
+      if (onboardingStep) {
+        clearOnboardingStep();
+        router.replace("/");
+        return;
+      }
+
+      setTimeout(() => setSaveMsg(null), 2500);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Nao foi possivel salvar o perfil.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -150,7 +181,7 @@ export function ProfileScreen() {
           {/* Player info */}
           <div className="flex-1 space-y-1 text-center sm:text-left">
             <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">{user?.email}</p>
-            <h2 className="font-[var(--font-body)] text-2xl font-bold">{profile.name || "Sem nome"}</h2>
+            <h2 className="font-[var(--font-body)] text-2xl">{profile.name || "Sem nome"}</h2>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <LevelBadge xp={totalXp} />
               <span className="font-[var(--font-pixel)] text-[10px] uppercase">{totalXp} XP</span>
@@ -232,20 +263,33 @@ export function ProfileScreen() {
         <PixelCard className="space-y-4">
           <h3 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Editar Perfil</h3>
 
-          <label className="block font-[var(--font-body)] text-sm font-semibold">
-            Nome de jogador
+          {isOnboardingProfile && (
+            <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
+              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+                Etapa obrigatoria
+              </p>
+              <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
+                Complete nome, certificacao AWS alvo e tema favorito para liberar a Home e o restante da experiencia.
+              </p>
+            </PixelCard>
+          )}
+
+          <label className="block font-[var(--font-body)] text-sm">
+            Nome de jogador *
             <input
               type="text"
+              required
               className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </label>
 
-          <label className="block font-[var(--font-body)] text-sm font-semibold">
-            Certificação AWS alvo
+          <label className="block font-[var(--font-body)] text-sm">
+            Certificacao AWS alvo *
             <input
               type="text"
+              required
               placeholder="ex: AWS Solutions Architect Associate"
               className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
               value={certification}
@@ -253,10 +297,11 @@ export function ProfileScreen() {
             />
           </label>
 
-          <label className="block font-[var(--font-body)] text-sm font-semibold">
-            Tema favorito para quests
+          <label className="block font-[var(--font-body)] text-sm">
+            Tema favorito para quests *
             <input
               type="text"
+              required
               placeholder="ex: games, anime, música..."
               className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
               value={favoriteTheme}
@@ -264,9 +309,15 @@ export function ProfileScreen() {
             />
           </label>
 
+          {saveError && (
+            <PixelCard className="border-red-500 bg-red-900/20 py-2">
+              <p className="font-[var(--font-body)] text-sm text-red-300">{saveError}</p>
+            </PixelCard>
+          )}
+
           <div className="flex items-center gap-3">
             <PixelButton onClick={handleSave} disabled={saving}>
-              {saving ? "Salvando..." : "Salvar Perfil"}
+              {saving ? "Salvando..." : isOnboardingProfile ? "Salvar e entrar" : "Salvar Perfil"}
             </PixelButton>
             {saveMsg && <span className="font-[var(--font-body)] text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
           </div>

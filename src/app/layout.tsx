@@ -16,7 +16,7 @@ const bodyFont = Nunito_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
   title: {
     default: "AWS Lab Quest",
     template: "%s | AWS Lab Quest",

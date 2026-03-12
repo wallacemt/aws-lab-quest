@@ -75,3 +75,33 @@ export function sanitizeUserText(input: string): string {
     .replace(/```/g, "")
     .trim();
 }
+
+export type ProfileInput = {
+  name: string;
+  certification: string;
+  favoriteTheme: string;
+};
+
+export function sanitizeProfileInput(input: Partial<ProfileInput>): ProfileInput {
+  return {
+    name: sanitizeUserText(input.name ?? ""),
+    certification: sanitizeUserText(input.certification ?? ""),
+    favoriteTheme: sanitizeUserText(input.favoriteTheme ?? ""),
+  };
+}
+
+export function getProfileValidationError(profile: ProfileInput): string | null {
+  if (!profile.name) {
+    return "Informe seu nome de jogador.";
+  }
+
+  if (!profile.certification) {
+    return "Informe sua certificacao AWS alvo.";
+  }
+
+  if (!profile.favoriteTheme) {
+    return "Informe o tema favorito para quests.";
+  }
+
+  return null;
+}

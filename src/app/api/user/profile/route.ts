@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getProfileValidationError, sanitizeProfileInput } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
@@ -31,22 +32,28 @@ export async function PUT(request: NextRequest) {
     certification?: string;
     favoriteTheme?: string;
   };
+  const sanitizedProfile = sanitizeProfileInput(body);
+  const validationError = getProfileValidationError(sanitizedProfile);
+
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
+  }
 
   const [updatedUser, updatedProfile] = await prisma.$transaction([
     prisma.user.update({
       where: { id: session.user.id },
-      data: { name: body.name ?? session.user.name },
+      data: { name: sanitizedProfile.name },
     }),
     prisma.userProfile.upsert({
       where: { userId: session.user.id },
       create: {
         userId: session.user.id,
-        certification: body.certification ?? "",
-        favoriteTheme: body.favoriteTheme ?? "",
+        certification: sanitizedProfile.certification,
+        favoriteTheme: sanitizedProfile.favoriteTheme,
       },
       update: {
-        certification: body.certification ?? undefined,
-        favoriteTheme: body.favoriteTheme ?? undefined,
+        certification: sanitizedProfile.certification,
+        favoriteTheme: sanitizedProfile.favoriteTheme,
       },
     }),
   ]);

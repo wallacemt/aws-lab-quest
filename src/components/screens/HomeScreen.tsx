@@ -84,7 +84,7 @@ export function HomeScreen() {
       }
 
       startQuest({ title: extractBoardTitle(labText), theme, tasks: data.tasks as never[] });
-      void setProfile({ ...profile, favoriteTheme: theme });
+      void setProfile({ ...profile, favoriteTheme: theme }).catch(() => void 0);
       router.push("/quest");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Falha ao gerar quest.");

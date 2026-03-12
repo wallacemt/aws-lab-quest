@@ -7,6 +7,7 @@ import Image from "next/image";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { authClient } from "@/lib/auth-client";
+import { setOnboardingStep } from "@/lib/onboarding";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import appLogo from "@/assets/logo.png";
 
@@ -45,8 +46,8 @@ export function RegisterScreen() {
       return;
     }
 
-    // New player lands on profile setup
-    router.replace("/profile");
+    setOnboardingStep("manual");
+    router.replace("/help");
   }
 
   return (
@@ -59,7 +60,14 @@ export function RegisterScreen() {
         {/* Logo */}
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">
-            <Image src={appLogo} alt="AWS Lab Quest logo" width={124} height={124} priority className="h-auto w-28 sm:w-32" />
+            <Image
+              src={appLogo}
+              alt="AWS Lab Quest logo"
+              width={124}
+              height={124}
+              priority
+              className="h-auto w-28 sm:w-32"
+            />
           </div>
           <h1 className="font-[var(--font-pixel)] text-xl text-[var(--pixel-primary)] drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
             AWS LAB QUEST
