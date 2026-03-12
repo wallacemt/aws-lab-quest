@@ -226,8 +226,8 @@ export function ProfileScreen() {
                   <Image
                     src={currentBadge.imageUrl}
                     alt={`Badge ${currentBadge.name}`}
-                    width={88}
-                    height={88}
+                    width={120}
+                    height={120}
                     className="object-cover"
                   />
                 </motion.div>

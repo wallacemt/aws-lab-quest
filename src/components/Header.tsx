@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import appLogo from "@/assets/logo.png";
 
 type HeaderProps = {
   /** Pass XP to show the XP badge (e.g. on the quest screen). Omit on other screens. */
@@ -65,7 +66,7 @@ export function Header({ xp }: HeaderProps) {
         {/* Logo */}
         <Link href="/" className="flex min-w-0 items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
           <div className={`pixel-cloud-icon ${theme === "dark" ? "bg-primary" : ""}`} aria-hidden="true">
-            <Image src={"/android-chrome-192x192.png"} alt="app logo" height={260} width={260} />
+            <Image src={appLogo} alt="AWS Lab Quest logo" height={260} width={260} />
           </div>
           <div className="hidden min-w-0 sm:block">
             <p className="truncate font-[var(--font-pixel)] text-xs text-[var(--pixel-primary)]">AWS LAB QUEST</p>

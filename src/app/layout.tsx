@@ -61,14 +61,6 @@ export const metadata: Metadata = {
     title: "AWS Lab Quest - Gamificacao Retro para Labs AWS",
     description: "Treine laboratorios AWS com quests tematicas, XP, badges e ranking.",
     siteName: "AWS Lab Quest",
-    images: [
-      {
-        url: "/og-image",
-        width: 1200,
-        height: 630,
-        alt: "AWS Lab Quest",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
@@ -79,7 +71,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/icon",
+        url: "/android-chrome-512x512.png",
         sizes: "512x512",
         type: "image/png",
       },
@@ -89,7 +81,7 @@ export const metadata: Metadata = {
     ],
     apple: [
       {
-        url: "/apple-icon",
+        url: "/apple-touch-icon.png",
         sizes: "180x180",
         type: "image/png",
       },
