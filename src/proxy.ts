@@ -1,11 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const AUTH_PAGES = ["/login", "/register"];
-const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon", "/share", "/icon", "/apple-icon", "/twitter-image", "/og-image"];
+const PUBLIC_PREFIXES = [
+  "/api/auth",
+  "/_next",
+  "/favicon",
+  "/share",
+  "/icon",
+  "/apple-icon",
+  "/twitter-image",
+  "/og-image",
+];
 const PUBLIC_EXACT_PATHS = ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest"];
 
-// Better Auth session cookie name (default)
-const SESSION_COOKIE = "better-auth.session_token";
+// Better Auth may prefix secure cookies in production environments.
+const SESSION_COOKIE_NAMES = [
+  "better-auth.session_token",
+  "__Secure-better-auth.session_token",
+  "__Host-better-auth.session_token",
+];
+
+function hasSessionCookie(request: NextRequest) {
+  if (SESSION_COOKIE_NAMES.some((cookieName) => Boolean(request.cookies.get(cookieName)?.value))) {
+    return true;
+  }
+
+  // Fallback for deployments that may rename/prefix cookies.
+  return request.cookies.getAll().some((cookie) => cookie.name.endsWith("better-auth.session_token"));
+}
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -16,7 +38,7 @@ export function proxy(request: NextRequest) {
   }
 
   const isAuthPage = AUTH_PAGES.includes(pathname);
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const hasSession = hasSessionCookie(request);
 
   if (!hasSession && !isAuthPage) {
     const loginUrl = new URL("/login", request.url);

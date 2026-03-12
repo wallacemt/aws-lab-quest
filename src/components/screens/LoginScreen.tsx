@@ -38,7 +38,9 @@ export function LoginScreen() {
         .forEach((k) => localStorage.removeItem(k));
     }
 
-    router.replace("/");
+    const from = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") : null;
+    const safeTarget = from && from.startsWith("/") && !from.startsWith("//") ? from : "/";
+    router.replace(safeTarget);
   }
 
   return (
@@ -72,7 +74,7 @@ export function LoginScreen() {
           <h2 className="text-center font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Login</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <label className="block font-[var(--font-body)] text-sm font-semibold">
+            <label className="block font-[var(--font-body)] text-sm">
               E-mail
               <input
                 type="email"
@@ -84,7 +86,7 @@ export function LoginScreen() {
               />
             </label>
 
-            <label className="block font-[var(--font-body)] text-sm font-semibold">
+            <label className="block font-[var(--font-body)] text-sm">
               Senha
               <div className="relative mt-1">
                 <input
