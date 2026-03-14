@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
         rank: index + 1,
         userId: entry.userId,
         name: user?.name ?? "Anônimo",
+        username: user?.username,
         avatarUrl: user?.profile?.avatarUrl ?? null,
         totalXp: entry._sum.xp ?? 0,
         labsCompleted: entry._count.id,
