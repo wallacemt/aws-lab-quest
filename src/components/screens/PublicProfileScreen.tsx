@@ -9,7 +9,7 @@ import { BadgesView } from "@/components/BadgesView";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { LevelBadge } from "@/components/ui/LevelBadge";
-import { getLevel, getLevelProgressPercent, LEVELS } from "@/lib/levels";
+import { getLevel, getLevelProgressPercent } from "@/lib/levels";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
 
 type PublicUser = {

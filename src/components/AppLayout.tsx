@@ -4,6 +4,7 @@ import { ReactNode, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CreatorCredits } from "@/components/CreatorCredits";
 import { Header } from "@/components/Header";
+import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
 
@@ -21,6 +22,7 @@ export function AppLayout({ children, xp, credits = false, creditsCompact = fals
   const pathname = usePathname();
   const router = useRouter();
   const { hydrated, isProfileComplete } = useUserProfile();
+  const { hydrated: simHydrated, isActive: simulatedExamActive } = useSimulatedExam();
   const onboardingStep = getOnboardingStep();
 
   const guardReady =
@@ -29,6 +31,20 @@ export function AppLayout({ children, xp, credits = false, creditsCompact = fals
       (onboardingStep === "manual" && pathname === "/help") ||
       (onboardingStep === "profile" && pathname === "/profile") ||
       (!onboardingStep && (pathname === "/profile" || pathname === "/help")));
+
+  useEffect(() => {
+    if (!pathname || !simHydrated) {
+      return;
+    }
+
+    if (!simulatedExamActive) {
+      return;
+    }
+
+    if (pathname !== "/simulado") {
+      router.replace("/simulado");
+    }
+  }, [pathname, router, simHydrated, simulatedExamActive]);
 
   useEffect(() => {
     if (!pathname || !hydrated) {
@@ -77,6 +93,11 @@ export function AppLayout({ children, xp, credits = false, creditsCompact = fals
   return (
     <div className="min-h-screen pb-12">
       <Header xp={xp} />
+      {simHydrated && simulatedExamActive && pathname !== "/simulado" && (
+        <div className="border-b-2 border-red-500 bg-red-900/20 px-4 py-2 text-center font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
+          Simulado em andamento. Navegacao bloqueada ate finalizar a prova.
+        </div>
+      )}
       {children}
       {credits && <CreatorCredits compact={creditsCompact} />}
     </div>

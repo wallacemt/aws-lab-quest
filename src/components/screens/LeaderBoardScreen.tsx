@@ -114,7 +114,7 @@ export function LeaderBoardScreen() {
 
                   {/* Name */}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-[var(--font-body)] text-base font-semibold">
+                    <p className="truncate font-[var(--font-body)] text-base">
                       {entry.name}
                       {isMe && (
                         <span className="ml-2 font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">

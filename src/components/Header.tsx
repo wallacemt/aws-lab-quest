@@ -8,6 +8,7 @@ import { LevelBadge } from "@/components/ui/LevelBadge";
 import { NavBar } from "@/components/NavBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
+import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -25,6 +26,7 @@ export function Header({ xp }: HeaderProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const { user, signOut } = useAuth();
+  const { isActive: simulatedExamActive, remainingSeconds } = useSimulatedExam();
   const router = useRouter();
   const { avatarUrl } = useUserProfile();
   const name = user?.name ?? "Anônimo";
@@ -59,6 +61,12 @@ export function Header({ xp }: HeaderProps) {
     router.replace("/login");
   }
 
+  const simMinutes = Math.floor(Math.max(0, remainingSeconds) / 60)
+    .toString()
+    .padStart(2, "0");
+  const simSeconds = (Math.max(0, remainingSeconds) % 60).toString().padStart(2, "0");
+  const simTimerLabel = `${simMinutes}:${simSeconds}`;
+
   return (
     <header className="sticky top-0 z-30 border-b-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)]/90 backdrop-blur">
       {/* Main bar */}
@@ -81,6 +89,13 @@ export function Header({ xp }: HeaderProps) {
 
         {/* Desktop: right controls */}
         <div className="hidden items-center gap-2 md:flex">
+          {simulatedExamActive && (
+            <div className="flex items-center gap-2 border-2 border-red-500 bg-red-900/20 px-3 py-2">
+              <span className="font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
+                Simulado {simTimerLabel}
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
             <span className="font-[var(--font-pixel)] text-[10px] uppercase">XP {displayedXp}</span>
             <LevelBadge xp={displayedXp} />
@@ -142,6 +157,11 @@ export function Header({ xp }: HeaderProps) {
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 border-t border-[var(--pixel-border)] px-4 pb-4 pt-3 md:hidden xl:px-8">
+          {simulatedExamActive && (
+            <div className="border-2 border-red-500 bg-red-900/20 px-3 py-2 text-center font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
+              Simulado {simTimerLabel}
+            </div>
+          )}
           <div className="flex items-center gap-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
             <span className="font-[var(--font-pixel)] text-[10px] uppercase">XP {displayedXp}</span>
             <LevelBadge xp={displayedXp} />

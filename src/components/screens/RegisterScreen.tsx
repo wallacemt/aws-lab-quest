@@ -14,6 +14,7 @@ import appLogo from "@/assets/logo.png";
 export function RegisterScreen() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -22,9 +23,23 @@ export function RegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  function normalizeUsername(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
+  }
+
+  function isValidUsername(value: string) {
+    return /^[a-z0-9_]{3,24}$/.test(value);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const normalizedUsername = normalizeUsername(username);
 
     if (password !== confirm) {
       setError("As senhas não coincidem.");
@@ -36,6 +51,20 @@ export function RegisterScreen() {
       return;
     }
 
+    if (normalizedUsername && !isValidUsername(normalizedUsername)) {
+      setError("Nome de usuario invalido. Use 3-24 caracteres com letras, numeros ou _.");
+      return;
+    }
+
+    if (normalizedUsername) {
+      const availability = await fetch(`/api/user/username?value=${encodeURIComponent(normalizedUsername)}`);
+      const availabilityData = (await availability.json()) as { available?: boolean; error?: string };
+      if (!availabilityData.available) {
+        setError(availabilityData.error ?? "Nome de usuario indisponivel.");
+        return;
+      }
+    }
+
     setLoading(true);
 
     const { error: authError } = await authClient.signUp.email({ name, email, password });
@@ -44,6 +73,17 @@ export function RegisterScreen() {
       setError(authError.message ?? "Erro ao criar conta. Tente novamente.");
       setLoading(false);
       return;
+    }
+
+    const usernameResponse = await fetch("/api/user/username", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(normalizedUsername ? { username: normalizedUsername } : { random: true }),
+    });
+
+    if (!usernameResponse.ok) {
+      const usernameData = (await usernameResponse.json()) as { error?: string };
+      setError(usernameData.error ?? "Conta criada, mas falhou ao definir username. Edite no perfil.");
     }
 
     setOnboardingStep("manual");
@@ -83,7 +123,7 @@ export function RegisterScreen() {
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <label className="block font-[var(--font-body)] text-sm font-semibold">
+            <label className="block font-[var(--font-body)] text-sm">
               Nome de jogador
               <input
                 type="text"
@@ -95,7 +135,31 @@ export function RegisterScreen() {
               />
             </label>
 
-            <label className="block font-[var(--font-body)] text-sm font-semibold">
+            <label className="block font-[var(--font-body)] text-sm">
+              Nome de usuario unico
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="text"
+                  autoComplete="username"
+                  className="w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] lowercase focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="ex: cloud_runner_123"
+                />
+                <button
+                  type="button"
+                  onClick={() => setUsername("")}
+                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
+                >
+                  Aleatorio
+                </button>
+              </div>
+              <p className="mt-1 font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+                Deixe vazio para gerar automaticamente.
+              </p>
+            </label>
+
+            <label className="block font-[var(--font-body)] text-sm">
               E-mail
               <input
                 type="email"
@@ -107,7 +171,7 @@ export function RegisterScreen() {
               />
             </label>
 
-            <label className="block font-[var(--font-body)] text-sm font-semibold">
+            <label className="block font-[var(--font-body)] text-sm">
               Senha
               <div className="relative mt-1">
                 <input
@@ -130,7 +194,7 @@ export function RegisterScreen() {
               </div>
             </label>
 
-            <label className="block font-[var(--font-body)] text-sm font-semibold">
+            <label className="block font-[var(--font-body)] text-sm">
               Confirmar senha
               <div className="relative mt-1">
                 <input
