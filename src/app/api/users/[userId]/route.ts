@@ -15,6 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     select: {
       id: true,
       name: true,
+      username: true,
       createdAt: true,
       profile: {
         select: {
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     user: {
       id: user.id,
       name: user.name,
+      username: user.username,
       createdAt: user.createdAt,
       avatarUrl: user.profile?.avatarUrl ?? null,
       certification: user.profile?.certification ?? "",
