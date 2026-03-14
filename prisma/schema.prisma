@@ -27,6 +27,7 @@ model User {
   accounts     Account[]
   profile      UserProfile?
   questHistory QuestHistory[]
+  studyHistory StudySessionHistory[]
   userBadges   UserBadge[]
 
   @@map("user")
@@ -94,16 +95,96 @@ model UserProfile {
 }
 
 model CertificationPreset {
-  id           String        @id @default(cuid())
-  code         String        @unique
+  id           String          @id @default(cuid())
+  code         String          @unique
   name         String
   description  String
-  examMinutes  Int           @default(90)
-  active       Boolean       @default(true)
-  displayOrder Int           @default(0)
+  examMinutes  Int             @default(90)
+  active       Boolean         @default(true)
+  displayOrder Int             @default(0)
   userProfiles UserProfile[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  questions    StudyQuestion[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model AwsService {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  name        String
+  description String?
+  active      Boolean         @default(true)
+  questions   StudyQuestion[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+enum StudyQuestionUsage {
+  KC
+  SIMULADO
+  BOTH
+}
+
+enum StudyQuestionDifficulty {
+  easy
+  medium
+  hard
+}
+
+enum StudySessionType {
+  KC
+  SIMULADO
+}
+
+model StudyQuestion {
+  id                    String                  @id @default(cuid())
+  externalId            String                  @unique
+  statement             String
+  usage                 StudyQuestionUsage      @default(BOTH)
+  difficulty            StudyQuestionDifficulty @default(medium)
+  topic                 String
+  optionA               String
+  optionB               String
+  optionC               String
+  optionD               String
+  optionE               String?
+  correctOption         String
+  explanationA          String?
+  explanationB          String?
+  explanationC          String?
+  explanationD          String?
+  explanationE          String?
+  active                Boolean                 @default(true)
+  certificationPresetId String?
+  certificationPreset   CertificationPreset?    @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
+  awsServiceId          String?
+  awsService            AwsService?             @relation(fields: [awsServiceId], references: [id], onDelete: SetNull)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  @@index([usage, active])
+  @@index([difficulty, active])
+  @@index([certificationPresetId])
+  @@index([awsServiceId])
+}
+
+model StudySessionHistory {
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionType       StudySessionType
+  title             String
+  certificationCode String?
+  scorePercent      Int
+  correctAnswers    Int
+  totalQuestions    Int
+  durationSeconds   Int?
+  answersSnapshot   Json
+  completedAt       DateTime
+  createdAt         DateTime         @default(now())
+
+  @@index([userId, completedAt])
+  @@index([sessionType])
 }
 
 model QuestHistory {
