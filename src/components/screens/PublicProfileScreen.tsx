@@ -16,6 +16,7 @@ type PublicUser = {
   id: string;
   name: string;
   createdAt: string;
+  username: string;
   avatarUrl: string | null;
   certification: string;
   favoriteTheme: string;
@@ -129,7 +130,7 @@ export function PublicProfileScreen() {
 
             {/* Info */}
             <div className="flex-1 space-y-2 text-center sm:text-left">
-              <h1 className="font-[var(--font-body)] text-2xl font-bold">{user.name}</h1>
+              <h1 className="font-[var(--font-body)] text-2xl">@{user.username}</h1>
 
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 <LevelBadge xp={totalXp} />
@@ -236,7 +237,7 @@ export function PublicProfileScreen() {
                     className="flex items-center justify-between border border-[var(--pixel-border)] bg-[var(--pixel-muted)]/40 px-3 py-2"
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-[var(--font-body)] text-sm font-semibold">{item.title}</p>
+                      <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
                       <p className="font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
                         {item.theme} · {item.tasksCount} task{item.tasksCount !== 1 ? "s" : ""} ·{" "}
                         {new Date(item.completedAt).toLocaleDateString("pt-BR")}

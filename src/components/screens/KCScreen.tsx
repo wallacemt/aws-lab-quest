@@ -1,111 +1,452 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
-import { useKCAudit } from "@/hooks/useKCAudit";
-import { QuestionOption } from "@/lib/types";
+import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
+type ServiceItem = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+};
+
+type ExplanationResult = {
+  summary: string;
+  options: Partial<Record<QuestionOption, string>>;
+};
+
+type AnswerMap = Record<string, QuestionOption | undefined>;
+
+const DIFFICULTIES: TaskDifficulty[] = ["easy", "medium", "hard"];
 const OPTIONS: QuestionOption[] = ["A", "B", "C", "D", "E"];
 
 export function KCScreen() {
-  const { questions, stats, answerQuestion, getQuestionResult, reset } = useKCAudit();
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState<string | null>(null);
+
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [selectedDifficulties, setSelectedDifficulties] = useState<TaskDifficulty[]>(["easy", "medium", "hard"]);
+
+  const [questions, setQuestions] = useState<StudyQuestion[]>([]);
+  const [answers, setAnswers] = useState<AnswerMap>({});
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [submittedCurrent, setSubmittedCurrent] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
+  const [explanationByQuestion, setExplanationByQuestion] = useState<Record<string, ExplanationResult>>({});
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [flowError, setFlowError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/study/services")
+      .then((response) => response.json())
+      .then((data: { services?: ServiceItem[]; error?: string }) => {
+        if (data.error) throw new Error(data.error);
+        setServices(data.services ?? []);
+      })
+      .catch((error) => setServicesError(error instanceof Error ? error.message : "Falha ao carregar serviços AWS."))
+      .finally(() => setServicesLoading(false));
+  }, []);
+
+  const inProgress = questions.length > 0;
+  const currentQuestion = questions[currentIndex] ?? null;
+  const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
+
+  const stats = useMemo(() => {
+    const answered = questions.filter((question) => answers[question.id]).length;
+    const correct = questions.filter((question) => {
+      const answer = answers[question.id];
+      return answer && answer === question.correctOption;
+    }).length;
+
+    return {
+      answered,
+      total: questions.length,
+      correct,
+      wrong: Math.max(0, answered - correct),
+    };
+  }, [answers, questions]);
+
+  const isCurrentCorrect = Boolean(currentQuestion && currentAnswer === currentQuestion.correctOption);
+
+  const currentExplanation = currentQuestion ? explanationByQuestion[currentQuestion.id] : undefined;
+
+  function toggleTopic(code: string) {
+    setSelectedTopics((prev) => (prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]));
+  }
+
+  function toggleDifficulty(difficulty: TaskDifficulty) {
+    setSelectedDifficulties((prev) =>
+      prev.includes(difficulty) ? prev.filter((item) => item !== difficulty) : [...prev, difficulty],
+    );
+  }
+
+  async function startKC() {
+    setFlowError(null);
+    setCompletionMessage(null);
+
+    if (selectedTopics.length === 0) {
+      setFlowError("Selecione pelo menos um assunto para iniciar o KC.");
+      return;
+    }
+
+    if (selectedDifficulties.length === 0) {
+      setFlowError("Selecione pelo menos um nivel de dificuldade.");
+      return;
+    }
+
+    setLoadingQuestions(true);
+    try {
+      const response = await fetch("/api/study/kc/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topics: selectedTopics,
+          difficulties: selectedDifficulties,
+          count: 10,
+        }),
+      });
+
+      const data = (await response.json()) as { questions?: StudyQuestion[]; error?: string };
+      if (!response.ok || !data.questions?.length) {
+        throw new Error(data.error ?? "Nao foi possivel iniciar o KC.");
+      }
+
+      setQuestions(data.questions);
+      setAnswers({});
+      setCurrentIndex(0);
+      setExplanationByQuestion({});
+      setSubmittedCurrent(false);
+    } catch (error) {
+      setFlowError(error instanceof Error ? error.message : "Erro ao iniciar KC.");
+    } finally {
+      setLoadingQuestions(false);
+    }
+  }
+
+  async function submitCurrentAnswer() {
+    if (!currentQuestion) return;
+    if (!answers[currentQuestion.id]) {
+      setFlowError("Selecione uma alternativa antes de enviar.");
+      return;
+    }
+
+    setFlowError(null);
+    setSubmittedCurrent(true);
+
+    if (explanationByQuestion[currentQuestion.id]) {
+      return;
+    }
+
+    try {
+      setLoadingExplanation(true);
+
+      const response = await fetch("/api/study/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId: currentQuestion.id,
+          selectedOption: answers[currentQuestion.id],
+        }),
+      });
+
+      const data = (await response.json()) as {
+        summary?: string;
+        options?: Partial<Record<QuestionOption, string>>;
+      };
+
+      if (!response.ok || !data.options) {
+        throw new Error("Nao foi possivel gerar auditoria por IA.");
+      }
+
+      setExplanationByQuestion((prev) => ({
+        ...prev,
+        [currentQuestion.id]: {
+          summary: data.summary ?? "Resumo indisponivel.",
+          options: data.options ?? {},
+        },
+      }));
+    } catch {
+      setExplanationByQuestion((prev) => ({
+        ...prev,
+        [currentQuestion.id]: {
+          summary: "Auditoria local baseada no gabarito da questao.",
+          options: currentQuestion.explanations,
+        },
+      }));
+    } finally {
+      setLoadingExplanation(false);
+    }
+  }
+
+  function goToNextQuestion() {
+    if (!currentQuestion) return;
+    if (currentIndex >= questions.length - 1) return;
+
+    setCurrentIndex((prev) => prev + 1);
+    setSubmittedCurrent(false);
+    setFlowError(null);
+  }
+
+  function restartKC() {
+    setQuestions([]);
+    setAnswers({});
+    setCurrentIndex(0);
+    setExplanationByQuestion({});
+    setSubmittedCurrent(false);
+    setFlowError(null);
+  }
+
+  async function finishKC() {
+    if (questions.length === 0) return;
+
+    const correctAnswers = questions.filter((question) => answers[question.id] === question.correctOption).length;
+    const scorePercent = Math.round((correctAnswers / questions.length) * 100);
+
+    try {
+      await fetch("/api/study/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionType: "KC",
+          title: "Knowledge Check",
+          certificationCode: questions[0]?.certificationCode ?? null,
+          scorePercent,
+          correctAnswers,
+          totalQuestions: questions.length,
+          answersSnapshot: questions.map((question) => {
+            const mergedExplanations = {
+              A: explanationByQuestion[question.id]?.options.A ?? question.explanations.A ?? "Sem explicacao.",
+              B: explanationByQuestion[question.id]?.options.B ?? question.explanations.B ?? "Sem explicacao.",
+              C: explanationByQuestion[question.id]?.options.C ?? question.explanations.C ?? "Sem explicacao.",
+              D: explanationByQuestion[question.id]?.options.D ?? question.explanations.D ?? "Sem explicacao.",
+              E: explanationByQuestion[question.id]?.options.E ?? question.explanations.E ?? "Nao aplicavel.",
+            };
+
+            return {
+              questionId: question.id,
+              statement: question.statement,
+              selectedOption: answers[question.id] ?? "-",
+              correctOption: question.correctOption,
+              options: question.options,
+              explanations: mergedExplanations,
+            };
+          }),
+        }),
+      });
+
+      setCompletionMessage(
+        `KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). Resultado salvo no historico.`,
+      );
+    } catch {
+      setCompletionMessage(
+        `KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). Nao foi possivel salvar no historico.`,
+      );
+    }
+
+    restartKC();
+  }
 
   return (
     <AppLayout>
-      <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-8 xl:px-8">
+      <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 xl:px-8">
         <PixelCard>
           <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">
             KC - Knowledge Check
           </h1>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            Ao errar, voce recebe auditoria completa explicando por que cada alternativa esta correta ou incorreta.
+            Escolha assunto e dificuldade antes de iniciar. O fluxo de resposta e por questao, com auditoria completa
+            quando houver erro.
           </p>
         </PixelCard>
 
-        <PixelCard className="flex flex-wrap items-center justify-between gap-3">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
-            Respondidas: {stats.answered}/{stats.total} · Acertos: {stats.correct} · Erros: {stats.wrong}
-          </p>
-          <PixelButton variant="ghost" onClick={reset}>
-            Reiniciar KC
-          </PixelButton>
-        </PixelCard>
+        {!inProgress && (
+          <PixelCard className="space-y-4">
+            <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Configurar KC</h2>
 
-        <div className="space-y-4">
-          {questions.map((question, index) => {
-            const result = getQuestionResult(question);
-            return (
-              <PixelCard key={question.id} className="space-y-3">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
-                  Questao {index + 1} · {question.topic} · {question.difficulty}
-                </p>
-                <p className="font-[var(--font-body)] text-base">{question.statement}</p>
+            {completionMessage && (
+              <p className="font-[var(--font-body)] text-sm text-[var(--pixel-accent)]">{completionMessage}</p>
+            )}
 
-                <div className="grid gap-2">
-                  {OPTIONS.map((option) => {
-                    const value = question.options[option];
-                    if (!value) return null;
+            <div className="space-y-2">
+              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Assuntos AWS</p>
+              {servicesLoading && <p className="font-[var(--font-body)] text-sm">Carregando servicos...</p>}
+              {servicesError && <p className="font-[var(--font-body)] text-sm text-red-300">{servicesError}</p>}
+              {!servicesLoading && !servicesError && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {services.map((service) => {
+                    const selected = selectedTopics.includes(service.code);
                     return (
-                      <label
-                        key={`${question.id}-${option}`}
-                        className="flex items-start gap-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                      <button
+                        key={service.id}
+                        type="button"
+                        onClick={() => toggleTopic(service.code)}
+                        className={`border px-3 py-2 text-left font-[var(--font-body)] text-sm ${
+                          selected
+                            ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
+                            : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                        }`}
                       >
-                        <input
-                          type="radio"
-                          name={question.id}
-                          value={option}
-                          onChange={() => answerQuestion(question.id, option)}
-                        />
-                        <span className="font-[var(--font-body)] text-sm">
-                          {option}) {value}
-                        </span>
-                      </label>
+                        {service.name}
+                      </button>
                     );
                   })}
                 </div>
+              )}
+            </div>
 
-                {result.selected && (
-                  <PixelCard
-                    className={
-                      result.isCorrect
-                        ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10"
-                        : "border-red-500 bg-red-900/15"
-                    }
-                  >
-                    <p className="font-[var(--font-pixel)] text-[10px] uppercase">
-                      {result.isCorrect ? "Resposta correta" : "Auditoria de erro"}
+            <div className="space-y-2">
+              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Dificuldade</p>
+              <div className="flex flex-wrap gap-2">
+                {DIFFICULTIES.map((difficulty) => {
+                  const selected = selectedDifficulties.includes(difficulty);
+                  return (
+                    <button
+                      key={difficulty}
+                      type="button"
+                      onClick={() => toggleDifficulty(difficulty)}
+                      className={`border px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
+                        selected
+                          ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
+                          : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                      }`}
+                    >
+                      {difficulty}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {flowError && <p className="font-[var(--font-body)] text-sm text-red-300">{flowError}</p>}
+
+            <div className="flex justify-end">
+              <PixelButton onClick={startKC} disabled={loadingQuestions}>
+                {loadingQuestions ? "Iniciando..." : "Iniciar KC"}
+              </PixelButton>
+            </div>
+          </PixelCard>
+        )}
+
+        {inProgress && currentQuestion && (
+          <>
+            <PixelCard className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+                Questao {currentIndex + 1}/{questions.length} · Acertos: {stats.correct} · Erros: {stats.wrong}
+              </p>
+              <PixelButton variant="ghost" onClick={restartKC}>
+                Reiniciar
+              </PixelButton>
+            </PixelCard>
+
+            <PixelCard className="space-y-4">
+              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+                {currentQuestion.topic} · {currentQuestion.difficulty}
+              </p>
+              <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
+
+              <div className="grid gap-2">
+                {OPTIONS.map((option) => {
+                  const optionText = currentQuestion.options[option];
+                  if (!optionText) return null;
+                  const checked = answers[currentQuestion.id] === option;
+                  return (
+                    <label
+                      key={`${currentQuestion.id}-${option}`}
+                      className="flex items-start gap-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                    >
+                      <input
+                        type="radio"
+                        name={currentQuestion.id}
+                        value={option}
+                        checked={checked}
+                        onChange={() =>
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [currentQuestion.id]: option,
+                          }))
+                        }
+                        disabled={submittedCurrent}
+                      />
+                      <span className="font-[var(--font-body)] text-sm">
+                        {option}) {optionText}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {submittedCurrent && (
+                <PixelCard
+                  className={
+                    isCurrentCorrect
+                      ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10"
+                      : "border-red-500 bg-red-900/15"
+                  }
+                >
+                  <p className="font-[var(--font-pixel)] text-[10px] uppercase">
+                    {isCurrentCorrect ? "Resposta correta" : "Resposta incorreta"}
+                  </p>
+
+                  {loadingExplanation && (
+                    <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                      Gerando auditoria detalhada com IA...
                     </p>
-                    {!result.isCorrect && (
-                      <div className="mt-2 space-y-2">
-                        {OPTIONS.map((option) => {
-                          const value = question.options[option];
-                          if (!value) return null;
-                          const isCorrectOption = option === question.correctOption;
-                          const isSelected = option === result.selected;
-                          return (
-                            <div
-                              key={`${question.id}-audit-${option}`}
-                              className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
-                            >
-                              <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
-                                {option}) {isCorrectOption ? "correta" : "incorreta"}
-                                {isSelected ? " · sua resposta" : ""}
-                              </p>
-                              <p className="mt-1 font-[var(--font-body)] text-sm">
-                                {question.explanations[option] ?? "Sem explicacao adicional."}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </PixelCard>
+                  )}
+
+                  <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                    {currentExplanation?.summary ?? "Analise das alternativas para reforcar o aprendizado."}
+                  </p>
+
+                  <div className="mt-2 space-y-2">
+                    {OPTIONS.map((option) => {
+                      const text = currentQuestion.options[option];
+                      if (!text) return null;
+
+                      const isCorrectOption = option === currentQuestion.correctOption;
+                      const isSelected = option === answers[currentQuestion.id];
+
+                      return (
+                        <div
+                          key={`${currentQuestion.id}-audit-${option}`}
+                          className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                        >
+                          <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+                            {option}) {isCorrectOption ? "correta" : "incorreta"}
+                            {isSelected ? " · sua resposta" : ""}
+                          </p>
+                          <p className="mt-1 font-[var(--font-body)] text-sm">
+                            {currentExplanation?.options[option] ??
+                              currentQuestion.explanations[option] ??
+                              "Sem explicacao adicional."}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </PixelCard>
+              )}
+
+              {flowError && <p className="font-[var(--font-body)] text-sm text-red-300">{flowError}</p>}
+
+              <div className="flex flex-wrap justify-end gap-2">
+                {!submittedCurrent ? (
+                  <PixelButton onClick={submitCurrentAnswer} disabled={loadingExplanation}>
+                    {loadingExplanation ? "Aguarde IA..." : "Enviar resposta"}
+                  </PixelButton>
+                ) : currentIndex < questions.length - 1 ? (
+                  <PixelButton onClick={goToNextQuestion}>Proxima</PixelButton>
+                ) : (
+                  <PixelButton onClick={finishKC}>Finalizar KC</PixelButton>
                 )}
-              </PixelCard>
-            );
-          })}
-        </div>
+              </div>
+            </PixelCard>
+          </>
+        )}
       </main>
     </AppLayout>
   );

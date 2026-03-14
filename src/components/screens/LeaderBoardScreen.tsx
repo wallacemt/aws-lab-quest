@@ -11,6 +11,7 @@ type LeaderboardEntry = {
   rank: number;
   userId: string;
   name: string;
+  username: string;
   avatarUrl: string | null;
   totalXp: number;
   labsCompleted: number;
@@ -115,7 +116,7 @@ export function LeaderBoardScreen() {
                   {/* Name */}
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-[var(--font-body)] text-base">
-                      {entry.name}
+                      @{entry.username}
                       {isMe && (
                         <span className="ml-2 font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
                           você

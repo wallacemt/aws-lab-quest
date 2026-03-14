@@ -8,7 +8,7 @@ type CreatorCreditsProps = {
   compact?: boolean;
 };
 
-export function CreatorCredits({ compact = false }: CreatorCreditsProps) {
+export function CreatorCredits({ compact = true }: CreatorCreditsProps) {
   const [visible, setVisible] = useState(!compact);
 
   return (

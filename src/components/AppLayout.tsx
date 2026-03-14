@@ -18,7 +18,7 @@ type AppLayoutProps = {
   creditsCompact?: boolean;
 };
 
-export function AppLayout({ children, xp, credits = false, creditsCompact = false }: AppLayoutProps) {
+export function AppLayout({ children, xp, credits = false, creditsCompact = true }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { hydrated, isProfileComplete } = useUserProfile();
