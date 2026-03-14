@@ -204,7 +204,7 @@ export function ProfileScreen() {
           {/* Player info */}
           <div className="flex-1 space-y-1 text-center sm:text-left">
             <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">{user?.email}</p>
-            <h2 className="font-[var(--font-body)] text-2xl">{profile.name || "Sem nome"}</h2>
+            <h2 className="font-[var(--font-body)] text-2xl">@{profile.username || "Sem nome"}</h2>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <LevelBadge xp={totalXp} />
               <span className="font-[var(--font-pixel)] text-[10px] uppercase">{totalXp} XP</span>

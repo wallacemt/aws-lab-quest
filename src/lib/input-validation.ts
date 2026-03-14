@@ -78,14 +78,18 @@ export function sanitizeUserText(input: string): string {
 
 export type ProfileInput = {
   name: string;
+  username: string;
   certification: string;
+  certificationPresetCode: string;
   favoriteTheme: string;
 };
 
 export function sanitizeProfileInput(input: Partial<ProfileInput>): ProfileInput {
   return {
     name: sanitizeUserText(input.name ?? ""),
+    username: sanitizeUserText(input.username ?? "").toLowerCase(),
     certification: sanitizeUserText(input.certification ?? ""),
+    certificationPresetCode: sanitizeUserText(input.certificationPresetCode ?? "").toUpperCase(),
     favoriteTheme: sanitizeUserText(input.favoriteTheme ?? ""),
   };
 }
@@ -93,6 +97,18 @@ export function sanitizeProfileInput(input: Partial<ProfileInput>): ProfileInput
 export function getProfileValidationError(profile: ProfileInput): string | null {
   if (!profile.name) {
     return "Informe seu nome de jogador.";
+  }
+
+  if (!profile.username) {
+    return "Informe um nome de usuario.";
+  }
+
+  if (!/^[a-z0-9_]{3,24}$/.test(profile.username)) {
+    return "Nome de usuario invalido. Use 3-24 caracteres com letras, numeros ou _.";
+  }
+
+  if (!profile.certificationPresetCode) {
+    return "Selecione sua certificacao AWS alvo.";
   }
 
   if (!profile.certification) {

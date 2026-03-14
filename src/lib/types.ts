@@ -25,7 +25,41 @@ export type Level = {
 export type UserProfile = {
   name: string;
   certification: string;
+  certificationPresetCode: string;
   favoriteTheme: string;
+  username: string;
+};
+
+export type CertificationPreset = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  examMinutes: number;
+  active: boolean;
+  displayOrder: number;
+};
+
+export type QuestionOption = "A" | "B" | "C" | "D" | "E";
+
+export type StudyQuestion = {
+  id: string;
+  statement: string;
+  certificationCode: string;
+  topic: string;
+  difficulty: TaskDifficulty;
+  options: Record<QuestionOption, string>;
+  correctOption: QuestionOption;
+  explanations: Partial<Record<QuestionOption, string>>;
+};
+
+export type SimulatedExamSession = {
+  id: string;
+  startedAt: string;
+  endsAt: string;
+  certificationCode: string;
+  locked: boolean;
+  submittedAt?: string;
 };
 
 export type ActiveQuest = {

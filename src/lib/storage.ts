@@ -3,6 +3,8 @@ export const STORAGE_KEYS = {
   activeQuest: "awlq_activeQuest",
   history: "awlq_history",
   draftQuest: "awlq_draft_quest",
+  activeSimulatedExam: "awlq_active_simulated_exam",
+  kcAttempts: "awlq_kc_attempts",
 } as const;
 
 export function safeLocalStorageGet<T>(key: string, fallback: T): T {
