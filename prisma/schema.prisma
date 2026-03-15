@@ -175,6 +175,7 @@ model StudySessionHistory {
   sessionType       StudySessionType
   title             String
   certificationCode String?
+  gainedXp          Int              @default(0)
   scorePercent      Int
   correctAnswers    Int
   totalQuestions    Int

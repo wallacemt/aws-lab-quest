@@ -37,6 +37,18 @@ type HistoryEntry = {
   certification: string;
 };
 
+type StudyEntry = {
+  id: string;
+  sessionType: "KC" | "SIMULADO";
+  title: string;
+  certificationCode: string | null;
+  gainedXp: number;
+  scorePercent: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  completedAt: string;
+};
+
 export function PublicProfileScreen() {
   const params = useParams();
   const router = useRouter();
@@ -45,6 +57,7 @@ export function PublicProfileScreen() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [studyHistory, setStudyHistory] = useState<StudyEntry[]>([]);
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -61,6 +74,7 @@ export function PublicProfileScreen() {
         setUser(userData.user);
         setStats(userData.stats);
         setHistory(userData.history ?? []);
+        setStudyHistory(userData.studyHistory ?? []);
         setLevelBadges(badgesData.badges ?? []);
       })
       .catch(() => setNotFound(true))
@@ -245,6 +259,42 @@ export function PublicProfileScreen() {
                     </div>
                     <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
                       +{item.xp} XP
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+            </PixelCard>
+          </motion.div>
+        )}
+
+        {studyHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35, duration: 0.4 }}
+          >
+            <PixelCard className="space-y-3">
+              <h3 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">
+                KC e Simulados ({studyHistory.length})
+              </h3>
+              <div className="space-y-2">
+                {studyHistory.map((item, i) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.04, duration: 0.25 }}
+                    className="flex items-center justify-between border border-[var(--pixel-border)] bg-[var(--pixel-muted)]/40 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
+                      <p className="font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+                        {item.sessionType} · {item.scorePercent}% · {item.correctAnswers}/{item.totalQuestions} ·{" "}
+                        {new Date(item.completedAt).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                    <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
+                      +{item.gainedXp} XP
                     </span>
                   </motion.div>
                 ))}

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
+import { getTaskXpByDifficulty } from "@/lib/levels";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
 type ServiceItem = {
@@ -22,6 +24,7 @@ type AnswerMap = Record<string, QuestionOption | undefined>;
 
 const DIFFICULTIES: TaskDifficulty[] = ["easy", "medium", "hard"];
 const OPTIONS: QuestionOption[] = ["A", "B", "C", "D", "E"];
+const SERVICES_PAGE_SIZE = 12;
 
 export function KCScreen() {
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -29,7 +32,9 @@ export function KCScreen() {
   const [servicesError, setServicesError] = useState<string | null>(null);
 
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedDifficulties, setSelectedDifficulties] = useState<TaskDifficulty[]>(["easy", "medium", "hard"]);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<TaskDifficulty>("easy");
+  const [searchTopic, setSearchTopic] = useState("");
+  const [servicesPage, setServicesPage] = useState(1);
 
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
   const [answers, setAnswers] = useState<AnswerMap>({});
@@ -37,8 +42,10 @@ export function KCScreen() {
   const [submittedCurrent, setSubmittedCurrent] = useState(false);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [explanationByQuestion, setExplanationByQuestion] = useState<Record<string, ExplanationResult>>({});
+  const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [lastEarnedXp, setLastEarnedXp] = useState<number | null>(null);
   const [flowError, setFlowError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +62,25 @@ export function KCScreen() {
   const inProgress = questions.length > 0;
   const currentQuestion = questions[currentIndex] ?? null;
   const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
+
+  const filteredServices = useMemo(() => {
+    const term = searchTopic.trim().toLowerCase();
+    if (!term) {
+      return services;
+    }
+
+    return services.filter((service) => {
+      const haystack = `${service.name} ${service.code} ${service.description ?? ""}`.toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [searchTopic, services]);
+
+  const servicePageCount = Math.max(1, Math.ceil(filteredServices.length / SERVICES_PAGE_SIZE));
+  const currentServicesPage = Math.max(1, Math.min(servicesPage, servicePageCount));
+  const pagedServices = filteredServices.slice(
+    (currentServicesPage - 1) * SERVICES_PAGE_SIZE,
+    currentServicesPage * SERVICES_PAGE_SIZE,
+  );
 
   const stats = useMemo(() => {
     const answered = questions.filter((question) => answers[question.id]).length;
@@ -79,23 +105,12 @@ export function KCScreen() {
     setSelectedTopics((prev) => (prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]));
   }
 
-  function toggleDifficulty(difficulty: TaskDifficulty) {
-    setSelectedDifficulties((prev) =>
-      prev.includes(difficulty) ? prev.filter((item) => item !== difficulty) : [...prev, difficulty],
-    );
-  }
-
   async function startKC() {
     setFlowError(null);
     setCompletionMessage(null);
 
     if (selectedTopics.length === 0) {
       setFlowError("Selecione pelo menos um assunto para iniciar o KC.");
-      return;
-    }
-
-    if (selectedDifficulties.length === 0) {
-      setFlowError("Selecione pelo menos um nivel de dificuldade.");
       return;
     }
 
@@ -106,7 +121,7 @@ export function KCScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           topics: selectedTopics,
-          difficulties: selectedDifficulties,
+          difficulty: selectedDifficulty,
           count: 10,
         }),
       });
@@ -136,9 +151,11 @@ export function KCScreen() {
     }
 
     setFlowError(null);
-    setSubmittedCurrent(true);
+    setSubmittingAnswer(true);
 
     if (explanationByQuestion[currentQuestion.id]) {
+      setSubmittedCurrent(true);
+      setSubmittingAnswer(false);
       return;
     }
 
@@ -180,6 +197,8 @@ export function KCScreen() {
       }));
     } finally {
       setLoadingExplanation(false);
+      setSubmittedCurrent(true);
+      setSubmittingAnswer(false);
     }
   }
 
@@ -201,11 +220,27 @@ export function KCScreen() {
     setFlowError(null);
   }
 
+  async function rerollKC() {
+    restartKC();
+    await startKC();
+  }
+
   async function finishKC() {
     if (questions.length === 0) return;
 
     const correctAnswers = questions.filter((question) => answers[question.id] === question.correctOption).length;
     const scorePercent = Math.round((correctAnswers / questions.length) * 100);
+    const xpPerCorrect = Math.max(20, Math.round(getTaskXpByDifficulty(selectedDifficulty) / 4));
+    const gainedXp = correctAnswers * xpPerCorrect;
+    const selectedTopicNames = services
+      .filter((service) => selectedTopics.includes(service.code))
+      .map((service) => service.name)
+      .slice(0, 4);
+
+    const titleTopics = selectedTopicNames.length > 0 ? selectedTopicNames.join(", ") : selectedTopics.join(", ");
+    const sessionTitle = titleTopics
+      ? `Knowledge Check ${titleTopics}`
+      : `Knowledge Check ${questions[0]?.certificationCode ?? "AWS"}`;
 
     try {
       await fetch("/api/study/history", {
@@ -213,8 +248,9 @@ export function KCScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionType: "KC",
-          title: "Knowledge Check",
+          title: sessionTitle,
           certificationCode: questions[0]?.certificationCode ?? null,
+          gainedXp,
           scorePercent,
           correctAnswers,
           totalQuestions: questions.length,
@@ -240,12 +276,14 @@ export function KCScreen() {
       });
 
       setCompletionMessage(
-        `KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). Resultado salvo no historico.`,
+        `KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). +${gainedXp} XP salvo no historico.`,
       );
+      setLastEarnedXp(gainedXp);
     } catch {
       setCompletionMessage(
         `KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). Nao foi possivel salvar no historico.`,
       );
+      setLastEarnedXp(gainedXp);
     }
 
     restartKC();
@@ -254,6 +292,26 @@ export function KCScreen() {
   return (
     <AppLayout>
       <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 xl:px-8">
+        <AnimatePresence>
+          {lastEarnedXp != null && (
+            <motion.div
+              initial={{ opacity: 0, y: -18, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -24 }}
+              transition={{ duration: 0.35 }}
+              className="fixed left-1/2 top-24 z-50 w-full max-w-sm -translate-x-1/2 px-4"
+              onAnimationComplete={() => {
+                window.setTimeout(() => setLastEarnedXp(null), 1800);
+              }}
+            >
+              <PixelCard className="border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/20 text-center">
+                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">XP Recebido</p>
+                <p className="mt-1 font-[var(--font-body)] text-lg">+{lastEarnedXp} XP</p>
+              </PixelCard>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <PixelCard>
           <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">
             KC - Knowledge Check
@@ -277,24 +335,62 @@ export function KCScreen() {
               {servicesLoading && <p className="font-[var(--font-body)] text-sm">Carregando servicos...</p>}
               {servicesError && <p className="font-[var(--font-body)] text-sm text-red-300">{servicesError}</p>}
               {!servicesLoading && !servicesError && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {services.map((service) => {
-                    const selected = selectedTopics.includes(service.code);
-                    return (
-                      <button
-                        key={service.id}
-                        type="button"
-                        onClick={() => toggleTopic(service.code)}
-                        className={`border px-3 py-2 text-left font-[var(--font-body)] text-sm ${
-                          selected
-                            ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
-                            : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                        }`}
+                <div className="space-y-3">
+                  <input
+                    type="search"
+                    value={searchTopic}
+                    onChange={(event) => {
+                      setSearchTopic(event.target.value);
+                      setServicesPage(1);
+                    }}
+                    placeholder="Buscar por nome ou codigo do servico"
+                    className="w-full border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] text-sm"
+                  />
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {pagedServices.map((service) => {
+                      const selected = selectedTopics.includes(service.code);
+                      return (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => toggleTopic(service.code)}
+                          className={`border px-3 py-2 text-left font-[var(--font-body)] text-sm ${
+                            selected
+                              ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
+                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                          }`}
+                        >
+                          <p className="font-[var(--font-body)] text-sm">{service.name}</p>
+                          <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+                            {service.code}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                      Pagina {currentServicesPage}/{servicePageCount} · {filteredServices.length} servicos encontrados
+                    </p>
+                    <div className="flex gap-2">
+                      <PixelButton
+                        variant="ghost"
+                        onClick={() => setServicesPage((prev) => Math.max(1, prev - 1))}
+                        disabled={currentServicesPage <= 1}
                       >
-                        {service.name}
-                      </button>
-                    );
-                  })}
+                        Anterior
+                      </PixelButton>
+                      <PixelButton
+                        variant="ghost"
+                        onClick={() => setServicesPage((prev) => Math.min(servicePageCount, prev + 1))}
+                        disabled={currentServicesPage >= servicePageCount}
+                      >
+                        Proxima
+                      </PixelButton>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -303,12 +399,12 @@ export function KCScreen() {
               <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Dificuldade</p>
               <div className="flex flex-wrap gap-2">
                 {DIFFICULTIES.map((difficulty) => {
-                  const selected = selectedDifficulties.includes(difficulty);
+                  const selected = selectedDifficulty === difficulty;
                   return (
                     <button
                       key={difficulty}
                       type="button"
-                      onClick={() => toggleDifficulty(difficulty)}
+                      onClick={() => setSelectedDifficulty(difficulty)}
                       className={`border px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
                         selected
                           ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
@@ -326,7 +422,14 @@ export function KCScreen() {
 
             <div className="flex justify-end">
               <PixelButton onClick={startKC} disabled={loadingQuestions}>
-                {loadingQuestions ? "Iniciando..." : "Iniciar KC"}
+                {loadingQuestions ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                    Gerando KC...
+                  </span>
+                ) : (
+                  "Iniciar KC"
+                )}
               </PixelButton>
             </div>
           </PixelCard>
@@ -338,7 +441,7 @@ export function KCScreen() {
               <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
                 Questao {currentIndex + 1}/{questions.length} · Acertos: {stats.correct} · Erros: {stats.wrong}
               </p>
-              <PixelButton variant="ghost" onClick={restartKC}>
+              <PixelButton variant="ghost" onClick={() => void rerollKC()}>
                 Reiniciar
               </PixelButton>
             </PixelCard>
@@ -354,10 +457,19 @@ export function KCScreen() {
                   const optionText = currentQuestion.options[option];
                   if (!optionText) return null;
                   const checked = answers[currentQuestion.id] === option;
+                  const isCorrectOption = submittedCurrent && option === currentQuestion.correctOption;
+                  const isSelectedWrong =
+                    submittedCurrent && checked && answers[currentQuestion.id] !== currentQuestion.correctOption;
                   return (
                     <label
                       key={`${currentQuestion.id}-${option}`}
-                      className="flex items-start gap-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                      className={`flex items-start gap-2 border px-3 py-2 ${
+                        isCorrectOption
+                          ? "border-green-500 bg-green-900/20"
+                          : isSelectedWrong
+                            ? "border-red-500 bg-red-900/20"
+                            : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                      }`}
                     >
                       <input
                         type="radio"
@@ -379,6 +491,15 @@ export function KCScreen() {
                   );
                 })}
               </div>
+
+              {submittingAnswer && (
+                <PixelCard className="border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
+                  <p className="inline-flex items-center gap-2 font-[var(--font-body)] text-sm">
+                    <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                    Gerando explicacao da IA...
+                  </p>
+                </PixelCard>
+              )}
 
               {submittedCurrent && (
                 <PixelCard
@@ -435,8 +556,8 @@ export function KCScreen() {
 
               <div className="flex flex-wrap justify-end gap-2">
                 {!submittedCurrent ? (
-                  <PixelButton onClick={submitCurrentAnswer} disabled={loadingExplanation}>
-                    {loadingExplanation ? "Aguarde IA..." : "Enviar resposta"}
+                  <PixelButton onClick={submitCurrentAnswer} disabled={loadingExplanation || submittingAnswer}>
+                    {submittingAnswer ? "Gerando feedback..." : "Enviar resposta"}
                   </PixelButton>
                 ) : currentIndex < questions.length - 1 ? (
                   <PixelButton onClick={goToNextQuestion}>Proxima</PixelButton>

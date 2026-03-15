@@ -41,8 +41,7 @@ export function useUserProfile() {
         });
         setNeedsCertificationReview(Boolean(profileData.needsCertificationReview));
         setAvatarUrl(
-          profileData.avatarUrl ??
-            "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
+          profileData.avatarUrl,
         );
         setCertificationOptions(certData.certifications ?? []);
       })

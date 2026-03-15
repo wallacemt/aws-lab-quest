@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FontSizeControl } from "@/components/FontSizeControl";
@@ -19,7 +19,7 @@ type HeaderProps = {
   xp?: number;
 };
 
-export function Header({ xp }: HeaderProps) {
+function HeaderComponent({ xp }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [totalXp, setTotalXp] = useState(0);
@@ -28,8 +28,8 @@ export function Header({ xp }: HeaderProps) {
   const { user, signOut } = useAuth();
   const { isActive: simulatedExamActive, remainingSeconds } = useSimulatedExam();
   const router = useRouter();
-  const { avatarUrl } = useUserProfile();
-  const name = user?.name ?? "Anônimo";
+  const { avatarUrl, profile } = useUserProfile();
+  const name = profile?.username ?? "Anônimo";
   const displayedXp = totalXp + (xp ?? 0);
 
   // Close dropdown when clicking outside
@@ -45,10 +45,15 @@ export function Header({ xp }: HeaderProps) {
 
   useEffect(() => {
     if (!user) return;
-    fetch("/api/quest-history")
-      .then((r) => r.json())
-      .then((data: { history?: { xp: number }[] }) => {
-        const nextTotalXp = (data.history ?? []).reduce((sum, item) => sum + item.xp, 0);
+    Promise.all([fetch("/api/quest-history"), fetch("/api/study/history")])
+      .then(async ([questRes, studyRes]) => {
+        const questData = (await questRes.json()) as { history?: { xp: number }[] };
+        const studyData = (await studyRes.json()) as { history?: { gainedXp?: number }[] };
+
+        const labsXp = (questData.history ?? []).reduce((sum, item) => sum + item.xp, 0);
+        const studyXp = (studyData.history ?? []).reduce((sum, item) => sum + (item.gainedXp ?? 0), 0);
+
+        const nextTotalXp = labsXp + studyXp;
         setTotalXp(nextTotalXp);
       })
       .catch(() => void 0);
@@ -78,7 +83,7 @@ export function Header({ xp }: HeaderProps) {
           </div>
           <div className="hidden min-w-0 sm:block">
             <p className="truncate font-[var(--font-pixel)] text-xs text-[var(--pixel-primary)]">AWS LAB QUEST</p>
-            <p className="truncate font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Player: {name}</p>
+            <p className="truncate font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Player: @{name}</p>
           </div>
         </Link>
 
@@ -187,3 +192,5 @@ export function Header({ xp }: HeaderProps) {
     </header>
   );
 }
+
+export const Header = memo(HeaderComponent);

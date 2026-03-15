@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { CreatorCredits } from "@/components/CreatorCredits";
 import { Header } from "@/components/Header";
@@ -98,7 +99,17 @@ export function AppLayout({ children, xp, credits = false, creditsCompact = true
           Simulado em andamento. Navegacao bloqueada ate finalizar a prova.
         </div>
       )}
-      {children}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          {children}
+        </motion.div>
+      </AnimatePresence>
       {credits && <CreatorCredits compact={creditsCompact} />}
     </div>
   );

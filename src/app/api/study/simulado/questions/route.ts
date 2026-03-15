@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureQuestionPool } from "@/lib/study-question-generation";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
 
 const VALID_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
@@ -18,13 +19,15 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json()) as Body;
   const desiredCount = Math.max(10, Math.min(65, Number(body.count ?? 65)));
-  const difficulties = (body.difficulties ?? []).filter((value) => VALID_DIFFICULTIES.has(value));
+  const difficulties = (body.difficulties ?? []).filter((value) => VALID_DIFFICULTIES.has(value)) as Array<
+    "easy" | "medium" | "hard"
+  >;
 
   const profile = await prisma.userProfile.findUnique({
     where: { userId: session.user.id },
     select: {
       certificationPresetId: true,
-      certificationPreset: { select: { code: true, examMinutes: true } },
+      certificationPreset: { select: { code: true, name: true, examMinutes: true } },
     },
   });
 
@@ -35,12 +38,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const selectedDifficulties = difficulties.length > 0 ? difficulties : (["easy", "medium", "hard"] as const);
+
+  for (const difficulty of selectedDifficulties) {
+    await ensureQuestionPool({
+      certification: {
+        id: profile.certificationPresetId,
+        code: profile.certificationPreset.code,
+        name: profile.certificationPreset.name,
+      },
+      usage: "SIMULADO",
+      difficulty,
+      desiredCount: Math.ceil(desiredCount / selectedDifficulties.length) + 8,
+    });
+  }
+
   const pool = await prisma.studyQuestion.findMany({
     where: {
       active: true,
       certificationPresetId: profile.certificationPresetId,
       usage: { in: ["SIMULADO", "BOTH"] },
-      ...(difficulties.length > 0 ? { difficulty: { in: difficulties as Array<"easy" | "medium" | "hard"> } } : {}),
+      ...(difficulties.length > 0 ? { difficulty: { in: difficulties } } : {}),
     },
     include: {
       certificationPreset: { select: { code: true } },

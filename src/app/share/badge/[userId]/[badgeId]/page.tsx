@@ -9,6 +9,22 @@ type Props = {
   }>;
 };
 
+function getBadgeLore(level: number, badgeName: string): string {
+  const stories: Record<number, string> = {
+    1: "Este badge marca o primeiro voo na nuvem: como uma instancia inicial, pequena mas pronta para escalar.",
+    2: "Aqui o aventureiro aprende disciplina de rota e seguranca, como quem configura rede e permissoes para atravessar tempestades de trafego.",
+    3: "No nivel Explorador, cada servico vira ferramenta de mapa: armazenar, monitorar e descobrir o melhor caminho entre regioes.",
+    4: "Especialista significa combinar servicos como arquitetura bem desenhada: resiliente, observavel e preparada para picos.",
+    5: "Guardiao AWS protege a fortaleza em nuvem com defesa em profundidade, automacao e resposta rapida a incidentes.",
+    6: "No estado Lendario, a jornada domina custo, performance e confiabilidade como quem orquestra constelacoes inteiras na nuvem.",
+  };
+
+  return (
+    stories[level] ??
+    `${badgeName} representa um marco de evolucao na trilha cloud, onde estrategia e tecnologia andam juntas.`
+  );
+}
+
 export default async function ShareBadgePage({ params }: Props) {
   const { userId, badgeId } = await params;
 
@@ -55,12 +71,13 @@ export default async function ShareBadgePage({ params }: Props) {
   const userName = ownership.user.name;
   const badgeName = ownership.badge.name;
   const avatarUrl = ownership.user.profile?.avatarUrl;
+  const badgeLore = getBadgeLore(ownership.badge.level, badgeName);
 
   return (
     <main className="grid min-h-screen place-items-center bg-[var(--pixel-bg)] p-4">
       <div className="w-full max-w-2xl border-4 border-[var(--pixel-primary)] bg-[var(--pixel-card)] p-6 text-center shadow-[8px_8px_0_0_#000]">
         <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-accent)]">Conquista desbloqueada</p>
-        <h1 className="mt-2 font-[var(--font-body)] text-2xl font-bold">
+        <h1 className="mt-2 font-[var(--font-body)] text-2xl">
           {userName} possui o badge {badgeName}
         </h1>
 
@@ -69,14 +86,20 @@ export default async function ShareBadgePage({ params }: Props) {
             <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Jogador</p>
             <div className="mt-3 flex justify-center">
               {avatarUrl ? (
-                <Image src={avatarUrl} alt={userName} width={120} height={120} className="h-28 w-28 border-2 border-[var(--pixel-border)] object-cover" />
+                <Image
+                  src={avatarUrl}
+                  alt={userName}
+                  width={120}
+                  height={120}
+                  className="h-28 w-28 border-2 border-[var(--pixel-border)] object-cover"
+                />
               ) : (
                 <div className="flex h-28 w-28 items-center justify-center border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-3xl text-[var(--pixel-subtext)]">
                   {userName.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
-            <p className="mt-2 font-[var(--font-body)] text-sm font-semibold">{userName}</p>
+            <p className="mt-2 font-[var(--font-body)] text-sm">{userName}</p>
           </div>
 
           <div className="rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-4">
@@ -90,13 +113,20 @@ export default async function ShareBadgePage({ params }: Props) {
                 className="h-28 w-28 border-2 border-[var(--pixel-border)] object-cover"
               />
             </div>
-            <p className="mt-2 font-[var(--font-body)] text-sm font-semibold">{badgeName}</p>
+            <p className="mt-2 font-[var(--font-body)] text-sm">{badgeName}</p>
           </div>
         </div>
 
         <p className="mt-5 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
           Conquistado em {new Date(ownership.earnedAt).toLocaleDateString("pt-BR")}
         </p>
+
+        <div className="mt-4 border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3 text-left">
+          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+            Historia do badge
+          </p>
+          <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{badgeLore}</p>
+        </div>
 
         <Link
           href="/"

@@ -93,6 +93,9 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ...profile,
+    avatarUrl:
+      profile?.avatarUrl ??
+      "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
     user: {
       name: user?.name ?? session.user.name,
       email: user?.email ?? session.user.email,

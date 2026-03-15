@@ -32,9 +32,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   // Aggregate XP and lab count
-  const stats = await prisma.questHistory.aggregate({
+  const labStats = await prisma.questHistory.aggregate({
     where: { userId },
     _sum: { xp: true },
+    _count: { id: true },
+  });
+
+  const studyStats = await prisma.studySessionHistory.aggregate({
+    where: { userId },
+    _sum: { gainedXp: true },
     _count: { id: true },
   });
 
@@ -54,20 +60,38 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     },
   });
 
+  const studyHistory = await prisma.studySessionHistory.findMany({
+    where: { userId },
+    orderBy: { completedAt: "desc" },
+    take: 8,
+    select: {
+      id: true,
+      sessionType: true,
+      title: true,
+      certificationCode: true,
+      gainedXp: true,
+      scorePercent: true,
+      correctAnswers: true,
+      totalQuestions: true,
+      completedAt: true,
+    },
+  });
+
   return NextResponse.json({
     user: {
       id: user.id,
       name: user.name,
       username: user.username,
       createdAt: user.createdAt,
-      avatarUrl: user.profile?.avatarUrl ?? null,
+      avatarUrl: user.profile?.avatarUrl ?? "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
       certification: user.profile?.certification ?? "",
       favoriteTheme: user.profile?.favoriteTheme ?? "",
     },
     stats: {
-      totalXp: stats._sum.xp ?? 0,
-      labsCompleted: stats._count.id,
+      totalXp: (labStats._sum.xp ?? 0) + (studyStats._sum.gainedXp ?? 0),
+      labsCompleted: labStats._count.id,
     },
     history,
+    studyHistory,
   });
 }

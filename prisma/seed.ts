@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { AWS_CERTIFICATION_PRESETS } from "@/lib/certification-presets";
 import { createClient } from "@supabase/supabase-js";
-import { SeedAwsService, SeedQuestion } from "@/types/seeds";
+import { SeedAwsService } from "@/types/seeds";
 import { LEVEL_DEFS, SERVICE_FALLBACK } from "@/lib/utils";
 
 async function generateBadgeImage(prompt: string): Promise<{ data: Buffer; mimeType: string }> {

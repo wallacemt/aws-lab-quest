@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
+import { getTaskXpByDifficulty } from "@/lib/levels";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
 const OPTIONS: QuestionOption[] = ["A", "B", "C", "D", "E"];
@@ -162,6 +164,14 @@ export function SimuladoScreen() {
     const totalQuestions = questions.length;
     const correctAnswers = questions.filter((question) => answers[question.id] === question.correctOption).length;
     const scorePercent = Math.round((correctAnswers / totalQuestions) * 100);
+    const difficultyWeight =
+      selectedDifficulties.length === 0
+        ? getTaskXpByDifficulty("medium")
+        : Math.round(
+            selectedDifficulties.reduce((sum, difficulty) => sum + getTaskXpByDifficulty(difficulty), 0) /
+              selectedDifficulties.length,
+          );
+    const gainedXp = Math.max(30, Math.round(difficultyWeight / 4)) * correctAnswers;
 
     const totalDurationSeconds = Math.max(
       0,
@@ -181,6 +191,7 @@ export function SimuladoScreen() {
           sessionType: "SIMULADO",
           title: `Simulado ${session.certificationCode}`,
           certificationCode: session.certificationCode,
+          gainedXp,
           scorePercent,
           correctAnswers,
           totalQuestions,
@@ -309,7 +320,14 @@ export function SimuladoScreen() {
 
             <div className="flex justify-end">
               <PixelButton onClick={handleStart} disabled={loading}>
-                {loading ? "Carregando banco de questoes..." : "Iniciar Simulado (65 questoes)"}
+                {loading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                    Gerando Simulado...
+                  </span>
+                ) : (
+                  "Iniciar Simulado (65 questoes)"
+                )}
               </PixelButton>
             </div>
           </PixelCard>
@@ -356,10 +374,20 @@ export function SimuladoScreen() {
                   {OPTIONS.map((option) => {
                     const text = currentQuestion.options[option];
                     if (!text) return null;
+                    const isReviewing = submitted;
+                    const isCorrectOption = isReviewing && option === currentQuestion.correctOption;
+                    const isSelectedWrong =
+                      isReviewing && answers[currentQuestion.id] === option && option !== currentQuestion.correctOption;
                     return (
                       <label
                         key={`${currentQuestion.id}-${option}`}
-                        className="flex items-start gap-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                        className={`flex items-start gap-2 border px-3 py-2 ${
+                          isCorrectOption
+                            ? "border-green-500 bg-green-900/20"
+                            : isSelectedWrong
+                              ? "border-red-500 bg-red-900/20"
+                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                        }`}
                       >
                         <input
                           type="radio"
@@ -382,56 +410,67 @@ export function SimuladoScreen() {
                 </div>
 
                 {submitted && (
-                  <PixelCard
-                    className={
-                      answers[currentQuestion.id] === currentQuestion.correctOption
-                        ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10"
-                        : "border-red-500 bg-red-900/15"
-                    }
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    <p className="font-[var(--font-pixel)] text-[10px] uppercase">
-                      {answers[currentQuestion.id] === currentQuestion.correctOption
-                        ? "Resposta correta"
-                        : "Resposta incorreta"}
-                    </p>
-
-                    {loadingReviewByQuestion[currentQuestion.id] && (
-                      <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                        Gerando revisao com IA...
+                    <PixelCard
+                      className={
+                        answers[currentQuestion.id] === currentQuestion.correctOption
+                          ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10"
+                          : "border-red-500 bg-red-900/15"
+                      }
+                    >
+                      <p className="font-[var(--font-pixel)] text-[10px] uppercase">
+                        {answers[currentQuestion.id] === currentQuestion.correctOption
+                          ? "Resposta correta"
+                          : "Resposta incorreta"}
                       </p>
-                    )}
 
-                    <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                      {currentReview?.summary ?? "Analise de alternativas da questao."}
-                    </p>
+                      {loadingReviewByQuestion[currentQuestion.id] && (
+                        <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                            Gerando revisao com IA...
+                          </span>
+                        </p>
+                      )}
 
-                    <div className="mt-2 space-y-2">
-                      {OPTIONS.map((option) => {
-                        const text = currentQuestion.options[option];
-                        if (!text) return null;
+                      {currentReview && (
+                        <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                          {currentReview.summary}
+                        </p>
+                      )}
 
-                        const isCorrectOption = option === currentQuestion.correctOption;
-                        const isSelected = option === answers[currentQuestion.id];
+                      <div className="mt-2 space-y-2">
+                        {OPTIONS.map((option) => {
+                          const text = currentQuestion.options[option];
+                          if (!text) return null;
 
-                        return (
-                          <div
-                            key={`${currentQuestion.id}-review-${option}`}
-                            className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
-                          >
-                            <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
-                              {option}) {isCorrectOption ? "correta" : "incorreta"}
-                              {isSelected ? " · sua resposta" : ""}
-                            </p>
-                            <p className="mt-1 font-[var(--font-body)] text-sm">
-                              {currentReview?.options[option] ??
-                                currentQuestion.explanations[option] ??
-                                "Sem explicacao adicional."}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </PixelCard>
+                          const isCorrectOption = option === currentQuestion.correctOption;
+                          const isSelected = option === answers[currentQuestion.id];
+
+                          return (
+                            <div
+                              key={`${currentQuestion.id}-review-${option}`}
+                              className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                            >
+                              <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+                                {option}) {isCorrectOption ? "correta" : "incorreta"}
+                                {isSelected ? " · sua resposta" : ""}
+                              </p>
+                              <p className="mt-1 font-[var(--font-body)] text-sm">
+                                {currentReview?.options[option] ??
+                                  currentQuestion.explanations[option] ??
+                                  "Sem explicacao adicional."}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </PixelCard>
+                  </motion.div>
                 )}
 
                 <div className="flex flex-wrap justify-between gap-2">

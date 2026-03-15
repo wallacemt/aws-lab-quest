@@ -15,6 +15,7 @@ type Body = {
   sessionType?: "KC" | "SIMULADO";
   title?: string;
   certificationCode?: string;
+  gainedXp?: number;
   scorePercent?: number;
   correctAnswers?: number;
   totalQuestions?: number;
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
       sessionType: body.sessionType,
       title: body.title,
       certificationCode: body.certificationCode ?? null,
+      gainedXp: Math.max(0, Math.round(body.gainedXp ?? 0)),
       scorePercent: Math.max(0, Math.min(100, Math.round(body.scorePercent))),
       correctAnswers: Math.max(0, Math.round(body.correctAnswers)),
       totalQuestions: Math.max(1, Math.round(body.totalQuestions)),

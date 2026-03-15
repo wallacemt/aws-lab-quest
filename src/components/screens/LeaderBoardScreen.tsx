@@ -24,6 +24,11 @@ export function LeaderBoardScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [searchResults, setSearchResults] = useState<
+    Array<{ id: string; name: string; username: string | null; avatarUrl: string | null }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +43,47 @@ export function LeaderBoardScreen() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (term.length < 2) {
+      setSearchResults([]);
+      setSearchingUsers(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        setSearchingUsers(true);
+        const response = await fetch(`/api/users/search?q=${encodeURIComponent(term)}&take=8`, {
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as {
+          users?: Array<{ id: string; name: string; username: string | null; avatarUrl: string | null }>;
+          error?: string;
+        };
+
+        if (!response.ok || data.error) {
+          throw new Error(data.error ?? "Falha ao buscar usuarios.");
+        }
+
+        setSearchResults(data.users ?? []);
+      } catch (searchError) {
+        if (searchError instanceof Error && searchError.name === "AbortError") {
+          return;
+        }
+        setSearchResults([]);
+      } finally {
+        setSearchingUsers(false);
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [searchTerm]);
+
   return (
     <AppLayout>
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 xl:px-8">
@@ -47,6 +93,68 @@ export function LeaderBoardScreen() {
             Top 10 jogadores com mais XP acumulado
           </p>
         </div>
+
+        <PixelCard className="space-y-3">
+          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+            Buscar jogador por nome
+          </p>
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Digite pelo menos 2 caracteres"
+            className="w-full border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] text-sm"
+          />
+
+          {searchTerm.trim().length > 0 && (
+            <div className="space-y-2">
+              {searchingUsers && (
+                <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Buscando usuarios...</p>
+              )}
+
+              {!searchingUsers && searchTerm.trim().length >= 2 && searchResults.length === 0 && (
+                <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                  Nenhum usuario encontrado para esta busca.
+                </p>
+              )}
+
+              {searchResults.length > 0 && (
+                <div className="grid gap-2">
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      type="button"
+                      onClick={() => router.push(`/players/${result.id}`)}
+                      className="flex items-center gap-3 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left hover:border-[var(--pixel-primary)]"
+                    >
+                      <div className="h-8 w-8 shrink-0 overflow-hidden border border-[var(--pixel-border)]">
+                        {result.avatarUrl ? (
+                          <Image
+                            src={result.avatarUrl}
+                            alt={result.name}
+                            width={32}
+                            height={32}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-xs text-[var(--pixel-subtext)]">
+                            {result.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-[var(--font-body)] text-sm">{result.name}</p>
+                        <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                          @{result.username ?? "sem-username"}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </PixelCard>
 
         {loading && (
           <PixelCard>
