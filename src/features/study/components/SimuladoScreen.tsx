@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
+import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
+import { createSimuladoQuestions, createStudyExplanation, saveStudyHistory } from "@/features/study/services";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -13,15 +15,8 @@ import { getTaskXpByDifficulty } from "@/lib/levels";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
-const OPTIONS: QuestionOption[] = ["A", "B", "C", "D", "E"];
-const DIFFICULTIES: TaskDifficulty[] = ["easy", "medium", "hard"];
-
-type AnswerMap = Record<string, QuestionOption | undefined>;
-
-type ExplanationResult = {
-  summary: string;
-  options: Partial<Record<QuestionOption, string>>;
-};
+const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
+const DIFFICULTIES: TaskDifficulty[] = STUDY_DIFFICULTIES;
 
 type ExamResult = {
   certificationCode: string;
@@ -50,12 +45,12 @@ export function SimuladoScreen() {
   const rulesConsent = useLocalStorage<RulesConsentMap>(STORAGE_KEYS.simuladoRulesConsent, {});
 
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
-  const [answers, setAnswers] = useState<AnswerMap>({});
+  const [answers, setAnswers] = useState<StudyAnswerMap>({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<ExamResult | null>(null);
-  const [reviewByQuestion, setReviewByQuestion] = useState<Record<string, ExplanationResult>>({});
+  const [reviewByQuestion, setReviewByQuestion] = useState<Record<string, StudyExplanationResult>>({});
   const [loadingReviewByQuestion, setLoadingReviewByQuestion] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [selectedDifficulties, setSelectedDifficulties] = useState<TaskDifficulty[]>(["easy", "medium", "hard"]);
@@ -70,6 +65,18 @@ export function SimuladoScreen() {
 
   const currentReview = currentQuestion ? reviewByQuestion[currentQuestion.id] : undefined;
   const consentScope = profile.certificationPresetCode?.trim() || "default";
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    // A stale persisted session without restored question state would lock navigation globally.
+    if (isActive && questions.length === 0 && !submitted && !loading) {
+      clearSession();
+      setError("Sessao anterior de simulado expirada ou incompleta. Inicie um novo simulado para continuar.");
+    }
+  }, [clearSession, hydrated, isActive, loading, questions.length, submitted]);
 
   function hasValidRulesConsent(scope: string): boolean {
     const raw = rulesConsent.value[scope];
@@ -106,22 +113,7 @@ export function SimuladoScreen() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/study/simulado/questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ count: 65, difficulties: selectedDifficulties }),
-      });
-
-      const data = (await response.json()) as {
-        questions?: StudyQuestion[];
-        certificationCode?: string;
-        examMinutes?: number;
-        error?: string;
-      };
-
-      if (!response.ok || !data.questions || !data.certificationCode) {
-        throw new Error(data.error ?? "Nao foi possivel iniciar o simulado.");
-      }
+      const data = await createSimuladoQuestions({ count: 65, difficulties: selectedDifficulties });
 
       setQuestions(data.questions);
       setAnswers({});
@@ -166,30 +158,17 @@ export function SimuladoScreen() {
     setLoadingReviewByQuestion((prev) => ({ ...prev, [question.id]: true }));
 
     try {
-      const response = await fetch("/api/study/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          questionId: question.id,
-          selectedOption,
-          optionMapping: question.optionMapping,
-        }),
+      const explanation = await createStudyExplanation({
+        questionId: question.id,
+        selectedOption,
+        optionMapping: question.optionMapping,
       });
-
-      const data = (await response.json()) as {
-        summary?: string;
-        options?: Partial<Record<QuestionOption, string>>;
-      };
-
-      if (!response.ok || !data.options) {
-        throw new Error("Nao foi possivel gerar explicacao da questao.");
-      }
 
       setReviewByQuestion((prev) => ({
         ...prev,
         [question.id]: {
-          summary: data.summary ?? "Resumo indisponivel.",
-          options: data.options ?? {},
+          summary: explanation.summary,
+          options: explanation.options,
         },
       }));
     } catch {
@@ -233,37 +212,31 @@ export function SimuladoScreen() {
 
     let historySaved = false;
     try {
-      const saveResponse = await fetch("/api/study/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionType: "SIMULADO",
-          title: `Simulado ${session.certificationCode}`,
-          certificationCode: session.certificationCode,
-          gainedXp,
-          scorePercent,
-          correctAnswers,
-          totalQuestions,
-          durationSeconds: usedDurationSeconds,
-          answersSnapshot: questions.map((question) => ({
-            questionId: question.id,
-            statement: question.statement,
-            selectedOption: answers[question.id] ?? "-",
-            correctOption: question.correctOption,
-            options: question.options,
-            optionMapping: question.optionMapping,
-            explanations: {
-              A: question.explanations.A ?? "Sem explicacao.",
-              B: question.explanations.B ?? "Sem explicacao.",
-              C: question.explanations.C ?? "Sem explicacao.",
-              D: question.explanations.D ?? "Sem explicacao.",
-              E: question.explanations.E ?? "Nao aplicavel.",
-            },
-          })),
-        }),
+      historySaved = await saveStudyHistory({
+        sessionType: "SIMULADO",
+        title: `Simulado ${session.certificationCode}`,
+        certificationCode: session.certificationCode,
+        gainedXp,
+        scorePercent,
+        correctAnswers,
+        totalQuestions,
+        durationSeconds: usedDurationSeconds,
+        answersSnapshot: questions.map((question) => ({
+          questionId: question.id,
+          statement: question.statement,
+          selectedOption: answers[question.id] ?? "-",
+          correctOption: question.correctOption,
+          options: question.options,
+          optionMapping: question.optionMapping,
+          explanations: {
+            A: question.explanations.A ?? "Sem explicacao.",
+            B: question.explanations.B ?? "Sem explicacao.",
+            C: question.explanations.C ?? "Sem explicacao.",
+            D: question.explanations.D ?? "Sem explicacao.",
+            E: question.explanations.E ?? "Nao aplicavel.",
+          },
+        })),
       });
-
-      historySaved = saveResponse.ok;
     } catch {
       historySaved = false;
     }

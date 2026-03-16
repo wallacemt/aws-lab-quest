@@ -1,13 +1,7 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { usePathname, useRouter } from "next/navigation";
-import { CreatorCredits } from "@/components/CreatorCredits";
-import { Header } from "@/components/Header";
-import { useSimulatedExam } from "@/hooks/useSimulatedExam";
-import { useUserProfile } from "@/hooks/useUserProfile";
-import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
+import { ReactNode } from "react";
+import { motion } from "framer-motion";
 
 type AppLayoutProps = {
   children: ReactNode;
@@ -20,97 +14,13 @@ type AppLayoutProps = {
 };
 
 export function AppLayout({ children, xp, credits = false, creditsCompact = true }: AppLayoutProps) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { hydrated, isProfileComplete } = useUserProfile();
-  const { hydrated: simHydrated, isActive: simulatedExamActive } = useSimulatedExam();
-  const onboardingStep = getOnboardingStep();
-
-  const guardReady =
-    hydrated &&
-    (isProfileComplete ||
-      (onboardingStep === "manual" && pathname === "/help") ||
-      (onboardingStep === "profile" && pathname === "/profile") ||
-      (!onboardingStep && (pathname === "/profile" || pathname === "/help")));
-
-  useEffect(() => {
-    if (!pathname || !simHydrated) {
-      return;
-    }
-
-    if (!simulatedExamActive) {
-      return;
-    }
-
-    if (pathname !== "/simulado") {
-      router.replace("/simulado");
-    }
-  }, [pathname, router, simHydrated, simulatedExamActive]);
-
-  useEffect(() => {
-    if (!pathname || !hydrated) {
-      return;
-    }
-
-    if (isProfileComplete) {
-      if (onboardingStep) {
-        clearOnboardingStep();
-      }
-      return;
-    }
-
-    if (onboardingStep === "manual") {
-      if (pathname !== "/help") {
-        router.replace("/help");
-      }
-      return;
-    }
-
-    if (onboardingStep === "profile") {
-      if (pathname !== "/profile") {
-        router.replace("/profile");
-      }
-      return;
-    }
-
-    if (pathname === "/profile" || pathname === "/help") {
-      return;
-    }
-
-    router.replace("/profile");
-  }, [hydrated, isProfileComplete, onboardingStep, pathname, router]);
-
-  if (!guardReady) {
-    return (
-      <div className="min-h-screen pb-12">
-        <Header xp={xp} />
-        <main className="flex min-h-[60vh] items-center justify-center px-4">
-          <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
-        </main>
-      </div>
-    );
-  }
+  void xp;
+  void credits;
+  void creditsCompact;
 
   return (
-    <div className="min-h-screen pb-12">
-      <Header xp={xp} />
-      {simHydrated && simulatedExamActive && pathname !== "/simulado" && (
-        <div className="border-b-2 border-red-500 bg-red-900/20 px-4 py-2 text-center font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
-          Simulado em andamento. Navegacao bloqueada ate finalizar a prova.
-        </div>
-      )}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={pathname}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-        >
-          {children}
-        </motion.div>
-      </AnimatePresence>
-      {credits && <CreatorCredits compact={creditsCompact} />}
-    </div>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+      {children}
+    </motion.div>
   );
 }

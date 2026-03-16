@@ -5,29 +5,23 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
+import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
+import {
+  createKcQuestions,
+  createStudyExplanation,
+  listStudyServices,
+  saveStudyHistory,
+  StudyServiceItem,
+} from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
-type ServiceItem = {
-  id: string;
-  code: string;
-  name: string;
-  description?: string | null;
-};
-
-type ExplanationResult = {
-  summary: string;
-  options: Partial<Record<QuestionOption, string>>;
-};
-
-type AnswerMap = Record<string, QuestionOption | undefined>;
-
-const DIFFICULTIES: TaskDifficulty[] = ["easy", "medium", "hard"];
-const OPTIONS: QuestionOption[] = ["A", "B", "C", "D", "E"];
+const DIFFICULTIES: TaskDifficulty[] = STUDY_DIFFICULTIES;
+const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const SERVICES_PAGE_SIZE = 12;
 
 export function KCScreen() {
-  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [services, setServices] = useState<StudyServiceItem[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState<string | null>(null);
 
@@ -37,11 +31,11 @@ export function KCScreen() {
   const [servicesPage, setServicesPage] = useState(1);
 
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
-  const [answers, setAnswers] = useState<AnswerMap>({});
+  const [answers, setAnswers] = useState<StudyAnswerMap>({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [submittedCurrent, setSubmittedCurrent] = useState(false);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
-  const [explanationByQuestion, setExplanationByQuestion] = useState<Record<string, ExplanationResult>>({});
+  const [explanationByQuestion, setExplanationByQuestion] = useState<Record<string, StudyExplanationResult>>({});
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
@@ -49,12 +43,8 @@ export function KCScreen() {
   const [flowError, setFlowError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/study/services")
-      .then((response) => response.json())
-      .then((data: { services?: ServiceItem[]; error?: string }) => {
-        if (data.error) throw new Error(data.error);
-        setServices(data.services ?? []);
-      })
+    listStudyServices()
+      .then((items) => setServices(items))
       .catch((error) => setServicesError(error instanceof Error ? error.message : "Falha ao carregar serviços AWS."))
       .finally(() => setServicesLoading(false));
   }, []);
@@ -116,22 +106,13 @@ export function KCScreen() {
 
     setLoadingQuestions(true);
     try {
-      const response = await fetch("/api/study/kc/questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topics: selectedTopics,
-          difficulty: selectedDifficulty,
-          count: 10,
-        }),
+      const nextQuestions = await createKcQuestions({
+        topics: selectedTopics,
+        difficulty: selectedDifficulty,
+        count: 10,
       });
 
-      const data = (await response.json()) as { questions?: StudyQuestion[]; error?: string };
-      if (!response.ok || !data.questions?.length) {
-        throw new Error(data.error ?? "Nao foi possivel iniciar o KC.");
-      }
-
-      setQuestions(data.questions);
+      setQuestions(nextQuestions);
       setAnswers({});
       setCurrentIndex(0);
       setExplanationByQuestion({});
@@ -145,7 +126,7 @@ export function KCScreen() {
 
   async function submitCurrentAnswer() {
     if (!currentQuestion) return;
-    if (!answers[currentQuestion.id]) {
+    if (!currentAnswer) {
       setFlowError("Selecione uma alternativa antes de enviar.");
       return;
     }
@@ -161,31 +142,17 @@ export function KCScreen() {
 
     try {
       setLoadingExplanation(true);
-
-      const response = await fetch("/api/study/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          questionId: currentQuestion.id,
-          selectedOption: answers[currentQuestion.id],
-          optionMapping: currentQuestion.optionMapping,
-        }),
+      const explanation = await createStudyExplanation({
+        questionId: currentQuestion.id,
+        selectedOption: currentAnswer,
+        optionMapping: currentQuestion.optionMapping,
       });
-
-      const data = (await response.json()) as {
-        summary?: string;
-        options?: Partial<Record<QuestionOption, string>>;
-      };
-
-      if (!response.ok || !data.options) {
-        throw new Error("Nao foi possivel gerar auditoria por IA.");
-      }
 
       setExplanationByQuestion((prev) => ({
         ...prev,
         [currentQuestion.id]: {
-          summary: data.summary ?? "Resumo indisponivel.",
-          options: data.options ?? {},
+          summary: explanation.summary,
+          options: explanation.options,
         },
       }));
     } catch {
@@ -244,36 +211,32 @@ export function KCScreen() {
       : `Knowledge Check ${questions[0]?.certificationCode ?? "AWS"}`;
 
     try {
-      await fetch("/api/study/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionType: "KC",
-          title: sessionTitle,
-          certificationCode: questions[0]?.certificationCode ?? null,
-          gainedXp,
-          scorePercent,
-          correctAnswers,
-          totalQuestions: questions.length,
-          answersSnapshot: questions.map((question) => {
-            const mergedExplanations = {
-              A: explanationByQuestion[question.id]?.options.A ?? question.explanations.A ?? "Sem explicacao.",
-              B: explanationByQuestion[question.id]?.options.B ?? question.explanations.B ?? "Sem explicacao.",
-              C: explanationByQuestion[question.id]?.options.C ?? question.explanations.C ?? "Sem explicacao.",
-              D: explanationByQuestion[question.id]?.options.D ?? question.explanations.D ?? "Sem explicacao.",
-              E: explanationByQuestion[question.id]?.options.E ?? question.explanations.E ?? "Nao aplicavel.",
-            };
+      await saveStudyHistory({
+        sessionType: "KC",
+        title: sessionTitle,
+        certificationCode: questions[0]?.certificationCode ?? null,
+        gainedXp,
+        scorePercent,
+        correctAnswers,
+        totalQuestions: questions.length,
+        answersSnapshot: questions.map((question) => {
+          const mergedExplanations = {
+            A: explanationByQuestion[question.id]?.options.A ?? question.explanations.A ?? "Sem explicacao.",
+            B: explanationByQuestion[question.id]?.options.B ?? question.explanations.B ?? "Sem explicacao.",
+            C: explanationByQuestion[question.id]?.options.C ?? question.explanations.C ?? "Sem explicacao.",
+            D: explanationByQuestion[question.id]?.options.D ?? question.explanations.D ?? "Sem explicacao.",
+            E: explanationByQuestion[question.id]?.options.E ?? question.explanations.E ?? "Nao aplicavel.",
+          };
 
-            return {
-              questionId: question.id,
-              statement: question.statement,
-              selectedOption: answers[question.id] ?? "-",
-              correctOption: question.correctOption,
-              options: question.options,
-              optionMapping: question.optionMapping,
-              explanations: mergedExplanations,
-            };
-          }),
+          return {
+            questionId: question.id,
+            statement: question.statement,
+            selectedOption: answers[question.id] ?? "-",
+            correctOption: question.correctOption,
+            options: question.options,
+            optionMapping: question.optionMapping,
+            explanations: mergedExplanations,
+          };
         }),
       });
 

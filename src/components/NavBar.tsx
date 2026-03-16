@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
@@ -14,6 +15,8 @@ const NAV_ITEMS = [
 
 export function NavBar({ onNavClick }: { onNavClick?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { isActive: simulatedExamActive } = useSimulatedExam();
 
   return (
     <nav className="flex items-center">
@@ -24,7 +27,13 @@ export function NavBar({ onNavClick }: { onNavClick?: () => void }) {
           <Link
             key={item.href}
             href={item.href}
-            onClick={onNavClick}
+            onClick={(event) => {
+              if (simulatedExamActive && item.href !== "/simulado") {
+                event.preventDefault();
+                router.replace("/simulado");
+              }
+              onNavClick?.();
+            }}
             className={[
               "border-b-2 px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase tracking-wider transition-colors",
               isActive

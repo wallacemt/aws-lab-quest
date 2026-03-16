@@ -3,21 +3,11 @@
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelCard } from "@/components/ui/PixelCard";
+import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { QuestionOptionMapping, Task } from "@/lib/types";
 
-type HistoryItem = {
-  id: string;
-  title: string;
-  theme: string;
-  xp: number;
-  tasksCount: number;
-  completedAt: string;
-  certification: string;
-  userName: string;
-  sourceLabText?: string | null;
-  taskSnapshot?: Task[];
-};
+type HistoryItem = QuestHistoryItem;
 
 type StudyAnswerSnapshot = {
   questionId: string;
@@ -29,18 +19,7 @@ type StudyAnswerSnapshot = {
   optionMapping?: QuestionOptionMapping;
 };
 
-type StudySessionItem = {
-  id: string;
-  sessionType: "KC" | "SIMULADO";
-  title: string;
-  certificationCode?: string | null;
-  scorePercent: number;
-  correctAnswers: number;
-  totalQuestions: number;
-  durationSeconds?: number | null;
-  completedAt: string;
-  answersSnapshot: StudyAnswerSnapshot[];
-};
+type StudySessionItem = Omit<StudyHistoryItem, "answersSnapshot"> & { answersSnapshot: StudyAnswerSnapshot[] };
 
 const DIFFICULTY_LABEL: Record<"easy" | "medium" | "hard", string> = {
   easy: "Facil",
@@ -71,22 +50,11 @@ export function HistoryScreen() {
   const [selectedStudyItem, setSelectedStudyItem] = useState<StudySessionItem | null>(null);
 
   useEffect(() => {
-    Promise.all([fetch("/api/quest-history"), fetch("/api/study/history")])
-      .then(async ([labsResponse, studyResponse]) => {
-        const labsData = (await labsResponse.json()) as { history?: HistoryItem[]; error?: string };
-        const studyData = (await studyResponse.json()) as { history?: StudySessionItem[]; error?: string };
-
-        if (!labsResponse.ok || labsData.error) {
-          throw new Error(labsData.error ?? "Erro ao carregar historico de labs.");
-        }
-
-        if (!studyResponse.ok || studyData.error) {
-          throw new Error(studyData.error ?? "Erro ao carregar historico de estudo.");
-        }
-
-        setHistory(labsData.history ?? []);
+    Promise.all([fetchQuestHistory(), fetchStudyHistory()])
+      .then(([labsHistory, studyHistoryItems]) => {
+        setHistory(labsHistory);
         setStudyHistory(
-          (studyData.history ?? []).map((item) => ({
+          studyHistoryItems.map((item) => ({
             ...item,
             answersSnapshot: Array.isArray(item.answersSnapshot) ? (item.answersSnapshot as StudyAnswerSnapshot[]) : [],
           })),

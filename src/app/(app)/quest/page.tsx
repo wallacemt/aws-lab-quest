@@ -1,4 +1,4 @@
-import { QuestScreen } from "@/components/screens/QuestScreen";
+import { QuestScreen } from "@/features/quest/components";
 
 export default function QuestPage() {
   return <QuestScreen />;
