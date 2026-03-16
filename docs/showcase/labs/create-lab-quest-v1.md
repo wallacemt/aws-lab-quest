@@ -4,8 +4,7 @@ Este tutorial mostra como gerar uma nova quest baseada em um lab AWS.
 
 ## Video
 
-[![Watch the tutorial](https://img.youtube.com/vi/KU7fzb0Z0h4/0.jpg)]
-(https://youtu.be/KU7fzb0Z0h4)
+[![Watch the tutorial](https://img.youtube.com/vi/KU7fzb0Z0h4/0.jpg)](https://youtu.be/KU7fzb0Z0h4)
 
 ## Passos
 
