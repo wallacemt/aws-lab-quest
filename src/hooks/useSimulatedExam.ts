@@ -1,20 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { STORAGE_KEYS } from "@/lib/storage";
-import { SimulatedExamSession } from "@/lib/types";
+import { useEffect, useMemo } from "react";
+import { useSimulatedExamStore } from "@/stores/simulatedExamStore";
+
+let tickerId: number | null = null;
+let tickerSubscribers = 0;
 
 export function useSimulatedExam() {
-  const storage = useLocalStorage<SimulatedExamSession | null>(STORAGE_KEYS.activeSimulatedExam, null);
-  const session = storage.value;
-  const [nowMs, setNowMs] = useState<number>(0);
+  const { hydrated, session, nowMs, hydrate, setNowMs, startSession, submitSession, clearSession } =
+    useSimulatedExamStore();
 
   useEffect(() => {
-    if (!storage.hydrated) return;
-    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [storage.hydrated]);
+    if (!hydrated) {
+      hydrate();
+    }
+  }, [hydrate, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    tickerSubscribers += 1;
+
+    if (tickerId == null) {
+      tickerId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    }
+
+    return () => {
+      tickerSubscribers = Math.max(0, tickerSubscribers - 1);
+      if (tickerSubscribers === 0 && tickerId != null) {
+        window.clearInterval(tickerId);
+        tickerId = null;
+      }
+    };
+  }, [hydrated, setNowMs]);
 
   const remainingSeconds = useMemo(() => {
     if (!session) return 0;
@@ -29,33 +49,8 @@ export function useSimulatedExam() {
 
   const isActive = Boolean(session && !session.submittedAt && remainingSeconds > 0);
 
-  function startSession(certificationCode: string, minutes = 90) {
-    const startedAt = new Date();
-    const endsAt = new Date(startedAt.getTime() + minutes * 60 * 1000);
-    const nextSession: SimulatedExamSession = {
-      id: `sim-${startedAt.getTime()}`,
-      startedAt: startedAt.toISOString(),
-      endsAt: endsAt.toISOString(),
-      certificationCode,
-      locked: true,
-    };
-
-    storage.setValue(nextSession);
-  }
-
-  function submitSession() {
-    if (!session) return;
-    storage.setValue(null);
-    setNowMs(0);
-  }
-
-  function clearSession() {
-    storage.setValue(null);
-    setNowMs(0);
-  }
-
   return {
-    hydrated: storage.hydrated,
+    hydrated,
     session,
     isActive,
     remainingSeconds,

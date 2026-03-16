@@ -227,3 +227,6 @@ bun run db:studio
 - O proxy protege rotas privadas e redireciona para login quando nao ha sessao.
 - Upload de avatar e badges usam o bucket aws-lab-quest no Supabase Storage.
 - Se ocorrer erro "Invalid Compact JWS" no seed/upload, valide se SUPABASE_SERVICE_ROLE_KEY e uma chave real do projeto.
+
+## Tutoriais
+ Showcases e tutoriais de como usar o app presentes em 

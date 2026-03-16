@@ -168,6 +168,7 @@ export function KCScreen() {
         body: JSON.stringify({
           questionId: currentQuestion.id,
           selectedOption: answers[currentQuestion.id],
+          optionMapping: currentQuestion.optionMapping,
         }),
       });
 
@@ -269,6 +270,7 @@ export function KCScreen() {
               selectedOption: answers[question.id] ?? "-",
               correctOption: question.correctOption,
               options: question.options,
+              optionMapping: question.optionMapping,
               explanations: mergedExplanations,
             };
           }),
@@ -463,11 +465,11 @@ export function KCScreen() {
                   return (
                     <label
                       key={`${currentQuestion.id}-${option}`}
-                      className={`flex items-start gap-2 border px-3 py-2 ${
+                      className={`flex items-start gap-2 border-2 px-3 py-2 ${
                         isCorrectOption
-                          ? "border-green-500 bg-green-900/20"
+                          ? "border-[#2ecc71] bg-green-900/35"
                           : isSelectedWrong
-                            ? "border-red-500 bg-red-900/20"
+                            ? "border-[#e74c3c] bg-red-900/35"
                             : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
                       }`}
                     >
@@ -503,14 +505,10 @@ export function KCScreen() {
 
               {submittedCurrent && (
                 <PixelCard
-                  className={
-                    isCurrentCorrect
-                      ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10"
-                      : "border-red-500 bg-red-900/15"
-                  }
+                  className={isCurrentCorrect ? "border-[#2ecc71] bg-green-900/25" : "border-[#e74c3c] bg-red-900/25"}
                 >
                   <p className="font-[var(--font-pixel)] text-[10px] uppercase">
-                    {isCurrentCorrect ? "Resposta correta" : "Resposta incorreta"}
+                    {isCurrentCorrect ? "✓ Resposta correta" : "✗ Resposta incorreta"}
                   </p>
 
                   {loadingExplanation && (

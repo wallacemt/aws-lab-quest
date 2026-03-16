@@ -1,4 +1,4 @@
-import { StudyQuestion } from "@/lib/types";
+import { QuestionOptionMapping, StudyQuestion } from "@/lib/types";
 import { StudyQuestion as DbStudyQuestion } from "@prisma/client";
 
 type OptionKey = "A" | "B" | "C" | "D" | "E";
@@ -47,12 +47,18 @@ export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations):
   };
 
   const nextExplanations: Partial<Record<OptionKey, string>> = {};
+  const optionMapping: QuestionOptionMapping = {
+    displayToOriginal: {},
+    originalToDisplay: {},
+  };
   let nextCorrect: OptionKey = "A";
 
   shuffled.forEach((option, index) => {
     const mappedKey = targetKeys[index] ?? "E";
     nextOptions[mappedKey] = option.text;
     nextExplanations[mappedKey] = option.explanation;
+    optionMapping.displayToOriginal[mappedKey] = option.key;
+    optionMapping.originalToDisplay[option.key] = mappedKey;
 
     if (option.key === originalCorrect) {
       nextCorrect = mappedKey;
@@ -68,6 +74,7 @@ export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations):
     options: nextOptions,
     correctOption: nextCorrect,
     explanations: nextExplanations,
+    optionMapping,
   };
 }
 

@@ -154,6 +154,14 @@ model StudyQuestion {
   explanationC          String?
   explanationD          String?
   explanationE          String?
+  cachedExplainSummary  String?
+  cachedExplainA        String?
+  cachedExplainB        String?
+  cachedExplainC        String?
+  cachedExplainD        String?
+  cachedExplainE        String?
+  cachedExplainAt       DateTime?
+  cachedExplainVersion  Int                     @default(1)
   active                Boolean                 @default(true)
   certificationPresetId String?
   certificationPreset   CertificationPreset?    @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
@@ -166,6 +174,7 @@ model StudyQuestion {
   @@index([difficulty, active])
   @@index([certificationPresetId])
   @@index([awsServiceId])
+  @@index([cachedExplainAt])
 }
 
 model StudySessionHistory {

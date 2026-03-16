@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   draftQuest: "awlq_draft_quest",
   activeSimulatedExam: "awlq_active_simulated_exam",
   kcAttempts: "awlq_kc_attempts",
+  simuladoRulesConsent: "awlq_simulado_rules_consent",
 } as const;
 
 export function safeLocalStorageGet<T>(key: string, fallback: T): T {

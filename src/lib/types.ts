@@ -42,6 +42,11 @@ export type CertificationPreset = {
 
 export type QuestionOption = "A" | "B" | "C" | "D" | "E";
 
+export type QuestionOptionMapping = {
+  displayToOriginal: Partial<Record<QuestionOption, QuestionOption>>;
+  originalToDisplay: Partial<Record<QuestionOption, QuestionOption>>;
+};
+
 export type StudyQuestion = {
   id: string;
   statement: string;
@@ -51,6 +56,7 @@ export type StudyQuestion = {
   options: Record<QuestionOption, string>;
   correctOption: QuestionOption;
   explanations: Partial<Record<QuestionOption, string>>;
+  optionMapping?: QuestionOptionMapping;
 };
 
 export type SimulatedExamSession = {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { getTaskXpByDifficulty } from "@/lib/levels";
-import { Task } from "@/lib/types";
+import { QuestionOptionMapping, Task } from "@/lib/types";
 
 type HistoryItem = {
   id: string;
@@ -26,6 +26,7 @@ type StudyAnswerSnapshot = {
   correctOption: string;
   options: Record<string, string>;
   explanations: Record<string, string>;
+  optionMapping?: QuestionOptionMapping;
 };
 
 type StudySessionItem = {
@@ -387,10 +388,18 @@ export function HistoryScreen() {
                           {Object.entries(item.options).map(([option, optionText]) => (
                             <div
                               key={`${item.questionId}-${option}`}
-                              className="border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-2"
+                              className={`border-2 px-2 py-2 ${
+                                option === item.correctOption
+                                  ? "border-[#2ecc71] bg-green-900/25"
+                                  : option === item.selectedOption && option !== item.correctOption
+                                    ? "border-[#e74c3c] bg-red-900/25"
+                                    : "border-[var(--pixel-border)] bg-[var(--pixel-card)]"
+                              }`}
                             >
                               <p className="font-[var(--font-body)] text-xs">
                                 {option}) {optionText}
+                                {option === item.correctOption ? " · correta" : ""}
+                                {option === item.selectedOption ? " · sua resposta" : ""}
                               </p>
                               <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
                                 {item.explanations[option] ?? "Sem explicacao adicional."}

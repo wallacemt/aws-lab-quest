@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { QuestionOptionMapping } from "@/lib/types";
 
 type StudyHistoryItem = {
   questionId: string;
@@ -9,6 +10,7 @@ type StudyHistoryItem = {
   correctOption: string;
   options: Record<string, string>;
   explanations: Record<string, string>;
+  optionMapping?: QuestionOptionMapping;
 };
 
 type Body = {

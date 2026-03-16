@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { getTaskXpByDifficulty } from "@/lib/levels";
+import { STORAGE_KEYS } from "@/lib/storage";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
 const OPTIONS: QuestionOption[] = ["A", "B", "C", "D", "E"];
@@ -28,6 +31,8 @@ type ExamResult = {
   historySaved: boolean;
 };
 
+type RulesConsentMap = Record<string, string>;
+
 function formatTime(seconds: number): string {
   const clamped = Math.max(0, seconds);
   const mm = Math.floor(clamped / 60)
@@ -41,6 +46,8 @@ export function SimuladoScreen() {
   const router = useRouter();
   const { hydrated, isActive, remainingSeconds, session, startSession, submitSession, clearSession } =
     useSimulatedExam();
+  const { profile } = useUserProfile();
+  const rulesConsent = useLocalStorage<RulesConsentMap>(STORAGE_KEYS.simuladoRulesConsent, {});
 
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
   const [answers, setAnswers] = useState<AnswerMap>({});
@@ -52,6 +59,8 @@ export function SimuladoScreen() {
   const [loadingReviewByQuestion, setLoadingReviewByQuestion] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [selectedDifficulties, setSelectedDifficulties] = useState<TaskDifficulty[]>(["easy", "medium", "hard"]);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [rulesAccepted, setRulesAccepted] = useState(false);
 
   const inExamFlow = isActive && questions.length > 0 && !submitted;
   const inReviewFlow = submitted && questions.length > 0;
@@ -60,6 +69,25 @@ export function SimuladoScreen() {
   const timerLabel = useMemo(() => formatTime(remainingSeconds), [remainingSeconds]);
 
   const currentReview = currentQuestion ? reviewByQuestion[currentQuestion.id] : undefined;
+  const consentScope = profile.certificationPresetCode?.trim() || "default";
+
+  function hasValidRulesConsent(scope: string): boolean {
+    const raw = rulesConsent.value[scope];
+    if (!raw) {
+      return false;
+    }
+
+    const expiresAt = new Date(raw).getTime();
+    return Number.isFinite(expiresAt) && expiresAt > Date.now();
+  }
+
+  function persistRulesConsent(scope: string) {
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    rulesConsent.setValue((prev) => ({
+      ...prev,
+      [scope]: expiresAt,
+    }));
+  }
 
   function toggleDifficulty(difficulty: TaskDifficulty) {
     setSelectedDifficulties((prev) =>
@@ -110,6 +138,26 @@ export function SimuladoScreen() {
     }
   }
 
+  async function handleStartWithRulesGate() {
+    if (hasValidRulesConsent(consentScope)) {
+      await handleStart();
+      return;
+    }
+
+    setRulesAccepted(false);
+    setShowRulesModal(true);
+  }
+
+  async function confirmRulesAndStart() {
+    if (!rulesAccepted) {
+      return;
+    }
+
+    persistRulesConsent(consentScope);
+    setShowRulesModal(false);
+    await handleStart();
+  }
+
   async function fetchReviewForQuestion(question: StudyQuestion, selectedOption: QuestionOption) {
     if (reviewByQuestion[question.id] || loadingReviewByQuestion[question.id]) {
       return;
@@ -124,6 +172,7 @@ export function SimuladoScreen() {
         body: JSON.stringify({
           questionId: question.id,
           selectedOption,
+          optionMapping: question.optionMapping,
         }),
       });
 
@@ -202,6 +251,7 @@ export function SimuladoScreen() {
             selectedOption: answers[question.id] ?? "-",
             correctOption: question.correctOption,
             options: question.options,
+            optionMapping: question.optionMapping,
             explanations: {
               A: question.explanations.A ?? "Sem explicacao.",
               B: question.explanations.B ?? "Sem explicacao.",
@@ -284,7 +334,7 @@ export function SimuladoScreen() {
           </p>
         </PixelCard>
 
-        {!inExamFlow && (
+        {!inExamFlow && !inReviewFlow && (
           <PixelCard className="space-y-4">
             <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">
               Configurar Simulado
@@ -319,7 +369,7 @@ export function SimuladoScreen() {
             {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
 
             <div className="flex justify-end">
-              <PixelButton onClick={handleStart} disabled={loading}>
+              <PixelButton onClick={() => void handleStartWithRulesGate()} disabled={loading}>
                 {loading ? (
                   <span className="inline-flex items-center gap-2">
                     <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
@@ -331,6 +381,43 @@ export function SimuladoScreen() {
               </PixelButton>
             </div>
           </PixelCard>
+        )}
+
+        {showRulesModal && (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
+            <PixelCard className="w-full max-w-2xl space-y-4 border-yellow-500 bg-yellow-900/15">
+              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-yellow-300">Regras do Simulado</p>
+              <h3 className="font-[var(--font-body)] text-xl">Ambiente de prova real</h3>
+
+              <ul className="space-y-2 font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+                <li>1. O simulado possui 65 questoes e cronometro ativo.</li>
+                <li>2. Nao e permitido consultar materiais externos durante a prova.</li>
+                <li>3. O objetivo e simular o ambiente real da certificacao AWS.</li>
+                <li>4. Ao iniciar, mantenha foco continuo ate o envio final.</li>
+              </ul>
+
+              <label className="flex items-start gap-3 border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={rulesAccepted}
+                  onChange={(event) => setRulesAccepted(event.target.checked)}
+                  className="mt-1"
+                />
+                <span className="font-[var(--font-body)] text-sm">
+                  Li e aceito as regras do simulado para reproduzir um ambiente real de prova.
+                </span>
+              </label>
+
+              <div className="flex justify-end gap-2">
+                <PixelButton variant="ghost" onClick={() => setShowRulesModal(false)}>
+                  Cancelar
+                </PixelButton>
+                <PixelButton onClick={() => void confirmRulesAndStart()} disabled={!rulesAccepted || loading}>
+                  Aceitar e iniciar simulado
+                </PixelButton>
+              </div>
+            </PixelCard>
+          </div>
         )}
 
         {(inExamFlow || inReviewFlow) && currentQuestion && (
@@ -381,11 +468,11 @@ export function SimuladoScreen() {
                     return (
                       <label
                         key={`${currentQuestion.id}-${option}`}
-                        className={`flex items-start gap-2 border px-3 py-2 ${
+                        className={`flex items-start gap-2 border-2 px-3 py-2 ${
                           isCorrectOption
-                            ? "border-green-500 bg-green-900/20"
+                            ? "border-[#2ecc71] bg-green-900/35"
                             : isSelectedWrong
-                              ? "border-red-500 bg-red-900/20"
+                              ? "border-[#e74c3c] bg-red-900/35"
                               : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
                         }`}
                       >
@@ -418,14 +505,14 @@ export function SimuladoScreen() {
                     <PixelCard
                       className={
                         answers[currentQuestion.id] === currentQuestion.correctOption
-                          ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10"
-                          : "border-red-500 bg-red-900/15"
+                          ? "border-[#2ecc71] bg-green-900/25"
+                          : "border-[#e74c3c] bg-red-900/25"
                       }
                     >
                       <p className="font-[var(--font-pixel)] text-[10px] uppercase">
                         {answers[currentQuestion.id] === currentQuestion.correctOption
-                          ? "Resposta correta"
-                          : "Resposta incorreta"}
+                          ? "✓ Resposta correta"
+                          : "✗ Resposta incorreta"}
                       </p>
 
                       {loadingReviewByQuestion[currentQuestion.id] && (
