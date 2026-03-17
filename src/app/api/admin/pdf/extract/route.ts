@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { extractPdfText } from "@/features/admin/services/pdf-extraction";
+import { prisma } from "@/lib/prisma";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -20,9 +21,23 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData();
   const file = formData.get("file");
+  const certificationCode = formData.get("certificationCode");
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Arquivo PDF obrigatorio." }, { status: 400 });
+  }
+
+  if (typeof certificationCode !== "string" || !certificationCode.trim()) {
+    return NextResponse.json({ error: "Certificacao obrigatoria." }, { status: 400 });
+  }
+
+  const certification = await prisma.certificationPreset.findUnique({
+    where: { code: certificationCode.trim() },
+    select: { code: true, name: true },
+  });
+
+  if (!certification) {
+    return NextResponse.json({ error: "Certificacao invalida." }, { status: 400 });
   }
 
   if (!isPdfFile(file)) {
@@ -34,6 +49,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    console.log("[Extract PDF]: Iniciando extracão");
     const buffer = Buffer.from(await file.arrayBuffer());
     const extractedText = await extractPdfText(buffer);
 
@@ -42,8 +58,10 @@ export async function POST(request: NextRequest) {
       characters: extractedText.length,
       preview: extractedText.slice(0, 4000),
       extractedText,
+      certification,
     });
-  } catch {
+  } catch (e) {
+    console.log(`[Extract PDF]: Erro ao processar documento: ${e}`);
     return NextResponse.json({ error: "Falha ao processar PDF." }, { status: 422 });
   }
 }
