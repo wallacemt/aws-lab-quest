@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppLayout } from "@/components/AppLayout";
 import { BadgesView } from "@/components/BadgesView";
+import { UserProfileModal } from "@/components/UserProfileModal";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { LevelBadge } from "@/components/ui/LevelBadge";
@@ -30,11 +31,7 @@ export function ProfileScreen() {
     setNeedsCertificationReview,
   } = useUserProfile();
 
-  const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
-  const [certification, setCertification] = useState("");
-  const [certificationPresetCode, setCertificationPresetCode] = useState("");
-  const [favoriteTheme, setFavoriteTheme] = useState("");
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -46,15 +43,14 @@ export function ProfileScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
 
-  // Sync local form state when profile loads
+  // Keep onboarding flow forcing profile completion through modal.
   useEffect(() => {
     if (!hydrated) return;
-    setName(profile.name);
-    setUsername(profile.username);
-    setCertification(profile.certification);
-    setCertificationPresetCode(profile.certificationPresetCode);
-    setFavoriteTheme(profile.favoriteTheme);
-  }, [hydrated, profile]);
+
+    if (isOnboardingProfile) {
+      setEditProfileOpen(true);
+    }
+  }, [hydrated, isOnboardingProfile]);
 
   // Fetch total XP from history
   useEffect(() => {
@@ -91,16 +87,23 @@ export function ProfileScreen() {
     }
   }
 
-  async function handleSave() {
+  async function handleSave(nextDraft: {
+    name: string;
+    username: string;
+    certification: string;
+    certificationPresetCode: string;
+    favoriteTheme: string;
+  }) {
     const selectedCertificationName =
-      certificationOptions.find((option) => option.code === certificationPresetCode)?.name ?? certification;
+      certificationOptions.find((option) => option.code === nextDraft.certificationPresetCode)?.name ??
+      nextDraft.certification;
 
     const nextProfile = sanitizeProfileInput({
-      name,
-      username,
+      name: nextDraft.name,
+      username: nextDraft.username,
       certification: selectedCertificationName,
-      certificationPresetCode,
-      favoriteTheme,
+      certificationPresetCode: nextDraft.certificationPresetCode,
+      favoriteTheme: nextDraft.favoriteTheme,
     });
     const validationError = getProfileValidationError(nextProfile);
 
@@ -120,6 +123,7 @@ export function ProfileScreen() {
       await setProfile(nextProfile);
       setNeedsCertificationReview(false);
       setSaveMsg(isOnboardingProfile ? "Perfil concluido!" : "Perfil salvo!");
+      setEditProfileOpen(false);
 
       if (onboardingStep) {
         clearOnboardingStep();
@@ -284,7 +288,7 @@ export function ProfileScreen() {
 
         {/* Edit form */}
         <PixelCard className="space-y-4">
-          <h3 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Editar Perfil</h3>
+          <h3 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Perfil</h3>
 
           {isOnboardingProfile && (
             <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
@@ -297,77 +301,20 @@ export function ProfileScreen() {
             </PixelCard>
           )}
 
-          <label className="block font-[var(--font-body)] text-sm">
-            Nome de jogador *
-            <input
-              type="text"
-              required
-              className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-
-          <label className="block font-[var(--font-body)] text-sm">
-            Nome de usuario *
-            <div className="mt-1 flex gap-2">
-              <input
-                type="text"
-                required
-                className="w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] lowercase focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="ex: cloud_runner_123"
-              />
-              <PixelButton
-                type="button"
-                variant="ghost"
-                onClick={async () => {
-                  const response = await fetch("/api/user/username", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ random: true }),
-                  });
-
-                  const data = (await response.json()) as { username?: string; error?: string };
-                  if (!response.ok || !data.username) {
-                    setSaveError(data.error ?? "Nao foi possivel gerar username.");
-                    return;
-                  }
-
-                  setUsername(data.username);
-                  setSaveError(null);
-                }}
-              >
-                Gerar
-              </PixelButton>
-            </div>
-            <p className="mt-1 font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
-              Use de 3 a 24 caracteres: letras, numeros ou _
+          <div className="space-y-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
+            <p>
+              <strong>Nome:</strong> {profile.name || "Nao definido"}
             </p>
-          </label>
-
-          <label className="block font-[var(--font-body)] text-sm">
-            Certificacao AWS alvo *
-            <select
-              required
-              className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
-              value={certificationPresetCode}
-              onChange={(e) => {
-                const code = e.target.value;
-                const selected = certificationOptions.find((option) => option.code === code);
-                setCertificationPresetCode(code);
-                setCertification(selected?.name ?? "");
-              }}
-            >
-              <option value="">Selecione uma certificacao</option>
-              {certificationOptions.map((option) => (
-                <option key={option.id} value={option.code}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <p>
+              <strong>Username:</strong> {profile.username ? `@${profile.username}` : "Nao definido"}
+            </p>
+            <p>
+              <strong>Certificacao alvo:</strong> {profile.certification || "Nao definida"}
+            </p>
+            <p>
+              <strong>Tema favorito:</strong> {profile.favoriteTheme || "Nao definido"}
+            </p>
+          </div>
 
           {needsCertificationReview && (
             <PixelCard className="border-yellow-500 bg-yellow-900/20 py-2">
@@ -378,18 +325,6 @@ export function ProfileScreen() {
             </PixelCard>
           )}
 
-          <label className="block font-[var(--font-body)] text-sm">
-            Tema favorito para quests *
-            <input
-              type="text"
-              required
-              placeholder="ex: games, anime, música..."
-              className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] focus:outline-none focus:ring-2 focus:ring-[var(--pixel-primary)]"
-              value={favoriteTheme}
-              onChange={(e) => setFavoriteTheme(e.target.value)}
-            />
-          </label>
-
           {saveError && (
             <PixelCard className="border-red-500 bg-red-900/20 py-2">
               <p className="font-[var(--font-body)] text-sm text-red-300">{saveError}</p>
@@ -397,12 +332,25 @@ export function ProfileScreen() {
           )}
 
           <div className="flex items-center gap-3">
-            <PixelButton onClick={handleSave} disabled={saving}>
-              {saving ? "Salvando..." : isOnboardingProfile ? "Salvar e entrar" : "Salvar Perfil"}
+            <PixelButton onClick={() => setEditProfileOpen(true)} disabled={saving}>
+              {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
             </PixelButton>
             {saveMsg && <span className="font-[var(--font-body)] text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
           </div>
         </PixelCard>
+
+        <UserProfileModal
+          open={editProfileOpen}
+          onClose={() => {
+            if (!saving) {
+              setEditProfileOpen(false);
+            }
+          }}
+          profile={profile}
+          currentUsername={profile.username}
+          certificationOptions={certificationOptions}
+          onSave={handleSave}
+        />
       </main>
     </AppLayout>
   );

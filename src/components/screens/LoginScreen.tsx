@@ -31,13 +31,7 @@ export function LoginScreen() {
       return;
     }
 
-    // Clear legacy localStorage data to avoid conflicts with DB-backed state
-    if (typeof window !== "undefined") {
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith("awlq_") && k !== "awlq_activeQuest" && k !== "awlq_font_scale")
-        .forEach((k) => localStorage.removeItem(k));
-    }
-
+    
     const from = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") : null;
     const safeTarget = from && from.startsWith("/") && !from.startsWith("//") ? from : "/";
     router.replace(safeTarget);

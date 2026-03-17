@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getLevel } from "@/lib/levels";
+import { getLevel, getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
 import { Task } from "@/lib/types";
+import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 
 function normalizeTaskSnapshot(tasks: unknown): Task[] {
   if (!Array.isArray(tasks)) {
@@ -62,18 +63,37 @@ export async function POST(request: NextRequest) {
     userName?: string;
   };
 
-  if (!body.title || !body.theme || body.xp == null || !body.tasksCount || !body.completedAt) {
+  if (!body.title || !body.theme || !body.tasksCount || !body.completedAt) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
   const taskSnapshot = normalizeTaskSnapshot(body.taskSnapshot);
+  const completedTasks = taskSnapshot.filter((task) => task.completed);
+  const taskBase = completedTasks.length > 0 ? completedTasks : taskSnapshot;
+
+  let computedXp = Math.max(0, Math.round(body.xp ?? 0));
+  if (taskBase.length > 0) {
+    const weights = await listXpWeightsByActivity("LAB");
+
+    computedXp = taskBase.reduce((total, task) => {
+      const difficulty = task.difficulty ?? "medium";
+      const baseXp = getTaskXpByDifficulty(difficulty);
+      const weight = resolveXpWeight(weights, {
+        activityType: "LAB",
+        topic: task.service,
+        difficulty,
+      });
+
+      return total + applyWeightedXp(baseXp, weight);
+    }, 0);
+  }
 
   const item = await prisma.questHistory.create({
     data: {
       userId: session.user.id,
       title: body.title,
       theme: body.theme,
-      xp: body.xp,
+      xp: computedXp,
       tasksCount: body.tasksCount,
       taskSnapshot,
       sourceLabText: body.sourceLabText ? String(body.sourceLabText).slice(0, 30000) : null,

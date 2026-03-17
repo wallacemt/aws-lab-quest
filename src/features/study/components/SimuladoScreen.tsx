@@ -289,322 +289,318 @@ export function SimuladoScreen() {
 
   if (!hydrated) {
     return (
-      <AppLayout>
-        <main className="flex min-h-[60vh] items-center justify-center">
-          <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
-        </main>
-      </AppLayout>
+      <main className="flex min-h-[60vh] items-center justify-center">
+        <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
+      </main>
     );
   }
 
   return (
-    <AppLayout>
-      <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
-        <PixelCard>
-          <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
-          <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
+    <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
+      <PixelCard>
+        <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
+        <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+          Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
+        </p>
+      </PixelCard>
+
+      {!inExamFlow && !inReviewFlow && (
+        <PixelCard className="space-y-4">
+          <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">
+            Configurar Simulado
+          </h2>
+          <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+            O filtro da certificacao e automatico pelo seu perfil. Selecione dificuldade e inicie a prova.
           </p>
+
+          <div className="space-y-2">
+            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Dificuldade</p>
+            <div className="flex flex-wrap gap-2">
+              {DIFFICULTIES.map((difficulty) => {
+                const selected = selectedDifficulties.includes(difficulty);
+                return (
+                  <button
+                    key={difficulty}
+                    type="button"
+                    onClick={() => toggleDifficulty(difficulty)}
+                    className={`border px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
+                      selected
+                        ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
+                        : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                    }`}
+                  >
+                    {difficulty}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
+
+          <div className="flex justify-end">
+            <PixelButton onClick={() => void handleStartWithRulesGate()} disabled={loading}>
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                  Gerando Simulado...
+                </span>
+              ) : (
+                "Iniciar Simulado (65 questoes)"
+              )}
+            </PixelButton>
+          </div>
         </PixelCard>
+      )}
 
-        {!inExamFlow && !inReviewFlow && (
-          <PixelCard className="space-y-4">
-            <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">
-              Configurar Simulado
-            </h2>
-            <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-              O filtro da certificacao e automatico pelo seu perfil. Selecione dificuldade e inicie a prova.
-            </p>
+      {showRulesModal && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
+          <PixelCard className="w-full max-w-2xl space-y-4 border-yellow-500 bg-yellow-900/15">
+            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-yellow-300">Regras do Simulado</p>
+            <h3 className="font-[var(--font-body)] text-xl">Ambiente de prova real</h3>
 
-            <div className="space-y-2">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Dificuldade</p>
-              <div className="flex flex-wrap gap-2">
-                {DIFFICULTIES.map((difficulty) => {
-                  const selected = selectedDifficulties.includes(difficulty);
+            <ul className="space-y-2 font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+              <li>1. O simulado possui 65 questoes e cronometro ativo.</li>
+              <li>2. Nao e permitido consultar materiais externos durante a prova.</li>
+              <li>3. O objetivo e simular o ambiente real da certificacao AWS.</li>
+              <li>4. Ao iniciar, mantenha foco continuo ate o envio final.</li>
+            </ul>
+
+            <label className="flex items-start gap-3 border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-3">
+              <input
+                type="checkbox"
+                checked={rulesAccepted}
+                onChange={(event) => setRulesAccepted(event.target.checked)}
+                className="mt-1"
+              />
+              <span className="font-[var(--font-body)] text-sm">
+                Li e aceito as regras do simulado para reproduzir um ambiente real de prova.
+              </span>
+            </label>
+
+            <div className="flex justify-end gap-2">
+              <PixelButton variant="ghost" onClick={() => setShowRulesModal(false)}>
+                Cancelar
+              </PixelButton>
+              <PixelButton onClick={() => void confirmRulesAndStart()} disabled={!rulesAccepted || loading}>
+                Aceitar e iniciar simulado
+              </PixelButton>
+            </div>
+          </PixelCard>
+        </div>
+      )}
+
+      {(inExamFlow || inReviewFlow) && currentQuestion && (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="space-y-4">
+            {inExamFlow && (
+              <PixelCard className="flex flex-wrap items-center justify-between gap-2 border-red-500 bg-red-900/10">
+                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
+                  Prova em andamento · Certificacao {session?.certificationCode}
+                </p>
+                <div className="border-2 border-red-400 px-3 py-1 font-[var(--font-pixel)] text-sm text-red-300">
+                  {timerLabel}
+                </div>
+              </PixelCard>
+            )}
+
+            {inReviewFlow && result && (
+              <PixelCard className="space-y-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
+                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                  Resultado Final - {result.certificationCode}
+                </p>
+                <p className="font-[var(--font-body)] text-base">
+                  Pontuacao: {result.scorePercent}% ({result.correct}/{result.total})
+                </p>
+                <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                  {result.historySaved
+                    ? "Resultado salvo no seu historico."
+                    : "Resultado concluido, mas nao foi possivel salvar no historico."}
+                </p>
+              </PixelCard>
+            )}
+
+            <PixelCard className="space-y-4">
+              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+                Questao {currentIndex + 1} de {questions.length} · {currentQuestion.topic} ·{" "}
+                {currentQuestion.difficulty}
+              </p>
+              <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
+
+              <div className="grid gap-2">
+                {OPTIONS.map((option) => {
+                  const text = currentQuestion.options[option];
+                  if (!text) return null;
+                  const isReviewing = submitted;
+                  const isCorrectOption = isReviewing && option === currentQuestion.correctOption;
+                  const isSelectedWrong =
+                    isReviewing && answers[currentQuestion.id] === option && option !== currentQuestion.correctOption;
                   return (
-                    <button
-                      key={difficulty}
-                      type="button"
-                      onClick={() => toggleDifficulty(difficulty)}
-                      className={`border px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
-                        selected
-                          ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
-                          : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                    <label
+                      key={`${currentQuestion.id}-${option}`}
+                      className={`flex items-start gap-2 border-2 px-3 py-2 ${
+                        isCorrectOption
+                          ? "border-[#2ecc71] bg-green-900/35"
+                          : isSelectedWrong
+                            ? "border-[#e74c3c] bg-red-900/35"
+                            : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
                       }`}
                     >
-                      {difficulty}
+                      <input
+                        type="radio"
+                        name={currentQuestion.id}
+                        checked={answers[currentQuestion.id] === option}
+                        onChange={() =>
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [currentQuestion.id]: option,
+                          }))
+                        }
+                        disabled={submitted}
+                      />
+                      <span className="font-[var(--font-body)] text-sm">
+                        {option}) {text}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {submitted && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <PixelCard
+                    className={
+                      answers[currentQuestion.id] === currentQuestion.correctOption
+                        ? "border-[#2ecc71] bg-green-900/25"
+                        : "border-[#e74c3c] bg-red-900/25"
+                    }
+                  >
+                    <p className="font-[var(--font-pixel)] text-[10px] uppercase">
+                      {answers[currentQuestion.id] === currentQuestion.correctOption
+                        ? "✓ Resposta correta"
+                        : "✗ Resposta incorreta"}
+                    </p>
+
+                    {loadingReviewByQuestion[currentQuestion.id] && (
+                      <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                          Gerando revisao com IA...
+                        </span>
+                      </p>
+                    )}
+
+                    {currentReview && (
+                      <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                        {currentReview.summary}
+                      </p>
+                    )}
+
+                    <div className="mt-2 space-y-2">
+                      {OPTIONS.map((option) => {
+                        const text = currentQuestion.options[option];
+                        if (!text) return null;
+
+                        const isCorrectOption = option === currentQuestion.correctOption;
+                        const isSelected = option === answers[currentQuestion.id];
+
+                        return (
+                          <div
+                            key={`${currentQuestion.id}-review-${option}`}
+                            className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                          >
+                            <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+                              {option}) {isCorrectOption ? "correta" : "incorreta"}
+                              {isSelected ? " · sua resposta" : ""}
+                            </p>
+                            <p className="mt-1 font-[var(--font-body)] text-sm">
+                              {currentReview?.options[option] ??
+                                currentQuestion.explanations[option] ??
+                                "Sem explicacao adicional."}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </PixelCard>
+                </motion.div>
+              )}
+
+              <div className="flex flex-wrap justify-between gap-2">
+                <div className="flex gap-2">
+                  <PixelButton variant="ghost" onClick={() => void goToQuestion(currentIndex - 1)}>
+                    Anterior
+                  </PixelButton>
+                  <PixelButton onClick={() => void goToQuestion(currentIndex + 1)}>Proxima</PixelButton>
+                </div>
+
+                <div className="flex gap-2">
+                  {inExamFlow ? (
+                    <>
+                      <PixelButton variant="ghost" onClick={handleForceExit}>
+                        Encerrar
+                      </PixelButton>
+                      <PixelButton onClick={handleSubmitExam}>Enviar Simulado</PixelButton>
+                    </>
+                  ) : (
+                    <>
+                      <PixelButton variant="ghost" onClick={() => router.replace("/")}>
+                        Voltar ao inicio
+                      </PixelButton>
+                      <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
+                    </>
+                  )}
+                </div>
+              </div>
+            </PixelCard>
+          </section>
+
+          <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+            <PixelCard className="space-y-3">
+              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+                Navegacao da prova
+              </p>
+              <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                Respondidas: {answeredCount}/{questions.length}
+              </p>
+              <div className="grid grid-cols-5 gap-2">
+                {questions.map((question, index) => {
+                  const answered = Boolean(answers[question.id]);
+                  const isCurrent = index === currentIndex;
+                  return (
+                    <button
+                      key={question.id}
+                      type="button"
+                      onClick={() => void goToQuestion(index)}
+                      className={`border px-2 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
+                        isCurrent
+                          ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/20"
+                          : answered
+                            ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15"
+                            : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                      }`}
+                    >
+                      {index + 1}
                     </button>
                   );
                 })}
               </div>
-            </div>
-
-            {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
-
-            <div className="flex justify-end">
-              <PixelButton onClick={() => void handleStartWithRulesGate()} disabled={loading}>
-                {loading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
-                    Gerando Simulado...
-                  </span>
-                ) : (
-                  "Iniciar Simulado (65 questoes)"
-                )}
-              </PixelButton>
-            </div>
-          </PixelCard>
-        )}
-
-        {showRulesModal && (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
-            <PixelCard className="w-full max-w-2xl space-y-4 border-yellow-500 bg-yellow-900/15">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-yellow-300">Regras do Simulado</p>
-              <h3 className="font-[var(--font-body)] text-xl">Ambiente de prova real</h3>
-
-              <ul className="space-y-2 font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
-                <li>1. O simulado possui 65 questoes e cronometro ativo.</li>
-                <li>2. Nao e permitido consultar materiais externos durante a prova.</li>
-                <li>3. O objetivo e simular o ambiente real da certificacao AWS.</li>
-                <li>4. Ao iniciar, mantenha foco continuo ate o envio final.</li>
-              </ul>
-
-              <label className="flex items-start gap-3 border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-3">
-                <input
-                  type="checkbox"
-                  checked={rulesAccepted}
-                  onChange={(event) => setRulesAccepted(event.target.checked)}
-                  className="mt-1"
-                />
-                <span className="font-[var(--font-body)] text-sm">
-                  Li e aceito as regras do simulado para reproduzir um ambiente real de prova.
-                </span>
-              </label>
-
-              <div className="flex justify-end gap-2">
-                <PixelButton variant="ghost" onClick={() => setShowRulesModal(false)}>
-                  Cancelar
-                </PixelButton>
-                <PixelButton onClick={() => void confirmRulesAndStart()} disabled={!rulesAccepted || loading}>
-                  Aceitar e iniciar simulado
-                </PixelButton>
-              </div>
             </PixelCard>
-          </div>
-        )}
+          </aside>
+        </div>
+      )}
 
-        {(inExamFlow || inReviewFlow) && currentQuestion && (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <section className="space-y-4">
-              {inExamFlow && (
-                <PixelCard className="flex flex-wrap items-center justify-between gap-2 border-red-500 bg-red-900/10">
-                  <p className="font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
-                    Prova em andamento · Certificacao {session?.certificationCode}
-                  </p>
-                  <div className="border-2 border-red-400 px-3 py-1 font-[var(--font-pixel)] text-sm text-red-300">
-                    {timerLabel}
-                  </div>
-                </PixelCard>
-              )}
-
-              {inReviewFlow && result && (
-                <PixelCard className="space-y-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
-                  <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
-                    Resultado Final - {result.certificationCode}
-                  </p>
-                  <p className="font-[var(--font-body)] text-base">
-                    Pontuacao: {result.scorePercent}% ({result.correct}/{result.total})
-                  </p>
-                  <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                    {result.historySaved
-                      ? "Resultado salvo no seu historico."
-                      : "Resultado concluido, mas nao foi possivel salvar no historico."}
-                  </p>
-                </PixelCard>
-              )}
-
-              <PixelCard className="space-y-4">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
-                  Questao {currentIndex + 1} de {questions.length} · {currentQuestion.topic} ·{" "}
-                  {currentQuestion.difficulty}
-                </p>
-                <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
-
-                <div className="grid gap-2">
-                  {OPTIONS.map((option) => {
-                    const text = currentQuestion.options[option];
-                    if (!text) return null;
-                    const isReviewing = submitted;
-                    const isCorrectOption = isReviewing && option === currentQuestion.correctOption;
-                    const isSelectedWrong =
-                      isReviewing && answers[currentQuestion.id] === option && option !== currentQuestion.correctOption;
-                    return (
-                      <label
-                        key={`${currentQuestion.id}-${option}`}
-                        className={`flex items-start gap-2 border-2 px-3 py-2 ${
-                          isCorrectOption
-                            ? "border-[#2ecc71] bg-green-900/35"
-                            : isSelectedWrong
-                              ? "border-[#e74c3c] bg-red-900/35"
-                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name={currentQuestion.id}
-                          checked={answers[currentQuestion.id] === option}
-                          onChange={() =>
-                            setAnswers((prev) => ({
-                              ...prev,
-                              [currentQuestion.id]: option,
-                            }))
-                          }
-                          disabled={submitted}
-                        />
-                        <span className="font-[var(--font-body)] text-sm">
-                          {option}) {text}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                {submitted && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <PixelCard
-                      className={
-                        answers[currentQuestion.id] === currentQuestion.correctOption
-                          ? "border-[#2ecc71] bg-green-900/25"
-                          : "border-[#e74c3c] bg-red-900/25"
-                      }
-                    >
-                      <p className="font-[var(--font-pixel)] text-[10px] uppercase">
-                        {answers[currentQuestion.id] === currentQuestion.correctOption
-                          ? "✓ Resposta correta"
-                          : "✗ Resposta incorreta"}
-                      </p>
-
-                      {loadingReviewByQuestion[currentQuestion.id] && (
-                        <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                          <span className="inline-flex items-center gap-2">
-                            <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
-                            Gerando revisao com IA...
-                          </span>
-                        </p>
-                      )}
-
-                      {currentReview && (
-                        <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                          {currentReview.summary}
-                        </p>
-                      )}
-
-                      <div className="mt-2 space-y-2">
-                        {OPTIONS.map((option) => {
-                          const text = currentQuestion.options[option];
-                          if (!text) return null;
-
-                          const isCorrectOption = option === currentQuestion.correctOption;
-                          const isSelected = option === answers[currentQuestion.id];
-
-                          return (
-                            <div
-                              key={`${currentQuestion.id}-review-${option}`}
-                              className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
-                            >
-                              <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
-                                {option}) {isCorrectOption ? "correta" : "incorreta"}
-                                {isSelected ? " · sua resposta" : ""}
-                              </p>
-                              <p className="mt-1 font-[var(--font-body)] text-sm">
-                                {currentReview?.options[option] ??
-                                  currentQuestion.explanations[option] ??
-                                  "Sem explicacao adicional."}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </PixelCard>
-                  </motion.div>
-                )}
-
-                <div className="flex flex-wrap justify-between gap-2">
-                  <div className="flex gap-2">
-                    <PixelButton variant="ghost" onClick={() => void goToQuestion(currentIndex - 1)}>
-                      Anterior
-                    </PixelButton>
-                    <PixelButton onClick={() => void goToQuestion(currentIndex + 1)}>Proxima</PixelButton>
-                  </div>
-
-                  <div className="flex gap-2">
-                    {inExamFlow ? (
-                      <>
-                        <PixelButton variant="ghost" onClick={handleForceExit}>
-                          Encerrar
-                        </PixelButton>
-                        <PixelButton onClick={handleSubmitExam}>Enviar Simulado</PixelButton>
-                      </>
-                    ) : (
-                      <>
-                        <PixelButton variant="ghost" onClick={() => router.replace("/")}>
-                          Voltar ao inicio
-                        </PixelButton>
-                        <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </PixelCard>
-            </section>
-
-            <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
-              <PixelCard className="space-y-3">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
-                  Navegacao da prova
-                </p>
-                <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                  Respondidas: {answeredCount}/{questions.length}
-                </p>
-                <div className="grid grid-cols-5 gap-2">
-                  {questions.map((question, index) => {
-                    const answered = Boolean(answers[question.id]);
-                    const isCurrent = index === currentIndex;
-                    return (
-                      <button
-                        key={question.id}
-                        type="button"
-                        onClick={() => void goToQuestion(index)}
-                        className={`border px-2 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
-                          isCurrent
-                            ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/20"
-                            : answered
-                              ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15"
-                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                        }`}
-                      >
-                        {index + 1}
-                      </button>
-                    );
-                  })}
-                </div>
-              </PixelCard>
-            </aside>
-          </div>
-        )}
-
-        {!isActive && questions.length > 0 && !submitted && (
-          <PixelCard className="border-yellow-500 bg-yellow-900/20">
-            <p className="font-[var(--font-body)] text-sm text-yellow-300">
-              O tempo do simulado terminou ou a sessao foi encerrada. Envie ou reinicie para continuar.
-            </p>
-          </PixelCard>
-        )}
-      </main>
-    </AppLayout>
+      {!isActive && questions.length > 0 && !submitted && (
+        <PixelCard className="border-yellow-500 bg-yellow-900/20">
+          <p className="font-[var(--font-body)] text-sm text-yellow-300">
+            O tempo do simulado terminou ou a sessao foi encerrada. Envie ou reinicie para continuar.
+          </p>
+        </PixelCard>
+      )}
+    </main>
   );
 }

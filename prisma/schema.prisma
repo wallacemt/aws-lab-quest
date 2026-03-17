@@ -234,3 +234,18 @@ model UserBadge {
   @@index([userId])
   @@index([badgeId])
 }
+
+model XpWeightConfig {
+  id           String   @id @default(cuid())
+  activityType String
+  topic        String   @default("*")
+  difficulty   String   @default("*")
+  multiplier   Float    @default(1)
+  bonusXp      Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([activityType, topic, difficulty])
+  @@index([activityType, active])
+}

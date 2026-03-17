@@ -14,7 +14,7 @@ const PUBLIC_PREFIXES = [
 const PUBLIC_EXACT_PATHS = ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest"];
 
 // Better Auth may prefix secure cookies in production environments.
-const SESSION_COOKIE_NAMES = [
+ const SESSION_COOKIE_NAMES = [
   "better-auth.session_token",
   "__Secure-better-auth.session_token",
   "__Host-better-auth.session_token",

@@ -1,8 +1,22 @@
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import { AWS_CERTIFICATION_PRESETS } from "@/lib/certification-presets";
 import { createClient } from "@supabase/supabase-js";
 import { SeedAwsService } from "@/types/seeds";
 import { LEVEL_DEFS, SERVICE_FALLBACK } from "@/lib/utils";
+
+const DEFAULT_XP_WEIGHTS = [
+  { activityType: "LAB", topic: "*", difficulty: "*", multiplier: 1.2, bonusXp: 0 },
+  { activityType: "KC", topic: "*", difficulty: "easy", multiplier: 0.8, bonusXp: 0 },
+  { activityType: "KC", topic: "*", difficulty: "medium", multiplier: 1, bonusXp: 0 },
+  { activityType: "KC", topic: "*", difficulty: "hard", multiplier: 1.25, bonusXp: 0 },
+  { activityType: "SIMULADO", topic: "*", difficulty: "easy", multiplier: 1, bonusXp: 0 },
+  { activityType: "SIMULADO", topic: "*", difficulty: "medium", multiplier: 1.2, bonusXp: 0 },
+  { activityType: "SIMULADO", topic: "*", difficulty: "hard", multiplier: 1.4, bonusXp: 0 },
+  { activityType: "KC", topic: "EC2", difficulty: "*", multiplier: 1.4, bonusXp: 20 },
+  { activityType: "KC", topic: "IAM", difficulty: "*", multiplier: 1.15, bonusXp: 10 },
+  { activityType: "KC", topic: "VPC", difficulty: "*", multiplier: 1.25, bonusXp: 15 },
+] as const;
 
 async function generateBadgeImage(prompt: string): Promise<{ data: Buffer; mimeType: string }> {
   const encoded = encodeURIComponent(prompt);
@@ -233,9 +247,70 @@ async function seedBadgesIfConfigured() {
   }
 }
 
+async function seedAdminIfConfigured() {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD?.trim();
+  const adminName = process.env.ADMIN_NAME?.trim() || "Admin";
+
+  if (!adminEmail || !adminPassword) {
+    console.log("Skipping admin seed (ADMIN_EMAIL / ADMIN_PASSWORD not provided).");
+    return;
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email: adminEmail } });
+
+  if (!existingUser) {
+    await auth.api.signUpEmail({
+      body: {
+        email: adminEmail,
+        password: adminPassword,
+        name: adminName,
+      },
+    });
+  }
+
+  await prisma.user.update({
+    where: { email: adminEmail },
+    data: { role: "admin" },
+  });
+
+  console.log(`Admin user ready: ${adminEmail}`);
+}
+
+async function seedXpWeights() {
+  console.log("Seeding XP weight configs...");
+
+  for (const config of DEFAULT_XP_WEIGHTS) {
+    await prisma.xpWeightConfig.upsert({
+      where: {
+        activityType_topic_difficulty: {
+          activityType: config.activityType,
+          topic: config.topic,
+          difficulty: config.difficulty,
+        },
+      },
+      create: {
+        activityType: config.activityType,
+        topic: config.topic,
+        difficulty: config.difficulty,
+        multiplier: config.multiplier,
+        bonusXp: config.bonusXp,
+        active: true,
+      },
+      update: {
+        multiplier: config.multiplier,
+        bonusXp: config.bonusXp,
+        active: true,
+      },
+    });
+  }
+}
+
 async function main() {
+  await seedAdminIfConfigured();
   await seedCertifications();
   await seedAwsServicesAndQuestions();
+  await seedXpWeights();
   await seedBadgesIfConfigured();
   console.log("Seed completed.");
 }

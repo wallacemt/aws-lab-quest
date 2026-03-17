@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
     POLLINATIONS_API_KEY: process.env.POLLINATIONS_API_KEY,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+    ADMIN_NAME: process.env.ADMIN_NAME,
   },
   images: {
     remotePatterns: [{ protocol: "https", hostname: new URL(process.env.SUPABASE_URL || "").hostname || "" }],
