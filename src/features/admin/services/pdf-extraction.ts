@@ -1,26 +1,39 @@
 import { PDFParse } from "pdf-parse";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 
 const MAX_TEXT_LENGTH = 120_000;
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {
-  //exemple
-  //     async function run() {
-  // 	const parser = new PDFParse({ url: 'https://bitcoin.org/bitcoin.pdf' });
+  const tempDir = await mkdtemp(join(tmpdir(), "alq-pdf-"));
+  const tempFilePath = join(tempDir, `${Date.now()}-${crypto.randomUUID()}.pdf`);
+  const tempFileUrl = pathToFileURL(tempFilePath);
 
-  // 	const result = await parser.getText();
-  // 	console.log(result.text);
-  // }
-//   const pdfParse = new PDFParse({ b });
-//   const result = await pdfParse(buffer);
-//   const normalized = result.text
-//     .replace(/\s+\n/g, "\n")
-//     .replace(/\n{3,}/g, "\n\n")
-//     .trim();
+  let parser: PDFParse | null = null;
 
-//   if (!normalized) {
-//     throw new Error("Nao foi possivel extrair texto do PDF.");
-//   }
+  try {
+    await writeFile(tempFilePath, buffer);
 
-//   return normalized.slice(0, MAX_TEXT_LENGTH);
-return 'teste'
+    parser = new PDFParse({ url: tempFileUrl });
+    const result = await parser.getText();
+
+    const normalized = result.text
+      .replace(/\s+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    if (!normalized) {
+      throw new Error("Nao foi possivel extrair texto do PDF.");
+    }
+
+    return normalized.slice(0, MAX_TEXT_LENGTH);
+  } finally {
+    if (parser) {
+      await parser.destroy().catch(() => undefined);
+    }
+
+    await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+  }
 }

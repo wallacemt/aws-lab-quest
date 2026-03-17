@@ -228,7 +228,6 @@ bun run db:studio
 - Upload de avatar e badges usam o bucket aws-lab-quest no Supabase Storage.
 - Se ocorrer erro "Invalid Compact JWS" no seed/upload, valide se SUPABASE_SERVICE_ROLE_KEY e uma chave real do projeto.
 
-
 ## Tutoriais
 
 Showcases e tutoriais de como usar o app.
@@ -239,9 +238,14 @@ Tutorial completo de como gerar uma quest gamificada usando AWS Labs.
 
 ➡️ [Assistir tutorial](./docs/showcase/labs/create-lab-quest-v1.md)
 
+### Integracao de Feedback
+
+Guia de como direcionar usuarios para o canal oficial de feedback via GitHub Issues.
+
+➡️ [Ver guia](./docs/github-feedback-integration.md)
+
 ### Em breve
 
 - Criando Knowledge Check (KC)
 - Fazendo Simulado
 - Modo Revisao
-

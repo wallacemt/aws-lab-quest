@@ -11,12 +11,30 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import appLogo from "@/assets/logo.png";
 
 export function LoginScreen() {
+  return <LoginScreenBase mode="user" />;
+}
+
+export function AdminLoginScreen() {
+  return <LoginScreenBase mode="admin" />;
+}
+
+function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  async function checkAdminAccess(): Promise<boolean> {
+    const response = await fetch("/api/admin/status", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    return response.ok;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,9 +49,28 @@ export function LoginScreen() {
       return;
     }
 
-    
     const from = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") : null;
     const safeTarget = from && from.startsWith("/") && !from.startsWith("//") ? from : "/";
+
+    const isAdmin = await checkAdminAccess();
+
+    if (mode === "admin") {
+      if (!isAdmin) {
+        await authClient.signOut();
+        setError("Conta sem permissao de administrador.");
+        setLoading(false);
+        return;
+      }
+
+      router.replace("/admin");
+      return;
+    }
+
+    if (isAdmin) {
+      router.replace("/admin");
+      return;
+    }
+
     router.replace(safeTarget);
   }
 
@@ -56,9 +93,7 @@ export function LoginScreen() {
               className="h-auto w-28 sm:w-32"
             />
           </div>
-          <h1 className="font-[var(--font-pixel)] text-xl text-[var(--pixel-primary)] drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
-            AWS LAB QUEST
-          </h1>
+          <h1 className="font-mono text-xl text-primary drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">AWS LAB QUEST</h1>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Entre para começar sua jornada na nuvem
           </p>
@@ -66,6 +101,11 @@ export function LoginScreen() {
 
         <PixelCard className="w-full max-w-md space-y-5">
           <h2 className="text-center font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Login</h2>
+          {mode === "admin" && (
+            <p className="text-center font-sans text-xs text-[var(--pixel-subtext)] flex items-center flex-col  justify-center">
+              <span className="font-mono">(ADMIN)</span> Area restrita para administradores
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <label className="block font-[var(--font-body)] text-sm">
@@ -112,13 +152,14 @@ export function LoginScreen() {
               {loading ? "Entrando..." : "Entrar no Jogo"}
             </PixelButton>
           </form>
-
-          <p className="text-center font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            Não tem conta?{" "}
-            <Link href="/register" className="font-semibold text-[var(--pixel-primary)] underline">
-              Criar conta
-            </Link>
-          </p>
+          {mode !== "admin" && (
+            <p className="text-center font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+              Não tem conta?{" "}
+              <Link href="/register" className="font-semibold text-[var(--pixel-primary)] underline">
+                Criar conta
+              </Link>
+            </p>
+          )}
         </PixelCard>
       </div>
     </div>

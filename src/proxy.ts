@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const AUTH_PAGES = ["/login", "/register"];
+const AUTH_PAGES = ["/login", "/register", "/admin/login"];
 const PUBLIC_PREFIXES = [
   "/api/auth",
   "/_next",
@@ -14,7 +14,7 @@ const PUBLIC_PREFIXES = [
 const PUBLIC_EXACT_PATHS = ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest"];
 
 // Better Auth may prefix secure cookies in production environments.
- const SESSION_COOKIE_NAMES = [
+const SESSION_COOKIE_NAMES = [
   "better-auth.session_token",
   "__Secure-better-auth.session_token",
   "__Host-better-auth.session_token",
@@ -41,13 +41,15 @@ export function proxy(request: NextRequest) {
   const hasSession = hasSessionCookie(request);
 
   if (!hasSession && !isAuthPage) {
-    const loginUrl = new URL("/login", request.url);
+    const loginPath = pathname.startsWith("/admin") ? "/admin/login" : "/login";
+    const loginUrl = new URL(loginPath, request.url);
     loginUrl.searchParams.set("from", pathname !== "/login" ? pathname : "/");
     return NextResponse.redirect(loginUrl);
   }
 
   if (hasSession && isAuthPage) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const target = pathname.startsWith("/admin") ? "/admin" : "/";
+    return NextResponse.redirect(new URL(target, request.url));
   }
 
   return NextResponse.next();

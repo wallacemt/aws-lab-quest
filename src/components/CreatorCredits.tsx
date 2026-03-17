@@ -66,6 +66,18 @@ export function CreatorCredits({ compact = true }: CreatorCreditsProps) {
             >
               LinkedIn
             </Link>
+            <Link
+              href="https://github.com/wallacemt/lab-gamification/issues/new/choose"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={
+                compact
+                  ? "border border-[var(--pixel-border)] bg-[var(--pixel-primary)]/20 px-2 py-1 text-center font-[var(--font-body)] text-xs hover:brightness-110"
+                  : "border-2 border-[var(--pixel-border)] bg-[var(--pixel-primary)]/20 px-3 py-2 text-center font-[var(--font-body)] text-sm hover:brightness-110"
+              }
+            >
+              Enviar Feedback
+            </Link>
           </div>
         </PixelCard>
       )}
