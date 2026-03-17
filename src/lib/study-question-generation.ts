@@ -11,6 +11,7 @@ type CertificationContext = {
   id: string;
   code: string;
   name: string;
+  examGuide?: string | null;
 };
 
 type GeneratedQuestion = {
@@ -112,13 +113,18 @@ function sanitizeGeneratedQuestion(
 async function generateQuestionsWithAi(input: {
   certification: CertificationContext;
   usage: StudyQuestionUsage;
-  difficulty: StudyQuestionDifficulty;
+  difficulty: StudyQuestionDifficulty | "mixed";
   desiredCount: number;
   services: ServiceContext[];
+  sourceText?: string;
 }): Promise<GeneratedQuestion[]> {
   const model = getAiModel();
 
   const servicesList = input.services.map((service) => `${service.code}: ${service.name}`).join("\n");
+  const guideContext = input.certification.examGuide
+    ? String(input.certification.examGuide).trim().slice(0, 14_000)
+    : "";
+  const sourceContext = input.sourceText ? String(input.sourceText).trim().slice(0, 22_000) : "";
 
   const prompt = `
 Voce e um especialista em preparacao para certificacoes AWS.
@@ -129,6 +135,9 @@ Contexto:
 - Tipo de uso: ${input.usage}
 - Dificuldade: ${input.difficulty}
 - Quantidade: ${input.desiredCount}
+
+${guideContext ? `Guia oficial da certificacao (use como referencia principal):\n${guideContext}\n` : ""}
+${sourceContext ? `Texto extraido de simulado/documento fonte (priorize este contexto):\n${sourceContext}\n` : ""}
 
 Servicos permitidos (USE SOMENTE ESTES CODES):
 ${servicesList}
@@ -214,6 +223,20 @@ async function saveGeneratedQuestions(input: {
 }
 
 export async function ensureQuestionPool(input: EnsurePoolInput): Promise<void> {
+  const certification = await prisma.certificationPreset.findUnique({
+    where: { id: input.certification.id },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      examGuide: true,
+    },
+  });
+
+  if (!certification) {
+    return;
+  }
+
   const candidateServices = await prisma.awsService.findMany({
     where: {
       active: true,
@@ -257,7 +280,7 @@ export async function ensureQuestionPool(input: EnsurePoolInput): Promise<void> 
   const generationTarget = Math.max(5, Math.min(30, missing + 5));
 
   const generatedRaw = await generateQuestionsWithAi({
-    certification: input.certification,
+    certification,
     usage: input.usage,
     difficulty: input.difficulty,
     desiredCount: generationTarget,
@@ -277,9 +300,82 @@ export async function ensureQuestionPool(input: EnsurePoolInput): Promise<void> 
   }
 
   await saveGeneratedQuestions({
-    certification: input.certification,
+    certification,
     usage: input.usage,
     generated: sanitized,
     serviceByCode,
   });
+}
+
+export async function ingestQuestionsFromPdf(input: {
+  certificationCode: string;
+  extractedText: string;
+  desiredCount?: number;
+}) {
+  const certification = await prisma.certificationPreset.findUnique({
+    where: { code: input.certificationCode },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      examGuide: true,
+    },
+  });
+
+  if (!certification) {
+    throw new Error("Certificacao invalida.");
+  }
+
+  const candidateServices = await prisma.awsService.findMany({
+    where: { active: true },
+    select: { id: true, code: true, name: true },
+    take: 45,
+  });
+
+  if (candidateServices.length === 0) {
+    throw new Error("Nenhum servico AWS ativo encontrado para gerar questoes.");
+  }
+
+  const desiredCount = Math.max(5, Math.min(50, Math.round(input.desiredCount ?? 20)));
+
+  const generatedRaw = await generateQuestionsWithAi({
+    certification,
+    usage: "BOTH",
+    difficulty: "mixed",
+    desiredCount,
+    services: candidateServices,
+    sourceText: input.extractedText,
+  });
+
+  if (generatedRaw.length === 0) {
+    throw new Error("Nao foi possivel gerar questoes a partir do PDF.");
+  }
+
+  const serviceByCode = new Map(
+    candidateServices.map((service) => [service.code, { id: service.id, code: service.code }]),
+  );
+  const allowedServiceCodes = new Set(candidateServices.map((service) => service.code));
+  const fallbackServiceCode = candidateServices[0].code;
+
+  const sanitized = generatedRaw
+    .map((item) => sanitizeGeneratedQuestion(item, allowedServiceCodes, fallbackServiceCode, "medium"))
+    .filter((item) => item.statement.length > 10)
+    .slice(0, desiredCount);
+
+  if (sanitized.length === 0) {
+    throw new Error("As questoes geradas ficaram invalidas apos sanitizacao.");
+  }
+
+  await saveGeneratedQuestions({
+    certification,
+    usage: "BOTH",
+    generated: sanitized,
+    serviceByCode,
+  });
+
+  return {
+    certificationCode: certification.code,
+    generatedCount: generatedRaw.length,
+    savedCount: sanitized.length,
+  };
 }

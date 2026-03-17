@@ -99,6 +99,7 @@ model CertificationPreset {
   code         String          @unique
   name         String
   description  String
+  examGuide    String?
   examMinutes  Int             @default(90)
   active       Boolean         @default(true)
   displayOrder Int             @default(0)

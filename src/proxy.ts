@@ -51,7 +51,7 @@ export function proxy(request: NextRequest) {
     const target = pathname.startsWith("/admin") ? "/admin" : "/";
     return NextResponse.redirect(new URL(target, request.url));
   }
-
+  
   return NextResponse.next();
 }
 
