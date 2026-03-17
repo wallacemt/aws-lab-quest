@@ -44,6 +44,7 @@ function HeaderComponent({ xp }: HeaderProps) {
   }, []);
 
   useEffect(() => {
+    
     if (!user) return;
     Promise.all([fetch("/api/quest-history"), fetch("/api/study/history")])
       .then(async ([questRes, studyRes]) => {

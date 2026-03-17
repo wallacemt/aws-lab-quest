@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
+import { getAdminStatus } from "@/features/admin/services/admin-api";
 
 type AppRouteShellProps = {
   children: ReactNode;
@@ -27,6 +28,17 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
       (!onboardingStep && (pathname === "/profile" || pathname === "/help")));
 
   useEffect(() => {
+    const checkAdminAndRedirect = async () => {
+      try {
+        const res = await getAdminStatus();
+        if (res.ready) {
+          router.replace("/admin");
+        }
+      } catch {
+        return;
+      }
+    };
+    checkAdminAndRedirect();
     if (!pathname || !simHydrated) {
       return;
     }
