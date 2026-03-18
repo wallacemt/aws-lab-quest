@@ -56,15 +56,6 @@ export function RegisterScreen() {
       return;
     }
 
-    if (normalizedUsername) {
-      const availability = await fetch(`/api/user/username?value=${encodeURIComponent(normalizedUsername)}`);
-      const availabilityData = (await availability.json()) as { available?: boolean; error?: string };
-      if (!availabilityData.available) {
-        setError(availabilityData.error ?? "Nome de usuario indisponivel.");
-        return;
-      }
-    }
-
     setLoading(true);
 
     const { error: authError } = await authClient.signUp.email({ name, email, password });
@@ -75,21 +66,26 @@ export function RegisterScreen() {
       return;
     }
 
-    const usernameResponse = await fetch("/api/user/username", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(normalizedUsername ? { username: normalizedUsername } : { random: true }),
-    });
-
-    if (!usernameResponse.ok) {
-      const usernameData = (await usernameResponse.json()) as { error?: string };
-      setError(usernameData.error ?? "Conta criada, mas falhou ao definir username. Edite no perfil.");
-    }
-
     setOnboardingStep("manual");
     router.replace("/help");
   }
+  const generateRandomUsername = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/user/username/generate");
+      const data = (await response.json()) as { username?: string; error?: string };
+      if (!response.ok || !data.username) {
+        setError(data.error ?? "Nao foi possivel gerar username.");
+        return;
+      }
 
+      setUsername(data.username);
+    } catch {
+      return;
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="relative min-h-screen bg-[var(--pixel-bg)]">
       <div className="absolute right-4 top-4">
@@ -148,7 +144,7 @@ export function RegisterScreen() {
                 />
                 <button
                   type="button"
-                  onClick={() => setUsername("")}
+                  onClick={async () => await generateRandomUsername()}
                   className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
                 >
                   Aleatorio

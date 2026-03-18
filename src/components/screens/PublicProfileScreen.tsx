@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { AchievementsView } from "@/components/AchievementsView";
 import { AppLayout } from "@/components/AppLayout";
 import { BadgesView } from "@/components/BadgesView";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { LevelBadge } from "@/components/ui/LevelBadge";
+import { AchievementItem } from "@/lib/achievements";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
 
@@ -49,6 +51,12 @@ type StudyEntry = {
   completedAt: string;
 };
 
+type PublicAchievements = {
+  total: number;
+  unlockedCount: number;
+  items: AchievementItem[];
+};
+
 export function PublicProfileScreen() {
   const params = useParams();
   const router = useRouter();
@@ -58,6 +66,7 @@ export function PublicProfileScreen() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [studyHistory, setStudyHistory] = useState<StudyEntry[]>([]);
+  const [achievements, setAchievements] = useState<PublicAchievements | null>(null);
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -75,6 +84,7 @@ export function PublicProfileScreen() {
         setStats(userData.stats);
         setHistory(userData.history ?? []);
         setStudyHistory(userData.studyHistory ?? []);
+        setAchievements(userData.achievements ?? null);
         setLevelBadges(badgesData.badges ?? []);
       })
       .catch(() => setNotFound(true))
@@ -229,6 +239,18 @@ export function PublicProfileScreen() {
             <BadgesView xp={totalXp} levelBadges={levelBadges} />
           </PixelCard>
         </motion.div>
+
+        {achievements && achievements.items.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+          >
+            <PixelCard>
+              <AchievementsView items={achievements.items} title="Conquistas" />
+            </PixelCard>
+          </motion.div>
+        )}
 
         {/* Recent quests */}
         {history.length > 0 && (

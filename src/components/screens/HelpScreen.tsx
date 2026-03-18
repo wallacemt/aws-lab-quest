@@ -43,17 +43,31 @@ const manualSections = [
   },
   {
     title: "4. Acompanhe sua evolucao",
-    objective: "Usar historico, leaderboard e badges para medir progresso.",
+    objective: "Usar historico, leaderboard em tempo real, badges e conquistas para medir progresso.",
     howTo: [
       "Consulte o historico para revisar quests concluidas e XP acumulado.",
-      "Use o leaderboard para comparar consistencia de estudo com outros jogadores.",
-      "Confira badges e compartilhe conquistas quando atingir novos niveis.",
+      "Use o leaderboard para comparar consistencia de estudo com outros jogadores em tempo real.",
+      "Acompanhe o contador de usuarios online no cabecalho quando houver mais de 1 jogador ativo.",
+      "Confira badges e a pagina de conquistas para planejar os proximos desbloqueios.",
+      "Compartilhe badges e conquistas desbloqueadas com links publicos.",
     ],
     bestExperience:
       "Volte ao historico depois de cada sessao de estudo para identificar temas recorrentes e manter ritmo de pratica.",
   },
   {
-    title: "5. Ajuste a experiencia ao seu ritmo",
+    title: "5. Simulado com guia oficial",
+    objective: "Garantir que os simulados sigam o exam guide oficial da certificacao alvo.",
+    howTo: [
+      "No admin, envie primeiro o PDF do Exam Guide da certificacao.",
+      "Se o PDF for escaneado e sem texto selecionavel, use o campo de fallback manual.",
+      "Somente apos salvar o exam guide, envie os PDFs de simulados para gerar questoes.",
+      "No fim do simulado, revise os pontos de fraqueza por servico para evolucao direcionada.",
+    ],
+    bestExperience:
+      "Sempre mantenha o exam guide atualizado para que a geracao de questoes continue aderente aos topicos e pesos oficiais.",
+  },
+  {
+    title: "6. Ajuste a experiencia ao seu ritmo",
     objective: "Aproveitar recursos de acessibilidade e personalizacao sem perder foco.",
     howTo: [
       "Use o controle de fonte no cabecalho para melhorar leitura durante labs longos.",

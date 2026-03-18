@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealtimeLeaderboard } from "@/hooks/useRealtimeLeaderboard";
 
 type LeaderboardEntry = {
   rank: number;
@@ -32,16 +33,29 @@ export function LeaderBoardScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/leaderboard")
-      .then((r) => r.json())
-      .then((data: { leaderboard?: LeaderboardEntry[]; error?: string }) => {
-        if (data.error) throw new Error(data.error);
-        setEntries(data.leaderboard ?? []);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Erro ao carregar leaderboard."))
-      .finally(() => setLoading(false));
+  const loadLeaderboard = useCallback(async () => {
+    try {
+      const response = await fetch("/api/leaderboard", { cache: "no-store" });
+      const data = (await response.json()) as { leaderboard?: LeaderboardEntry[]; error?: string };
+      if (!response.ok || data.error) {
+        throw new Error(data.error ?? "Erro ao carregar leaderboard.");
+      }
+      setEntries(data.leaderboard ?? []);
+      setError(null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Erro ao carregar leaderboard.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadLeaderboard();
+  }, [loadLeaderboard]);
+
+  useRealtimeLeaderboard(() => {
+    void loadLeaderboard();
+  });
 
   useEffect(() => {
     const term = searchTerm.trim();

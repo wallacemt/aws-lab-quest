@@ -8,6 +8,7 @@ import { LevelBadge } from "@/components/ui/LevelBadge";
 import { NavBar } from "@/components/NavBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
+import { useOnlineUsers } from "@/hooks/useOnlineUsers";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useTheme } from "next-themes";
 import Image from "next/image";
@@ -26,6 +27,7 @@ function HeaderComponent({ xp }: HeaderProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const { user, signOut } = useAuth();
+  const { onlineCount } = useOnlineUsers();
   const { isActive: simulatedExamActive, remainingSeconds } = useSimulatedExam();
   const router = useRouter();
   const { avatarUrl, profile } = useUserProfile();
@@ -44,7 +46,6 @@ function HeaderComponent({ xp }: HeaderProps) {
   }, []);
 
   useEffect(() => {
-    
     if (!user) return;
     Promise.all([fetch("/api/quest-history"), fetch("/api/study/history")])
       .then(async ([questRes, studyRes]) => {
@@ -95,6 +96,13 @@ function HeaderComponent({ xp }: HeaderProps) {
 
         {/* Desktop: right controls */}
         <div className="hidden items-center gap-2 md:flex">
+          {onlineCount > 1 && (
+            <div className="border-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15 px-3 py-2">
+              <span className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                {onlineCount} online
+              </span>
+            </div>
+          )}
           {simulatedExamActive && (
             <div className="flex items-center gap-2 border-2 border-red-500 bg-red-900/20 px-3 py-2">
               <span className="font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
@@ -163,6 +171,11 @@ function HeaderComponent({ xp }: HeaderProps) {
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 border-t border-[var(--pixel-border)] px-4 pb-4 pt-3 md:hidden xl:px-8">
+          {onlineCount > 1 && (
+            <div className="border-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15 px-3 py-2 text-center font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+              {onlineCount} online
+            </div>
+          )}
           {simulatedExamActive && (
             <div className="border-2 border-red-500 bg-red-900/20 px-3 py-2 text-center font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
               Simulado {simTimerLabel}

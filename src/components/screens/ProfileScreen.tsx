@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { AchievementsView } from "@/components/AchievementsView";
 import { AppLayout } from "@/components/AppLayout";
 import { BadgesView } from "@/components/BadgesView";
 import { UserProfileModal } from "@/components/UserProfileModal";
@@ -15,6 +16,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { getProfileValidationError, sanitizeProfileInput } from "@/lib/input-validation";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
 import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
+import { AchievementItem } from "@/lib/achievements";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
 
 export function ProfileScreen() {
@@ -39,6 +41,7 @@ export function ProfileScreen() {
   const [totalXp, setTotalXp] = useState(0);
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
   const [ownedBadgeIds, setOwnedBadgeIds] = useState<string[]>([]);
+  const [achievements, setAchievements] = useState<AchievementItem[]>([]);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
@@ -70,6 +73,15 @@ export function ProfileScreen() {
       .then((data: { badges?: LevelBadgeModel[]; ownedBadgeIds?: string[] }) => {
         setLevelBadges(data.badges ?? []);
         setOwnedBadgeIds(data.ownedBadgeIds ?? []);
+      })
+      .catch(() => void 0);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/achievements")
+      .then((r) => r.json())
+      .then((data: { achievements?: { items?: AchievementItem[] } }) => {
+        setAchievements(data.achievements?.items ?? []);
       })
       .catch(() => void 0);
   }, []);
@@ -285,6 +297,12 @@ export function ProfileScreen() {
         <PixelCard>
           <BadgesView xp={totalXp} levelBadges={levelBadges} />
         </PixelCard>
+
+        {achievements.length > 0 && (
+          <PixelCard>
+            <AchievementsView items={achievements} />
+          </PixelCard>
+        )}
 
         {/* Edit form */}
         <PixelCard className="space-y-4">
