@@ -29,6 +29,7 @@ model User {
   questHistory QuestHistory[]
   studyHistory StudySessionHistory[]
   userBadges   UserBadge[]
+  achievements UserAchievement[]
 
   @@map("user")
 }
@@ -234,6 +235,37 @@ model UserBadge {
   @@unique([userId, badgeId])
   @@index([userId])
   @@index([badgeId])
+}
+
+model Achievement {
+  id               String            @id @default(cuid())
+  code             String            @unique
+  name             String
+  description      String
+  rarity           String            @default("common")
+  imageUrl         String?
+  supabasePath     String?
+  generationPrompt String?
+  active           Boolean           @default(true)
+  displayOrder     Int               @default(0)
+  userAchievements UserAchievement[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  progress      Int         @default(0)
+  metadata      Json?
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
 }
 
 model XpWeightConfig {

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { AWS_CERTIFICATION_PRESETS } from "@/lib/certification-presets";
 import { createClient } from "@supabase/supabase-js";
 import { SeedAwsService } from "@/types/seeds";
+import { ACHIEVEMENT_DEFS } from "@/lib/achievement-catalog";
 import { LEVEL_DEFS, SERVICE_FALLBACK } from "@/lib/utils";
 
 const DEFAULT_XP_WEIGHTS = [
@@ -247,6 +248,100 @@ async function seedBadgesIfConfigured() {
   }
 }
 
+async function seedAchievementsIfConfigured() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.log("Seeding achievements without generated images (SUPABASE not configured).");
+
+    for (const def of ACHIEVEMENT_DEFS) {
+      const existing = await prisma.achievement.findUnique({ where: { code: def.code } });
+      if (existing) {
+        return;
+      }
+      await prisma.achievement.upsert({
+        where: { code: def.code },
+        create: {
+          code: def.code,
+          name: def.name,
+          description: def.description,
+          rarity: def.rarity,
+          generationPrompt: def.prompt,
+          displayOrder: def.displayOrder,
+          active: true,
+        },
+        update: {
+          name: def.name,
+          description: def.description,
+          rarity: def.rarity,
+          generationPrompt: def.prompt,
+          displayOrder: def.displayOrder,
+          active: true,
+        },
+      });
+    }
+
+    return;
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  console.log("Seeding achievements and generated badges...");
+
+  for (const def of ACHIEVEMENT_DEFS) {
+    const existing = await prisma.achievement.findUnique({ where: { code: def.code } });
+
+    let imageUrl = existing?.imageUrl ?? null;
+    let supabasePath = existing?.supabasePath ?? null;
+
+    if (!imageUrl || !supabasePath) {
+      const { data: imageBuffer, mimeType } = await generateBadgeImage(def.prompt);
+      const ext = mimeType.includes("png") ? "png" : "jpg";
+      const path = `achievements/${def.code}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("aws-lab-quest")
+        .upload(path, imageBuffer, { contentType: mimeType, upsert: true });
+
+      if (uploadError) {
+        throw new Error(`Upload failed for achievement ${def.code}: ${uploadError.message}`);
+      }
+
+      const { data: publicUrlData } = supabase.storage.from("aws-lab-quest").getPublicUrl(path);
+      imageUrl = publicUrlData.publicUrl;
+      supabasePath = path;
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
+
+    await prisma.achievement.upsert({
+      where: { code: def.code },
+      create: {
+        code: def.code,
+        name: def.name,
+        description: def.description,
+        rarity: def.rarity,
+        generationPrompt: def.prompt,
+        displayOrder: def.displayOrder,
+        imageUrl,
+        supabasePath,
+        active: true,
+      },
+      update: {
+        name: def.name,
+        description: def.description,
+        rarity: def.rarity,
+        generationPrompt: def.prompt,
+        displayOrder: def.displayOrder,
+        imageUrl,
+        supabasePath,
+        active: true,
+      },
+    });
+  }
+}
+
 async function seedAdminIfConfigured() {
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD?.trim();
@@ -312,6 +407,7 @@ async function main() {
   await seedAwsServicesAndQuestions();
   await seedXpWeights();
   await seedBadgesIfConfigured();
+  await seedAchievementsIfConfigured();
   console.log("Seed completed.");
 }
 
