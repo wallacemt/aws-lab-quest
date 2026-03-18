@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { syncUserAchievements } from "@/lib/achievements";
 import { getLevel, getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
+import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
 import { Task } from "@/lib/types";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 
@@ -135,6 +137,13 @@ export async function POST(request: NextRequest) {
       ),
     );
   }
+
+  void publishLeaderboardUpdatedEvent({
+    userId: session.user.id,
+    source: "LAB",
+    gainedXp: item.xp,
+  });
+  void syncUserAchievements(session.user.id);
 
   return NextResponse.json({ item }, { status: 201 });
 }

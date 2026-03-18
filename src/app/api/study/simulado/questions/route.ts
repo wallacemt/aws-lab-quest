@@ -27,13 +27,23 @@ export async function POST(request: NextRequest) {
     where: { userId: session.user.id },
     select: {
       certificationPresetId: true,
-      certificationPreset: { select: { code: true, name: true, examMinutes: true } },
+      certificationPreset: { select: { code: true, name: true, examMinutes: true, examGuide: true } },
     },
   });
 
   if (!profile?.certificationPresetId || !profile.certificationPreset?.code) {
     return NextResponse.json(
       { error: "Defina sua certificacao alvo no perfil antes de iniciar um simulado." },
+      { status: 400 },
+    );
+  }
+
+  if (!profile.certificationPreset.examGuide || profile.certificationPreset.examGuide.trim().length < 120) {
+    return NextResponse.json(
+      {
+        error:
+          "Guia oficial da certificacao nao encontrado. O admin precisa enviar o Exam Guide antes de liberar simulados.",
+      },
       { status: 400 },
     );
   }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUserAchievementSummary } from "@/lib/achievements";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -77,13 +78,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     },
   });
 
+  const achievements = await getUserAchievementSummary(userId);
+
   return NextResponse.json({
     user: {
       id: user.id,
       name: user.name,
       username: user.username,
       createdAt: user.createdAt,
-      avatarUrl: user.profile?.avatarUrl ?? "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
+      avatarUrl:
+        user.profile?.avatarUrl ??
+        "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
       certification: user.profile?.certification ?? "",
       favoriteTheme: user.profile?.favoriteTheme ?? "",
     },
@@ -93,5 +98,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     },
     history,
     studyHistory,
+    achievements,
   });
 }
