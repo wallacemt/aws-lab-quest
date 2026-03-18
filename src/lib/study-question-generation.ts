@@ -326,6 +326,12 @@ export async function ingestQuestionsFromPdf(input: {
     throw new Error("Certificacao invalida.");
   }
 
+  if (!certification.examGuide || certification.examGuide.trim().length < 120) {
+    throw new Error(
+      "Antes de enviar PDFs de simulado, faca upload do Exam Guide oficial da certificacao no painel admin.",
+    );
+  }
+
   const candidateServices = await prisma.awsService.findMany({
     where: { active: true },
     select: { id: true, code: true, name: true },
