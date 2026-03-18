@@ -112,7 +112,6 @@ function HeaderComponent({ xp }: HeaderProps) {
           )}
           <div className="flex items-center gap-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
             <span className="font-[var(--font-pixel)] text-[10px] uppercase">XP {displayedXp}</span>
-            <LevelBadge xp={displayedXp} />
           </div>
           <FontSizeControl />
           <ThemeToggle className="min-w-28" />

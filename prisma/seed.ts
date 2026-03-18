@@ -22,7 +22,7 @@ const DEFAULT_XP_WEIGHTS = [
 async function generateBadgeImage(prompt: string): Promise<{ data: Buffer; mimeType: string }> {
   const encoded = encodeURIComponent(prompt);
   const seed = Math.floor(Math.random() * 9999);
-  const url = `https://gen.pollinations.ai/image/${encoded}?model=gptimage&width=512&height=512&seed=${seed}&key=${process.env.POLLINATIONS_API_KEY}`;
+  const url = `https://gen.pollinations.ai/image/${encoded}?model=flux&width=512&height=512&seed=${seed}&key=${process.env.POLLINATIONS_API_KEY}`;
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const response = await fetch(url);
@@ -402,11 +402,11 @@ async function seedXpWeights() {
 }
 
 async function main() {
-  await seedAdminIfConfigured();
-  await seedCertifications();
-  await seedAwsServicesAndQuestions();
-  await seedXpWeights();
-  await seedBadgesIfConfigured();
+  // await seedAdminIfConfigured();
+  // await seedCertifications();
+  // await seedAwsServicesAndQuestions();
+  // await seedXpWeights();
+  // await seedBadgesIfConfigured();
   await seedAchievementsIfConfigured();
   console.log("Seed completed.");
 }
