@@ -56,6 +56,16 @@ export type StudyHistoryItem = {
   answersSnapshot: StudyAnswerSnapshotPayload[];
 };
 
+export type WeakServiceItem = {
+  topic: string;
+  serviceCode: string;
+  serviceName: string;
+  attempts: number;
+  errors: number;
+  correct: number;
+  errorRate: number;
+};
+
 type StudyExplainPayload = {
   questionId: string;
   selectedOption: QuestionOption;
@@ -173,4 +183,26 @@ export async function fetchStudyHistory(): Promise<StudyHistoryItem[]> {
   }
 
   return data.history ?? [];
+}
+
+export async function fetchWeakServices(params?: { take?: number; sample?: number }): Promise<WeakServiceItem[]> {
+  const searchParams = new URLSearchParams();
+
+  if (typeof params?.take === "number") {
+    searchParams.set("take", String(params.take));
+  }
+
+  if (typeof params?.sample === "number") {
+    searchParams.set("sample", String(params.sample));
+  }
+
+  const suffix = searchParams.toString();
+  const response = await fetch(`/api/study/weak-services${suffix ? `?${suffix}` : ""}`);
+  const data = await parseJson<{ weakServices?: WeakServiceItem[]; error?: string }>(response);
+
+  if (!response.ok || data.error) {
+    throw new Error(data.error ?? "Erro ao carregar fraquezas por servico.");
+  }
+
+  return data.weakServices ?? [];
 }

@@ -1,78 +1,96 @@
-import PdfParse from "pdf-parse";
-import pdf from "pdf-parse";
 import PDFParser from "pdf2json";
 const MAX_TEXT_LENGTH = 120_000;
+
+function normalizeText(input: string): string {
+  return input
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, MAX_TEXT_LENGTH);
+}
+
+function decodePdf2JsonPayload(payload: unknown): string {
+  if (!payload || typeof payload !== "object" || !("Pages" in payload)) {
+    return "";
+  }
+
+  const pages = (payload as { Pages?: Array<{ Texts?: Array<{ R?: Array<{ T?: string }> }> }> }).Pages ?? [];
+  const parts: string[] = [];
+
+  for (const page of pages) {
+    const texts = page.Texts ?? [];
+    for (const textNode of texts) {
+      const runs = textNode.R ?? [];
+      for (const run of runs) {
+        if (typeof run.T !== "string") {
+          continue;
+        }
+        try {
+          parts.push(decodeURIComponent(run.T));
+        } catch {
+          parts.push(run.T);
+        }
+      }
+    }
+    parts.push("\n");
+  }
+
+  return parts.join(" ");
+}
+
+async function extractWithPdf2Json(buffer: Buffer): Promise<string> {
+  const pdfParser = new PDFParser();
+
+  return new Promise((resolve, reject) => {
+    pdfParser.on("pdfParser_dataError", (errData: unknown) => {
+      const parserError =
+        typeof errData === "object" && errData !== null && "parserError" in errData
+          ? (errData as { parserError?: unknown }).parserError
+          : undefined;
+      reject(new Error(`pdf2json failure: ${String(parserError ?? "unknown")}`));
+    });
+
+    pdfParser.on("pdfParser_dataReady", (data: unknown) => {
+      const raw = pdfParser.getRawTextContent();
+      if (typeof raw === "string" && raw.trim().length > 0) {
+        resolve(raw);
+        return;
+      }
+
+      resolve(decodePdf2JsonPayload(data));
+    });
+
+    pdfParser.parseBuffer(buffer);
+  });
+}
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {
   const start = Date.now();
 
-  //   try {
-  //     console.log("[Extract PDF] Iniciando extração");
-  //     console.log(`[Extract PDF] Buffer size: ${buffer.length}`);
+  console.log("[Extract PDF] Iniciando extração");
+  console.log(`[Extract PDF] Buffer size: ${buffer.length}`);
 
-  //     const data = await pdf(buffer);
+  let parseText = "";
+  let parserErrorMessage = "";
 
-  //     console.log(`[Extract PDF] Páginas: ${data.numpages}`);
+  try {
+    const fallback = await extractWithPdf2Json(buffer);
+    parseText = normalizeText(fallback);
+    console.log(`[Extract PDF] pdf2json chars: ${parseText.length}`);
+  } catch (error) {
+    parserErrorMessage = error instanceof Error ? error.message : "pdf2json unknown error";
+    console.warn(`[Extract PDF] pdf2json falhou: ${parserErrorMessage}`);
+  }
 
-  //     const text = data.text || "";
+  if (!parseText.trim()) {
+    console.warn("[Extract PDF] Texto vazio - possivel PDF escaneado");
+    const detail = parserErrorMessage ? ` (${parserErrorMessage})` : "";
+    throw new Error(
+      `Nao foi possivel extrair texto do PDF${detail}. O arquivo parece escaneado/imagem. Use OCR ou cole o texto manualmente no campo de fallback.`,
+    );
+  }
 
-  //     if (!text.trim()) {
-  //       console.warn("[Extract PDF] Texto vazio - possível PDF escaneado");
-  //       throw new Error("Nao foi possivel extrair texto do PDF.");
-  //     }
-
-  //     const normalized = text
-  //       .replace(/\s+\n/g, "\n")
-  //       .replace(/\n{3,}/g, "\n\n")
-  //       .trim();
-
-  //     const finalText = normalized.slice(0, MAX_TEXT_LENGTH);
-
-  //     console.log(`[Extract PDF] Caracteres: ${finalText.length}`);
-  //     console.log(`[Extract PDF] Tempo: ${Date.now() - start}ms`);
-
-  //     return finalText;
-
-  //   } catch (err: any) {
-  //     console.error("[Extract PDF] Erro real:", err);
-  //     throw err;
-  //   }
-  const pdfParser = new PDFParser();
-  return new Promise((resolve, reject) => {
-    console.log("[Extract PDF] Iniciando extração");
-
-    pdfParser.on("pdfParser_dataError", (errData: any) => {
-      console.error("PDF parsing error:", errData.parserError);
-      reject(new Error("Failed to parse PDF"));
-    });
-
-    pdfParser.on("pdfParser_dataReady", () => {
-      const parsedText = pdfParser.getRawTextContent();
-      resolve(parsedText);
-    });
-
-    console.log(`[Extract PDF] Buffer size: ${buffer.length}`);
-    pdfParser.parseBuffer(buffer);
-  })
-    .then((text) => {
-      if (!(text as string).trim()) {
-        console.warn("[Extract PDF] Texto vazio - possível PDF escaneado");
-        throw new Error("Nao foi possivel extrair texto do PDF.");
-      }
-      const normalized = (text as string)
-        .replace(/\s+\n/g, "\n")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
-
-      const finalText = normalized.slice(0, MAX_TEXT_LENGTH);
-
-      console.log(`[Extract PDF] Caracteres: ${finalText.length}`);
-      console.log(`[Extract PDF] Tempo: ${Date.now() - start}ms`);
-
-      return finalText;
-    })
-    .catch((err) => {
-      console.error("[Extract PDF] Erro real:", err);
-      throw err;
-    });
+  console.log(`[Extract PDF] Caracteres finais: ${parseText.length}`);
+  console.log(`[Extract PDF] Tempo: ${Date.now() - start}ms`);
+  return parseText;
 }

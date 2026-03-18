@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getAdminStatus } from "@/features/admin/services/admin-api";
+import { useAuth } from "@/hooks/useAuth";
 
 const ADMIN_MENU = [
   { href: "/admin", label: "Dashboard" },
@@ -16,7 +17,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
-
+  const { signOut } = useAuth();
   useEffect(() => {
     async function bootstrap() {
       try {
@@ -86,6 +87,12 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            <button
+              className=" border border-red-500/40 px-3 py-2 text-xs uppercase transition-colors w-full hover:border-red-500/80 cursor-pointer hover:bg-[#111827] flex"
+              onClick={signOut}
+            >
+              Sair
+            </button>
           </nav>
         </aside>
 

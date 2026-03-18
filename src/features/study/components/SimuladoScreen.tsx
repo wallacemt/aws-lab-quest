@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
-import { createSimuladoQuestions, createStudyExplanation, saveStudyHistory } from "@/features/study/services";
+import {
+  createSimuladoQuestions,
+  createStudyExplanation,
+  fetchWeakServices,
+  saveStudyHistory,
+} from "@/features/study/services";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -26,6 +31,14 @@ type ExamResult = {
 };
 
 type RulesConsentMap = Record<string, string>;
+
+type WeakServiceMetric = {
+  topic: string;
+  attempts: number;
+  errors: number;
+  correct: number;
+  errorRate: number;
+};
 
 function formatTime(seconds: number): string {
   const clamped = Math.max(0, seconds);
@@ -55,12 +68,60 @@ export function SimuladoScreen() {
   const [selectedDifficulties, setSelectedDifficulties] = useState<TaskDifficulty[]>(["easy", "medium", "hard"]);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [rulesAccepted, setRulesAccepted] = useState(false);
+  const [historicalWeakServices, setHistoricalWeakServices] = useState<WeakServiceMetric[]>([]);
+  const [loadingWeakServices, setLoadingWeakServices] = useState(false);
 
   const inExamFlow = isActive && questions.length > 0 && !submitted;
   const inReviewFlow = submitted && questions.length > 0;
   const currentQuestion = questions[currentIndex] ?? null;
   const answeredCount = useMemo(() => questions.filter((q) => answers[q.id]).length, [answers, questions]);
   const timerLabel = useMemo(() => formatTime(remainingSeconds), [remainingSeconds]);
+  const weakServicesCurrentExam = useMemo<WeakServiceMetric[]>(() => {
+    if (questions.length === 0) {
+      return [];
+    }
+
+    const byTopic = new Map<string, WeakServiceMetric>();
+    for (const question of questions) {
+      const topic = question.topic?.trim() || "OUTROS";
+      const key = topic.toUpperCase();
+      const selectedOption = answers[question.id] ?? "-";
+      const current =
+        byTopic.get(key) ??
+        ({
+          topic,
+          attempts: 0,
+          errors: 0,
+          correct: 0,
+          errorRate: 0,
+        } as WeakServiceMetric);
+
+      current.attempts += 1;
+      if (selectedOption === question.correctOption) {
+        current.correct += 1;
+      } else {
+        current.errors += 1;
+      }
+
+      byTopic.set(key, current);
+    }
+
+    return Array.from(byTopic.values())
+      .map((item) => ({
+        ...item,
+        errorRate: item.attempts > 0 ? Math.round((item.errors / item.attempts) * 100) : 0,
+      }))
+      .filter((item) => item.errors > 0)
+      .sort((a, b) => {
+        if (b.errorRate !== a.errorRate) {
+          return b.errorRate - a.errorRate;
+        }
+        if (b.errors !== a.errors) {
+          return b.errors - a.errors;
+        }
+        return b.attempts - a.attempts;
+      });
+  }, [answers, questions]);
 
   const currentReview = currentQuestion ? reviewByQuestion[currentQuestion.id] : undefined;
   const consentScope = profile.certificationPresetCode?.trim() || "default";
@@ -103,6 +164,7 @@ export function SimuladoScreen() {
 
   async function handleStart() {
     setError(null);
+    setHistoricalWeakServices([]);
 
     if (selectedDifficulties.length === 0) {
       setError("Selecione pelo menos um nivel de dificuldade.");
@@ -250,6 +312,24 @@ export function SimuladoScreen() {
       historySaved,
     });
 
+    setLoadingWeakServices(true);
+    try {
+      const weakServices = await fetchWeakServices({ take: 5, sample: 35 });
+      setHistoricalWeakServices(
+        weakServices.map((item) => ({
+          topic: item.serviceCode || item.topic,
+          attempts: item.attempts,
+          errors: item.errors,
+          correct: item.correct,
+          errorRate: item.errorRate,
+        })),
+      );
+    } catch {
+      setHistoricalWeakServices([]);
+    } finally {
+      setLoadingWeakServices(false);
+    }
+
     if (questions[0]) {
       await fetchReviewForQuestion(questions[0], answers[questions[0].id] ?? questions[0].correctOption);
     }
@@ -271,6 +351,8 @@ export function SimuladoScreen() {
     setResult(null);
     setReviewByQuestion({});
     setLoadingReviewByQuestion({});
+    setHistoricalWeakServices([]);
+    setLoadingWeakServices(false);
     setError(null);
   }
 
@@ -411,6 +493,23 @@ export function SimuladoScreen() {
                 <p className="font-[var(--font-body)] text-base">
                   Pontuacao: {result.scorePercent}% ({result.correct}/{result.total})
                 </p>
+                {weakServicesCurrentExam.length > 0 && (
+                  <div className="space-y-2 border-t border-[var(--pixel-border)] pt-2">
+                    <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+                      Pontos de fraqueza neste simulado
+                    </p>
+                    <div className="space-y-1">
+                      {weakServicesCurrentExam.slice(0, 3).map((item) => (
+                        <p
+                          key={`exam-${item.topic}`}
+                          className="font-[var(--font-body)] text-xs text-[var(--pixel-text)]"
+                        >
+                          {item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
                   {result.historySaved
                     ? "Resultado salvo no seu historico."
@@ -589,6 +688,45 @@ export function SimuladoScreen() {
                 })}
               </div>
             </PixelCard>
+
+            {inReviewFlow && (
+              <PixelCard className="space-y-3 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
+                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                  Prioridades de revisao
+                </p>
+                {loadingWeakServices && (
+                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                    Atualizando pontos de fraqueza...
+                  </p>
+                )}
+
+                {!loadingWeakServices && historicalWeakServices.length > 0 && (
+                  <div className="space-y-2">
+                    {historicalWeakServices.map((item) => (
+                      <p
+                        key={`history-${item.topic}`}
+                        className="font-[var(--font-body)] text-xs text-[var(--pixel-text)]"
+                      >
+                        {item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {!loadingWeakServices && historicalWeakServices.length === 0 && weakServicesCurrentExam.length > 0 && (
+                  <div className="space-y-2">
+                    {weakServicesCurrentExam.slice(0, 5).map((item) => (
+                      <p
+                        key={`fallback-${item.topic}`}
+                        className="font-[var(--font-body)] text-xs text-[var(--pixel-text)]"
+                      >
+                        {item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </PixelCard>
+            )}
           </aside>
         </div>
       )}
