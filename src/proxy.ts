@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 const AUTH_PAGES = ["/login", "/register", "/admin/login"];
 const PUBLIC_PREFIXES = [
   "/api/auth",
+  "/api/health",
+  "/api/user/username/generate",
   "/_next",
   "/favicon",
   "/share",

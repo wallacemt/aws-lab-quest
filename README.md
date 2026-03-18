@@ -1,251 +1,158 @@
 # AWS Lab Quest
 
-Aplicacao web para transformar labs AWS em uma jornada gamificada, com autenticacao, progresso por XP, badges, historico e leaderboard.
+Aplicacao web para preparacao de certificacoes AWS em formato gamificado, com modos Lab, KC e Simulado, ranking em tempo real, conquistas persistidas e fluxo admin para ingestao de conteudo.
 
-## Implementacoes principais
+## Destaques atuais
 
-- Autenticacao com Better Auth (email e senha), sessoes persistidas no banco.
-- Banco PostgreSQL com Prisma 7 (adapter pg).
-- Perfil de usuario com avatar (upload para Supabase Storage).
-- Historico de labs persistido no banco.
-- Leaderboard Top 10 por XP.
-- Tela de perfil publico de outros jogadores.
-- Sistema de niveis com dificuldade exponencial (6 niveis).
-- Badges por nivel, com colecao visual e suspense de desbloqueio.
-- Animacoes com Framer Motion no perfil e badges.
-- Navegacao retro dinamica com telas separadas (Login, Register, Home, Quest, History, Leaderboard, Profile, Public Profile).
+- Autenticacao com Better Auth (email/senha) e sessoes persistidas.
+- Preparacao de certificacao com presets no banco (certification presets).
+- Modo Simulado com:
+  - regras obrigatorias antes de iniciar,
+  - score final,
+  - prioridades de revisao por servico fraco.
+- Pre-requisito de Exam Guide:
+  - admin deve enviar primeiro o guia oficial,
+  - fallback manual para guias em PDF escaneado.
+- Pipeline admin de PDF:
+  - extracao de texto,
+  - geracao de perguntas com IA,
+  - persistencia no banco.
+- Leaderboard em tempo real via Supabase Realtime.
+- Indicador de usuarios online (> 1) no header.
+- Sistema de niveis + badges por nivel.
+- Sistema de conquistas persistido no banco:
+  - 12 conquistas,
+  - progresso e desbloqueio,
+  - galeria dedicada com lock/unlock,
+  - compartilhamento publico de conquista.
+- Historico de labs/KC/simulado e perfil publico de jogador.
 
 ## Stack
 
 - Next.js 16 (App Router)
 - TypeScript
 - Tailwind CSS
-- Bun
 - Better Auth
-- Prisma 7
-- PostgreSQL
-- Supabase Storage
-- Google Gemini API (geracao de quests)
-- Pollinations API (seed de imagens de badge)
+- Prisma 7 + PostgreSQL
+- Supabase (Storage + Realtime)
+- Google Gemini API (geracao de conteudo)
+- Pollinations API (geracao de imagens de badge/conquista)
 - Framer Motion
-
-## Fluxo de paginas
-
-```mermaid
-flowchart TD
-		A[Start] --> B{Sessao valida?}
-		B -- Nao --> C[Login]
-		C --> D[Register]
-		D --> E[Profile Setup]
-		C --> F[Home]
-		B -- Sim --> F[Home]
-
-		F --> G[Quest]
-		F --> H[History]
-		F --> I[Leaderboard]
-		F --> J[Meu Profile]
-
-		I --> K[Public Profile de outro usuario]
-		J --> L[Editar profile, avatar e ver badges]
-		G --> M[Completa tasks]
-		M --> H
-```
-
-## Diagrama do banco
-
-```mermaid
-erDiagram
-
-    User {
-        string id PK
-        string name
-        string email UK
-        boolean emailVerified
-        datetime createdAt
-        datetime updatedAt
-    }
-
-    Session {
-        string id PK
-        string token UK
-        datetime expiresAt
-        string userId FK
-    }
-
-    Account {
-        string id PK
-        string providerId
-        string accountId
-        string userId FK
-        string password
-    }
-
-    Verification {
-        string id PK
-        string identifier
-        string value
-        datetime expiresAt
-    }
-
-    UserProfile {
-        string id PK
-        string userId FK
-        string certification
-        string favoriteTheme
-        string avatarUrl
-    }
-
-    QuestHistory {
-        string id PK
-        string userId FK
-        string title
-        string theme
-        int xp
-        int tasksCount
-        datetime completedAt
-    }
-
-    LevelBadge {
-        string id PK
-        int level UK
-        string name
-        string imageUrl
-        string supabasePath
-    }
-
-    User ||--o{ Session : has
-    User ||--o{ Account : has
-    User ||--|| UserProfile : owns
-    User ||--o{ QuestHistory : logs
-
-```
 
 ## Rotas principais
 
-- Paginas:
-  - /
-  - /login
-  - /register
-  - /quest
-  - /history
-  - /leaderboard
-  - /profile
-  - /players/[userId]
+### Paginas
 
-- APIs:
-  - /api/auth/[...all]
-  - /api/health
-  - /api/user/profile
-  - /api/upload-avatar
-  - /api/quest-history
-  - /api/leaderboard
-  - /api/badges
-  - /api/users/[userId]
+- /
+- /login
+- /register
+- /lab
+- /kc
+- /simulado
+- /history
+- /leaderboard
+- /achievements
+- /profile
+- /players/[userId]
+- /help
+- /share/badge/[userId]/[badgeId]
+- /share/achievement/[userId]/[achievementId]
+
+### APIs
+
+- /api/auth/[...all]
+- /api/user/profile
+- /api/user/username
+- /api/upload-avatar
+- /api/quest-history
+- /api/study/history
+- /api/study/kc/questions
+- /api/study/simulado/questions
+- /api/study/weak-services
+- /api/study/explain
+- /api/leaderboard
+- /api/online/count
+- /api/online/heartbeat
+- /api/badges
+- /api/achievements
+- /api/users/[userId]
+- /api/users/search
+- /api/admin/status
+- /api/admin/questions
+- /api/admin/users
+- /api/admin/pdf/extract
+- /api/admin/pdf/ingest
+- /api/admin/pdf/exam-guide
 
 ## Variaveis de ambiente
 
-Crie um arquivo .env com base em .env.local.example:
+Crie um arquivo .env baseado em .env.local.example.
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# PostgreSQL (Docker local)
 DATABASE_URL=postgresql://awlq_user:awlq_pass@localhost:5432/awlq
 
-# Better Auth
 BETTER_AUTH_SECRET=change_this_to_a_random_32_char_secret
 BETTER_AUTH_URL=http://localhost:3000
- APP_URL=http://localhost:3000
+APP_URL=http://localhost:3000
 
-# Supabase (storage for avatars + badges)
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
- SUPABASE_URL=https://your-project.supabase.co
- SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_ANON_KEY=your_anon_key_here
 
-# Optional (seed badge image provider)
 POLLINATIONS_API_KEY=optional_key
+
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=change_this_password
+ADMIN_NAME=Admin
 ```
 
 ## Como rodar localmente
 
-1. Instalar dependencias
-
 ```bash
-bun install
-```
-
-2. Subir PostgreSQL local
-
-```bash
+npm install
 docker compose up -d
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+npm run dev
 ```
 
-3. Gerar Prisma Client
-
-```bash
-bun run db:generate
-```
-
-4. Aplicar migracoes
-
-```bash
-bun run db:migrate
-```
-
-5. Popular badges no banco/storage
-
-```bash
-bun run db:seed
-```
-
-6. Rodar app
-
-```bash
-bun run dev
-```
-
-7. Abrir no navegador
-
-http://localhost:3000
+Acesse: http://localhost:3000
 
 ## Scripts
 
 ```bash
-bun run dev
-bun run build
-bun run start
-bun run lint
-bun run db:generate
-bun run db:migrate
-bun run db:seed
-bun run db:studio
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+npm run db:studio
 ```
 
-## Observacoes
+## Fluxos importantes
 
-- O proxy protege rotas privadas e redireciona para login quando nao ha sessao.
-- Upload de avatar e badges usam o bucket aws-lab-quest no Supabase Storage.
-- Se ocorrer erro "Invalid Compact JWS" no seed/upload, valide se SUPABASE_SERVICE_ROLE_KEY e uma chave real do projeto.
+### 1) Exam Guide obrigatorio
 
-## Tutoriais
+1. Admin envia o Exam Guide em /admin/upload (tipo: Exam Guide).
+2. Se PDF for escaneado, usar campo de texto manual.
+3. Depois disso, enviar PDF de simulado para ingestao de questoes.
+4. Sem exam guide, /api/study/simulado/questions retorna bloqueio funcional.
 
-Showcases e tutoriais de como usar o app.
+### 2) Conquistas persistidas
 
-### Criar Lab Quest
+1. Catalogo de conquistas existe na tabela Achievement.
+2. Desbloqueios por usuario ficam em UserAchievement.
+3. Unlock e sincronizacao acontecem automaticamente ao salvar historico de lab/KC/simulado.
+4. Galeria em /achievements mostra lock/unlock, progresso e compartilhamento.
 
-Tutorial completo de como gerar uma quest gamificada usando AWS Labs.
+## Documentacao complementar
 
-➡️ [Assistir tutorial](./docs/showcase/labs/create-lab-quest-v1.md)
-
-### Integracao de Feedback
-
-Guia de como direcionar usuarios para o canal oficial de feedback via GitHub Issues.
-
-➡️ [Ver guia](./docs/github-feedback-integration.md)
-
-### Em breve
-
-- Criando Knowledge Check (KC)
-- Fazendo Simulado
-- Modo Revisao
+- [Guia de feedback via GitHub](./docs/github-feedback-integration.md)
+- [Showcase: criar lab quest](./docs/showcase/labs/create-lab-quest-v1.md)
+- [Guia de arquitetura e funcionalidades recentes](./docs/platform-upgrade-2026-03.md)
+- [Guia do sistema de conquistas](./docs/achievements-system.md)
