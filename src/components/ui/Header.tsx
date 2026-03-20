@@ -1,9 +1,8 @@
-import { HelpCircle, Settings2, Star, User, Users } from "lucide-react";
+import { HelpCircle, Settings2, Star,} from "lucide-react";
 import Image from "next/image";
 import appLogo from "@/assets/logo.png";
 import { useTheme } from "next-themes";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useRouter } from "next/navigation";
@@ -23,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FontSizeControl } from "./font-size-control";
 
-export default function HeaderMin() {
+export default function Header() {
   const { theme } = useTheme();
 
   const { user, signOut } = useAuth();
@@ -31,7 +30,6 @@ export default function HeaderMin() {
   const { isActive: simulatedExamActive, remainingSeconds } = useSimulatedExam();
   const router = useRouter();
   const { avatarUrl, profile } = useUserProfile();
-  const name = profile?.username ?? "Anônimo";
 
   async function handleSignOut() {
     await signOut();
