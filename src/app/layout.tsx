@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import { Nunito_Sans, Press_Start_2P } from "next/font/google";
+import { Nunito_Sans, Press_Start_2P, Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/stores/providers";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 const pixelFont = Press_Start_2P({
   variable: "--font-pixel",
@@ -108,7 +111,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
       <body className={`${pixelFont.variable} ${bodyFont.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>

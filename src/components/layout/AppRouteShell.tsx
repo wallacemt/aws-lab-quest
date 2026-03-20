@@ -52,7 +52,7 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
     if (pathname !== "/simulado") {
       router.replace("/simulado");
     }
-  }, [pathname, router, simHydrated, simulatedExamActive]);
+  }, [pathname, router, simHydrated, simulatedExamActive, profile.role]);
 
   useEffect(() => {
     if (!pathname || !hydrated) {
