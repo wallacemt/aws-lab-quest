@@ -3,10 +3,10 @@
 import { memo, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FontSizeControl } from "@/components/FontSizeControl";
+import { FontSizeControl } from "@/components/ui/FontSizeControl";
 import { LevelBadge } from "@/components/ui/LevelBadge";
-import { NavBar } from "@/components/NavBar";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { NavBar } from "@/components/ui/NavBar";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnlineUsers } from "@/hooks/useOnlineUsers";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
@@ -186,7 +186,7 @@ function HeaderComponent({ xp }: HeaderProps) {
           </div>
           <NavBar onNavClick={() => setMobileMenuOpen(false)} />
           <FontSizeControl />
-          <ThemeToggle className="w-full justify-center" />
+          <ThemeToggle className="w-8 justify-center" />
           <Link
             href="/profile"
             onClick={() => setMobileMenuOpen(false)}

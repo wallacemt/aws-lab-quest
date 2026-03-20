@@ -1,4 +1,4 @@
-import { KCScreen } from "@/features/study/components";
+import { KCScreen } from "@/features/study/screens/KCScreen";
 
 export default function KCPage() {
   return <KCScreen />;

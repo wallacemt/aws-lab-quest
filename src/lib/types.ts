@@ -28,6 +28,8 @@ export type UserProfile = {
   certificationPresetCode: string;
   favoriteTheme: string;
   username: string;
+  totalXp?: number;
+  role?:string
 };
 
 export type CertificationPreset = {

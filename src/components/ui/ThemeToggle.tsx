@@ -2,8 +2,9 @@
 
 import { useTheme } from "next-themes";
 import { PixelButton } from "@/components/ui/PixelButton";
+import { Moon, Sun } from "lucide-react";
 
-export function ThemeToggle({ className = "min-w-28" }: { className?: string }) {
+export function ThemeToggle({ className = "min-w-8 min-h-8" }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   if (!theme) {
     return null;
@@ -18,7 +19,7 @@ export function ThemeToggle({ className = "min-w-28" }: { className?: string }) 
       aria-label="Alternar tema"
       className={className}
     >
-      {isDark ? "Modo Claro" : "Modo Escuro"}
+      {isDark ? <Sun /> : <Moon />}
     </PixelButton>
   );
 }

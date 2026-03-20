@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { AppLayout } from "@/components/AppLayout";
+import { AppLayout } from "@/components/ui/AppLayout";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { useAuth } from "@/hooks/useAuth";

@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { AppLayout } from "@/components/AppLayout";
+import { AppLayout } from "@/components/ui/AppLayout";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { getOnboardingStep, setOnboardingStep } from "@/lib/onboarding";
+import { CreatorCredits } from "@/components/ui/CreatorCredits";
 
 const manualSections = [
   {
@@ -104,6 +105,7 @@ export function HelpScreen() {
             </p>
           </div>
         </PixelCard>
+        <CreatorCredits compact={false} />
 
         {isOnboardingManual && (
           <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">

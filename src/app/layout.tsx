@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito_Sans, Press_Start_2P } from "next/font/google";
 import "./globals.css";
-import { Providers } from "@/components/providers";
+import { Providers } from "@/stores/providers";
 
 const pixelFont = Press_Start_2P({
   variable: "--font-pixel",

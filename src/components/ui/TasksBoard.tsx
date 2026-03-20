@@ -1,4 +1,4 @@
-import { TaskCard } from "@/components/TaskCard";
+import { TaskCard } from "@/components/ui/TaskCard";
 import { Task } from "@/lib/types";
 
 export function TasksBoard({

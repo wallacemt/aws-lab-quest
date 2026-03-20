@@ -7,6 +7,7 @@ type ApiProfileResponse = {
   id: string;
   userId: string;
   certification: string;
+  role: string;
   certificationPresetCode: string;
   favoriteTheme: string;
   avatarUrl: string | null;
@@ -20,6 +21,7 @@ const defaultProfile: UserProfile = {
   certification: "",
   certificationPresetCode: "",
   favoriteTheme: "",
+  totalXp: 0,
 };
 
 type UserProfileState = {
@@ -58,23 +60,36 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
     inFlightLoad = Promise.all([
       fetch("/api/user/profile").then((r) => r.json()),
       fetch("/api/certifications").then((r) => r.json()),
+      fetch("/api/quest-history").then((r) => r.json()),
+      fetch("/api/study/history").then((r) => r.json()),
     ])
-      .then(([profileData, certData]: [ApiProfileResponse, { certifications?: CertificationPreset[] }]) => {
-        set({
-          profile: {
-            name: profileData.user?.name ?? "",
-            username: profileData.user?.username ?? "",
-            certification: profileData.certification ?? "",
-            certificationPresetCode: profileData.certificationPresetCode ?? "",
-            favoriteTheme: profileData.favoriteTheme ?? "",
-          },
-          needsCertificationReview: Boolean(profileData.needsCertificationReview),
-          avatarUrl: profileData.avatarUrl,
-          certificationOptions: certData.certifications ?? [],
-          hydrated: true,
-          loading: false,
-        });
-      })
+      .then(
+        ([profileData, certData, questData, studyData]: [
+          ApiProfileResponse,
+          { certifications?: CertificationPreset[] },
+          { history?: { xp: number }[] },
+          { history?: { gainedXp?: number }[] },
+        ]) => {
+          set({
+            profile: {
+              name: profileData.user?.name ?? "",
+              username: profileData.user?.username ?? "",
+              certification: profileData.certification ?? "",
+              certificationPresetCode: profileData.certificationPresetCode ?? "",
+              role: profileData.role ?? "",
+              favoriteTheme: profileData.favoriteTheme ?? "",
+              totalXp:
+                (questData.history ?? []).reduce((sum, item) => sum + item.xp, 0) +
+                (studyData.history ?? []).reduce((sum, item) => sum + (item.gainedXp ?? 0), 0),
+            },
+            needsCertificationReview: Boolean(profileData.needsCertificationReview),
+            avatarUrl: profileData.avatarUrl,
+            certificationOptions: certData.certifications ?? [],
+            hydrated: true,
+            loading: false,
+          });
+        },
+      )
       .catch(() => {
         set({ hydrated: true, loading: false });
       })

@@ -2,12 +2,13 @@
 
 import { ReactNode, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { CreatorCredits } from "@/components/CreatorCredits";
-import { Header } from "@/components/Header";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
 import { getAdminStatus } from "@/features/admin/services/admin-api";
+import HeaderMin from "../ui/HeaderMin";
+import BottomNav from "../ui/BottomNav";
+import RetroLoading from "../ui/RetroLoading";
 
 type AppRouteShellProps = {
   children: ReactNode;
@@ -16,10 +17,9 @@ type AppRouteShellProps = {
 export function AppRouteShell({ children }: AppRouteShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { hydrated, isProfileComplete } = useUserProfile();
+  const { hydrated, isProfileComplete, profile } = useUserProfile();
   const { hydrated: simHydrated, isActive: simulatedExamActive } = useSimulatedExam();
   const onboardingStep = getOnboardingStep();
-
   const guardReady =
     hydrated &&
     (isProfileComplete ||
@@ -38,7 +38,9 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
         return;
       }
     };
-    checkAdminAndRedirect();
+    if (profile.role === "admin") {
+      checkAdminAndRedirect();
+    }
     if (!pathname || !simHydrated) {
       return;
     }
@@ -92,24 +94,26 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   if (!guardReady) {
     return (
       <div className="min-h-screen pb-12">
-        <Header />
         <main className="flex min-h-[60vh] items-center justify-center px-4">
-          <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
+          <RetroLoading />
         </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-12">
-      <Header />
-      {simHydrated && simulatedExamActive && pathname !== "/simulado" && (
-        <div className="border-b-2 border-red-500 bg-red-900/20 px-4 py-2 text-center font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
-          Simulado em andamento. Navegacao bloqueada ate finalizar a prova.
-        </div>
-      )}
-      {children}
-      <CreatorCredits compact />
-    </div>
+    <>
+      <div className="min-h-screen pb-28">
+        {/* <Header /> */}
+        <HeaderMin />
+        {simHydrated && simulatedExamActive && pathname !== "/simulado" && (
+          <div className="border-b-2 border-red-500 bg-red-900/20 px-4 py-2 text-center font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
+            Simulado em andamento. Navegacao bloqueada ate finalizar a prova.
+          </div>
+        )}
+        {children}
+      </div>
+      <BottomNav />
+    </>
   );
 }

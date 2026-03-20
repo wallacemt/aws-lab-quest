@@ -1,6 +1,6 @@
 "use client";
 
-import { AppLayout } from "@/components/AppLayout";
+import { AppLayout } from "@/components/ui/AppLayout";
 import { PixelCard } from "@/components/ui/PixelCard";
 
 export function ReviewScreen() {

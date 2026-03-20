@@ -7,8 +7,9 @@ import Image from "next/image";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { authClient } from "@/lib/auth-client";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import appLogo from "@/assets/logo.png";
+import { EyeClosed, EyeIcon } from "lucide-react";
 
 export function LoginScreen() {
   return <LoginScreenBase mode="user" />;
@@ -134,10 +135,10 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
+                  className="absolute right-1 top-1/2 -translate-y-1/2   px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase ]"
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
-                  {showPassword ? "Ocultar" : "Ver"}
+                  {showPassword ? <EyeClosed /> : <EyeIcon />}
                 </button>
               </div>
             </label>

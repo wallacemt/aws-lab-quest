@@ -1,4 +1,4 @@
-import { ReviewScreen } from "@/components/screens/ReviewScreen";
+import { ReviewScreen } from "@/features/study/screens/ReviewScreen";
 
 export default function RevisaoPage() {
   return <ReviewScreen />;

@@ -12,7 +12,7 @@ export function CreatorCredits({ compact = true }: CreatorCreditsProps) {
   const [visible, setVisible] = useState(!compact);
 
   return (
-    <section className="mx-auto max-w-[600px] px-4 pb-8 xl:px-8">
+    <section className="mx-auto  max-w-5xl  ">
       <div className="mb-2 flex justify-end">
         <button
           type="button"

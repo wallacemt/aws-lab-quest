@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppLayout } from "@/components/AppLayout";
+import { AppLayout } from "@/components/ui/AppLayout";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
@@ -70,7 +70,7 @@ export function HistoryScreen() {
 
   return (
     <AppLayout>
-      <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-8 xl:px-8">
+      <main className="mx-auto  w-fit max-w-4xl space-y-6 px-2 py-4 xl:px-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">Histórico</h1>
@@ -113,7 +113,7 @@ export function HistoryScreen() {
         {!loading && history.length > 0 && (
           <div className="space-y-3">
             <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Labs</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 ">
               {history.map((item) => (
                 <button key={item.id} type="button" onClick={() => setSelectedItem(item)} className="text-left">
                   <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-primary)]">
@@ -149,7 +149,7 @@ export function HistoryScreen() {
         {!loading && studyHistory.length > 0 && (
           <div className="space-y-3">
             <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">KC e Simulados</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
               {studyHistory.map((item) => (
                 <button key={item.id} type="button" onClick={() => setSelectedStudyItem(item)} className="text-left">
                   <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">

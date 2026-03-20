@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { AchievementsView } from "@/components/AchievementsView";
-import { AppLayout } from "@/components/AppLayout";
-import { BadgesView } from "@/components/BadgesView";
-import { UserProfileModal } from "@/components/UserProfileModal";
+import { AchievementsView } from "@/components/ui/AchievementsView";
+import { AppLayout } from "@/components/ui/AppLayout";
+import { BadgesView } from "@/components/ui/BadgesView";
+import { UserProfileModal } from "@/components/ui/UserProfileModal";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { LevelBadge } from "@/components/ui/LevelBadge";
@@ -38,7 +38,7 @@ export function ProfileScreen() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
-  const [totalXp, setTotalXp] = useState(0);
+
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
   const [ownedBadgeIds, setOwnedBadgeIds] = useState<string[]>([]);
   const [achievements, setAchievements] = useState<AchievementItem[]>([]);
@@ -54,17 +54,6 @@ export function ProfileScreen() {
       setEditProfileOpen(true);
     }
   }, [hydrated, isOnboardingProfile]);
-
-  // Fetch total XP from history
-  useEffect(() => {
-    fetch("/api/quest-history")
-      .then((r) => r.json())
-      .then((data: { history?: { xp: number }[] }) => {
-        const xp = (data.history ?? []).reduce((sum, item) => sum + item.xp, 0);
-        setTotalXp(xp);
-      })
-      .catch(() => void 0);
-  }, []);
 
   // Fetch level badges
   useEffect(() => {
@@ -171,8 +160,8 @@ export function ProfileScreen() {
     }
   }
 
-  const currentLevel = getLevel(totalXp);
-  const progress = getLevelProgressPercent(totalXp);
+  const currentLevel = getLevel(profile.totalXp ?? 0);
+  const progress = getLevelProgressPercent(profile.totalXp ?? 0);
   const currentBadge = levelBadges.find((b) => b.level === currentLevel.number);
 
   if (!hydrated) {
@@ -222,8 +211,8 @@ export function ProfileScreen() {
             <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">{user?.email}</p>
             <h2 className="font-[var(--font-body)] text-2xl">@{profile.username || "Sem nome"}</h2>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-              <LevelBadge xp={totalXp} />
-              <span className="font-[var(--font-pixel)] text-[10px] uppercase">{totalXp} XP</span>
+              <LevelBadge xp={profile.totalXp ?? 0} />
+              <span className="font-[var(--font-pixel)] text-[10px] uppercase">{profile.totalXp ?? 0} XP</span>
             </div>
 
             {/* XP progress bar */}
@@ -295,7 +284,7 @@ export function ProfileScreen() {
 
         {/* Badges collection */}
         <PixelCard>
-          <BadgesView xp={totalXp} levelBadges={levelBadges} />
+          <BadgesView xp={profile.totalXp ?? 0} levelBadges={levelBadges} />
         </PixelCard>
 
         {achievements.length > 0 && (

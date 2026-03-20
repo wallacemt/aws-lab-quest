@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppLayout } from "@/components/AppLayout";
-import { SetupPanel } from "@/components/SetupPanel";
+import { AppLayout } from "@/components/ui/AppLayout";
+import { SetupPanel } from "@/components/ui/SetupPanel";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { useQuest } from "@/hooks/useQuest";
 import { useUserProfile } from "@/hooks/useUserProfile";
