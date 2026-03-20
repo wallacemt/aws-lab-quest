@@ -247,7 +247,7 @@ export function PublicProfileScreen() {
             transition={{ delay: 0.2, duration: 0.4 }}
           >
             <PixelCard>
-              <AchievementsView items={achievements.items} title="Conquistas" />
+              <AchievementsView items={achievements.items} title="Conquistas" isPublic />
             </PixelCard>
           </motion.div>
         )}

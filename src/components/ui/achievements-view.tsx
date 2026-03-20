@@ -7,8 +7,9 @@ import { PixelButton } from "./pixel-button";
 type AchievementsViewProps = {
   items: AchievementItem[];
   title?: string;
-  handleCopyShareLink(type: "badge" | "achievement" | undefined, itemId: string): Promise<void>;
-  shareMsg: { message: string; type: "badge" | "achievement" } | null;
+  handleCopyShareLink?: (type: "badge" | "achievement" | undefined, itemId: string) => Promise<void>;
+  shareMsg?: { message: string; type: "badge" | "achievement" } | null;
+  isPublic?: boolean;
 };
 
 function rarityClass(rarity: AchievementItem["rarity"]): string {
@@ -31,6 +32,7 @@ export function AchievementsView({
   title = "Conquistas",
   handleCopyShareLink,
   shareMsg,
+  isPublic,
 }: AchievementsViewProps) {
   const unlockedCount = items.filter((item) => item.unlocked).length;
 
@@ -79,11 +81,20 @@ export function AchievementsView({
                   <p className="font-mono text-[8px] uppercase text-[var(--pixel-accent)]">
                     Desbloqueada {item.unlockedAt ? new Date(item.unlockedAt).toLocaleDateString("pt-BR") : ""}
                   </p>
-                  <PixelButton type="button" onClick={() => void handleCopyShareLink("achievement", item.id)}>
-                    Compartilhar conquista
-                  </PixelButton>
-                  {shareMsg && (
-                    <p className="mt-1 text-center font-mono text-[8px] uppercase text-accent">{shareMsg.message}</p>
+                  {!isPublic && (
+                    <>
+                      <PixelButton
+                        type="button"
+                        onClick={() => handleCopyShareLink && handleCopyShareLink("achievement", item.id)}
+                      >
+                        Compartilhar conquista
+                      </PixelButton>
+                      {shareMsg && (
+                        <p className="mt-1 text-center font-mono text-[8px] uppercase text-accent">
+                          {shareMsg.message}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (
