@@ -8,7 +8,7 @@ import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useRouter } from "next/navigation";
 import { useOnlineUsers } from "@/hooks/useOnlineUsers";
 import { useAuth } from "@/hooks/useAuth";
-import { ThemeToggle } from "./theme-toggle";
+import { ThemeToggle } from "../ui/theme-toggle";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FontSizeControl } from "./font-size-control";
+import { FontSizeControl } from "../ui/font-size-control";
 
 export const Header = () => {
   const { theme } = useTheme();

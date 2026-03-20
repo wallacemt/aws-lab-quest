@@ -9,7 +9,7 @@ import { getAdminStatus } from "@/features/admin/services/admin-api";
 
 import BottomNav from "../ui/bottom-nav";
 import RetroLoading from "../ui/retro-loading";
-import { Header } from "@/components/ui/header";
+import { Header } from "@/components/layout/header";
 
 type AppRouteShellProps = {
   children: ReactNode;
