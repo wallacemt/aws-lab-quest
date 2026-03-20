@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FontSizeControl } from "./font-size-control";
 
-export function Header() {
+export const Header = () => {
   const { theme } = useTheme();
 
   const { user, signOut } = useAuth();
@@ -160,4 +160,4 @@ export function Header() {
       )}
     </header>
   );
-}
+};

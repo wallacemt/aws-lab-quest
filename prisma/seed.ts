@@ -402,11 +402,11 @@ async function seedXpWeights() {
 }
 
 async function main() {
-  // await seedAdminIfConfigured();
-  // await seedCertifications();
-  // await seedAwsServicesAndQuestions();
-  // await seedXpWeights();
-  // await seedBadgesIfConfigured();
+  await seedAdminIfConfigured();
+  await seedCertifications();
+  await seedAwsServicesAndQuestions();
+  await seedXpWeights();
+  await seedBadgesIfConfigured();
   await seedAchievementsIfConfigured();
   console.log("Seed completed.");
 }

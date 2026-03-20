@@ -1,10 +1,6 @@
 "use client";
-
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { PixelCard } from "@/components/ui/pixel-card";
-import BottomNav from "../../../components/ui/bottom-nav";
 import GameCard from "../../../components/ui/game-card";
 
 type GameMode = {
