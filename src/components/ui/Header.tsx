@@ -1,4 +1,4 @@
-import { HelpCircle, Settings2, Star,} from "lucide-react";
+import { HelpCircle, Settings2, Star } from "lucide-react";
 import Image from "next/image";
 import appLogo from "@/assets/logo.png";
 import { useTheme } from "next-themes";
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FontSizeControl } from "./font-size-control";
 
-export default function Header() {
+export function Header() {
   const { theme } = useTheme();
 
   const { user, signOut } = useAuth();

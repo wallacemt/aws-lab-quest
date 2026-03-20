@@ -9,7 +9,7 @@ import { getAdminStatus } from "@/features/admin/services/admin-api";
 
 import BottomNav from "../ui/bottom-nav";
 import RetroLoading from "../ui/retro-loading";
-import Header from "../ui/header";
+import { Header } from "../ui/header";
 
 type AppRouteShellProps = {
   children: ReactNode;
@@ -105,7 +105,6 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   return (
     <>
       <div className="min-h-screen pb-28">
-        {/* <Header /> */}
         <Header />
         {simHydrated && simulatedExamActive && pathname !== "/simulado" && (
           <div className="border-b-2 border-red-500 bg-red-900/20 px-4 py-2 text-center font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
