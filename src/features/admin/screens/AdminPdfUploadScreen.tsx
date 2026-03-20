@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PixelButton } from "@/components/ui/PixelButton";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { PixelCard } from "@/components/ui/pixel-card";
 
 type CertificationOption = {
   id: string;

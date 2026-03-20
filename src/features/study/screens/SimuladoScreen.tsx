@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { PixelButton } from "@/components/ui/PixelButton";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import {
   createSimuladoQuestions,

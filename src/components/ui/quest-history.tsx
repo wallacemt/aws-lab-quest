@@ -1,4 +1,4 @@
-import { PixelCard } from "@/components/ui/PixelCard";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { QuestHistoryItem } from "@/lib/types";
 
 export function QuestHistory({ history }: { history: QuestHistoryItem[] }) {

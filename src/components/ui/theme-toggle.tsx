@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { PixelButton } from "@/components/ui/PixelButton";
+import { PixelButton } from "@/components/ui/pixel-button";
 import { Moon, Sun } from "lucide-react";
 
 export function ThemeToggle({ className = "min-w-8 min-h-8" }: { className?: string }) {

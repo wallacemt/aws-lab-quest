@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { AppLayout } from "@/components/ui/AppLayout";
-import { PixelButton } from "@/components/ui/PixelButton";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { getOnboardingStep, setOnboardingStep } from "@/lib/onboarding";
-import { CreatorCredits } from "@/components/ui/CreatorCredits";
+import { CreatorCredits } from "@/components/ui/creator-credits";
 
 const manualSections = [
   {

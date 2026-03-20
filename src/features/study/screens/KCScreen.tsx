@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AppLayout } from "@/components/ui/AppLayout";
-import { PixelButton } from "@/components/ui/PixelButton";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import {
   createKcQuestions,

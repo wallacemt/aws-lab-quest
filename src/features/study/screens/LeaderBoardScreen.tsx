@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { AppLayout } from "@/components/ui/AppLayout";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { useAuth } from "@/hooks/useAuth";
 import { useRealtimeLeaderboard } from "@/hooks/useRealtimeLeaderboard";
 

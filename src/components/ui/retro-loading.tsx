@@ -118,7 +118,7 @@ export default function RetroLoading() {
         .animate-shadow-pulse { animation: shadow-pulse 2s ease-in-out infinite; }
         .animate-blink { animation: blink 1s step-end infinite; }
         .animate-shimmer {
-          animation: shimmer 2s infinite;
+          animation: shimmer 1s infinite;
         }
       `}</style>
     </div>

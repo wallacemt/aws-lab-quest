@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { PixelCard } from "@/components/ui/pixel-card";
 import Link from "next/link";
 
 type CreatorCreditsProps = {

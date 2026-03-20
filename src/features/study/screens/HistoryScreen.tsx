@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppLayout } from "@/components/ui/AppLayout";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { QuestionOptionMapping, Task } from "@/lib/types";

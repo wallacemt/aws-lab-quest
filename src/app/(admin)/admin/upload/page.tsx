@@ -1,4 +1,4 @@
-import { AdminPdfUploadScreen } from "@/features/admin/components/AdminPdfUploadScreen";
+import { AdminPdfUploadScreen } from "@/features/admin/screens/AdminPdfUploadScreen";
 
 export default function AdminUploadPage() {
   return <AdminPdfUploadScreen />;

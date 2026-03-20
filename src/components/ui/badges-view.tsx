@@ -43,7 +43,7 @@ export function BadgesView({ xp, levelBadges }: BadgesViewProps) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Coleção de Badges</h3>
+      <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Coleção de Badges</h3>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
         {LEVELS.map((level) => {
@@ -150,9 +150,7 @@ function BadgeCell({
                 animate={{ scale: [1, 1.15, 1] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
               >
-                <span className="font-[var(--font-pixel)] text-xl text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                  ?
-                </span>
+                <span className="font-mono text-xl text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">?</span>
               </motion.div>
             </div>
           </motion.div>
@@ -171,7 +169,7 @@ function BadgeCell({
 
       {/* Label */}
       <p
-        className={`font-[var(--font-pixel)] text-[8px] uppercase leading-tight text-center ${
+        className={`font-mono text-[8px] uppercase leading-tight text-center ${
           isFar ? "text-[var(--pixel-subtext)] opacity-40" : isNext ? "text-[var(--pixel-subtext)]" : textClass
         }`}
       >
@@ -181,7 +179,7 @@ function BadgeCell({
       {/* XP requirement */}
       {!isUnlocked && !isFar && (
         <motion.p
-          className="font-[var(--font-pixel)] text-[7px] uppercase text-[var(--pixel-primary)]"
+          className="font-mono text-[7px] uppercase text-[var(--pixel-primary)]"
           animate={{ opacity: [0.6, 1, 0.6] }}
           transition={{ duration: 1.4, repeat: Infinity }}
         >
@@ -189,11 +187,9 @@ function BadgeCell({
         </motion.p>
       )}
       {!isUnlocked && isFar && (
-        <p className="font-[var(--font-pixel)] text-[7px] uppercase text-[var(--pixel-subtext)] opacity-30">
-          {minXp} XP
-        </p>
+        <p className="font-mono text-[7px] uppercase text-[var(--pixel-subtext)] opacity-30">{minXp} XP</p>
       )}
-      {isUnlocked && <p className={`font-[var(--font-pixel)] text-[7px] uppercase ${textClass}`}>✓ {minXp} XP</p>}
+      {isUnlocked && <p className={`font-mono text-[7px] uppercase ${textClass}`}>✓ {minXp} XP</p>}
     </motion.div>
   );
 }
@@ -224,8 +220,8 @@ function BadgeImage({
 
   // Fallback: pixel art placeholder
   return (
-    <div className="flex items-center justify-center bg-[var(--pixel-muted)]" style={{ width: size, height: size }}>
-      <span className="font-[var(--font-pixel)] text-xl font-bold text-[var(--pixel-subtext)]">{level}</span>
+    <div className="flex items-center justify-center bg-muted" style={{ width: size, height: size }}>
+      <span className="font-mono text-xl font-bold text-pixel-subtext">{level}</span>
     </div>
   );
 }

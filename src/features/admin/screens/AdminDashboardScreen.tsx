@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PixelCard } from "@/components/ui/PixelCard";
-import { PixelButton } from "@/components/ui/PixelButton";
+import { PixelCard } from "@/components/ui/pixel-card";
+import { PixelButton } from "@/components/ui/pixel-button";
 import { getAdminStatus } from "@/features/admin/services/admin-api";
 import { AdminStatus } from "@/features/admin/types";
 

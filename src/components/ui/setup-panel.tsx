@@ -1,7 +1,7 @@
 "use client";
 
-import { PixelButton } from "@/components/ui/PixelButton";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { PixelCard } from "@/components/ui/pixel-card";
 
 export function SetupPanel({
   onGenerate,

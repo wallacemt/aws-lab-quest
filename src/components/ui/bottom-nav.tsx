@@ -1,12 +1,11 @@
-import { Home, CheckSquare, Timer, Trophy, History, BarChart2, ChevronDown, ChevronUp } from "lucide-react";
+import { Home, Trophy, History, BarChart2, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home, active: false },
-  { href: "/kc", label: "KC", icon: CheckSquare, active: false },
-  { href: "/simulado", label: "Simulado", icon: Timer, active: false },
+
   { href: "/achievements", label: "Conquistas", icon: Trophy, active: false },
   { href: "/history", label: "Histórico", icon: History, active: false },
   { href: "/leaderboard", label: "Rank", icon: BarChart2, active: false },

@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppLayout } from "@/components/ui/AppLayout";
-import { SetupPanel } from "@/components/ui/SetupPanel";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { SetupPanel } from "@/components/ui/setup-panel";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { useQuest } from "@/hooks/useQuest";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { extractBoardTitle } from "@/lib/retro";

@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
+    <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4 py-8">
       <div className="bg-pixel-card retro-border border-4 retro-shadow p-8 max-w-md w-full flex flex-col items-center relative overflow-hidden">
         {/* Decorative background elements */}
         <div className="absolute -right-10 -top-10 w-32 h-32 bg-primary/10 rounded-full blur-2xl" />

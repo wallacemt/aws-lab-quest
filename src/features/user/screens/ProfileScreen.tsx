@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { AchievementsView } from "@/components/ui/AchievementsView";
-import { AppLayout } from "@/components/ui/AppLayout";
-import { BadgesView } from "@/components/ui/BadgesView";
-import { UserProfileModal } from "@/components/ui/UserProfileModal";
-import { PixelButton } from "@/components/ui/PixelButton";
-import { PixelCard } from "@/components/ui/PixelCard";
-import { LevelBadge } from "@/components/ui/LevelBadge";
+import { AchievementsView } from "@/components/ui/achievements-view";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { BadgesView } from "@/components/ui/badges-view";
+import { UserProfileModal } from "@/components/ui/user-profile-modal";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { PixelCard } from "@/components/ui/pixel-card";
+import { LevelBadge } from "@/components/ui/level-badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { getProfileValidationError, sanitizeProfileInput } from "@/lib/input-validation";
@@ -42,7 +42,7 @@ export function ProfileScreen() {
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
   const [ownedBadgeIds, setOwnedBadgeIds] = useState<string[]>([]);
   const [achievements, setAchievements] = useState<AchievementItem[]>([]);
-  const [shareMsg, setShareMsg] = useState<string | null>(null);
+  const [shareMsg, setShareMsg] = useState<{ message: string; type: "badge" | "achievement" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
 
@@ -75,15 +75,15 @@ export function ProfileScreen() {
       .catch(() => void 0);
   }, []);
 
-  async function handleCopyShareLink() {
-    if (!user?.id || !currentBadge?.id) return;
-    const url = `${window.location.origin}/share/badge/${user.id}/${currentBadge.id}`;
+  async function handleCopyShareLink(type: "badge" | "achievement" = "badge", itemId: string) {
+    if (!user?.id || !itemId) return;
+    const url = `${window.location.origin}/share/${type}/${user.id}/${itemId}`;
     try {
       await navigator.clipboard.writeText(url);
-      setShareMsg("Link copiado!");
-      setTimeout(() => setShareMsg(null), 2500);
+      setShareMsg({ message: "Link copiado!", type });
+      setTimeout(() => setShareMsg(null), 2500, type);
     } catch {
-      setShareMsg("Nao foi possivel copiar o link.");
+      setShareMsg({ message: "Nao foi possivel copiar o link.", type });
       setTimeout(() => setShareMsg(null), 2500);
     }
   }
@@ -168,7 +168,7 @@ export function ProfileScreen() {
     return (
       <AppLayout>
         <main className="flex min-h-[60vh] items-center justify-center">
-          <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
+          <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
         </main>
       </AppLayout>
     );
@@ -185,7 +185,7 @@ export function ProfileScreen() {
               {avatarUrl ? (
                 <Image src={avatarUrl} alt="Avatar" width={96} height={96} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-2xl text-[var(--pixel-subtext)]">
+                <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-mono text-2xl text-[var(--pixel-subtext)]">
                   {(user?.name ?? "?").charAt(0).toUpperCase()}
                 </div>
               )}
@@ -193,7 +193,7 @@ export function ProfileScreen() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={avatarLoading}
-              className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-[var(--font-pixel)] text-[9px] uppercase hover:bg-[var(--pixel-muted)] disabled:opacity-50"
+              className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-mono text-[9px] uppercase hover:bg-[var(--pixel-muted)] disabled:opacity-50"
             >
               {avatarLoading ? "Enviando..." : "Trocar Foto"}
             </button>
@@ -208,18 +208,18 @@ export function ProfileScreen() {
 
           {/* Player info */}
           <div className="flex-1 space-y-1 text-center sm:text-left">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">{user?.email}</p>
-            <h2 className="font-[var(--font-body)] text-2xl">@{profile.username || "Sem nome"}</h2>
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">{user?.email}</p>
+            <h2 className="font-sans text-2xl">@{profile.username || "Sem nome"}</h2>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <LevelBadge xp={profile.totalXp ?? 0} />
-              <span className="font-[var(--font-pixel)] text-[10px] uppercase">{profile.totalXp ?? 0} XP</span>
+              <span className="font-mono text-[10px] uppercase">{profile.totalXp ?? 0} XP</span>
             </div>
 
             {/* XP progress bar */}
             <div className="mt-2 h-4 overflow-hidden border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-[2px]">
               <div className="h-full bg-[var(--pixel-primary)] transition-all" style={{ width: `${progress}%` }} />
             </div>
-            <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+            <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
               {currentLevel.next}
             </p>
           </div>
@@ -249,32 +249,32 @@ export function ProfileScreen() {
                         }
                   }
                   transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  className="border-2 border-[var(--pixel-border)] overflow-hidden"
+                  className="border-2 border-pixel-border overflow-hidden"
                 >
                   <Image
                     src={currentBadge.imageUrl}
                     alt={`Badge ${currentBadge.name}`}
-                    width={120}
-                    height={120}
+                    width={130}
+                    height={130}
                     className="object-cover"
                   />
                 </motion.div>
-                <p className="mt-1 text-center font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+                <p className="mt-1 text-center font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
                   {currentBadge.name}
                 </p>
                 {ownedBadgeIds.includes(currentBadge.id) && user?.id && (
                   <div className="mt-2 text-center">
                     <button
-                      onClick={handleCopyShareLink}
-                      className="border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
+                      onClick={() => handleCopyShareLink("badge", currentBadge.id)}
+                      className="border border-pixel-border bg-pixel-card px-2 py-1 font-mono text-[0.4rem] uppercase hover:bg-muted"
                     >
                       Compartilhar Badge
                     </button>
                   </div>
                 )}
-                {shareMsg && (
-                  <p className="mt-1 text-center font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-accent)]">
-                    {shareMsg}
+                {shareMsg?.type === "badge" && (
+                  <p className="mt-1 text-center font-mono text-[8px] uppercase text-accent">
+                    {shareMsg.message}
                   </p>
                 )}
               </motion.div>
@@ -289,26 +289,26 @@ export function ProfileScreen() {
 
         {achievements.length > 0 && (
           <PixelCard>
-            <AchievementsView items={achievements} />
+            <AchievementsView items={achievements} handleCopyShareLink={handleCopyShareLink} shareMsg={shareMsg} />
           </PixelCard>
         )}
 
         {/* Edit form */}
         <PixelCard className="space-y-4">
-          <h3 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Perfil</h3>
+          <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Perfil</h3>
 
           {isOnboardingProfile && (
             <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
                 Etapa obrigatoria
               </p>
-              <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
+              <p className="font-sans text-sm leading-6 text-pixel-text">
                 Complete nome, certificacao AWS alvo e tema favorito para liberar a Home e o restante da experiencia.
               </p>
             </PixelCard>
           )}
 
-          <div className="space-y-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
+          <div className="space-y-2 font-sans text-sm leading-6 text-pixel-text">
             <p>
               <strong>Nome:</strong> {profile.name || "Nao definido"}
             </p>
@@ -325,7 +325,7 @@ export function ProfileScreen() {
 
           {needsCertificationReview && (
             <PixelCard className="border-yellow-500 bg-yellow-900/20 py-2">
-              <p className="font-[var(--font-body)] text-sm text-yellow-300">
+              <p className="font-sans text-sm text-yellow-300">
                 Nao conseguimos mapear automaticamente sua certificacao antiga. Selecione a certificacao alvo para
                 concluir a migracao.
               </p>
@@ -334,7 +334,7 @@ export function ProfileScreen() {
 
           {saveError && (
             <PixelCard className="border-red-500 bg-red-900/20 py-2">
-              <p className="font-[var(--font-body)] text-sm text-red-300">{saveError}</p>
+              <p className="font-sans text-sm text-red-300">{saveError}</p>
             </PixelCard>
           )}
 
@@ -342,7 +342,7 @@ export function ProfileScreen() {
             <PixelButton onClick={() => setEditProfileOpen(true)} disabled={saving}>
               {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
             </PixelButton>
-            {saveMsg && <span className="font-[var(--font-body)] text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
+            {saveMsg && <span className="font-sans text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
           </div>
         </PixelCard>
 

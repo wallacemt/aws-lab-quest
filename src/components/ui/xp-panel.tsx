@@ -1,5 +1,5 @@
-import { LevelBadge } from "@/components/ui/LevelBadge";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { LevelBadge } from "@/components/ui/level-badge";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
 
 export function XPPanel({ xp }: { xp: number }) {

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppLayout } from "@/components/ui/AppLayout";
-import { CelebrationScreen } from "@/components/ui/CelebrationScreen";
-import { TasksBoard } from "@/components/ui/TasksBoard";
-import { XPPanel } from "@/components/ui/XPPanel";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { CelebrationScreen } from "@/components/ui/celebration-screen";
+import { TasksBoard } from "@/components/ui/tasks-board";
+import { XPPanel } from "@/components/ui/xp-panel";
 import { useQuest } from "@/hooks/useQuest";
 import { useUserProfile } from "@/hooks/useUserProfile";
 

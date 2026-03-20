@@ -6,9 +6,9 @@ import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
 import { getAdminStatus } from "@/features/admin/services/admin-api";
-import HeaderMin from "../ui/HeaderMin";
-import BottomNav from "../ui/BottomNav";
-import RetroLoading from "../ui/RetroLoading";
+import HeaderMin from "../ui/header";
+import BottomNav from "../ui/bottom-nav";
+import RetroLoading from "../ui/retro-loading";
 
 type AppRouteShellProps = {
   children: ReactNode;
