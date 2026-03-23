@@ -436,7 +436,7 @@ export function SimuladoScreen() {
 
       {showRulesModal && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
-          <PixelCard className="w-full max-w-2xl space-y-4 border-yellow-500 bg-yellow-900/15">
+          <PixelCard className="w-full max-w-2xl space-y-4 border-yellow-500 bg-yellow-900/95">
             <p className="font-[var(--font-pixel)] text-[10px] uppercase text-yellow-300">Regras do Simulado</p>
             <h3 className="font-[var(--font-body)] text-xl">Ambiente de prova real</h3>
 
