@@ -67,7 +67,7 @@ export function CreatorCredits({ compact = true }: CreatorCreditsProps) {
               LinkedIn
             </Link>
             <Link
-              href="https://github.com/wallacemt/lab-gamification/issues/new/choose"
+              href="https://github.com/wallacemt/aws-lab-quest/issues/new/choose"
               target="_blank"
               rel="noopener noreferrer"
               className={
