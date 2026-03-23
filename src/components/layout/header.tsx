@@ -3,6 +3,7 @@ import Image from "next/image";
 import appLogo from "@/assets/logo.png";
 import { useTheme } from "next-themes";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useRouter } from "next/navigation";
@@ -30,6 +31,46 @@ export const Header = () => {
   const { isActive: simulatedExamActive, remainingSeconds } = useSimulatedExam();
   const router = useRouter();
   const { avatarUrl, profile } = useUserProfile();
+  const xpTarget = profile.totalXp ?? 0;
+  const [displayXp, setDisplayXp] = useState(xpTarget);
+  const displayXpRef = useRef(xpTarget);
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      displayXpRef.current = xpTarget;
+      return;
+    }
+
+    const from = displayXpRef.current;
+    const to = xpTarget;
+
+    if (from === to) {
+      return;
+    }
+
+    const startedAt = performance.now();
+    const delta = to - from;
+    const duration = Math.max(250, Math.min(900, Math.abs(delta) * 24));
+    let frameId = 0;
+
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const nextValue = Math.round(from + delta * eased);
+
+      displayXpRef.current = nextValue;
+      setDisplayXp(nextValue);
+
+      if (progress < 1) {
+        frameId = window.requestAnimationFrame(animate);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [xpTarget]);
 
   async function handleSignOut() {
     await signOut();
@@ -77,7 +118,7 @@ export const Header = () => {
           {/* XP Badge */}
           <div className="flex items-center gap-1.5 bg-pixel-card retro-border border-2 px-2 md:px-2 py-1 rounded-lg retro-shadow-sm">
             <Star className="w-4 h-4 text-primary fill-primary" />
-            <span className="font-mono font-bold text-pixel-text text-[0.6rem]  ">{profile.totalXp}</span>
+            <span className="font-mono font-bold text-pixel-text text-[0.6rem]  ">{displayXp}</span>
           </div>
 
           {/* Icons de utilidades*/}

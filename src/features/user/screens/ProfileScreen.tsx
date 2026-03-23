@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { AchievementsView } from "@/components/ui/achievements-view";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { BadgesView } from "@/components/ui/badges-view";
 import { UserProfileModal } from "@/components/ui/user-profile-modal";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -43,6 +45,7 @@ export function ProfileScreen() {
   const [ownedBadgeIds, setOwnedBadgeIds] = useState<string[]>([]);
   const [achievements, setAchievements] = useState<AchievementItem[]>([]);
   const [shareMsg, setShareMsg] = useState<{ message: string; type: "badge" | "achievement" } | null>(null);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
 
@@ -219,9 +222,7 @@ export function ProfileScreen() {
             <div className="mt-2 h-4 overflow-hidden border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-[2px]">
               <div className="h-full bg-[var(--pixel-primary)] transition-all" style={{ width: `${progress}%` }} />
             </div>
-            <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
-              {currentLevel.next}
-            </p>
+            <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">{currentLevel.next}</p>
           </div>
 
           {/* Level badge image — animated */}
@@ -273,9 +274,7 @@ export function ProfileScreen() {
                   </div>
                 )}
                 {shareMsg?.type === "badge" && (
-                  <p className="mt-1 text-center font-mono text-[8px] uppercase text-accent">
-                    {shareMsg.message}
-                  </p>
+                  <p className="mt-1 text-center font-mono text-[8px] uppercase text-accent">{shareMsg.message}</p>
                 )}
               </motion.div>
             )}
@@ -289,7 +288,26 @@ export function ProfileScreen() {
 
         {achievements.length > 0 && (
           <PixelCard>
-            <AchievementsView items={achievements} handleCopyShareLink={handleCopyShareLink} shareMsg={shareMsg} />
+            <Collapsible open={achievementsOpen} onOpenChange={setAchievementsOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left"
+                >
+                  <span className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                    Conquistas do Perfil ({achievements.filter((item) => item.unlocked).length}/{achievements.length})
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${achievementsOpen ? "rotate-180" : "rotate-0"}`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </CollapsibleTrigger>
+
+              <CollapsibleContent className="pt-3">
+                <AchievementsView items={achievements} handleCopyShareLink={handleCopyShareLink} shareMsg={shareMsg} />
+              </CollapsibleContent>
+            </Collapsible>
           </PixelCard>
         )}
 
@@ -299,9 +317,7 @@ export function ProfileScreen() {
 
           {isOnboardingProfile && (
             <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
-                Etapa obrigatoria
-              </p>
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Etapa obrigatoria</p>
               <p className="font-sans text-sm leading-6 text-pixel-text">
                 Complete nome, certificacao AWS alvo e tema favorito para liberar a Home e o restante da experiencia.
               </p>

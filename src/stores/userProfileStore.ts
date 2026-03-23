@@ -32,12 +32,25 @@ type UserProfileState = {
   hydrated: boolean;
   loading: boolean;
   loadProfile: () => Promise<void>;
+  refreshTotalXp: () => Promise<void>;
   setProfile: (next: UserProfile) => Promise<ApiProfileResponse>;
   setNeedsCertificationReview: (next: boolean) => void;
   setAvatarUrl: (next: string | null) => void;
 };
 
 let inFlightLoad: Promise<void> | null = null;
+
+async function fetchTotalXpFromHistory(): Promise<number> {
+  const [questData, studyData] = await Promise.all([
+    fetch("/api/quest-history").then((r) => r.json() as Promise<{ history?: { xp: number }[] }>),
+    fetch("/api/study/history").then((r) => r.json() as Promise<{ history?: { gainedXp?: number }[] }>),
+  ]);
+
+  return (
+    (questData.history ?? []).reduce((sum, item) => sum + item.xp, 0) +
+    (studyData.history ?? []).reduce((sum, item) => sum + (item.gainedXp ?? 0), 0)
+  );
+}
 
 export const useUserProfileStore = create<UserProfileState>((set, get) => ({
   profile: defaultProfile,
@@ -60,15 +73,13 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
     inFlightLoad = Promise.all([
       fetch("/api/user/profile").then((r) => r.json()),
       fetch("/api/certifications").then((r) => r.json()),
-      fetch("/api/quest-history").then((r) => r.json()),
-      fetch("/api/study/history").then((r) => r.json()),
+      fetchTotalXpFromHistory(),
     ])
       .then(
-        ([profileData, certData, questData, studyData]: [
+        ([profileData, certData, totalXp]: [
           ApiProfileResponse,
           { certifications?: CertificationPreset[] },
-          { history?: { xp: number }[] },
-          { history?: { gainedXp?: number }[] },
+          number,
         ]) => {
           set({
             profile: {
@@ -78,9 +89,7 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
               certificationPresetCode: profileData.certificationPresetCode ?? "",
               role: profileData.role ?? "",
               favoriteTheme: profileData.favoriteTheme ?? "",
-              totalXp:
-                (questData.history ?? []).reduce((sum, item) => sum + item.xp, 0) +
-                (studyData.history ?? []).reduce((sum, item) => sum + (item.gainedXp ?? 0), 0),
+              totalXp,
             },
             needsCertificationReview: Boolean(profileData.needsCertificationReview),
             avatarUrl: profileData.avatarUrl,
@@ -99,6 +108,19 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
 
     return inFlightLoad;
   },
+  refreshTotalXp: async () => {
+    try {
+      const totalXp = await fetchTotalXpFromHistory();
+      set((state) => ({
+        profile: {
+          ...state.profile,
+          totalXp,
+        },
+      }));
+    } catch {
+      return;
+    }
+  },
   setProfile: async (next: UserProfile) => {
     const response = await fetch("/api/user/profile", {
       method: "PUT",
@@ -112,18 +134,20 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
       throw new Error(data.error ?? "Nao foi possivel salvar o perfil.");
     }
 
-    set({
+    set((state) => ({
       profile: {
+        ...state.profile,
         name: data.user?.name ?? "",
         username: data.user?.username ?? "",
         certification: data.certification ?? "",
         certificationPresetCode: data.certificationPresetCode ?? "",
         favoriteTheme: data.favoriteTheme ?? "",
+        role: data.role ?? state.profile.role,
       },
       needsCertificationReview: Boolean(data.needsCertificationReview),
       avatarUrl: data.avatarUrl ?? null,
       hydrated: true,
-    });
+    }));
 
     return data;
   },

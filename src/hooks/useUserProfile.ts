@@ -12,6 +12,7 @@ export function useUserProfile() {
     hydrated,
     loading,
     loadProfile,
+    refreshTotalXp,
     setProfile,
     setNeedsCertificationReview,
     setAvatarUrl,
@@ -34,6 +35,7 @@ export function useUserProfile() {
   return {
     profile,
     setProfile,
+    refreshTotalXp,
     hydrated,
     isProfileComplete,
     certificationOptions,

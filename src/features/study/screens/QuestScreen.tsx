@@ -11,8 +11,8 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function QuestScreen() {
   const router = useRouter();
-  const { profile, hydrated: userHydrated } = useUserProfile();
-  const [dismissedForQuestId, setDismissedForQuestId] = useState<string | null>(null);
+  const { profile, hydrated: userHydrated, refreshTotalXp } = useUserProfile();
+  const [xpSyncedQuestId, setXpSyncedQuestId] = useState<string | null>(null);
   const {
     activeQuest,
     hydrated: questHydrated,
@@ -24,14 +24,21 @@ export function QuestScreen() {
   } = useQuest();
 
   const allDone = Boolean(activeQuest?.tasks.length && activeQuest.tasks.every((task) => task.completed));
-  const dismissKey = activeQuest?.startedAt ?? null;
-  const confirmDismissed = Boolean(dismissKey && dismissedForQuestId === dismissKey);
 
   useEffect(() => {
     if (userHydrated && questHydrated && !activeQuest) {
       router.replace("/");
     }
   }, [activeQuest, questHydrated, router, userHydrated]);
+
+  useEffect(() => {
+    const completedQuestId = activeQuest?.completed ? activeQuest.startedAt : null;
+    if (!completedQuestId || completedQuestId === xpSyncedQuestId) {
+      return;
+    }
+
+    void refreshTotalXp().finally(() => setXpSyncedQuestId(completedQuestId));
+  }, [activeQuest?.completed, activeQuest?.startedAt, refreshTotalXp, xpSyncedQuestId]);
 
   if (!activeQuest) return null;
 
@@ -44,32 +51,22 @@ export function QuestScreen() {
         <TasksBoard tasks={activeQuest.tasks} completedCount={completedCount} onToggle={toggleTask} />
       </main>
 
-      {allDone && !activeQuest.completed && !confirmDismissed && (
+      {allDone && !activeQuest.completed && (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/80 p-4">
           <div className="w-full max-w-lg border-4 border-[var(--pixel-primary)] bg-[var(--pixel-card)] p-6 text-center shadow-[8px_8px_0_0_#000]">
             <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-accent)]">
               Todas as tarefas completas
             </p>
-            <h2 className="mt-2 font-[var(--font-body)] text-2xl">Finalizar este lab?</h2>
+            <h2 className="mt-2 font-[var(--font-body)] text-2xl">Finalizar LAB agora?</h2>
             <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
               Ao finalizar, o XP sera registrado e badges de nivel poderao ser desbloqueados.
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <button
-                onClick={() => {
-                  if (dismissKey) {
-                    setDismissedForQuestId(dismissKey);
-                  }
-                }}
-                className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
-              >
-                Revisar
-              </button>
-              <button
                 onClick={() => finishQuest(profile)}
                 className="border-2 border-[var(--pixel-primary)] bg-[var(--pixel-primary)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase text-black hover:brightness-110"
               >
-                Sim, Finalizar
+                Finalizar LAB
               </button>
             </div>
           </div>
@@ -80,7 +77,11 @@ export function QuestScreen() {
         open={Boolean(activeQuest.completed)}
         xp={xp}
         theme={activeQuest.theme}
-        onRestart={() => {
+        onDoAnotherLab={() => {
+          clearActiveQuest();
+          router.push("/lab");
+        }}
+        onBackHome={() => {
           clearActiveQuest();
           router.push("/");
         }}

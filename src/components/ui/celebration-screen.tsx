@@ -6,12 +6,14 @@ export function CelebrationScreen({
   open,
   xp,
   theme,
-  onRestart,
+  onDoAnotherLab,
+  onBackHome,
 }: {
   open: boolean;
   xp: number;
   theme: string;
-  onRestart: () => void;
+  onDoAnotherLab: () => void;
+  onBackHome: () => void;
 }) {
   if (!open) {
     return null;
@@ -24,8 +26,11 @@ export function CelebrationScreen({
         <h2 className="mt-2  text-4xl font-bold">AWS Hero</h2>
         <p className="mt-2 font-[var(--font-body)] text-lg">Tema: {theme}</p>
         <p className="mt-1 font-[var(--font-body)] text-lg">XP final: {xp}</p>
-        <div className="mt-6">
-          <PixelButton onClick={onRestart}>Novo Quest</PixelButton>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <PixelButton onClick={onDoAnotherLab}>Fazer outro LAB</PixelButton>
+          <PixelButton variant="ghost" onClick={onBackHome}>
+            Voltar ao inicio
+          </PixelButton>
         </div>
       </div>
     </div>

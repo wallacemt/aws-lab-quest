@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
-import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
+import { STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import {
   createSimuladoQuestions,
   createStudyExplanation,
@@ -20,7 +20,6 @@ import { STORAGE_KEYS } from "@/lib/storage";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
-const DIFFICULTIES: TaskDifficulty[] = STUDY_DIFFICULTIES;
 
 type ExamResult = {
   certificationCode: string;
@@ -53,7 +52,7 @@ export function SimuladoScreen() {
   const router = useRouter();
   const { hydrated, isActive, remainingSeconds, session, startSession, submitSession, clearSession } =
     useSimulatedExam();
-  const { profile } = useUserProfile();
+  const { profile, refreshTotalXp } = useUserProfile();
   const rulesConsent = useLocalStorage<RulesConsentMap>(STORAGE_KEYS.simuladoRulesConsent, {});
 
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
@@ -65,7 +64,7 @@ export function SimuladoScreen() {
   const [reviewByQuestion, setReviewByQuestion] = useState<Record<string, StudyExplanationResult>>({});
   const [loadingReviewByQuestion, setLoadingReviewByQuestion] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
-  const [selectedDifficulties, setSelectedDifficulties] = useState<TaskDifficulty[]>(["easy", "medium", "hard"]);
+
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [historicalWeakServices, setHistoricalWeakServices] = useState<WeakServiceMetric[]>([]);
@@ -156,25 +155,14 @@ export function SimuladoScreen() {
     }));
   }
 
-  function toggleDifficulty(difficulty: TaskDifficulty) {
-    setSelectedDifficulties((prev) =>
-      prev.includes(difficulty) ? prev.filter((item) => item !== difficulty) : [...prev, difficulty],
-    );
-  }
-
   async function handleStart() {
     setError(null);
     setHistoricalWeakServices([]);
 
-    if (selectedDifficulties.length === 0) {
-      setError("Selecione pelo menos um nivel de dificuldade.");
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const data = await createSimuladoQuestions({ count: 65, difficulties: selectedDifficulties });
+      const data = await createSimuladoQuestions({ count: 65, difficulties: ["easy", "medium", "hard"] });
 
       setQuestions(data.questions);
       setAnswers({});
@@ -253,13 +241,12 @@ export function SimuladoScreen() {
     const totalQuestions = questions.length;
     const correctAnswers = questions.filter((question) => answers[question.id] === question.correctOption).length;
     const scorePercent = Math.round((correctAnswers / totalQuestions) * 100);
-    const difficultyWeight =
-      selectedDifficulties.length === 0
-        ? getTaskXpByDifficulty("medium")
-        : Math.round(
-            selectedDifficulties.reduce((sum, difficulty) => sum + getTaskXpByDifficulty(difficulty), 0) /
-              selectedDifficulties.length,
-          );
+    const difficultyWeight = Math.round(
+      ["easy", "medium", "hard"].reduce(
+        (sum, difficulty) => sum + getTaskXpByDifficulty(difficulty as TaskDifficulty),
+        0,
+      ) / ["easy", "medium", "hard"].length,
+    );
     const gainedXp = Math.max(30, Math.round(difficultyWeight / 4)) * correctAnswers;
 
     const totalDurationSeconds = Math.max(
@@ -298,6 +285,10 @@ export function SimuladoScreen() {
           },
         })),
       });
+
+      if (historySaved) {
+        await refreshTotalXp();
+      }
     } catch {
       historySaved = false;
     }
@@ -393,29 +384,6 @@ export function SimuladoScreen() {
           <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             O filtro da certificacao e automatico pelo seu perfil. Selecione dificuldade e inicie a prova.
           </p>
-
-          <div className="space-y-2">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Dificuldade</p>
-            <div className="flex flex-wrap gap-2">
-              {DIFFICULTIES.map((difficulty) => {
-                const selected = selectedDifficulties.includes(difficulty);
-                return (
-                  <button
-                    key={difficulty}
-                    type="button"
-                    onClick={() => toggleDifficulty(difficulty)}
-                    className={`border px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
-                      selected
-                        ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
-                        : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                    }`}
-                  >
-                    {difficulty}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
 

@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import {
   createKcQuestions,
@@ -15,12 +17,16 @@ import {
 } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const DIFFICULTIES: TaskDifficulty[] = STUDY_DIFFICULTIES;
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const SERVICES_PAGE_SIZE = 12;
 
 export function KCScreen() {
+  const router = useRouter();
+  const { refreshTotalXp } = useUserProfile();
+
   const [services, setServices] = useState<StudyServiceItem[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState<string | null>(null);
@@ -41,6 +47,13 @@ export function KCScreen() {
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [lastEarnedXp, setLastEarnedXp] = useState<number | null>(null);
   const [flowError, setFlowError] = useState<string | null>(null);
+  const [kcSummary, setKcSummary] = useState<{
+    correct: number;
+    total: number;
+    scorePercent: number;
+    gainedXp: number;
+    historySaved: boolean;
+  } | null>(null);
 
   useEffect(() => {
     listStudyServices()
@@ -210,8 +223,9 @@ export function KCScreen() {
       ? `Knowledge Check ${titleTopics}`
       : `Knowledge Check ${questions[0]?.certificationCode ?? "AWS"}`;
 
+    let historySaved = false;
     try {
-      await saveStudyHistory({
+      historySaved = await saveStudyHistory({
         sessionType: "KC",
         title: sessionTitle,
         certificationCode: questions[0]?.certificationCode ?? null,
@@ -240,6 +254,10 @@ export function KCScreen() {
         }),
       });
 
+      if (historySaved) {
+        await refreshTotalXp();
+      }
+
       setCompletionMessage(
         `KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). +${gainedXp} XP salvo no historico.`,
       );
@@ -251,12 +269,20 @@ export function KCScreen() {
       setLastEarnedXp(gainedXp);
     }
 
+    setKcSummary({
+      correct: correctAnswers,
+      total: questions.length,
+      scorePercent,
+      gainedXp,
+      historySaved,
+    });
+
     restartKC();
   }
 
   return (
     <AppLayout>
-      <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 xl:px-8">
+      <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 xl:px-8 font-sans">
         <AnimatePresence>
           {lastEarnedXp != null && (
             <motion.div
@@ -270,18 +296,18 @@ export function KCScreen() {
               }}
             >
               <PixelCard className="border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/20 text-center">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">XP Recebido</p>
-                <p className="mt-1 font-[var(--font-body)] text-lg">+{lastEarnedXp} XP</p>
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">XP Recebido</p>
+                <p className="mt-1 font-sans text-lg">+{lastEarnedXp} XP</p>
               </PixelCard>
             </motion.div>
           )}
         </AnimatePresence>
 
         <PixelCard>
-          <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">
             KC - Knowledge Check
           </h1>
-          <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+          <p className="mt-2 font-sans text-sm text-[var(--pixel-subtext)]">
             Escolha assunto e dificuldade antes de iniciar. O fluxo de resposta e por questao, com auditoria completa
             quando houver erro.
           </p>
@@ -289,14 +315,14 @@ export function KCScreen() {
 
         {!inProgress && (
           <PixelCard className="space-y-4">
-            <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Configurar KC</h2>
+            <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Configurar KC</h2>
 
             {completionMessage && (
               <p className="font-[var(--font-body)] text-sm text-[var(--pixel-accent)]">{completionMessage}</p>
             )}
 
             <div className="space-y-2">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Assuntos AWS</p>
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Assuntos AWS</p>
               {servicesLoading && <p className="font-[var(--font-body)] text-sm">Carregando servicos...</p>}
               {servicesError && <p className="font-[var(--font-body)] text-sm text-red-300">{servicesError}</p>}
               {!servicesLoading && !servicesError && (
@@ -326,8 +352,8 @@ export function KCScreen() {
                               : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
                           }`}
                         >
-                          <p className="font-[var(--font-body)] text-sm">{service.name}</p>
-                          <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+                          <p className="font-sans text-sm">{service.name}</p>
+                          <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
                             {service.code}
                           </p>
                         </button>
@@ -361,7 +387,7 @@ export function KCScreen() {
             </div>
 
             <div className="space-y-2">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Dificuldade</p>
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Dificuldade</p>
               <div className="flex flex-wrap gap-2">
                 {DIFFICULTIES.map((difficulty) => {
                   const selected = selectedDifficulty === difficulty;
@@ -370,7 +396,7 @@ export function KCScreen() {
                       key={difficulty}
                       type="button"
                       onClick={() => setSelectedDifficulty(difficulty)}
-                      className={`border px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
+                      className={`border px-3 py-2 font-mono text-[10px] uppercase ${
                         selected
                           ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
                           : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
@@ -400,10 +426,43 @@ export function KCScreen() {
           </PixelCard>
         )}
 
+        {!inProgress && kcSummary && (
+          <PixelCard className="space-y-4 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">KC Finalizado</p>
+            <p className="font-[var(--font-body)] text-base">
+              Pontuacao: {kcSummary.scorePercent}% ({kcSummary.correct}/{kcSummary.total}) · +{kcSummary.gainedXp} XP
+            </p>
+            <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+              {kcSummary.historySaved
+                ? "Resultado salvo no historico com sucesso."
+                : "Resultado concluido, mas nao foi possivel salvar no historico."}
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <PixelButton
+                onClick={() => {
+                  setKcSummary(null);
+                  router.push("/kc");
+                }}
+              >
+                Fazer outro KC
+              </PixelButton>
+              <PixelButton
+                variant="ghost"
+                onClick={() => {
+                  setKcSummary(null);
+                  router.push("/");
+                }}
+              >
+                Voltar ao inicio
+              </PixelButton>
+            </div>
+          </PixelCard>
+        )}
+
         {inProgress && currentQuestion && (
           <>
             <PixelCard className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
                 Questao {currentIndex + 1}/{questions.length} · Acertos: {stats.correct} · Erros: {stats.wrong}
               </p>
               <PixelButton variant="ghost" onClick={() => void rerollKC()}>
@@ -412,12 +471,12 @@ export function KCScreen() {
             </PixelCard>
 
             <PixelCard className="space-y-4">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
                 {currentQuestion.topic} · {currentQuestion.difficulty}
               </p>
               <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
 
-              <div className="grid gap-2">
+              <div className="grid gap-4">
                 {OPTIONS.map((option) => {
                   const optionText = currentQuestion.options[option];
                   if (!optionText) return null;
@@ -428,7 +487,7 @@ export function KCScreen() {
                   return (
                     <label
                       key={`${currentQuestion.id}-${option}`}
-                      className={`flex items-start gap-2 border-2 px-3 py-2 ${
+                      className={`flex items-start gap-4 border-2 px-3 py-2 ${
                         isCorrectOption
                           ? "border-[#2ecc71] bg-green-900/35"
                           : isSelectedWrong
@@ -470,17 +529,17 @@ export function KCScreen() {
                 <PixelCard
                   className={isCurrentCorrect ? "border-[#2ecc71] bg-green-900/25" : "border-[#e74c3c] bg-red-900/25"}
                 >
-                  <p className="font-[var(--font-pixel)] text-[10px] uppercase">
+                  <p className="font-mono text-[10px] uppercase">
                     {isCurrentCorrect ? "✓ Resposta correta" : "✗ Resposta incorreta"}
                   </p>
 
                   {loadingExplanation && (
-                    <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                    <p className="mt-2 font-sans text-xs text-[var(--pixel-subtext)]">
                       Gerando auditoria detalhada com IA...
                     </p>
                   )}
 
-                  <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                  <p className="mt-2 font-sans text-sm text-[var(--pixel-subtext)]">
                     {currentExplanation?.summary ?? "Analise das alternativas para reforcar o aprendizado."}
                   </p>
 
@@ -495,13 +554,19 @@ export function KCScreen() {
                       return (
                         <div
                           key={`${currentQuestion.id}-audit-${option}`}
-                          className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                          className={cn(
+                            "border border-pixel-border bg-pixel-card px-3 py-2",
+                            isSelected && " border-2 ",
+                            isCorrectOption ? "border-green-400" : "border-red-400",
+                          )}
                         >
-                          <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
-                            {option}) {isCorrectOption ? "correta" : "incorreta"}
-                            {isSelected ? " · sua resposta" : ""}
+                          <p
+                            className={cn("font-mono text-[9px] uppercase text-[var(--pixel-subtext)]")}
+                          >
+                            {option} {isCorrectOption ? "correta" : "incorreta"}
+                            <span className="text-primary font-bold">{isSelected ? " · sua resposta" : ""}</span>
                           </p>
-                          <p className="mt-1 font-[var(--font-body)] text-sm">
+                          <p className="mt-1 font-sans text-sm">
                             {currentExplanation?.options[option] ??
                               currentQuestion.explanations[option] ??
                               "Sem explicacao adicional."}
@@ -513,7 +578,7 @@ export function KCScreen() {
                 </PixelCard>
               )}
 
-              {flowError && <p className="font-[var(--font-body)] text-sm text-red-300">{flowError}</p>}
+              {flowError && <p className="font-sans text-sm text-red-300">{flowError}</p>}
 
               <div className="flex flex-wrap justify-end gap-2">
                 {!submittedCurrent ? (
