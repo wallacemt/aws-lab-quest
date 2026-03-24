@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { QuestionOptionMapping, Task } from "@/lib/types";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type HistoryItem = QuestHistoryItem;
 
@@ -44,6 +45,7 @@ function normalizeSnapshot(tasks: Task[] | undefined): Task[] {
 export function HistoryScreen() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [studyHistory, setStudyHistory] = useState<StudySessionItem[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
@@ -67,6 +69,35 @@ export function HistoryScreen() {
   }, []);
 
   const totalXp = history.reduce((sum, item) => sum + item.xp, 0);
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredLabs = useMemo(() => {
+    if (!normalizedSearch) {
+      return history;
+    }
+
+    return history.filter((item) => {
+      const date = new Date(item.completedAt).toLocaleDateString("pt-BR");
+      const haystack =
+        `${item.title} ${item.theme} ${item.certification ?? ""} ${item.userName ?? ""} ${date}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [history, normalizedSearch]);
+
+  const filteredStudyHistory = useMemo(() => {
+    if (!normalizedSearch) {
+      return studyHistory;
+    }
+
+    return studyHistory.filter((item) => {
+      const date = new Date(item.completedAt).toLocaleDateString("pt-BR");
+      const haystack = `${item.title} ${item.sessionType} ${item.certificationCode ?? ""} ${date}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, studyHistory]);
+
+  const filteredLabsXp = filteredLabs.reduce((sum, item) => sum + item.xp, 0);
+  const hasAnyResult = filteredLabs.length > 0 || filteredStudyHistory.length > 0;
 
   return (
     <AppLayout>
@@ -81,11 +112,38 @@ export function HistoryScreen() {
           {(history.length > 0 || studyHistory.length > 0) && (
             <div className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
               <span className="font-[var(--font-pixel)] text-[10px] uppercase">
-                {history.length} labs · {studyHistory.length} estudos · {totalXp} XP total
+                {filteredLabs.length}/{history.length} labs · {filteredStudyHistory.length}/{studyHistory.length}{" "}
+                estudos · {filteredLabsXp}/{totalXp} XP
               </span>
             </div>
           )}
         </div>
+
+        {!loading && !error && (history.length > 0 || studyHistory.length > 0) && (
+          <PixelCard className="space-y-3">
+            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+              Busca no historico (LAB, KC e Simulado)
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por titulo, tema, certificacao, tipo ou data"
+                className="min-w-[240px] flex-1 border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] text-sm"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+          </PixelCard>
+        )}
 
         {loading && (
           <PixelCard>
@@ -110,76 +168,91 @@ export function HistoryScreen() {
           </PixelCard>
         )}
 
-        {!loading && history.length > 0 && (
+        {!loading && !error && (history.length > 0 || studyHistory.length > 0) && !hasAnyResult && (
+          <PixelCard className="py-8 text-center">
+            <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">
+              Nenhum resultado para &quot;{search}&quot;.
+            </p>
+            <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+              Tente outro termo, como nome do lab, tipo da sessao (KC/SIMULADO) ou certificacao.
+            </p>
+          </PixelCard>
+        )}
+
+        {!loading && filteredLabs.length > 0 && (
           <div className="space-y-3">
             <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Labs</h2>
-            <div className="grid gap-3 ">
-              {history.map((item) => (
-                <button key={item.id} type="button" onClick={() => setSelectedItem(item)} className="text-left">
-                  <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-primary)]">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-[var(--font-body)] text-base">{item.title}</p>
-                        <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                          Tema: {item.theme}
-                        </p>
+            <ScrollArea className="h-72 w-full rounded-md  border border-pixel-border">
+              <div className="flex flex-col p-4 gap-3 ">
+                {filteredLabs.map((item) => (
+                  <button key={item.id} type="button" onClick={() => setSelectedItem(item)} className="text-left">
+                    <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-primary)]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-[var(--font-body)] text-base">{item.title}</p>
+                          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                            Tema: {item.theme}
+                          </p>
+                        </div>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+                          +{item.xp} XP
+                        </span>
                       </div>
-                      <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
-                        +{item.xp} XP
-                      </span>
-                    </div>
 
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pixel-subtext)]">
-                      <span className="font-[var(--font-body)]">{item.tasksCount} tarefas</span>
-                      {item.certification && <span className="font-[var(--font-body)]">· {item.certification}</span>}
-                      <span className="font-[var(--font-body)]">
-                        · {new Date(item.completedAt).toLocaleDateString("pt-BR")}
-                      </span>
-                    </div>
-                    <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
-                      Clique para revisar o que foi realizado
-                    </p>
-                  </PixelCard>
-                </button>
-              ))}
-            </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pixel-subtext)]">
+                        <span className="font-[var(--font-body)]">{item.tasksCount} tarefas</span>
+                        {item.certification && <span className="font-[var(--font-body)]">· {item.certification}</span>}
+                        <span className="font-[var(--font-body)]">
+                          · {new Date(item.completedAt).toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                      <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
+                        Clique para revisar o que foi realizado
+                      </p>
+                    </PixelCard>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
         )}
 
-        {!loading && studyHistory.length > 0 && (
+        {!loading && filteredStudyHistory.length > 0 && (
           <div className="space-y-3">
             <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">KC e Simulados</h2>
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-              {studyHistory.map((item) => (
-                <button key={item.id} type="button" onClick={() => setSelectedStudyItem(item)} className="text-left">
-                  <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-[var(--font-body)] text-base">{item.title}</p>
-                        <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                          {item.sessionType} · {item.certificationCode ?? "Certificacao nao definida"}
-                        </p>
+            <ScrollArea className="h-72 w-full rounded-md  border border-pixel-border">
+              <div className="grid gap-3 grid-cols-1 p-4 sm:grid-cols-2">
+                {filteredStudyHistory.map((item) => (
+                  <button key={item.id} type="button" onClick={() => setSelectedStudyItem(item)} className="text-left">
+                    <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-[var(--font-body)] text-base">{item.title}</p>
+                          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                            {item.sessionType} · {item.certificationCode ?? "Certificacao nao definida"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                          {item.scorePercent}%
+                        </span>
                       </div>
-                      <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
-                        {item.scorePercent}%
-                      </span>
-                    </div>
 
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pixel-subtext)]">
-                      <span className="font-[var(--font-body)]">
-                        {item.correctAnswers}/{item.totalQuestions} corretas
-                      </span>
-                      <span className="font-[var(--font-body)]">
-                        · {new Date(item.completedAt).toLocaleDateString("pt-BR")}
-                      </span>
-                    </div>
-                    <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-accent)]">
-                      Clique para revisar respostas e explicacoes
-                    </p>
-                  </PixelCard>
-                </button>
-              ))}
-            </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pixel-subtext)]">
+                        <span className="font-[var(--font-body)]">
+                          {item.correctAnswers}/{item.totalQuestions} corretas
+                        </span>
+                        <span className="font-[var(--font-body)]">
+                          · {new Date(item.completedAt).toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                      <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-accent)]">
+                        Clique para revisar respostas e explicacoes
+                      </p>
+                    </PixelCard>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
         )}
 
