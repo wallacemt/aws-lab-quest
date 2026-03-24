@@ -1,4 +1,4 @@
-# AWS Lab Quest
+# AWS Quest
 
 Aplicacao web para preparacao de certificacoes AWS em formato gamificado, com modos Lab, KC e Simulado, ranking em tempo real, conquistas persistidas e fluxo admin para ingestao de conteudo.
 

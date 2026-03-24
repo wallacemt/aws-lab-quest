@@ -47,7 +47,7 @@ export default async function ShareAchievementPage({ params }: Props) {
             href="/"
             className="mt-4 inline-block border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
           >
-            Ir para AWS Lab Quest
+            Ir para AWS Quest
           </Link>
         </div>
       </main>
@@ -122,7 +122,7 @@ export default async function ShareAchievementPage({ params }: Props) {
           href="/"
           className="mt-5 inline-block border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
         >
-          Conhecer AWS Lab Quest
+          Conhecer AWS Quest
         </Link>
       </div>
     </main>

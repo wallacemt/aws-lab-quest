@@ -99,7 +99,7 @@ export function RegisterScreen() {
           <div className="mb-3 flex justify-center">
             <Image
               src={appLogo}
-              alt="AWS Lab Quest logo"
+              alt="AWS Quest logo"
               width={124}
               height={124}
               priority
@@ -107,7 +107,7 @@ export function RegisterScreen() {
             />
           </div>
           <h1 className="font-[var(--font-pixel)] text-xl text-[var(--pixel-primary)] drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
-            AWS LAB QUEST
+            AWS QUEST
           </h1>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Crie sua conta e entre na jornada

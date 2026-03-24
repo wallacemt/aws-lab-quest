@@ -30,7 +30,7 @@ export default function OgImage() {
             color: "#f59e0b",
           }}
         >
-          AWS Lab Quest
+          AWS Quest
         </div>
         <div style={{ fontSize: 78, fontWeight: 800, marginTop: 18, lineHeight: 1.08 }}>Gamificacao Retro</div>
         <div style={{ fontSize: 48, fontWeight: 700, marginTop: 10, lineHeight: 1.2 }}>

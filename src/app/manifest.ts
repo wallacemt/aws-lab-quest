@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "AWS Lab Quest",
-    short_name: "Lab Quest",
+    name: "AWS Quest",
+    short_name: "AWS Quest",
     description: "Gamificacao retro para laboratorios AWS com quests, badges, historico e leaderboard.",
     start_url: "/",
     display: "standalone",

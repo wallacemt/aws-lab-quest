@@ -87,14 +87,14 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
           <div className="mb-3 flex justify-center">
             <Image
               src={appLogo}
-              alt="AWS Lab Quest logo"
+              alt="AWS Quest logo"
               width={124}
               height={124}
               priority
               className="h-auto w-28 sm:w-32"
             />
           </div>
-          <h1 className="font-mono text-xl text-primary drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">AWS LAB QUEST</h1>
+          <h1 className="font-mono text-xl text-primary drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">AWS QUEST</h1>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Entre para começar sua jornada na nuvem
           </p>

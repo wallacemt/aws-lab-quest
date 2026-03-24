@@ -22,7 +22,7 @@ export default function TwitterImage() {
           color: "#f8fafc",
         }}
       >
-        <div style={{ fontSize: 34, color: "#f59e0b", textTransform: "uppercase", letterSpacing: 2 }}>AWS Lab Quest</div>
+        <div style={{ fontSize: 34, color: "#f59e0b", textTransform: "uppercase", letterSpacing: 2 }}>AWS Quest</div>
         <div style={{ fontSize: 72, fontWeight: 800, marginTop: 18, lineHeight: 1.08 }}>
           Estude AWS como um jogo
         </div>

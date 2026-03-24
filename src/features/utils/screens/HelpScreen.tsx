@@ -97,7 +97,7 @@ export function HelpScreen() {
               Manual do jogador
             </p>
             <h1 className="font-[var(--font-pixel)] text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
-              Como usar o AWS Lab Quest do jeito certo
+              Como usar o AWS Quest do jeito certo
             </h1>
             <p className="max-w-3xl font-[var(--font-body)] text-base leading-7 text-[var(--pixel-text)]">
               Este manual mostra o que fazer em cada parte do app e como configurar sua rotina para ter a melhor
