@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     default: "AWS Quest",
     template: "%s | AWS Quest",
   },
-  description: "Gamificacao retro para laboratorios AWS com Gemini, quests, badges, historico e leaderboard.",
+  description: "Gamificacao retro para AWS, quests, badges, historico e leaderboard.",
   applicationName: "AWS Quest",
   keywords: [
     "aws",
