@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 const ADMIN_MENU = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/upload", label: "Upload PDF" },
+  { href: "/admin/uploads", label: "Historico Uploads" },
   { href: "/admin/users", label: "Usuarios" },
   { href: "/admin/questions", label: "Banco de Questoes" },
 ];
@@ -63,8 +64,8 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1220] text-[#e2e8f0]">
-      <div className="mx-auto flex min-h-screen max-w-[1400px]">
+    <div className="min-h-scree n bg-[#0b1220] text-[#e2e8f0]">
+      <div className="mx-auto flex min-h-screen ">
         <aside className="w-72 border-r border-[#1e293b] bg-[#0f172a] p-6">
           <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>
           <p className="mt-2 text-xs text-[#94a3b8]">Gerencie usuarios, questoes e ingestao de simulados.</p>

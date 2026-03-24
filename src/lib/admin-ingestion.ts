@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 
-const ADMIN_UPLOADS_BUCKET = process.env.SUPABASE_ADMIN_UPLOADS_BUCKET ?? "admin-ingestion";
+const ADMIN_UPLOADS_BUCKET = 'aws-lab-quest';
 
 function sanitizeFileName(fileName: string): string {
   return fileName

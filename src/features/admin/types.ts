@@ -131,3 +131,84 @@ export type AdminMetricsPayload = {
   weakServices: AdminWeakServiceItem[];
   ranking: AdminXpRankingItem[];
 };
+
+export type AdminUploadType = "EXAM_GUIDE" | "SIMULADO_PDF" | "SIMULADO_GENERATION";
+
+export type AdminUploadedFileItem = {
+  id: string;
+  uploadType: AdminUploadType;
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  storageBucket: string;
+  storagePath: string;
+  sha256: string;
+  source: string;
+  createdAt: string;
+  certificationPreset: {
+    code: string;
+    name: string;
+  } | null;
+  uploadedBy: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+};
+
+export type AdminUploadJobItem = {
+  id: string;
+  status: "PENDING" | "UPLOADING" | "EXTRACTING" | "GENERATING" | "SAVING" | "COMPLETED" | "FAILED";
+  uploadType: AdminUploadType;
+  progressPercent: number;
+  message: string | null;
+  generatedCount: number | null;
+  savedCount: number | null;
+  errorMessage: string | null;
+  fileName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+  certificationPreset: {
+    code: string;
+    name: string;
+  } | null;
+  uploadedFile: {
+    id: string;
+    fileName: string;
+  } | null;
+};
+
+export type AdminUploadsListParams = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  uploadType?: AdminUploadType | "";
+  certificationCode?: string;
+  limit?: number;
+};
+
+export type AdminUploadsPayload = {
+  files: AdminUploadedFileItem[];
+  filesPagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  recentJobs: AdminUploadJobItem[];
+  recentJobsLimit: number;
+};
+
+export type AdminUploadSignedUrlPayload = {
+  file: {
+    id: string;
+    fileName: string;
+    storageBucket: string;
+    storagePath: string;
+    uploadType: AdminUploadType;
+    createdAt: string;
+  };
+  signedUrl: string;
+  expiresInSeconds: number;
+};

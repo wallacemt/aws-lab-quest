@@ -3,6 +3,9 @@ import {
   AdminMetricsPayload,
   AdminQuestionsListParams,
   AdminQuestionListItem,
+  AdminUploadSignedUrlPayload,
+  AdminUploadsListParams,
+  AdminUploadsPayload,
   AdminStatus,
   AdminUsersListParams,
   AdminUserListItem,
@@ -92,4 +95,44 @@ export async function getAdminMetrics(days = 30): Promise<AdminMetricsPayload> {
   }
 
   return (await response.json()) as AdminMetricsPayload;
+}
+
+export async function listAdminUploads(input: AdminUploadsListParams): Promise<AdminUploadsPayload> {
+  const qs = toQueryString(input);
+  const response = await fetch(`/api/admin/uploads?${qs}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar historico de uploads.");
+  }
+
+  return (await response.json()) as AdminUploadsPayload;
+}
+
+export async function getAdminUploadSignedUrl(fileId: string, ttlSeconds = 180): Promise<AdminUploadSignedUrlPayload> {
+  const response = await fetch(`/api/admin/uploads/${fileId}/signed-url?ttl=${ttlSeconds}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    let message = "Nao foi possivel gerar link seguro do arquivo.";
+
+    try {
+      const payload = (await response.json()) as AdminApiError;
+      if (payload?.error) {
+        message = payload.error;
+      }
+    } catch {
+      // Keep fallback message.
+    }
+
+    throw new Error(message);
+  }
+
+  return (await response.json()) as AdminUploadSignedUrlPayload;
 }
