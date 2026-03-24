@@ -87,6 +87,11 @@ export async function GET(request: NextRequest) {
             email: true,
           },
         },
+        _count: {
+          select: {
+            generatedQuestions: true,
+          },
+        },
       },
     }),
     prisma.adminUploadedFile.count({ where }),

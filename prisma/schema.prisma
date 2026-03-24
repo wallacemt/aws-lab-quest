@@ -189,6 +189,8 @@ model StudyQuestion {
   certificationPreset   CertificationPreset?    @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
   awsServiceId          String?
   awsService            AwsService?             @relation(fields: [awsServiceId], references: [id], onDelete: SetNull)
+  sourceUploadedFileId  String?
+  sourceUploadedFile    AdminUploadedFile?      @relation(fields: [sourceUploadedFileId], references: [id], onDelete: SetNull)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 
@@ -196,6 +198,7 @@ model StudyQuestion {
   @@index([difficulty, active])
   @@index([certificationPresetId])
   @@index([awsServiceId])
+  @@index([sourceUploadedFileId])
   @@index([cachedExplainAt])
 }
 
@@ -321,6 +324,7 @@ model AdminUploadedFile {
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   ingestionJobs         AdminIngestionJob[]
+  generatedQuestions    StudyQuestion[]
 
   @@unique([storageBucket, storagePath])
   @@index([uploadType, createdAt])

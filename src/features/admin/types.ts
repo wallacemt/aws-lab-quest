@@ -77,6 +77,17 @@ export type AdminQuestionListItem = {
   difficulty: "easy" | "medium" | "hard";
   usage: "KC" | "SIMULADO" | "BOTH";
   active: boolean;
+  correctOption: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  optionE: string | null;
+  explanationA: string | null;
+  explanationB: string | null;
+  explanationC: string | null;
+  explanationD: string | null;
+  explanationE: string | null;
   createdAt: string;
   certificationPreset: {
     code: string;
@@ -154,6 +165,9 @@ export type AdminUploadedFileItem = {
     name: string | null;
     email: string;
   } | null;
+  _count: {
+    generatedQuestions: number;
+  };
 };
 
 export type AdminUploadJobItem = {
@@ -211,4 +225,32 @@ export type AdminUploadSignedUrlPayload = {
   };
   signedUrl: string;
   expiresInSeconds: number;
+};
+
+export type AdminUploadGeneratedQuestionItem = {
+  id: string;
+  externalId: string;
+  statement: string;
+  topic: string;
+  difficulty: "easy" | "medium" | "hard";
+  usage: "KC" | "SIMULADO" | "BOTH";
+  correctOption: string;
+  createdAt: string;
+};
+
+export type AdminUploadQuestionsPayload = {
+  uploadedFile: {
+    id: string;
+    fileName: string;
+    uploadType: AdminUploadType;
+    certificationPreset: {
+      code: string;
+      name: string;
+    } | null;
+  };
+  items: AdminUploadGeneratedQuestionItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 };

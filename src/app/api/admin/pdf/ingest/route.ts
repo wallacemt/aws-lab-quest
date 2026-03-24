@@ -8,6 +8,7 @@ type IngestPayload = {
   certificationCode?: string;
   extractedText?: string;
   desiredCount?: number;
+  ingestMode?: "generate-new" | "extract-existing";
   jobId?: string;
   uploadedFileId?: string;
 };
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
     typeof body.desiredCount === "number" && Number.isFinite(body.desiredCount)
       ? Math.max(5, Math.min(50, Math.round(body.desiredCount)))
       : 20;
+  const ingestMode = body.ingestMode === "extract-existing" ? "extract-existing" : "generate-new";
 
   let jobId = body.jobId?.trim() || null;
 
@@ -56,17 +58,23 @@ export async function POST(request: NextRequest) {
         certificationPresetId: certification?.id,
         desiredCount,
         fileName: "simulado-ingest",
-        status: "GENERATING",
+        status: ingestMode === "extract-existing" ? "EXTRACTING" : "GENERATING",
         progressPercent: 55,
-        message: "Iniciando geracao de questoes.",
+        message:
+          ingestMode === "extract-existing"
+            ? "Iniciando extracao de questoes existentes do PDF."
+            : "Iniciando geracao de questoes.",
       });
 
       jobId = job.id;
     } else {
       await updateIngestionJob(jobId, {
-        status: "GENERATING",
+        status: ingestMode === "extract-existing" ? "EXTRACTING" : "GENERATING",
         progressPercent: 55,
-        message: "Iniciando geracao de questoes.",
+        message:
+          ingestMode === "extract-existing"
+            ? "Iniciando extracao de questoes existentes do PDF."
+            : "Iniciando geracao de questoes.",
         uploadedFileId: body.uploadedFileId?.trim() || undefined,
       });
     }
@@ -75,6 +83,8 @@ export async function POST(request: NextRequest) {
       certificationCode,
       extractedText,
       desiredCount,
+      mode: ingestMode,
+      sourceUploadedFileId: body.uploadedFileId?.trim() || undefined,
       onProgress: async (progress) => {
         if (!jobId) {
           return;

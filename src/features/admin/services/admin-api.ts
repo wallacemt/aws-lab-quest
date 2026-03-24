@@ -4,6 +4,7 @@ import {
   AdminQuestionsListParams,
   AdminQuestionListItem,
   AdminUploadSignedUrlPayload,
+  AdminUploadQuestionsPayload,
   AdminUploadsListParams,
   AdminUploadsPayload,
   AdminStatus,
@@ -135,4 +136,37 @@ export async function getAdminUploadSignedUrl(fileId: string, ttlSeconds = 180):
   }
 
   return (await response.json()) as AdminUploadSignedUrlPayload;
+}
+
+export async function listAdminUploadQuestions(
+  fileId: string,
+  input: { page?: number; pageSize?: number } = {},
+): Promise<AdminUploadQuestionsPayload> {
+  const qs = toQueryString({
+    page: input.page ?? 1,
+    pageSize: input.pageSize ?? 10,
+  });
+
+  const response = await fetch(`/api/admin/uploads/${fileId}/questions?${qs}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    let message = "Nao foi possivel carregar questoes do documento.";
+
+    try {
+      const payload = (await response.json()) as AdminApiError;
+      if (payload?.error) {
+        message = payload.error;
+      }
+    } catch {
+      // Keep fallback message.
+    }
+
+    throw new Error(message);
+  }
+
+  return (await response.json()) as AdminUploadQuestionsPayload;
 }

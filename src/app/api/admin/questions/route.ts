@@ -97,6 +97,17 @@ export async function GET(request: NextRequest) {
         difficulty: true,
         usage: true,
         active: true,
+        correctOption: true,
+        optionA: true,
+        optionB: true,
+        optionC: true,
+        optionD: true,
+        optionE: true,
+        explanationA: true,
+        explanationB: true,
+        explanationC: true,
+        explanationD: true,
+        explanationE: true,
         createdAt: true,
         certificationPreset: {
           select: {

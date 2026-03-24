@@ -31,6 +31,7 @@ export function AdminQuestionsScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PaginatedResult<AdminQuestionListItem> | null>(null);
+  const [selectedQuestion, setSelectedQuestion] = useState<AdminQuestionListItem | null>(null);
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [awsServices, setAwsServices] = useState<AwsServiceOption[]>([]);
 
@@ -245,7 +246,11 @@ export function AdminQuestionsScreen() {
               </thead>
               <tbody>
                 {result.items.map((item) => (
-                  <tr key={item.id} className="border-b border-[#1e293b] text-[#e2e8f0]">
+                  <tr
+                    key={item.id}
+                    className="cursor-pointer border-b border-[#1e293b] text-[#e2e8f0] hover:bg-[#0b1220]"
+                    onClick={() => setSelectedQuestion(item)}
+                  >
                     <td className="px-3 py-2">{item.statement.slice(0, 120)}...</td>
                     <td className="px-3 py-2">{item.topic}</td>
                     <td className="px-3 py-2 uppercase">{item.difficulty}</td>
@@ -282,6 +287,64 @@ export function AdminQuestionsScreen() {
             </div>
           </footer>
         </>
+      )}
+
+      {selectedQuestion && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <div className="w-full max-w-4xl space-y-4 rounded border border-[#334155] bg-[#111827] p-4 text-[#e2e8f0]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-xs uppercase text-[#f97316]">Detalhes da questao</p>
+                <p className="mt-1 text-sm">{selectedQuestion.externalId}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedQuestion(null)}
+                className="border border-[#334155] px-3 py-1 text-xs uppercase"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <p>
+                <strong>Enunciado:</strong> {selectedQuestion.statement}
+              </p>
+              <p>
+                <strong>Topico:</strong> {selectedQuestion.topic}
+              </p>
+              <p>
+                <strong>Dificuldade:</strong> {selectedQuestion.difficulty.toUpperCase()} | <strong>Uso:</strong>{" "}
+                {selectedQuestion.usage}
+              </p>
+              <p>
+                <strong>Servico:</strong> {selectedQuestion.awsService?.code ?? "-"} | <strong>Certificacao:</strong>{" "}
+                {selectedQuestion.certificationPreset?.code ?? "-"}
+              </p>
+            </div>
+
+            <div className="grid gap-2 text-sm">
+              <p className="font-mono text-xs uppercase text-[#94a3b8]">Alternativas</p>
+              <p>A) {selectedQuestion.optionA}</p>
+              <p>B) {selectedQuestion.optionB}</p>
+              <p>C) {selectedQuestion.optionC}</p>
+              <p>D) {selectedQuestion.optionD}</p>
+              {selectedQuestion.optionE && <p>E) {selectedQuestion.optionE}</p>}
+              <p className="mt-1 font-mono text-xs uppercase text-[#22c55e]">
+                Gabarito: {selectedQuestion.correctOption}
+              </p>
+            </div>
+
+            <div className="grid gap-2 text-sm">
+              <p className="font-mono text-xs uppercase text-[#94a3b8]">Explicacoes</p>
+              <p>A) {selectedQuestion.explanationA ?? "-"}</p>
+              <p>B) {selectedQuestion.explanationB ?? "-"}</p>
+              <p>C) {selectedQuestion.explanationC ?? "-"}</p>
+              <p>D) {selectedQuestion.explanationD ?? "-"}</p>
+              {selectedQuestion.optionE && <p>E) {selectedQuestion.explanationE ?? "-"}</p>}
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

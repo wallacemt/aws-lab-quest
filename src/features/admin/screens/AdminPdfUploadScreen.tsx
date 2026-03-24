@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { listAdminUploadQuestions, listAdminUploads } from "@/features/admin/services/admin-api";
+import { AdminUploadQuestionsPayload, AdminUploadsPayload } from "@/features/admin/types";
 
 type CertificationOption = {
   id: string;
@@ -40,6 +42,11 @@ type ExamGuideResponse = {
   certification: {
     code: string;
     name: string;
+  };
+  conflict?: {
+    certificationCode: string;
+    certificationName: string;
+    updatedAt: string;
   };
 };
 
@@ -87,38 +94,9 @@ type ExamGuideStatusItem = {
   } | null;
 };
 
-type UploadDashboardPayload = {
-  files: Array<{
-    id: string;
-    uploadType: "EXAM_GUIDE" | "SIMULADO_PDF" | "SIMULADO_GENERATION";
-    fileName: string;
-    fileSizeBytes: number;
-    createdAt: string;
-    certificationPreset: {
-      code: string;
-      name: string;
-    } | null;
-    uploadedBy: {
-      name: string | null;
-      email: string;
-    } | null;
-  }>;
-  recentJobs: Array<{
-    id: string;
-    status: "PENDING" | "UPLOADING" | "EXTRACTING" | "GENERATING" | "SAVING" | "COMPLETED" | "FAILED";
-    uploadType: "EXAM_GUIDE" | "SIMULADO_PDF" | "SIMULADO_GENERATION";
-    progressPercent: number;
-    message: string | null;
-    generatedCount: number | null;
-    savedCount: number | null;
-    errorMessage: string | null;
-    createdAt: string;
-    certificationPreset: {
-      code: string;
-      name: string;
-    } | null;
-  }>;
-};
+type UploadDashboardPayload = AdminUploadsPayload;
+
+type UploadAction = "exam-guide" | "simulado" | "simulado-completo";
 
 function formatBytes(value: number): string {
   if (value < 1024) {
@@ -142,6 +120,7 @@ export function AdminPdfUploadScreen() {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [mode, setMode] = useState<UploadMode>("exam-guide");
+  const [showUploadActions, setShowUploadActions] = useState(false);
   const [simuladoResult, setSimuladoResult] = useState<ExtractionResponse | null>(null);
   const [examGuideResult, setExamGuideResult] = useState<ExamGuideResponse | null>(null);
   const [ingestResult, setIngestResult] = useState<IngestResponse | null>(null);
@@ -153,6 +132,11 @@ export function AdminPdfUploadScreen() {
   const [jobSnapshot, setJobSnapshot] = useState<IngestionJobResponse["job"] | null>(null);
   const [guideStatuses, setGuideStatuses] = useState<ExamGuideStatusItem[]>([]);
   const [uploadDashboard, setUploadDashboard] = useState<UploadDashboardPayload | null>(null);
+  const [auditFileId, setAuditFileId] = useState<string | null>(null);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditPayload, setAuditPayload] = useState<AdminUploadQuestionsPayload | null>(null);
 
   useEffect(() => {
     async function loadCertifications() {
@@ -204,17 +188,11 @@ export function AdminPdfUploadScreen() {
 
     async function loadUploadDashboard() {
       try {
-        const response = await fetch("/api/admin/uploads?limit=8", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",
+        const payload = await listAdminUploads({
+          page: 1,
+          pageSize: 8,
+          limit: 8,
         });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = (await response.json()) as UploadDashboardPayload;
         setUploadDashboard(payload);
       } catch {
         // Preserve upload flow even if dashboard endpoint is unavailable.
@@ -224,6 +202,44 @@ export function AdminPdfUploadScreen() {
     void loadGuideStatus();
     void loadUploadDashboard();
   }, []);
+
+  useEffect(() => {
+    if (!auditFileId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadAudit() {
+      setAuditLoading(true);
+      setAuditError(null);
+
+      try {
+        const payload = await listAdminUploadQuestions(auditFileId as string, {
+          page: auditPage,
+          pageSize: 8,
+        });
+
+        if (!cancelled) {
+          setAuditPayload(payload);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setAuditError(err instanceof Error ? err.message : "Falha ao carregar auditoria do documento.");
+        }
+      } finally {
+        if (!cancelled) {
+          setAuditLoading(false);
+        }
+      }
+    }
+
+    void loadAudit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [auditFileId, auditPage]);
 
   useEffect(() => {
     if (!activeJobId) {
@@ -289,11 +305,7 @@ export function AdminPdfUploadScreen() {
           cache: "no-store",
           credentials: "include",
         }),
-        fetch("/api/admin/uploads?limit=8", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",
-        }),
+        listAdminUploads({ page: 1, pageSize: 8, limit: 8 }),
       ]);
 
       if (statusResponse.ok) {
@@ -301,13 +313,24 @@ export function AdminPdfUploadScreen() {
         setGuideStatuses(statusPayload.certifications ?? []);
       }
 
-      if (dashboardResponse.ok) {
-        const dashboardPayload = (await dashboardResponse.json()) as UploadDashboardPayload;
-        setUploadDashboard(dashboardPayload);
-      }
+      setUploadDashboard(dashboardResponse);
     } catch {
       // Soft refresh only.
     }
+  }
+
+  function startAction(nextAction: UploadAction) {
+    setMode(nextAction);
+    setShowUploadActions(false);
+    setError(null);
+    setWarning(null);
+  }
+
+  function closeAudit() {
+    setAuditFileId(null);
+    setAuditPayload(null);
+    setAuditPage(1);
+    setAuditError(null);
   }
 
   async function uploadExamGuide(formData: FormData) {
@@ -419,7 +442,7 @@ export function AdminPdfUploadScreen() {
           body: JSON.stringify({
             certificationCode: extracted.certification.code,
             extractedText: extracted.extractedText,
-            desiredCount: 20,
+            ingestMode: "extract-existing",
             jobId: extracted.jobId,
             uploadedFileId: extracted.uploadedFileId,
           }),
@@ -465,6 +488,7 @@ export function AdminPdfUploadScreen() {
           certificationCode: simuladoResult.certification.code,
           extractedText: simuladoResult.extractedText,
           desiredCount: 20,
+          ingestMode: "generate-new",
           jobId: simuladoResult.jobId,
           uploadedFileId: simuladoResult.uploadedFileId,
         }),
@@ -493,13 +517,10 @@ export function AdminPdfUploadScreen() {
       <PixelCard className="space-y-3">
         <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Admin OCR</p>
         <h1 className="font-mono text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
-          Upload de documentos de certificacao
+          Pipeline de upload e ingestao
         </h1>
         <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-          Fluxo recomendado: primeiro enviar o Exam Guide oficial da certificacao e depois enviar PDFs de simulado.
-        </p>
-        <p className="font-[var(--font-body)] text-xs leading-6 text-[var(--pixel-subtext)]">
-          Exemplo de guide: AWS-Certified-Cloud-Practitioner_Exam-Guide.pdf
+          Fluxo em etapas: selecione a certificacao, confira o status do guide e depois escolha o tipo de upload.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link href="/admin">
@@ -511,89 +532,112 @@ export function AdminPdfUploadScreen() {
         </div>
       </PixelCard>
 
-      <PixelCard className="space-y-3">
-        <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Tipo de upload</p>
+      <PixelCard className="space-y-4">
+        <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Etapa 1 - Certificacao alvo</p>
+        <label className="block space-y-2">
+          <span className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Selecione a certificacao</span>
+          <select
+            name="certificationCode"
+            value={selectedCertificationCode}
+            onChange={(event) => {
+              setSelectedCertificationCode(event.target.value);
+              resetStatus();
+            }}
+            className="w-full rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-sm"
+            required
+          >
+            {certifications.length === 0 && <option value="">Carregando certificacoes...</option>}
+            {certifications.map((certification) => (
+              <option key={certification.id} value={certification.code}>
+                {certification.code} - {certification.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </PixelCard>
+
+      <PixelCard className="space-y-4">
+        <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Etapa 2 - Exam Guide</p>
+        {selectedGuideStatus ? (
+          <>
+            <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+              {selectedGuideStatus.code} - {selectedGuideStatus.name}:{" "}
+              {selectedGuideStatus.hasExamGuide ? "guide ja enviado" : "guide ainda nao enviado"}
+            </p>
+            {selectedGuideStatus.latestUpload && (
+              <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                Ultimo guide: {selectedGuideStatus.latestUpload.fileName} em{" "}
+                {formatDate(selectedGuideStatus.latestUpload.createdAt)}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+            Selecione a certificacao para ver status.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
-          <button
+          <PixelButton
             type="button"
             onClick={() => {
-              setMode("exam-guide");
-              resetStatus();
+              startAction("exam-guide");
             }}
-            className={`border px-3 py-2 font-mono text-[10px] uppercase ${
-              mode === "exam-guide"
-                ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
-                : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-            }`}
           >
-            Exam Guide (obrigatorio)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("simulado");
-              resetStatus();
-            }}
-            className={`border px-3 py-2 font-mono text-[10px] uppercase ${
-              mode === "simulado"
-                ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
-                : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-            }`}
-          >
-            Simulado (2 etapas)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("simulado-completo");
-              resetStatus();
-            }}
-            className={`border px-3 py-2 font-mono text-[10px] uppercase ${
-              mode === "simulado-completo"
-                ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
-                : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-            }`}
-          >
-            Simulado Completo (1 clique)
-          </button>
+            {selectedGuideStatus?.hasExamGuide ? "Atualizar guide" : "Enviar guide"}
+          </PixelButton>
         </div>
       </PixelCard>
 
-      {selectedGuideStatus && (
-        <PixelCard className="space-y-2">
-          <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Status do Exam Guide</p>
-          <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
-            {selectedGuideStatus.code} - {selectedGuideStatus.name}:{" "}
-            {selectedGuideStatus.hasExamGuide ? "ja possui guia salvo" : "sem guia salvo"}
-          </p>
-          {selectedGuideStatus.latestUpload && (
-            <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-              Ultimo arquivo: {selectedGuideStatus.latestUpload.fileName} em{" "}
-              {formatDate(selectedGuideStatus.latestUpload.createdAt)}
-            </p>
-          )}
-        </PixelCard>
-      )}
+      <PixelCard className="space-y-4">
+        <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Etapa 3 - Upload de documento</p>
+        <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+          Escolha como o PDF deve ser processado.
+        </p>
+        {!showUploadActions ? (
+          <PixelButton type="button" onClick={() => setShowUploadActions(true)}>
+            Escolher opcao de upload
+          </PixelButton>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => startAction("simulado-completo")}
+              className="border border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10 px-3 py-3 text-left"
+            >
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">1 clique</p>
+              <p className="text-xs">Extrair questoes reais do PDF, enriquecer com IA e salvar.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => startAction("simulado")}
+              className="border border-[var(--pixel-border)] px-3 py-3 text-left"
+            >
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">2 etapas</p>
+              <p className="text-xs">Extrair texto e depois gerar um novo simulado com IA.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowUploadActions(false)}
+              className="border border-[var(--pixel-border)] px-3 py-3 text-left"
+            >
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Cancelar</p>
+              <p className="text-xs">Fechar opcoes de upload.</p>
+            </button>
+          </div>
+        )}
+      </PixelCard>
 
       <PixelCard>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <label className="block space-y-2">
-            <span className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Certificacao alvo</span>
-            <select
-              name="certificationCode"
-              value={selectedCertificationCode}
-              onChange={(event) => setSelectedCertificationCode(event.target.value)}
-              className="w-full rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-sm"
-              required
-            >
-              {certifications.length === 0 && <option value="">Carregando certificacoes...</option>}
-              {certifications.map((certification) => (
-                <option key={certification.id} value={certification.code}>
-                  {certification.code} - {certification.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Etapa 4 - Executar acao</p>
+          <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+            Acao selecionada:{" "}
+            {mode === "exam-guide"
+              ? "Upload de Exam Guide"
+              : mode === "simulado"
+                ? "Simulado em 2 etapas"
+                : "Simulado 1 clique"}
+          </p>
 
           <label className="block space-y-2">
             <span className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Arquivo PDF</span>
@@ -626,13 +670,13 @@ export function AdminPdfUploadScreen() {
                 : mode === "exam-guide"
                   ? "Salvar Exam Guide"
                   : mode === "simulado-completo"
-                    ? "Extrair + Gerar + Salvar"
+                    ? "Extrair questoes + Enriquecer + Salvar"
                     : "Extrair texto do simulado"}
             </PixelButton>
 
             {mode === "simulado" && simuladoResult && (
               <PixelButton type="button" disabled={saving} onClick={handleIngest}>
-                {saving ? "Salvando questoes..." : "Gerar e salvar questoes"}
+                {saving ? "Salvando questoes..." : "Gerar novo simulado com IA"}
               </PixelButton>
             )}
           </div>
@@ -680,19 +724,6 @@ export function AdminPdfUploadScreen() {
         </PixelCard>
       )}
 
-      {simuladoResult && (
-        <PixelCard className="space-y-3">
-          <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Preview extraido</p>
-          <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-            Arquivo: {simuladoResult.fileName} | Certificacao: {simuladoResult.certification.code} | Caracteres:{" "}
-            {simuladoResult.characters}
-          </p>
-          <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3 text-xs leading-5 text-[var(--pixel-text)]">
-            {simuladoResult.preview}
-          </pre>
-        </PixelCard>
-      )}
-
       {examGuideResult && (
         <PixelCard className="space-y-3 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Exam Guide atualizado</p>
@@ -737,6 +768,23 @@ export function AdminPdfUploadScreen() {
                       {fileItem.certificationPreset?.code ?? "SEM-CERT"} | {formatBytes(fileItem.fileSizeBytes)} |{" "}
                       {formatDate(fileItem.createdAt)}
                     </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[10px] uppercase text-[var(--pixel-subtext)]">
+                        Questoes geradas: {fileItem._count.generatedQuestions}
+                      </span>
+                      {fileItem._count.generatedQuestions > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuditFileId(fileItem.id);
+                            setAuditPage(1);
+                          }}
+                          className="border border-[var(--pixel-border)] px-2 py-1 text-[10px] uppercase"
+                        >
+                          Ver questoes
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -763,6 +811,91 @@ export function AdminPdfUploadScreen() {
             )}
           </div>
         </PixelCard>
+      )}
+
+      {auditFileId && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <div className="w-full max-w-4xl space-y-4 rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Auditoria</p>
+                <p className="text-sm text-[var(--pixel-text)]">
+                  {auditPayload?.uploadedFile.fileName ?? "Carregando documento..."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAudit}
+                className="border border-[var(--pixel-border)] px-2 py-1 text-xs uppercase"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {auditLoading && <p className="text-sm text-[var(--pixel-subtext)]">Carregando questoes do documento...</p>}
+            {auditError && <p className="text-sm text-[var(--pixel-danger)]">{auditError}</p>}
+
+            {!auditLoading && auditPayload && (
+              <>
+                <div className="max-h-[420px] overflow-auto rounded border border-[var(--pixel-border)]">
+                  <table className="w-full min-w-[900px] text-left text-xs">
+                    <thead className="border-b border-[var(--pixel-border)] bg-black/10 uppercase text-[var(--pixel-subtext)]">
+                      <tr>
+                        <th className="px-2 py-2">Enunciado</th>
+                        <th className="px-2 py-2">Topico</th>
+                        <th className="px-2 py-2">Dificuldade</th>
+                        <th className="px-2 py-2">Uso</th>
+                        <th className="px-2 py-2">Gabarito</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditPayload.items.length === 0 && (
+                        <tr>
+                          <td className="px-2 py-3" colSpan={5}>
+                            Nenhuma questao vinculada a este documento.
+                          </td>
+                        </tr>
+                      )}
+                      {auditPayload.items.map((question) => (
+                        <tr key={question.id} className="border-b border-[var(--pixel-border)]">
+                          <td className="px-2 py-2">{question.statement.slice(0, 130)}...</td>
+                          <td className="px-2 py-2">{question.topic}</td>
+                          <td className="px-2 py-2 uppercase">{question.difficulty}</td>
+                          <td className="px-2 py-2 uppercase">{question.usage}</td>
+                          <td className="px-2 py-2 uppercase">{question.correctOption}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span>
+                    Pagina {auditPayload.page} de {auditPayload.totalPages} | Total: {auditPayload.total}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={auditPayload.page <= 1}
+                      onClick={() => setAuditPage((prev) => Math.max(1, prev - 1))}
+                      className="border border-[var(--pixel-border)] px-2 py-1 uppercase disabled:opacity-40"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      type="button"
+                      disabled={auditPayload.page >= auditPayload.totalPages}
+                      onClick={() => setAuditPage((prev) => Math.min(auditPayload.totalPages, prev + 1))}
+                      className="border border-[var(--pixel-border)] px-2 py-1 uppercase disabled:opacity-40"
+                    >
+                      Proxima
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </main>
   );
