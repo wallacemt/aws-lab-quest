@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { createIngestionJob, updateIngestionJob } from "@/lib/admin-ingestion";
+import { prisma } from "@/lib/prisma";
 import { ingestQuestionsFromPdf } from "@/lib/study-question-generation";
 
 type IngestPayload = {
   certificationCode?: string;
   extractedText?: string;
   desiredCount?: number;
+  jobId?: string;
+  uploadedFileId?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -37,15 +41,72 @@ export async function POST(request: NextRequest) {
       ? Math.max(5, Math.min(50, Math.round(body.desiredCount)))
       : 20;
 
+  let jobId = body.jobId?.trim() || null;
+
   try {
+    if (!jobId) {
+      const certification = await prisma.certificationPreset.findUnique({
+        where: { code: certificationCode },
+        select: { id: true },
+      });
+
+      const job = await createIngestionJob({
+        uploadType: "SIMULADO_GENERATION",
+        createdByUserId: adminCheck.userId,
+        certificationPresetId: certification?.id,
+        desiredCount,
+        fileName: "simulado-ingest",
+        status: "GENERATING",
+        progressPercent: 55,
+        message: "Iniciando geracao de questoes.",
+      });
+
+      jobId = job.id;
+    } else {
+      await updateIngestionJob(jobId, {
+        status: "GENERATING",
+        progressPercent: 55,
+        message: "Iniciando geracao de questoes.",
+        uploadedFileId: body.uploadedFileId?.trim() || undefined,
+      });
+    }
+
     const result = await ingestQuestionsFromPdf({
       certificationCode,
       extractedText,
       desiredCount,
+      onProgress: async (progress) => {
+        if (!jobId) {
+          return;
+        }
+
+        await updateIngestionJob(jobId, {
+          status: progress.status,
+          progressPercent: progress.progressPercent,
+          message: progress.message,
+          generatedCount: progress.generatedCount,
+          savedCount: progress.savedCount,
+          uploadedFileId: body.uploadedFileId?.trim() || undefined,
+          finished: progress.status === "COMPLETED",
+        });
+      },
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      jobId,
+      ...result,
+    });
   } catch (error) {
+    if (jobId) {
+      await updateIngestionJob(jobId, {
+        status: "FAILED",
+        progressPercent: 100,
+        message: "Falha na ingestao de questoes.",
+        errorMessage: error instanceof Error ? error.message : "Falha ao gerar e salvar questoes.",
+        finished: true,
+      }).catch(() => undefined);
+    }
+
     const message = error instanceof Error ? error.message : "Falha ao gerar e salvar questoes.";
     return NextResponse.json({ error: message }, { status: 422 });
   }

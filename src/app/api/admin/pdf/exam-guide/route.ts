@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { extractPdfText } from "@/features/admin/services/pdf-extraction";
+import { buildSha256, createUploadedFileRecord, uploadAdminFileToSupabase } from "@/lib/admin-ingestion";
 import { prisma } from "@/lib/prisma";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest) {
   const certificationCode = formData.get("certificationCode");
   const manualTextRaw = formData.get("manualText");
   const manualText = typeof manualTextRaw === "string" ? manualTextRaw.trim() : "";
+  const overwriteConfirmed = formData.get("overwriteConfirmed") === "true";
 
   if (typeof certificationCode !== "string" || !certificationCode.trim()) {
     return NextResponse.json({ error: "Certificacao obrigatoria." }, { status: 400 });
@@ -41,16 +43,31 @@ export async function POST(request: NextRequest) {
 
   const certification = await prisma.certificationPreset.findUnique({
     where: { code: certificationCode.trim() },
-    select: { id: true, code: true, name: true },
+    select: { id: true, code: true, name: true, examGuide: true, updatedAt: true },
   });
 
   if (!certification) {
     return NextResponse.json({ error: "Certificacao invalida." }, { status: 400 });
   }
 
+  if (certification.examGuide && certification.examGuide.trim().length > 0 && !overwriteConfirmed) {
+    return NextResponse.json(
+      {
+        error: "Ja existe Exam Guide para esta certificacao. Confirme a sobrescrita para continuar.",
+        conflict: {
+          certificationCode: certification.code,
+          certificationName: certification.name,
+          updatedAt: certification.updatedAt,
+        },
+      },
+      { status: 409 },
+    );
+  }
+
   try {
     let extractedText = manualText;
     let fileName = "manual-input";
+    let uploadedFileId: string | null = null;
 
     if (hasPdfFile) {
       if (!isPdfFile(file)) {
@@ -64,6 +81,30 @@ export async function POST(request: NextRequest) {
       const buffer = Buffer.from(await file.arrayBuffer());
       extractedText = await extractPdfText(buffer);
       fileName = file.name;
+
+      const storage = await uploadAdminFileToSupabase({
+        fileName: file.name,
+        certificationCode: certification.code,
+        uploadType: "EXAM_GUIDE",
+        buffer,
+        mimeType: file.type || "application/pdf",
+      });
+
+      const uploadedFile = await createUploadedFileRecord({
+        uploadType: "EXAM_GUIDE",
+        certificationPresetId: certification.id,
+        uploadedByUserId: adminCheck.userId,
+        fileName: file.name,
+        mimeType: file.type || "application/pdf",
+        fileSizeBytes: file.size,
+        storageBucket: storage.bucket,
+        storagePath: storage.path,
+        sha256: buildSha256(buffer),
+        metadata: {
+          source: "exam-guide-upload",
+        },
+      });
+      uploadedFileId = uploadedFile.id;
     }
 
     if (extractedText.trim().length < 200) {
@@ -84,6 +125,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
+      uploadedFileId,
       fileName,
       characters: extractedText.length,
       preview: extractedText.slice(0, 4000),
