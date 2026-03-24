@@ -102,14 +102,14 @@ export function LeaderBoardScreen() {
     <AppLayout>
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 xl:px-8">
         <div>
-          <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">Leaderboard</h1>
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Leaderboard</h1>
           <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Top 10 jogadores com mais XP acumulado
           </p>
         </div>
 
         <PixelCard className="space-y-3">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
             Buscar jogador por nome
           </p>
           <input
@@ -151,7 +151,7 @@ export function LeaderBoardScreen() {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-xs text-[var(--pixel-subtext)]">
+                          <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-mono text-xs text-[var(--pixel-subtext)]">
                             {result.name.charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -172,7 +172,7 @@ export function LeaderBoardScreen() {
 
         {loading && (
           <PixelCard>
-            <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
           </PixelCard>
         )}
 
@@ -184,7 +184,7 @@ export function LeaderBoardScreen() {
 
         {!loading && !error && entries.length === 0 && (
           <PixelCard className="py-12 text-center">
-            <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
               Nenhum jogador no ranking ainda.
             </p>
             <p className="mt-3 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
@@ -212,7 +212,7 @@ export function LeaderBoardScreen() {
                     {medal ? (
                       <span className="text-2xl leading-none">{medal}</span>
                     ) : (
-                      <span className="font-[var(--font-pixel)] text-sm text-[var(--pixel-subtext)]">
+                      <span className="font-mono text-sm text-[var(--pixel-subtext)]">
                         #{entry.rank}
                       </span>
                     )}
@@ -229,7 +229,7 @@ export function LeaderBoardScreen() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-sm text-[var(--pixel-subtext)]">
+                      <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-mono text-sm text-[var(--pixel-subtext)]">
                         {entry.name.charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -240,7 +240,7 @@ export function LeaderBoardScreen() {
                     <p className="truncate font-[var(--font-body)] text-base">
                       @{entry.username}
                       {isMe && (
-                        <span className="ml-2 font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
+                        <span className="ml-2 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
                           você
                         </span>
                       )}
@@ -253,7 +253,7 @@ export function LeaderBoardScreen() {
 
                   {/* XP */}
                   <div className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1">
-                    <span className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+                    <span className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
                       {entry.totalXp} XP
                     </span>
                   </div>

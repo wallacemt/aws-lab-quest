@@ -25,7 +25,7 @@ export function SetupPanel({
 
   return (
     <PixelCard className="space-y-4">
-      <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Configurar Quest</h2>
+      <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Configurar Quest</h2>
       <label className="block text-sm">
         Tema favorito
         <input
@@ -40,7 +40,7 @@ export function SetupPanel({
         <div className="flex items-center justify-between">
           <span>Texto do laboratorio AWS</span>
           <span
-            className={`font-[var(--font-pixel)] text-[9px] uppercase ${
+            className={`font-mono text-[9px] uppercase ${
               isNearLimit ? "text-yellow-300" : "text-[var(--pixel-subtext)]"
             }`}
           >

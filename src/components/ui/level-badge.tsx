@@ -16,7 +16,7 @@ export function LevelBadge({ xp }: { xp: number }) {
 
   return (
     <span
-      className={`inline-flex border-2 border-black px-3 py-1 font-[var(--font-pixel)] text-[10px] uppercase ${toneClass}`}
+      className={`inline-flex border-2 border-black px-3 py-1 font-mono text-[10px] uppercase ${toneClass}`}
     >
       {level.name}
     </span>

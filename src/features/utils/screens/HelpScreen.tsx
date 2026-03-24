@@ -93,10 +93,10 @@ export function HelpScreen() {
       <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 xl:px-8">
         <PixelCard className="overflow-hidden bg-[linear-gradient(135deg,var(--pixel-card)_0%,var(--pixel-bg)_100%)]">
           <div className="space-y-4">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
               Manual do jogador
             </p>
-            <h1 className="font-[var(--font-pixel)] text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
+            <h1 className="font-mono text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
               Como usar o AWS Quest do jeito certo
             </h1>
             <p className="max-w-3xl font-[var(--font-body)] text-base leading-7 text-[var(--pixel-text)]">
@@ -109,7 +109,7 @@ export function HelpScreen() {
 
         {isOnboardingManual && (
           <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
               Primeiro acesso
             </p>
             <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
@@ -126,7 +126,7 @@ export function HelpScreen() {
           {manualSections.map((section) => (
             <PixelCard key={section.title} className="space-y-4">
               <div className="space-y-2">
-                <h2 className="font-[var(--font-pixel)] text-[10px] uppercase leading-5 text-[var(--pixel-primary)]">
+                <h2 className="font-mono text-[10px] uppercase leading-5 text-[var(--pixel-primary)]">
                   {section.title}
                 </h2>
                 <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
@@ -135,11 +135,11 @@ export function HelpScreen() {
               </div>
 
               <div className="space-y-2">
-                <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">Como fazer</p>
+                <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Como fazer</p>
                 <ul className="space-y-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
                   {section.howTo.map((item) => (
                     <li key={item} className="flex gap-2">
-                      <span className="pt-[2px] font-[var(--font-pixel)] text-[8px] text-[var(--pixel-accent)]">■</span>
+                      <span className="pt-[2px] font-mono text-[8px] text-[var(--pixel-accent)]">■</span>
                       <span>{item}</span>
                     </li>
                   ))}
@@ -147,7 +147,7 @@ export function HelpScreen() {
               </div>
 
               <div className="border-t-2 border-dashed border-[var(--pixel-border)] pt-3">
-                <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+                <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
                   Melhor experiencia
                 </p>
                 <p className="mt-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
@@ -160,7 +160,7 @@ export function HelpScreen() {
 
         {!isOnboardingManual && (
           <PixelCard className="space-y-3">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">Resumo rapido</p>
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Resumo rapido</p>
             <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
               Perfil completo primeiro, quest bem descrita na Home, uma jornada por vez e revisao constante do
               historico. Esse ciclo entrega a melhor experiencia dentro do app.

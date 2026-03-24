@@ -100,7 +100,7 @@ export const Header = () => {
       </div>
       {simulatedExamActive && (
         <div className="flex items-center gap-2 border-2 border-red-500 bg-red-900/20 px-3 py-2">
-          <span className="font-[var(--font-pixel)] text-[10px] uppercase text-red-300">Simulado {simTimerLabel}</span>
+          <span className="font-mono text-[10px] uppercase text-red-300">Simulado {simTimerLabel}</span>
         </div>
       )}
       {!simulatedExamActive && (
@@ -169,7 +169,7 @@ export const Header = () => {
                   {avatarUrl ? (
                     <Image src={avatarUrl} alt="Avatar" width={96} height={96} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-2xl text-[var(--pixel-subtext)]">
+                    <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-mono text-2xl text-[var(--pixel-subtext)]">
                       {(user?.name ?? "?").charAt(0).toUpperCase()}
                     </div>
                   )}

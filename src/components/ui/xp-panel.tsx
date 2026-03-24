@@ -9,13 +9,13 @@ export function XPPanel({ xp }: { xp: number }) {
   return (
     <PixelCard className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="font-[var(--font-pixel)] text-[10px] uppercase">Progresso: {xp} XP</p>
+        <p className="font-mono text-[10px] uppercase">Progresso: {xp} XP</p>
         <LevelBadge xp={xp} />
       </div>
       <div className="h-6 border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-1">
         <div className="h-full bg-[var(--pixel-primary)] transition-all" style={{ width: `${progress}%` }} />
       </div>
-      <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">{level.next}</p>
+      <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">{level.next}</p>
     </PixelCard>
   );
 }

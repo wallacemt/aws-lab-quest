@@ -18,7 +18,7 @@ export function FontSizeControl() {
         disabled={!canDecrease}
         aria-label="Diminuir fonte"
         title="Diminuir fonte"
-        className="border border-[var(--pixel-border)] px-1 font-[var(--font-pixel)] text-[10px] disabled:opacity-40"
+        className="border border-[var(--pixel-border)] px-1 font-mono text-[10px] disabled:opacity-40"
       >
         A-
       </button>
@@ -28,7 +28,7 @@ export function FontSizeControl() {
         disabled={!canIncrease}
         aria-label="Aumentar fonte"
         title="Aumentar fonte"
-        className="border border-[var(--pixel-border)] px-1 font-[var(--font-pixel)] text-[10px] disabled:opacity-40"
+        className="border border-[var(--pixel-border)] px-1 font-mono text-[10px] disabled:opacity-40"
       >
         A+
       </button>
@@ -37,7 +37,7 @@ export function FontSizeControl() {
         onClick={resetFontSize}
         aria-label="Resetar fonte"
         title="Resetar fonte"
-        className="border border-[var(--pixel-border)] px-1 font-[var(--font-pixel)] text-[10px]"
+        className="border border-[var(--pixel-border)] px-1 font-mono text-[10px]"
       >
         100%
       </button>

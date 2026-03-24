@@ -28,7 +28,7 @@ export function TaskCard({
     <PixelCard className={`${task.completed ? "bg-green-900/60" : ""} flex h-full flex-col space-y-3`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-[var(--font-pixel)] text-[10px] text-[var(--pixel-primary)]">MISSAO {index + 1}</p>
+          <p className="font-mono text-[10px] text-[var(--pixel-primary)]">MISSAO {index + 1}</p>
           <h3 className="font-[var(--font-body)] text-lg">{task.title}</h3>
           <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{task.mission}</p>
         </div>
@@ -55,7 +55,7 @@ export function TaskCard({
 
       <button
         onClick={() => setShowHints((value) => !value)}
-        className="mt-auto text-left font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]"
+        className="mt-auto text-left font-mono text-[10px] uppercase text-[var(--pixel-primary)]"
       >
         {showHints ? "Ocultar Dicas" : "Ver Dicas"}
       </button>

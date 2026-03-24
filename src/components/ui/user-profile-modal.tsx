@@ -99,7 +99,7 @@ export function UserProfileModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
       <PixelCard className="w-full max-w-xl space-y-4">
-        <h2 className="font-[var(--font-pixel)] text-xs uppercase">Perfil do Jogador</h2>
+        <h2 className="font-mono text-xs uppercase">Perfil do Jogador</h2>
         <label className="block text-sm">
           Nome
           <input
@@ -147,7 +147,7 @@ export function UserProfileModal({
               Gerar
             </PixelButton>
           </div>
-          <p className="mt-1 font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+          <p className="mt-1 font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
             {usernameStatus === "checking" && "Validando username..."}
             {usernameStatus === "available" && "Username disponivel."}
             {usernameStatus === "taken" && "Username indisponivel."}

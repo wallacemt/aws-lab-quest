@@ -21,7 +21,7 @@ export function PixelButton({ className = "", variant = "primary", ...props }: P
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center gap-2 border-2 px-4 py-2 font-[var(--font-pixel)] text-xs uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50 ${variantClassMap[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 border-2 px-4 py-2 font-mono text-xs uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50 ${variantClassMap[variant]} ${className}`}
     />
   );
 }

@@ -53,13 +53,13 @@ export default async function ShareBadgePage({ params }: Props) {
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--pixel-bg)] p-4">
         <div className="w-full max-w-lg border-4 border-[var(--pixel-border)] bg-[var(--pixel-card)] p-6 text-center">
-          <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Badge não encontrado</p>
+          <p className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Badge não encontrado</p>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Este link é inválido ou o badge ainda não foi conquistado.
           </p>
           <Link
             href="/"
-            className="mt-4 inline-block border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+            className="mt-4 inline-block border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
           >
             Ir para AWS Quest
           </Link>
@@ -76,14 +76,14 @@ export default async function ShareBadgePage({ params }: Props) {
   return (
     <main className="grid min-h-screen place-items-center bg-[var(--pixel-bg)] p-4">
       <div className="w-full max-w-2xl border-4 border-[var(--pixel-primary)] bg-[var(--pixel-card)] p-6 text-center shadow-[8px_8px_0_0_#000]">
-        <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-accent)]">Conquista desbloqueada</p>
+        <p className="font-mono text-xs uppercase text-[var(--pixel-accent)]">Conquista desbloqueada</p>
         <h1 className="mt-2 font-[var(--font-body)] text-2xl">
           {userName} possui o badge {badgeName}
         </h1>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <div className="rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-4">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Jogador</p>
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Jogador</p>
             <div className="mt-3 flex justify-center">
               {avatarUrl ? (
                 <Image
@@ -94,7 +94,7 @@ export default async function ShareBadgePage({ params }: Props) {
                   className="h-28 w-28 border-2 border-[var(--pixel-border)] object-cover"
                 />
               ) : (
-                <div className="flex h-28 w-28 items-center justify-center border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-3xl text-[var(--pixel-subtext)]">
+                <div className="flex h-28 w-28 items-center justify-center border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] font-mono text-3xl text-[var(--pixel-subtext)]">
                   {userName.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -103,7 +103,7 @@ export default async function ShareBadgePage({ params }: Props) {
           </div>
 
           <div className="rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-4">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Badge</p>
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Badge</p>
             <div className="mt-3 flex justify-center">
               <Image
                 src={ownership.badge.imageUrl}
@@ -122,7 +122,7 @@ export default async function ShareBadgePage({ params }: Props) {
         </p>
 
         <div className="mt-4 border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3 text-left">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
             Historia do badge
           </p>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{badgeLore}</p>
@@ -130,7 +130,7 @@ export default async function ShareBadgePage({ params }: Props) {
 
         <Link
           href="/"
-          className="mt-5 inline-block border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+          className="mt-5 inline-block border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
         >
           Conhecer AWS Quest
         </Link>

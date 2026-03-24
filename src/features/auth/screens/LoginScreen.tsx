@@ -101,7 +101,7 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
         </div>
 
         <PixelCard className="w-full max-w-md space-y-5">
-          <h2 className="text-center font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Login</h2>
+          <h2 className="text-center font-mono text-xs uppercase text-[var(--pixel-primary)]">Login</h2>
           {mode === "admin" && (
             <p className="text-center font-sans text-xs text-[var(--pixel-subtext)] flex items-center flex-col  justify-center">
               <span className="font-mono">(ADMIN)</span> Area restrita para administradores
@@ -135,7 +135,7 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2   px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase ]"
+                  className="absolute right-1 top-1/2 -translate-y-1/2   px-2 py-1 font-mono text-[8px] uppercase ]"
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeClosed /> : <EyeIcon />}

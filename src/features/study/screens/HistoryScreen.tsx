@@ -104,14 +104,14 @@ export function HistoryScreen() {
       <main className="mx-auto  w-fit max-w-4xl space-y-6 px-2 py-4 xl:px-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">Histórico</h1>
+            <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Histórico</h1>
             <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
               Labs finalizados e sessoes de estudo (KC e Simulado)
             </p>
           </div>
           {(history.length > 0 || studyHistory.length > 0) && (
             <div className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
-              <span className="font-[var(--font-pixel)] text-[10px] uppercase">
+              <span className="font-mono text-[10px] uppercase">
                 {filteredLabs.length}/{history.length} labs · {filteredStudyHistory.length}/{studyHistory.length}{" "}
                 estudos · {filteredLabsXp}/{totalXp} XP
               </span>
@@ -121,7 +121,7 @@ export function HistoryScreen() {
 
         {!loading && !error && (history.length > 0 || studyHistory.length > 0) && (
           <PixelCard className="space-y-3">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
               Busca no historico (LAB, KC e Simulado)
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -136,7 +136,7 @@ export function HistoryScreen() {
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
                 >
                   Limpar
                 </button>
@@ -147,7 +147,7 @@ export function HistoryScreen() {
 
         {loading && (
           <PixelCard>
-            <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
           </PixelCard>
         )}
 
@@ -159,7 +159,7 @@ export function HistoryScreen() {
 
         {!loading && !error && history.length === 0 && studyHistory.length === 0 && (
           <PixelCard className="py-12 text-center">
-            <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
               Nenhum registro encontrado ainda.
             </p>
             <p className="mt-3 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
@@ -170,7 +170,7 @@ export function HistoryScreen() {
 
         {!loading && !error && (history.length > 0 || studyHistory.length > 0) && !hasAnyResult && (
           <PixelCard className="py-8 text-center">
-            <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
               Nenhum resultado para &quot;{search}&quot;.
             </p>
             <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
@@ -181,7 +181,7 @@ export function HistoryScreen() {
 
         {!loading && filteredLabs.length > 0 && (
           <div className="space-y-3">
-            <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">Labs</h2>
+            <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Labs</h2>
             <ScrollArea className="h-72 w-full rounded-md  border border-pixel-border">
               <div className="flex flex-col p-4 gap-3 ">
                 {filteredLabs.map((item) => (
@@ -194,7 +194,7 @@ export function HistoryScreen() {
                             Tema: {item.theme}
                           </p>
                         </div>
-                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
                           +{item.xp} XP
                         </span>
                       </div>
@@ -206,7 +206,7 @@ export function HistoryScreen() {
                           · {new Date(item.completedAt).toLocaleDateString("pt-BR")}
                         </span>
                       </div>
-                      <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
+                      <p className="font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
                         Clique para revisar o que foi realizado
                       </p>
                     </PixelCard>
@@ -219,7 +219,7 @@ export function HistoryScreen() {
 
         {!loading && filteredStudyHistory.length > 0 && (
           <div className="space-y-3">
-            <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">KC e Simulados</h2>
+            <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">KC e Simulados</h2>
             <ScrollArea className="h-72 w-full rounded-md  border border-pixel-border">
               <div className="grid gap-3 grid-cols-1 p-4 sm:grid-cols-2">
                 {filteredStudyHistory.map((item) => (
@@ -232,7 +232,7 @@ export function HistoryScreen() {
                             {item.sessionType} · {item.certificationCode ?? "Certificacao nao definida"}
                           </p>
                         </div>
-                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
                           {item.scorePercent}%
                         </span>
                       </div>
@@ -245,7 +245,7 @@ export function HistoryScreen() {
                           · {new Date(item.completedAt).toLocaleDateString("pt-BR")}
                         </span>
                       </div>
-                      <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-accent)]">
+                      <p className="font-mono text-[9px] uppercase text-[var(--pixel-accent)]">
                         Clique para revisar respostas e explicacoes
                       </p>
                     </PixelCard>
@@ -261,7 +261,7 @@ export function HistoryScreen() {
             <PixelCard className="max-h-[90vh] w-full max-w-3xl overflow-y-auto space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
                     Revisao do lab
                   </p>
                   <h2 className="mt-1 font-[var(--font-body)] text-xl">{selectedItem.title}</h2>
@@ -272,7 +272,7 @@ export function HistoryScreen() {
                 <button
                   type="button"
                   onClick={() => setSelectedItem(null)}
-                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
                 >
                   Fechar
                 </button>
@@ -294,7 +294,7 @@ export function HistoryScreen() {
 
               {selectedItem.sourceLabText && (
                 <div className="space-y-2">
-                  <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
                     Texto base do lab
                   </p>
                   <div className="max-h-48 overflow-auto border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] p-3">
@@ -306,7 +306,7 @@ export function HistoryScreen() {
               )}
 
               <div className="space-y-2">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
                   Tarefas realizadas
                 </p>
                 {normalizeSnapshot(selectedItem.taskSnapshot).length === 0 ? (
@@ -334,13 +334,13 @@ export function HistoryScreen() {
                               </p>
                             </div>
                             <div className="flex flex-wrap gap-1">
-                              <span className="border border-[var(--pixel-border)] px-2 py-0.5 font-[var(--font-pixel)] text-[8px] uppercase">
+                              <span className="border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[8px] uppercase">
                                 {DIFFICULTY_LABEL[difficulty]}
                               </span>
-                              <span className="border border-[var(--pixel-border)] px-2 py-0.5 font-[var(--font-pixel)] text-[8px] uppercase">
+                              <span className="border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[8px] uppercase">
                                 +{getTaskXpByDifficulty(difficulty)} XP
                               </span>
-                              <span className="border border-[var(--pixel-border)] px-2 py-0.5 font-[var(--font-pixel)] text-[8px] uppercase">
+                              <span className="border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[8px] uppercase">
                                 {task.completed ? "Concluida" : "Pendente"}
                               </span>
                             </div>
@@ -369,7 +369,7 @@ export function HistoryScreen() {
             <PixelCard className="max-h-[90vh] w-full max-w-3xl overflow-y-auto space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
                     Revisao {selectedStudyItem.sessionType}
                   </p>
                   <h2 className="mt-1 font-[var(--font-body)] text-xl">{selectedStudyItem.title}</h2>
@@ -381,7 +381,7 @@ export function HistoryScreen() {
                 <button
                   type="button"
                   onClick={() => setSelectedStudyItem(null)}
-                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
                 >
                   Fechar
                 </button>
@@ -402,7 +402,7 @@ export function HistoryScreen() {
               </div>
 
               <div className="space-y-2">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
                   Revisao de questoes
                 </p>
 

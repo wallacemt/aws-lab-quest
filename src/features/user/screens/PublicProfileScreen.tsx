@@ -95,7 +95,7 @@ export function PublicProfileScreen() {
     return (
       <AppLayout>
         <main className="flex min-h-[60vh] items-center justify-center">
-          <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
+          <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
         </main>
       </AppLayout>
     );
@@ -105,7 +105,7 @@ export function PublicProfileScreen() {
     return (
       <AppLayout>
         <main className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-6 px-4 py-8">
-          <p className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">
+          <p className="font-mono text-sm uppercase text-[var(--pixel-primary)]">
             Jogador não encontrado
           </p>
           <PixelButton onClick={() => router.back()}>← Voltar</PixelButton>
@@ -145,7 +145,7 @@ export function PublicProfileScreen() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-3xl text-[var(--pixel-subtext)]">
+                  <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-mono text-3xl text-[var(--pixel-subtext)]">
                     {(user.name ?? "?").charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -158,7 +158,7 @@ export function PublicProfileScreen() {
 
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 <LevelBadge xp={totalXp} />
-                <span className="font-[var(--font-pixel)] text-[10px] uppercase">{totalXp} XP</span>
+                <span className="font-mono text-[10px] uppercase">{totalXp} XP</span>
               </div>
 
               {/* XP bar */}
@@ -170,7 +170,7 @@ export function PublicProfileScreen() {
                   transition={{ duration: 0.8, ease: "easeOut" }}
                 />
               </div>
-              <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+              <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
                 {currentLevel.next}
               </p>
 
@@ -220,7 +220,7 @@ export function PublicProfileScreen() {
                       className="object-cover"
                     />
                   </motion.div>
-                  <p className="mt-1 text-center font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+                  <p className="mt-1 text-center font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
                     {currentBadge.name}
                   </p>
                 </motion.div>
@@ -260,7 +260,7 @@ export function PublicProfileScreen() {
             transition={{ delay: 0.25, duration: 0.4 }}
           >
             <PixelCard className="space-y-3">
-              <h3 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">
+              <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">
                 Últimos Labs ({history.length})
               </h3>
               <div className="space-y-2">
@@ -274,12 +274,12 @@ export function PublicProfileScreen() {
                   >
                     <div className="min-w-0">
                       <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
-                      <p className="font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+                      <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
                         {item.theme} · {item.tasksCount} task{item.tasksCount !== 1 ? "s" : ""} ·{" "}
                         {new Date(item.completedAt).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
-                    <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
+                    <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
                       +{item.xp} XP
                     </span>
                   </motion.div>
@@ -296,7 +296,7 @@ export function PublicProfileScreen() {
             transition={{ delay: 0.35, duration: 0.4 }}
           >
             <PixelCard className="space-y-3">
-              <h3 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">
+              <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">
                 KC e Simulados ({studyHistory.length})
               </h3>
               <div className="space-y-2">
@@ -310,12 +310,12 @@ export function PublicProfileScreen() {
                   >
                     <div className="min-w-0">
                       <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
-                      <p className="font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+                      <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
                         {item.sessionType} · {item.scorePercent}% · {item.correctAnswers}/{item.totalQuestions} ·{" "}
                         {new Date(item.completedAt).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
-                    <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-primary)]">
+                    <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
                       +{item.gainedXp} XP
                     </span>
                   </motion.div>
@@ -332,8 +332,8 @@ export function PublicProfileScreen() {
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-1 border border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-0.5">
-      <span className="font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">{label}:</span>
-      <span className="font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-text)]">{value}</span>
+      <span className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">{label}:</span>
+      <span className="font-mono text-[8px] uppercase text-[var(--pixel-text)]">{value}</span>
     </div>
   );
 }

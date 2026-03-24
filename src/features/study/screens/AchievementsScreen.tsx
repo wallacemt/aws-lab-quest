@@ -77,15 +77,15 @@ export function AchievementsScreen() {
     <AppLayout>
       <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
         <PixelCard className="space-y-3">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">Conquistas</p>
-          <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Conquistas</p>
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">
             Galeria de conquistas AWS
           </h1>
           <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Desbloqueie metas de estudo, acompanhe progresso e compartilhe as conquistas liberadas.
           </p>
           {!loading && !error && (
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
               {unlockedCount}/{items.length} desbloqueadas
             </p>
           )}
@@ -99,7 +99,7 @@ export function AchievementsScreen() {
 
         {loading && (
           <PixelCard>
-            <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
           </PixelCard>
         )}
 
@@ -115,10 +115,10 @@ export function AchievementsScreen() {
               <PixelCard key={item.code} className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+                    <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
                       {item.name}
                     </p>
-                    <p className={`font-[var(--font-pixel)] text-[8px] uppercase ${rarityLabelClass(item.rarity)}`}>
+                    <p className={`font-mono text-[8px] uppercase ${rarityLabelClass(item.rarity)}`}>
                       {item.rarity}
                     </p>
                   </div>
@@ -135,12 +135,12 @@ export function AchievementsScreen() {
                       className={`h-full w-full object-cover ${item.unlocked ? "" : "grayscale opacity-40 blur-[1px]"}`}
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+                    <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-muted)] font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
                       sem arte
                     </div>
                   )}
                   {!item.unlocked && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/45 font-[var(--font-pixel)] text-lg">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/45 font-mono text-lg">
                       🔒
                     </div>
                   )}
@@ -150,7 +150,7 @@ export function AchievementsScreen() {
 
                 {item.unlocked ? (
                   <div className="space-y-2">
-                    <p className="font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-accent)]">
+                    <p className="font-mono text-[8px] uppercase text-[var(--pixel-accent)]">
                       Desbloqueada {item.unlockedAt ? new Date(item.unlockedAt).toLocaleDateString("pt-BR") : ""}
                     </p>
                     <PixelButton type="button" onClick={() => void handleCopyShareLink(item)} disabled={!user?.id}>
@@ -162,7 +162,7 @@ export function AchievementsScreen() {
                     <div className="h-2 overflow-hidden border border-[var(--pixel-border)] bg-[var(--pixel-bg)]">
                       <div className="h-full bg-[var(--pixel-primary)]" style={{ width: `${item.progressPercent}%` }} />
                     </div>
-                    <p className="font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+                    <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
                       {item.current}/{item.target} ({item.progressPercent}%)
                     </p>
                   </div>

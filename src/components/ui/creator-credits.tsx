@@ -17,7 +17,7 @@ export function CreatorCredits({ compact = true }: CreatorCreditsProps) {
         <button
           type="button"
           onClick={() => setVisible((state) => !state)}
-          className="border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)] opacity-80 transition-opacity hover:opacity-100"
+          className="border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-mono text-[8px] uppercase text-[var(--pixel-subtext)] opacity-80 transition-opacity hover:opacity-100"
           aria-expanded={visible}
           aria-controls="creator-credits-panel"
         >
@@ -27,7 +27,7 @@ export function CreatorCredits({ compact = true }: CreatorCreditsProps) {
 
       {visible && (
         <PixelCard id="creator-credits-panel" className={compact ? "space-y-2 opacity-90" : "space-y-3"}>
-          <h2 className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+          <h2 className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
             Creditos do Criador
           </h2>
 

@@ -362,7 +362,7 @@ export function SimuladoScreen() {
   if (!hydrated) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center">
-        <p className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
+        <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
       </main>
     );
   }
@@ -370,7 +370,7 @@ export function SimuladoScreen() {
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
       <PixelCard>
-        <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
+        <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
         <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
           Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
         </p>
@@ -378,7 +378,7 @@ export function SimuladoScreen() {
 
       {!inExamFlow && !inReviewFlow && (
         <PixelCard className="space-y-4">
-          <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">
+          <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">
             Configurar Simulado
           </h2>
           <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
@@ -405,7 +405,7 @@ export function SimuladoScreen() {
       {showRulesModal && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
           <PixelCard className="w-full max-w-2xl space-y-4 border-yellow-500 bg-yellow-900/95">
-            <p className="font-[var(--font-pixel)] text-[10px] uppercase text-yellow-300">Regras do Simulado</p>
+            <p className="font-mono text-[10px] uppercase text-yellow-300">Regras do Simulado</p>
             <h3 className="font-[var(--font-body)] text-xl">Ambiente de prova real</h3>
 
             <ul className="space-y-2 font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
@@ -444,10 +444,10 @@ export function SimuladoScreen() {
           <section className="space-y-4">
             {inExamFlow && (
               <PixelCard className="flex flex-wrap items-center justify-between gap-2 border-red-500 bg-red-900/10">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-red-300">
+                <p className="font-mono text-[10px] uppercase text-red-300">
                   Prova em andamento · Certificacao {session?.certificationCode}
                 </p>
-                <div className="border-2 border-red-400 px-3 py-1 font-[var(--font-pixel)] text-sm text-red-300">
+                <div className="border-2 border-red-400 px-3 py-1 font-mono text-sm text-red-300">
                   {timerLabel}
                 </div>
               </PixelCard>
@@ -455,7 +455,7 @@ export function SimuladoScreen() {
 
             {inReviewFlow && result && (
               <PixelCard className="space-y-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
                   Resultado Final - {result.certificationCode}
                 </p>
                 <p className="font-[var(--font-body)] text-base">
@@ -463,7 +463,7 @@ export function SimuladoScreen() {
                 </p>
                 {weakServicesCurrentExam.length > 0 && (
                   <div className="space-y-2 border-t border-[var(--pixel-border)] pt-2">
-                    <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+                    <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
                       Pontos de fraqueza neste simulado
                     </p>
                     <div className="space-y-1">
@@ -487,7 +487,7 @@ export function SimuladoScreen() {
             )}
 
             <PixelCard className="space-y-4">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
                 Questao {currentIndex + 1} de {questions.length} · {currentQuestion.topic} ·{" "}
                 {currentQuestion.difficulty}
               </p>
@@ -545,7 +545,7 @@ export function SimuladoScreen() {
                         : "border-[#e74c3c] bg-red-900/25"
                     }
                   >
-                    <p className="font-[var(--font-pixel)] text-[10px] uppercase">
+                    <p className="font-mono text-[10px] uppercase">
                       {answers[currentQuestion.id] === currentQuestion.correctOption
                         ? "✓ Resposta correta"
                         : "✗ Resposta incorreta"}
@@ -579,7 +579,7 @@ export function SimuladoScreen() {
                             key={`${currentQuestion.id}-review-${option}`}
                             className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
                           >
-                            <p className="font-[var(--font-pixel)] text-[9px] uppercase text-[var(--pixel-subtext)]">
+                            <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
                               {option}) {isCorrectOption ? "correta" : "incorreta"}
                               {isSelected ? " · sua resposta" : ""}
                             </p>
@@ -627,7 +627,7 @@ export function SimuladoScreen() {
 
           <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
             <PixelCard className="space-y-3">
-              <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
                 Navegacao da prova
               </p>
               <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
@@ -642,7 +642,7 @@ export function SimuladoScreen() {
                       key={question.id}
                       type="button"
                       onClick={() => void goToQuestion(index)}
-                      className={`border px-2 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
+                      className={`border px-2 py-2 font-mono text-[10px] uppercase ${
                         isCurrent
                           ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/20"
                           : answered
@@ -659,7 +659,7 @@ export function SimuladoScreen() {
 
             {inReviewFlow && (
               <PixelCard className="space-y-3 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
-                <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
                   Prioridades de revisao
                 </p>
                 {loadingWeakServices && (

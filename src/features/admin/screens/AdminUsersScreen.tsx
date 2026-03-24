@@ -32,8 +32,8 @@ export function AdminUsersScreen() {
   return (
     <main className="space-y-5">
       <header className="space-y-2">
-        <p className="font-[var(--font-pixel)] text-xs uppercase text-[#f97316]">Usuarios</p>
-        <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[#f8fafc]">Listagem de usuarios</h1>
+        <p className="font-mono text-xs uppercase text-[#f97316]">Usuarios</p>
+        <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Listagem de usuarios</h1>
       </header>
 
       <section className="border border-[#1e293b] bg-[#111827] p-4">

@@ -204,8 +204,8 @@ export function AdminPdfUploadScreen() {
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6">
       <PixelCard className="space-y-3">
-        <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">Admin OCR</p>
-        <h1 className="font-[var(--font-pixel)] text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
+        <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Admin OCR</p>
+        <h1 className="font-mono text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
           Upload de documentos de certificacao
         </h1>
         <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
@@ -225,7 +225,7 @@ export function AdminPdfUploadScreen() {
       </PixelCard>
 
       <PixelCard className="space-y-3">
-        <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">Tipo de upload</p>
+        <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Tipo de upload</p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -233,7 +233,7 @@ export function AdminPdfUploadScreen() {
               setMode("exam-guide");
               resetStatus();
             }}
-            className={`border px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
+            className={`border px-3 py-2 font-mono text-[10px] uppercase ${
               mode === "exam-guide"
                 ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
                 : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
@@ -247,7 +247,7 @@ export function AdminPdfUploadScreen() {
               setMode("simulado");
               resetStatus();
             }}
-            className={`border px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase ${
+            className={`border px-3 py-2 font-mono text-[10px] uppercase ${
               mode === "simulado"
                 ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
                 : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
@@ -261,7 +261,7 @@ export function AdminPdfUploadScreen() {
       <PixelCard>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <label className="block space-y-2">
-            <span className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+            <span className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
               Certificacao alvo
             </span>
             <select
@@ -281,7 +281,7 @@ export function AdminPdfUploadScreen() {
           </label>
 
           <label className="block space-y-2">
-            <span className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+            <span className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
               Arquivo PDF
             </span>
             <input
@@ -294,7 +294,7 @@ export function AdminPdfUploadScreen() {
 
           {mode === "exam-guide" && (
             <label className="block space-y-2">
-              <span className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-subtext)]">
+              <span className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
                 Fallback manual (para PDF escaneado)
               </span>
               <textarea
@@ -328,7 +328,7 @@ export function AdminPdfUploadScreen() {
 
       {simuladoResult && (
         <PixelCard className="space-y-3">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">Preview extraido</p>
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Preview extraido</p>
           <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
             Arquivo: {simuladoResult.fileName} | Certificacao: {simuladoResult.certification.code} | Caracteres:{" "}
             {simuladoResult.characters}
@@ -341,7 +341,7 @@ export function AdminPdfUploadScreen() {
 
       {examGuideResult && (
         <PixelCard className="space-y-3 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
             Exam Guide atualizado
           </p>
           <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
@@ -356,7 +356,7 @@ export function AdminPdfUploadScreen() {
 
       {ingestResult && (
         <PixelCard className="space-y-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
             Ingestao concluida
           </p>
           <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">

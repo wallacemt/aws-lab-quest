@@ -36,7 +36,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="grid min-h-screen place-items-center bg-[#0f1720] px-6 text-[#e7edf4]">
-        <p className="font-[var(--font-pixel)] text-xs uppercase">Validando acesso admin...</p>
+        <p className="font-mono text-xs uppercase">Validando acesso admin...</p>
       </div>
     );
   }
@@ -45,7 +45,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="grid min-h-screen place-items-center bg-[#0f1720] px-6 text-[#e7edf4]">
         <div className="w-full max-w-lg space-y-4 border border-[#334155] bg-[#111827] p-6">
-          <p className="font-[var(--font-pixel)] text-xs uppercase text-[#f97316]">Acesso negado</p>
+          <p className="font-mono text-xs uppercase text-[#f97316]">Acesso negado</p>
           <p className="font-[var(--font-body)] text-sm leading-6 text-[#cbd5e1]">
             Esta area e exclusiva para administradores. Entre com uma conta admin para continuar.
           </p>
@@ -66,7 +66,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[#0b1220] text-[#e2e8f0]">
       <div className="mx-auto flex min-h-screen max-w-[1400px]">
         <aside className="w-72 border-r border-[#1e293b] bg-[#0f172a] p-6">
-          <p className="font-[var(--font-pixel)] text-xs uppercase text-[#f97316]">Admin Console</p>
+          <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>
           <p className="mt-2 text-xs text-[#94a3b8]">Gerencie usuarios, questoes e ingestao de simulados.</p>
           <nav className="mt-6 space-y-2">
             {ADMIN_MENU.map((item) => {

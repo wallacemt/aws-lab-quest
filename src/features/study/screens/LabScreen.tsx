@@ -107,7 +107,7 @@ export function LabScreen() {
     <AppLayout credits>
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 xl:px-8">
         <PixelCard>
-          <h1 className="font-[var(--font-pixel)] text-sm uppercase text-[var(--pixel-primary)]">Modo Lab</h1>
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Lab</h1>
           <p className="mt-2 font-[var(--font-body)] text-base text-[var(--pixel-subtext)]">
             Configure e gere quests a partir do conteúdo do seu laboratório AWS.
           </p>
@@ -121,7 +121,7 @@ export function LabScreen() {
             <button
               type="button"
               onClick={() => router.replace("/quest")}
-              className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+              className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
             >
               Continuar Quest Atual
             </button>

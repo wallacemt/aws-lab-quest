@@ -4,7 +4,7 @@ import { QuestHistoryItem } from "@/lib/types";
 export function QuestHistory({ history }: { history: QuestHistoryItem[] }) {
   return (
     <PixelCard className="space-y-3">
-      <h2 className="font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-accent)]">Historico</h2>
+      <h2 className="font-mono text-xs uppercase text-[var(--pixel-accent)]">Historico</h2>
       {history.length === 0 ? (
         <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Nenhum quest finalizado ainda.</p>
       ) : (

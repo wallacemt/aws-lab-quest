@@ -106,7 +106,7 @@ export function RegisterScreen() {
               className="h-auto w-28 sm:w-32"
             />
           </div>
-          <h1 className="font-[var(--font-pixel)] text-xl text-[var(--pixel-primary)] drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
+          <h1 className="font-mono text-xl text-[var(--pixel-primary)] drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
             AWS QUEST
           </h1>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
@@ -115,7 +115,7 @@ export function RegisterScreen() {
         </div>
 
         <PixelCard className="w-full max-w-md space-y-5">
-          <h2 className="text-center font-[var(--font-pixel)] text-xs uppercase text-[var(--pixel-primary)]">
+          <h2 className="text-center font-mono text-xs uppercase text-[var(--pixel-primary)]">
             Criar Conta
           </h2>
 
@@ -146,12 +146,12 @@ export function RegisterScreen() {
                 <button
                   type="button"
                   onClick={async () => await generateRandomUsername()}
-                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-[var(--font-pixel)] text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
+                  className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
                 >
                   Aleatorio
                 </button>
               </div>
-              <p className="mt-1 font-[var(--font-pixel)] text-[8px] uppercase text-[var(--pixel-subtext)]">
+              <p className="mt-1 font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
                 Deixe vazio para gerar automaticamente.
               </p>
             </label>
@@ -183,7 +183,7 @@ export function RegisterScreen() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2  px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase "
+                  className="absolute right-1 top-1/2 -translate-y-1/2  px-2 py-1 font-mono text-[8px] uppercase "
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeClosed /> : <EyeIcon />}
@@ -205,7 +205,7 @@ export function RegisterScreen() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2   px-2 py-1 font-[var(--font-pixel)] text-[8px] uppercase "
+                  className="absolute right-1 top-1/2 -translate-y-1/2   px-2 py-1 font-mono text-[8px] uppercase "
                   aria-label={showConfirmPassword ? "Ocultar confirmacao de senha" : "Mostrar confirmacao de senha"}
                 >
                   {showConfirmPassword ? <EyeClosed /> : <EyeIcon />}

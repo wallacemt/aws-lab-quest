@@ -31,8 +31,8 @@ export function AdminDashboardScreen() {
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6">
       <PixelCard className="space-y-3">
-        <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-accent)]">Admin</p>
-        <h1 className="font-[var(--font-pixel)] text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
+        <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Admin</p>
+        <h1 className="font-mono text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
           Painel de ingestao de questoes
         </h1>
         <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
@@ -50,7 +50,7 @@ export function AdminDashboardScreen() {
 
       {!loading && error && (
         <PixelCard className="space-y-3 border-[var(--pixel-danger)] bg-[var(--pixel-danger)]/10">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-danger)]">Acesso negado</p>
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-danger)]">Acesso negado</p>
           <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">{error}</p>
           <div>
             <Link href="/">
@@ -62,7 +62,7 @@ export function AdminDashboardScreen() {
 
       {!loading && !error && status && (
         <PixelCard className="space-y-3">
-          <p className="font-[var(--font-pixel)] text-[10px] uppercase text-[var(--pixel-primary)]">
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
             Acesso autorizado
           </p>
           <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
