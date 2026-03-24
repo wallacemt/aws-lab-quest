@@ -4,12 +4,50 @@ import { useEffect, useState } from "react";
 import { listAdminUsers } from "@/features/admin/services/admin-api";
 import { AdminUserListItem, PaginatedResult } from "@/features/admin/types";
 
+type CertificationOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
 export function AdminUsersScreen() {
   const [search, setSearch] = useState("");
+  const [role, setRole] = useState("");
+  const [certificationCode, setCertificationCode] = useState("");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
+  const [lastSeenFrom, setLastSeenFrom] = useState("");
+  const [lastSeenTo, setLastSeenTo] = useState("");
+  const [sortBy, setSortBy] = useState<"createdAt" | "lastSeen" | "name" | "email" | "role">("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PaginatedResult<AdminUserListItem> | null>(null);
+  const [certifications, setCertifications] = useState<CertificationOption[]>([]);
+
+  useEffect(() => {
+    async function loadCertifications() {
+      try {
+        const response = await fetch("/api/certifications", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as { certifications?: CertificationOption[] };
+        setCertifications(payload.certifications ?? []);
+      } catch {
+        // Keep table usable without certification options.
+      }
+    }
+
+    void loadCertifications();
+  }, []);
 
   useEffect(() => {
     async function loadUsers() {
@@ -17,7 +55,19 @@ export function AdminUsersScreen() {
       setError(null);
 
       try {
-        const data = await listAdminUsers({ page, pageSize: 10, search });
+        const data = await listAdminUsers({
+          page,
+          pageSize: 10,
+          search,
+          role,
+          certificationCode,
+          createdFrom,
+          createdTo,
+          lastSeenFrom,
+          lastSeenTo,
+          sortBy,
+          sortOrder,
+        });
         setResult(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Falha ao carregar usuarios.");
@@ -27,7 +77,7 @@ export function AdminUsersScreen() {
     }
 
     loadUsers();
-  }, [page, search]);
+  }, [page, search, role, certificationCode, createdFrom, createdTo, lastSeenFrom, lastSeenTo, sortBy, sortOrder]);
 
   return (
     <main className="space-y-5">
@@ -37,15 +87,114 @@ export function AdminUsersScreen() {
       </header>
 
       <section className="border border-[#1e293b] bg-[#111827] p-4">
-        <input
-          value={search}
-          onChange={(event) => {
-            setPage(1);
-            setSearch(event.target.value);
-          }}
-          placeholder="Buscar por nome, username ou email"
-          className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
-        />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <input
+            value={search}
+            onChange={(event) => {
+              setPage(1);
+              setSearch(event.target.value);
+            }}
+            placeholder="Buscar por nome, username ou email"
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          />
+
+          <select
+            value={role}
+            onChange={(event) => {
+              setPage(1);
+              setRole(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todas as roles</option>
+            <option value="admin">Admin</option>
+            <option value="user">User</option>
+          </select>
+
+          <select
+            value={certificationCode}
+            onChange={(event) => {
+              setPage(1);
+              setCertificationCode(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todas as certificacoes</option>
+            {certifications.map((certification) => (
+              <option key={certification.id} value={certification.code}>
+                {certification.code}
+              </option>
+            ))}
+          </select>
+
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={sortBy}
+              onChange={(event) => {
+                setPage(1);
+                setSortBy(event.target.value as "createdAt" | "lastSeen" | "name" | "email" | "role");
+              }}
+              className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            >
+              <option value="createdAt">Cadastro</option>
+              <option value="lastSeen">Ultimo acesso</option>
+              <option value="name">Nome</option>
+              <option value="email">Email</option>
+              <option value="role">Role</option>
+            </select>
+            <select
+              value={sortOrder}
+              onChange={(event) => {
+                setPage(1);
+                setSortOrder(event.target.value as "asc" | "desc");
+              }}
+              className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            >
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
+          </div>
+
+          <input
+            type="date"
+            value={createdFrom}
+            onChange={(event) => {
+              setPage(1);
+              setCreatedFrom(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          />
+
+          <input
+            type="date"
+            value={createdTo}
+            onChange={(event) => {
+              setPage(1);
+              setCreatedTo(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          />
+
+          <input
+            type="date"
+            value={lastSeenFrom}
+            onChange={(event) => {
+              setPage(1);
+              setLastSeenFrom(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          />
+
+          <input
+            type="date"
+            value={lastSeenTo}
+            onChange={(event) => {
+              setPage(1);
+              setLastSeenTo(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          />
+        </div>
       </section>
 
       {loading && <p className="text-sm text-[#94a3b8]">Carregando usuarios...</p>}

@@ -27,10 +27,46 @@ export type AdminUserListItem = {
   role: string;
   createdAt: string;
   lastSeen: string;
+  profile: {
+    certification: string;
+    certificationPreset: {
+      code: string;
+      name: string;
+    } | null;
+  } | null;
   _count: {
     questHistory: number;
     studyHistory: number;
   };
+};
+
+export type AdminListSortOrder = "asc" | "desc";
+
+export type AdminUsersListParams = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  role?: string;
+  certificationCode?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  lastSeenFrom?: string;
+  lastSeenTo?: string;
+  sortBy?: "createdAt" | "lastSeen" | "name" | "email" | "role";
+  sortOrder?: AdminListSortOrder;
+};
+
+export type AdminQuestionsListParams = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  usage?: "KC" | "SIMULADO" | "BOTH";
+  active?: "true" | "false";
+  certificationCode?: string;
+  awsServiceCode?: string;
+  sortBy?: "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active";
+  sortOrder?: AdminListSortOrder;
 };
 
 export type AdminQuestionListItem = {
@@ -50,4 +86,48 @@ export type AdminQuestionListItem = {
     code: string;
     name: string;
   } | null;
+};
+
+export type AdminMetricsOverview = {
+  totals: {
+    users: number;
+    questions: number;
+    studySessions: number;
+  };
+  averageScorePercent: number;
+  passRatePercent: number;
+};
+
+export type AdminTimelinePoint = {
+  date: string;
+  users: number;
+  sessions: number;
+};
+
+export type AdminQuestionDistribution = {
+  byDifficulty: Array<{ label: string; count: number }>;
+  byUsage: Array<{ label: string; count: number }>;
+  byCertification: Array<{ label: string; count: number }>;
+};
+
+export type AdminWeakServiceItem = {
+  serviceCode: string;
+  serviceName: string;
+  attempts: number;
+  errors: number;
+  errorRate: number;
+};
+
+export type AdminXpRankingItem = {
+  userId: string;
+  userName: string;
+  totalXp: number;
+};
+
+export type AdminMetricsPayload = {
+  overview: AdminMetricsOverview;
+  timeline: AdminTimelinePoint[];
+  distribution: AdminQuestionDistribution;
+  weakServices: AdminWeakServiceItem[];
+  ranking: AdminXpRankingItem[];
 };

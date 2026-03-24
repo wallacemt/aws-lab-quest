@@ -1,7 +1,10 @@
 import {
   AdminApiError,
+  AdminMetricsPayload,
+  AdminQuestionsListParams,
   AdminQuestionListItem,
   AdminStatus,
+  AdminUsersListParams,
   AdminUserListItem,
   PaginatedResult,
 } from "@/features/admin/types";
@@ -45,11 +48,7 @@ function toQueryString(params: Record<string, string | number | undefined>): str
   return query.toString();
 }
 
-export async function listAdminUsers(input: {
-  page: number;
-  pageSize: number;
-  search?: string;
-}): Promise<PaginatedResult<AdminUserListItem>> {
+export async function listAdminUsers(input: AdminUsersListParams): Promise<PaginatedResult<AdminUserListItem>> {
   const qs = toQueryString(input);
   const response = await fetch(`/api/admin/users?${qs}`, {
     method: "GET",
@@ -64,11 +63,9 @@ export async function listAdminUsers(input: {
   return (await response.json()) as PaginatedResult<AdminUserListItem>;
 }
 
-export async function listAdminQuestions(input: {
-  page: number;
-  pageSize: number;
-  search?: string;
-}): Promise<PaginatedResult<AdminQuestionListItem>> {
+export async function listAdminQuestions(
+  input: AdminQuestionsListParams,
+): Promise<PaginatedResult<AdminQuestionListItem>> {
   const qs = toQueryString(input);
   const response = await fetch(`/api/admin/questions?${qs}`, {
     method: "GET",
@@ -81,4 +78,18 @@ export async function listAdminQuestions(input: {
   }
 
   return (await response.json()) as PaginatedResult<AdminQuestionListItem>;
+}
+
+export async function getAdminMetrics(days = 30): Promise<AdminMetricsPayload> {
+  const response = await fetch(`/api/admin/metrics?days=${days}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar metricas do dashboard.");
+  }
+
+  return (await response.json()) as AdminMetricsPayload;
 }

@@ -4,12 +4,72 @@ import { useEffect, useState } from "react";
 import { listAdminQuestions } from "@/features/admin/services/admin-api";
 import { AdminQuestionListItem, PaginatedResult } from "@/features/admin/types";
 
+type CertificationOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type AwsServiceOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
 export function AdminQuestionsScreen() {
   const [search, setSearch] = useState("");
+  const [difficulty, setDifficulty] = useState<"" | "easy" | "medium" | "hard">("");
+  const [usage, setUsage] = useState<"" | "KC" | "SIMULADO" | "BOTH">("");
+  const [active, setActive] = useState<"" | "true" | "false">("");
+  const [certificationCode, setCertificationCode] = useState("");
+  const [awsServiceCode, setAwsServiceCode] = useState("");
+  const [sortBy, setSortBy] = useState<"createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active">(
+    "createdAt",
+  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PaginatedResult<AdminQuestionListItem> | null>(null);
+  const [certifications, setCertifications] = useState<CertificationOption[]>([]);
+  const [awsServices, setAwsServices] = useState<AwsServiceOption[]>([]);
+
+  useEffect(() => {
+    async function loadFilterOptions() {
+      try {
+        const [certificationsResponse, servicesResponse] = await Promise.all([
+          fetch("/api/certifications", {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+          }),
+          fetch("/api/study/services", {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+          }),
+        ]);
+
+        if (certificationsResponse.ok) {
+          const certificationsPayload = (await certificationsResponse.json()) as {
+            certifications?: CertificationOption[];
+          };
+          setCertifications(certificationsPayload.certifications ?? []);
+        }
+
+        if (servicesResponse.ok) {
+          const servicesPayload = (await servicesResponse.json()) as {
+            services?: AwsServiceOption[];
+          };
+          setAwsServices(servicesPayload.services ?? []);
+        }
+      } catch {
+        // Keep table usable if filter options fail to load.
+      }
+    }
+
+    void loadFilterOptions();
+  }, []);
 
   useEffect(() => {
     async function loadQuestions() {
@@ -17,7 +77,18 @@ export function AdminQuestionsScreen() {
       setError(null);
 
       try {
-        const data = await listAdminQuestions({ page, pageSize: 10, search });
+        const data = await listAdminQuestions({
+          page,
+          pageSize: 10,
+          search,
+          difficulty: difficulty || undefined,
+          usage: usage || undefined,
+          active: active || undefined,
+          certificationCode,
+          awsServiceCode,
+          sortBy,
+          sortOrder,
+        });
         setResult(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Falha ao carregar questoes.");
@@ -27,7 +98,7 @@ export function AdminQuestionsScreen() {
     }
 
     loadQuestions();
-  }, [page, search]);
+  }, [page, search, difficulty, usage, active, certificationCode, awsServiceCode, sortBy, sortOrder]);
 
   return (
     <main className="space-y-5">
@@ -37,15 +108,122 @@ export function AdminQuestionsScreen() {
       </header>
 
       <section className="border border-[#1e293b] bg-[#111827] p-4">
-        <input
-          value={search}
-          onChange={(event) => {
-            setPage(1);
-            setSearch(event.target.value);
-          }}
-          placeholder="Buscar por enunciado ou topico"
-          className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
-        />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <input
+            value={search}
+            onChange={(event) => {
+              setPage(1);
+              setSearch(event.target.value);
+            }}
+            placeholder="Buscar por enunciado, topico ou externalId"
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          />
+
+          <select
+            value={difficulty}
+            onChange={(event) => {
+              setPage(1);
+              setDifficulty(event.target.value as "" | "easy" | "medium" | "hard");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todas as dificuldades</option>
+            <option value="easy">easy</option>
+            <option value="medium">medium</option>
+            <option value="hard">hard</option>
+          </select>
+
+          <select
+            value={usage}
+            onChange={(event) => {
+              setPage(1);
+              setUsage(event.target.value as "" | "KC" | "SIMULADO" | "BOTH");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todos os usos</option>
+            <option value="KC">KC</option>
+            <option value="SIMULADO">SIMULADO</option>
+            <option value="BOTH">BOTH</option>
+          </select>
+
+          <select
+            value={active}
+            onChange={(event) => {
+              setPage(1);
+              setActive(event.target.value as "" | "true" | "false");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Ativas e inativas</option>
+            <option value="true">Apenas ativas</option>
+            <option value="false">Apenas inativas</option>
+          </select>
+
+          <select
+            value={certificationCode}
+            onChange={(event) => {
+              setPage(1);
+              setCertificationCode(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todas as certificacoes</option>
+            {certifications.map((certification) => (
+              <option key={certification.id} value={certification.code}>
+                {certification.code}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={awsServiceCode}
+            onChange={(event) => {
+              setPage(1);
+              setAwsServiceCode(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todos os servicos AWS</option>
+            {awsServices.map((service) => (
+              <option key={service.id} value={service.code}>
+                {service.code} - {service.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={sortBy}
+              onChange={(event) => {
+                setPage(1);
+                setSortBy(
+                  event.target.value as "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active",
+                );
+              }}
+              className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            >
+              <option value="createdAt">Criacao</option>
+              <option value="difficulty">Dificuldade</option>
+              <option value="usage">Uso</option>
+              <option value="topic">Topico</option>
+              <option value="externalId">External ID</option>
+              <option value="active">Status</option>
+            </select>
+
+            <select
+              value={sortOrder}
+              onChange={(event) => {
+                setPage(1);
+                setSortOrder(event.target.value as "asc" | "desc");
+              }}
+              className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            >
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
+          </div>
+        </div>
       </section>
 
       {loading && <p className="text-sm text-[#94a3b8]">Carregando questoes...</p>}
