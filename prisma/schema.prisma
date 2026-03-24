@@ -23,13 +23,15 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions     Session[]
-  accounts     Account[]
-  profile      UserProfile?
-  questHistory QuestHistory[]
-  studyHistory StudySessionHistory[]
-  userBadges   UserBadge[]
-  achievements UserAchievement[]
+  sessions      Session[]
+  accounts      Account[]
+  profile       UserProfile?
+  questHistory  QuestHistory[]
+  studyHistory  StudySessionHistory[]
+  userBadges    UserBadge[]
+  achievements  UserAchievement[]
+  uploadedFiles AdminUploadedFile[]
+  ingestionJobs AdminIngestionJob[]
 
   @@map("user")
 }
@@ -96,18 +98,20 @@ model UserProfile {
 }
 
 model CertificationPreset {
-  id           String          @id @default(cuid())
-  code         String          @unique
-  name         String
-  description  String
-  examGuide    String?
-  examMinutes  Int             @default(90)
-  active       Boolean         @default(true)
-  displayOrder Int             @default(0)
-  userProfiles UserProfile[]
-  questions    StudyQuestion[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id            String              @id @default(cuid())
+  code          String              @unique
+  name          String
+  description   String
+  examGuide     String?
+  examMinutes   Int                 @default(90)
+  active        Boolean             @default(true)
+  displayOrder  Int                 @default(0)
+  userProfiles  UserProfile[]
+  questions     StudyQuestion[]
+  uploadedFiles AdminUploadedFile[]
+  ingestionJobs AdminIngestionJob[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 }
 
 model AwsService {
@@ -136,6 +140,22 @@ enum StudyQuestionDifficulty {
 enum StudySessionType {
   KC
   SIMULADO
+}
+
+enum AdminUploadType {
+  EXAM_GUIDE
+  SIMULADO_PDF
+  SIMULADO_GENERATION
+}
+
+enum AdminIngestionStatus {
+  PENDING
+  UPLOADING
+  EXTRACTING
+  GENERATING
+  SAVING
+  COMPLETED
+  FAILED
 }
 
 model StudyQuestion {
@@ -281,4 +301,59 @@ model XpWeightConfig {
 
   @@unique([activityType, topic, difficulty])
   @@index([activityType, active])
+}
+
+model AdminUploadedFile {
+  id                    String               @id @default(cuid())
+  uploadType            AdminUploadType
+  certificationPresetId String?
+  certificationPreset   CertificationPreset? @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
+  uploadedByUserId      String?
+  uploadedBy            User?                @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  fileName              String
+  mimeType              String
+  fileSizeBytes         Int
+  storageBucket         String
+  storagePath           String
+  sha256                String
+  source                String               @default("admin")
+  metadata              Json?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  ingestionJobs         AdminIngestionJob[]
+
+  @@unique([storageBucket, storagePath])
+  @@index([uploadType, createdAt])
+  @@index([certificationPresetId, uploadType, createdAt])
+  @@index([uploadedByUserId, createdAt])
+  @@index([sha256])
+}
+
+model AdminIngestionJob {
+  id                    String               @id @default(cuid())
+  status                AdminIngestionStatus @default(PENDING)
+  uploadType            AdminUploadType
+  certificationPresetId String?
+  certificationPreset   CertificationPreset? @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
+  createdByUserId       String?
+  createdBy             User?                @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  uploadedFileId        String?
+  uploadedFile          AdminUploadedFile?   @relation(fields: [uploadedFileId], references: [id], onDelete: SetNull)
+  fileName              String?
+  progressPercent       Int                  @default(0)
+  message               String?
+  desiredCount          Int?
+  generatedCount        Int?
+  savedCount            Int?
+  errorMessage          String?
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([uploadType, createdAt])
+  @@index([certificationPresetId, createdAt])
+  @@index([createdByUserId, createdAt])
+  @@index([uploadedFileId])
 }
