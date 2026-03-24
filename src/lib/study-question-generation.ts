@@ -185,6 +185,8 @@ async function saveGeneratedQuestions(input: {
   generated: GeneratedQuestion[];
   serviceByCode: Map<string, { id: string; code: string }>;
 }) {
+  let savedCount = 0;
+
   for (let index = 0; index < input.generated.length; index += 1) {
     const item = input.generated[index];
     const service = input.serviceByCode.get(item.serviceCode);
@@ -219,7 +221,11 @@ async function saveGeneratedQuestions(input: {
         awsServiceId: service.id,
       },
     });
+
+    savedCount += 1;
   }
+
+  return savedCount;
 }
 
 export async function ensureQuestionPool(input: EnsurePoolInput): Promise<void> {
@@ -311,6 +317,13 @@ export async function ingestQuestionsFromPdf(input: {
   certificationCode: string;
   extractedText: string;
   desiredCount?: number;
+  onProgress?: (progress: {
+    status: "EXTRACTING" | "GENERATING" | "SAVING" | "COMPLETED";
+    progressPercent: number;
+    message: string;
+    generatedCount?: number;
+    savedCount?: number;
+  }) => Promise<void> | void;
 }) {
   const certification = await prisma.certificationPreset.findUnique({
     where: { code: input.certificationCode },
@@ -344,6 +357,12 @@ export async function ingestQuestionsFromPdf(input: {
 
   const desiredCount = Math.max(5, Math.min(50, Math.round(input.desiredCount ?? 20)));
 
+  await input.onProgress?.({
+    status: "GENERATING",
+    progressPercent: 60,
+    message: "Gerando questoes com IA...",
+  });
+
   const generatedRaw = await generateQuestionsWithAi({
     certification,
     usage: "BOTH",
@@ -372,16 +391,31 @@ export async function ingestQuestionsFromPdf(input: {
     throw new Error("As questoes geradas ficaram invalidas apos sanitizacao.");
   }
 
-  await saveGeneratedQuestions({
+  await input.onProgress?.({
+    status: "SAVING",
+    progressPercent: 88,
+    message: "Salvando questoes no banco...",
+    generatedCount: generatedRaw.length,
+  });
+
+  const savedCount = await saveGeneratedQuestions({
     certification,
     usage: "BOTH",
     generated: sanitized,
     serviceByCode,
   });
 
+  await input.onProgress?.({
+    status: "COMPLETED",
+    progressPercent: 100,
+    message: "Ingestao concluida com sucesso.",
+    generatedCount: generatedRaw.length,
+    savedCount,
+  });
+
   return {
     certificationCode: certification.code,
     generatedCount: generatedRaw.length,
-    savedCount: sanitized.length,
+    savedCount,
   };
 }
