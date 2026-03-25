@@ -1,3 +1,6 @@
+import { getOcrAiModel } from "@/lib/ai";
+import { OCR_PROMPT } from "@/utils/prompt.utils";
+
 import PDFParser from "pdf2json";
 const MAX_TEXT_LENGTH = 120_000;
 
@@ -93,4 +96,35 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
   console.log(`[Extract PDF] Caracteres finais: ${parseText.length}`);
   console.log(`[Extract PDF] Tempo: ${Date.now() - start}ms`);
   return parseText;
+}
+
+export async function extractPdfTextWithGeminiOcr(buffer: Buffer, mimeType = "application/pdf"): Promise<string> {
+  const model = getOcrAiModel();
+  const result = await model.generateContent([
+    { text: OCR_PROMPT },
+    {
+      inlineData: {
+        mimeType,
+        data: buffer.toString("base64"),
+      },
+    },
+  ]);
+
+  const responseText = result.response.text().trim();
+  if (!responseText) {
+    throw new Error("OCR nao retornou conteudo textual.");
+  }
+
+  let maybeError: { error?: string } | null = null;
+  try {
+    maybeError = JSON.parse(responseText) as { error?: string };
+  } catch {
+    maybeError = null;
+  }
+
+  if (maybeError?.error) {
+    throw new Error(maybeError.error);
+  }
+
+  return normalizeText(responseText);
 }

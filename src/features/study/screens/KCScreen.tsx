@@ -11,7 +11,10 @@ import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResu
 import {
   createKcQuestions,
   createStudyExplanation,
+  isAnswerCorrect,
   listStudyServices,
+  normalizeAnswerValue,
+  normalizeCorrectOptions,
   saveStudyHistory,
   StudyServiceItem,
 } from "@/features/study/services";
@@ -22,6 +25,13 @@ import { cn } from "@/lib/utils";
 const DIFFICULTIES: TaskDifficulty[] = STUDY_DIFFICULTIES;
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const SERVICES_PAGE_SIZE = 12;
+
+function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): QuestionOption[] {
+  if (current.includes(option)) {
+    return current.filter((item) => item !== option).sort();
+  }
+  return [...current, option].sort();
+}
 
 export function KCScreen() {
   const router = useRouter();
@@ -86,10 +96,19 @@ export function KCScreen() {
   );
 
   const stats = useMemo(() => {
-    const answered = questions.filter((question) => answers[question.id]).length;
+    const answered = questions.filter((question) => normalizeAnswerValue(answers[question.id]).length > 0).length;
     const correct = questions.filter((question) => {
       const answer = answers[question.id];
-      return answer && answer === question.correctOption;
+      if (!answer) {
+        return false;
+      }
+
+      return isAnswerCorrect({
+        questionType: question.questionType,
+        answer,
+        correctOption: question.correctOption,
+        correctOptions: question.correctOptions,
+      });
     }).length;
 
     return {
@@ -100,7 +119,15 @@ export function KCScreen() {
     };
   }, [answers, questions]);
 
-  const isCurrentCorrect = Boolean(currentQuestion && currentAnswer === currentQuestion.correctOption);
+  const isCurrentCorrect = Boolean(
+    currentQuestion &&
+    isAnswerCorrect({
+      questionType: currentQuestion.questionType,
+      answer: currentAnswer,
+      correctOption: currentQuestion.correctOption,
+      correctOptions: currentQuestion.correctOptions,
+    }),
+  );
 
   const currentExplanation = currentQuestion ? explanationByQuestion[currentQuestion.id] : undefined;
 
@@ -139,7 +166,8 @@ export function KCScreen() {
 
   async function submitCurrentAnswer() {
     if (!currentQuestion) return;
-    if (!currentAnswer) {
+    const normalizedAnswer = normalizeAnswerValue(currentAnswer);
+    if (normalizedAnswer.length === 0) {
       setFlowError("Selecione uma alternativa antes de enviar.");
       return;
     }
@@ -157,7 +185,8 @@ export function KCScreen() {
       setLoadingExplanation(true);
       const explanation = await createStudyExplanation({
         questionId: currentQuestion.id,
-        selectedOption: currentAnswer,
+        selectedOption: normalizedAnswer[0],
+        selectedOptions: currentQuestion.questionType === "multi" ? normalizedAnswer : undefined,
         optionMapping: currentQuestion.optionMapping,
       });
 
@@ -209,7 +238,14 @@ export function KCScreen() {
   async function finishKC() {
     if (questions.length === 0) return;
 
-    const correctAnswers = questions.filter((question) => answers[question.id] === question.correctOption).length;
+    const correctAnswers = questions.filter((question) => {
+      return isAnswerCorrect({
+        questionType: question.questionType,
+        answer: answers[question.id],
+        correctOption: question.correctOption,
+        correctOptions: question.correctOptions,
+      });
+    }).length;
     const scorePercent = Math.round((correctAnswers / questions.length) * 100);
     const xpPerCorrect = Math.max(20, Math.round(getTaskXpByDifficulty(selectedDifficulty) / 4));
     const gainedXp = correctAnswers * xpPerCorrect;
@@ -245,8 +281,11 @@ export function KCScreen() {
           return {
             questionId: question.id,
             statement: question.statement,
-            selectedOption: answers[question.id] ?? "-",
+            questionType: question.questionType,
+            selectedOption: normalizeAnswerValue(answers[question.id])[0] ?? "-",
+            selectedOptions: normalizeAnswerValue(answers[question.id]),
             correctOption: question.correctOption,
+            correctOptions: normalizeCorrectOptions(question),
             options: question.options,
             optionMapping: question.optionMapping,
             explanations: mergedExplanations,
@@ -304,9 +343,7 @@ export function KCScreen() {
         </AnimatePresence>
 
         <PixelCard>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">
-            KC - Knowledge Check
-          </h1>
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">KC - Knowledge Check</h1>
           <p className="mt-2 font-sans text-sm text-[var(--pixel-subtext)]">
             Escolha assunto e dificuldade antes de iniciar. O fluxo de resposta e por questao, com auditoria completa
             quando houver erro.
@@ -353,9 +390,7 @@ export function KCScreen() {
                           }`}
                         >
                           <p className="font-sans text-sm">{service.name}</p>
-                          <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
-                            {service.code}
-                          </p>
+                          <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">{service.code}</p>
                         </button>
                       );
                     })}
@@ -475,15 +510,21 @@ export function KCScreen() {
                 {currentQuestion.topic} · {currentQuestion.difficulty}
               </p>
               <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
+              {currentQuestion.questionType === "multi" && (
+                <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                  Questao multipla: selecione todas as alternativas corretas.
+                </p>
+              )}
 
               <div className="grid gap-4">
                 {OPTIONS.map((option) => {
                   const optionText = currentQuestion.options[option];
                   if (!optionText) return null;
-                  const checked = answers[currentQuestion.id] === option;
-                  const isCorrectOption = submittedCurrent && option === currentQuestion.correctOption;
-                  const isSelectedWrong =
-                    submittedCurrent && checked && answers[currentQuestion.id] !== currentQuestion.correctOption;
+                  const selectedOptions = normalizeAnswerValue(answers[currentQuestion.id]);
+                  const checked = selectedOptions.includes(option);
+                  const correctOptions = normalizeCorrectOptions(currentQuestion);
+                  const isCorrectOption = submittedCurrent && correctOptions.includes(option);
+                  const isSelectedWrong = submittedCurrent && checked && !isCorrectOption;
                   return (
                     <label
                       key={`${currentQuestion.id}-${option}`}
@@ -496,16 +537,22 @@ export function KCScreen() {
                       }`}
                     >
                       <input
-                        type="radio"
+                        type={currentQuestion.questionType === "multi" ? "checkbox" : "radio"}
                         name={currentQuestion.id}
                         value={option}
                         checked={checked}
-                        onChange={() =>
-                          setAnswers((prev) => ({
-                            ...prev,
-                            [currentQuestion.id]: option,
-                          }))
-                        }
+                        onChange={() => {
+                          setAnswers((prev) => {
+                            const current = normalizeAnswerValue(prev[currentQuestion.id]);
+                            const nextValue =
+                              currentQuestion.questionType === "multi" ? toggleMultiAnswer(current, option) : option;
+
+                            return {
+                              ...prev,
+                              [currentQuestion.id]: nextValue,
+                            };
+                          });
+                        }}
                         disabled={submittedCurrent}
                       />
                       <span className="font-[var(--font-body)] text-sm">
@@ -548,8 +595,8 @@ export function KCScreen() {
                       const text = currentQuestion.options[option];
                       if (!text) return null;
 
-                      const isCorrectOption = option === currentQuestion.correctOption;
-                      const isSelected = option === answers[currentQuestion.id];
+                      const isCorrectOption = normalizeCorrectOptions(currentQuestion).includes(option);
+                      const isSelected = normalizeAnswerValue(answers[currentQuestion.id]).includes(option);
 
                       return (
                         <div
@@ -560,9 +607,7 @@ export function KCScreen() {
                             isCorrectOption ? "border-green-400" : "border-red-400",
                           )}
                         >
-                          <p
-                            className={cn("font-mono text-[9px] uppercase text-[var(--pixel-subtext)]")}
-                          >
+                          <p className={cn("font-mono text-[9px] uppercase text-[var(--pixel-subtext)]")}>
                             {option} {isCorrectOption ? "correta" : "incorreta"}
                             <span className="text-primary font-bold">{isSelected ? " · sua resposta" : ""}</span>
                           </p>

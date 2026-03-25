@@ -10,6 +10,9 @@ import {
   createSimuladoQuestions,
   createStudyExplanation,
   fetchWeakServices,
+  isAnswerCorrect,
+  normalizeAnswerValue,
+  normalizeCorrectOptions,
   saveStudyHistory,
 } from "@/features/study/services";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -20,6 +23,13 @@ import { STORAGE_KEYS } from "@/lib/storage";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
+
+function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): QuestionOption[] {
+  if (current.includes(option)) {
+    return current.filter((item) => item !== option).sort();
+  }
+  return [...current, option].sort();
+}
 
 type ExamResult = {
   certificationCode: string;
@@ -73,7 +83,10 @@ export function SimuladoScreen() {
   const inExamFlow = isActive && questions.length > 0 && !submitted;
   const inReviewFlow = submitted && questions.length > 0;
   const currentQuestion = questions[currentIndex] ?? null;
-  const answeredCount = useMemo(() => questions.filter((q) => answers[q.id]).length, [answers, questions]);
+  const answeredCount = useMemo(
+    () => questions.filter((question) => normalizeAnswerValue(answers[question.id]).length > 0).length,
+    [answers, questions],
+  );
   const timerLabel = useMemo(() => formatTime(remainingSeconds), [remainingSeconds]);
   const weakServicesCurrentExam = useMemo<WeakServiceMetric[]>(() => {
     if (questions.length === 0) {
@@ -84,7 +97,7 @@ export function SimuladoScreen() {
     for (const question of questions) {
       const topic = question.topic?.trim() || "OUTROS";
       const key = topic.toUpperCase();
-      const selectedOption = answers[question.id] ?? "-";
+      const selectedAnswer = answers[question.id];
       const current =
         byTopic.get(key) ??
         ({
@@ -96,7 +109,14 @@ export function SimuladoScreen() {
         } as WeakServiceMetric);
 
       current.attempts += 1;
-      if (selectedOption === question.correctOption) {
+      if (
+        isAnswerCorrect({
+          questionType: question.questionType,
+          answer: selectedAnswer,
+          correctOption: question.correctOption,
+          correctOptions: question.correctOptions,
+        })
+      ) {
         current.correct += 1;
       } else {
         current.errors += 1;
@@ -199,17 +219,20 @@ export function SimuladoScreen() {
     await handleStart();
   }
 
-  async function fetchReviewForQuestion(question: StudyQuestion, selectedOption: QuestionOption) {
+  async function fetchReviewForQuestion(question: StudyQuestion, answer: StudyAnswerMap[string]) {
     if (reviewByQuestion[question.id] || loadingReviewByQuestion[question.id]) {
       return;
     }
+
+    const normalized = normalizeAnswerValue(answer);
 
     setLoadingReviewByQuestion((prev) => ({ ...prev, [question.id]: true }));
 
     try {
       const explanation = await createStudyExplanation({
         questionId: question.id,
-        selectedOption,
+        selectedOption: normalized[0] ?? question.correctOption,
+        selectedOptions: question.questionType === "multi" ? normalized : undefined,
         optionMapping: question.optionMapping,
       });
 
@@ -239,7 +262,14 @@ export function SimuladoScreen() {
     }
 
     const totalQuestions = questions.length;
-    const correctAnswers = questions.filter((question) => answers[question.id] === question.correctOption).length;
+    const correctAnswers = questions.filter((question) => {
+      return isAnswerCorrect({
+        questionType: question.questionType,
+        answer: answers[question.id],
+        correctOption: question.correctOption,
+        correctOptions: question.correctOptions,
+      });
+    }).length;
     const scorePercent = Math.round((correctAnswers / totalQuestions) * 100);
     const difficultyWeight = Math.round(
       ["easy", "medium", "hard"].reduce(
@@ -272,8 +302,11 @@ export function SimuladoScreen() {
         answersSnapshot: questions.map((question) => ({
           questionId: question.id,
           statement: question.statement,
-          selectedOption: answers[question.id] ?? "-",
+          questionType: question.questionType,
+          selectedOption: normalizeAnswerValue(answers[question.id])[0] ?? "-",
+          selectedOptions: normalizeAnswerValue(answers[question.id]),
           correctOption: question.correctOption,
+          correctOptions: normalizeCorrectOptions(question),
           options: question.options,
           optionMapping: question.optionMapping,
           explanations: {
@@ -378,9 +411,7 @@ export function SimuladoScreen() {
 
       {!inExamFlow && !inReviewFlow && (
         <PixelCard className="space-y-4">
-          <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">
-            Configurar Simulado
-          </h2>
+          <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Configurar Simulado</h2>
           <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             O filtro da certificacao e automatico pelo seu perfil. Selecione dificuldade e inicie a prova.
           </p>
@@ -447,9 +478,7 @@ export function SimuladoScreen() {
                 <p className="font-mono text-[10px] uppercase text-red-300">
                   Prova em andamento · Certificacao {session?.certificationCode}
                 </p>
-                <div className="border-2 border-red-400 px-3 py-1 font-mono text-sm text-red-300">
-                  {timerLabel}
-                </div>
+                <div className="border-2 border-red-400 px-3 py-1 font-mono text-sm text-red-300">{timerLabel}</div>
               </PixelCard>
             )}
 
@@ -492,15 +521,21 @@ export function SimuladoScreen() {
                 {currentQuestion.difficulty}
               </p>
               <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
+              {currentQuestion.questionType === "multi" && (
+                <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                  Questao multipla: selecione todas as alternativas corretas.
+                </p>
+              )}
 
               <div className="grid gap-2">
                 {OPTIONS.map((option) => {
                   const text = currentQuestion.options[option];
                   if (!text) return null;
                   const isReviewing = submitted;
-                  const isCorrectOption = isReviewing && option === currentQuestion.correctOption;
-                  const isSelectedWrong =
-                    isReviewing && answers[currentQuestion.id] === option && option !== currentQuestion.correctOption;
+                  const selectedOptions = normalizeAnswerValue(answers[currentQuestion.id]);
+                  const correctOptions = normalizeCorrectOptions(currentQuestion);
+                  const isCorrectOption = isReviewing && correctOptions.includes(option);
+                  const isSelectedWrong = isReviewing && selectedOptions.includes(option) && !isCorrectOption;
                   return (
                     <label
                       key={`${currentQuestion.id}-${option}`}
@@ -513,15 +548,21 @@ export function SimuladoScreen() {
                       }`}
                     >
                       <input
-                        type="radio"
+                        type={currentQuestion.questionType === "multi" ? "checkbox" : "radio"}
                         name={currentQuestion.id}
-                        checked={answers[currentQuestion.id] === option}
-                        onChange={() =>
-                          setAnswers((prev) => ({
-                            ...prev,
-                            [currentQuestion.id]: option,
-                          }))
-                        }
+                        checked={selectedOptions.includes(option)}
+                        onChange={() => {
+                          setAnswers((prev) => {
+                            const current = normalizeAnswerValue(prev[currentQuestion.id]);
+                            const nextValue =
+                              currentQuestion.questionType === "multi" ? toggleMultiAnswer(current, option) : option;
+
+                            return {
+                              ...prev,
+                              [currentQuestion.id]: nextValue,
+                            };
+                          });
+                        }}
                         disabled={submitted}
                       />
                       <span className="font-[var(--font-body)] text-sm">
@@ -540,13 +581,23 @@ export function SimuladoScreen() {
                 >
                   <PixelCard
                     className={
-                      answers[currentQuestion.id] === currentQuestion.correctOption
+                      isAnswerCorrect({
+                        questionType: currentQuestion.questionType,
+                        answer: answers[currentQuestion.id],
+                        correctOption: currentQuestion.correctOption,
+                        correctOptions: currentQuestion.correctOptions,
+                      })
                         ? "border-[#2ecc71] bg-green-900/25"
                         : "border-[#e74c3c] bg-red-900/25"
                     }
                   >
                     <p className="font-mono text-[10px] uppercase">
-                      {answers[currentQuestion.id] === currentQuestion.correctOption
+                      {isAnswerCorrect({
+                        questionType: currentQuestion.questionType,
+                        answer: answers[currentQuestion.id],
+                        correctOption: currentQuestion.correctOption,
+                        correctOptions: currentQuestion.correctOptions,
+                      })
                         ? "✓ Resposta correta"
                         : "✗ Resposta incorreta"}
                     </p>
@@ -571,8 +622,8 @@ export function SimuladoScreen() {
                         const text = currentQuestion.options[option];
                         if (!text) return null;
 
-                        const isCorrectOption = option === currentQuestion.correctOption;
-                        const isSelected = option === answers[currentQuestion.id];
+                        const isCorrectOption = normalizeCorrectOptions(currentQuestion).includes(option);
+                        const isSelected = normalizeAnswerValue(answers[currentQuestion.id]).includes(option);
 
                         return (
                           <div
@@ -627,15 +678,13 @@ export function SimuladoScreen() {
 
           <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
             <PixelCard className="space-y-3">
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                Navegacao da prova
-              </p>
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Navegacao da prova</p>
               <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
                 Respondidas: {answeredCount}/{questions.length}
               </p>
               <div className="grid grid-cols-5 gap-2">
                 {questions.map((question, index) => {
-                  const answered = Boolean(answers[question.id]);
+                  const answered = normalizeAnswerValue(answers[question.id]).length > 0;
                   const isCurrent = index === currentIndex;
                   return (
                     <button
@@ -659,9 +708,7 @@ export function SimuladoScreen() {
 
             {inReviewFlow && (
               <PixelCard className="space-y-3 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
-                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                  Prioridades de revisao
-                </p>
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Prioridades de revisao</p>
                 {loadingWeakServices && (
                   <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
                     Atualizando pontos de fraqueza...

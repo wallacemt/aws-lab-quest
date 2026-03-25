@@ -920,6 +920,7 @@ export function AdminPdfUploadScreen() {
                         <th className="px-2 py-2">Enunciado</th>
                         <th className="px-2 py-2">Topico</th>
                         <th className="px-2 py-2">Dificuldade</th>
+                        <th className="px-2 py-2">Tipo</th>
                         <th className="px-2 py-2">Uso</th>
                         <th className="px-2 py-2">Gabarito</th>
                       </tr>
@@ -927,7 +928,7 @@ export function AdminPdfUploadScreen() {
                     <tbody>
                       {auditPayload.items.length === 0 && (
                         <tr>
-                          <td className="px-2 py-3" colSpan={5}>
+                          <td className="px-2 py-3" colSpan={6}>
                             Nenhuma questao vinculada a este documento.
                           </td>
                         </tr>
@@ -937,8 +938,11 @@ export function AdminPdfUploadScreen() {
                           <td className="px-2 py-2">{question.statement.slice(0, 130)}...</td>
                           <td className="px-2 py-2">{question.topic}</td>
                           <td className="px-2 py-2 uppercase">{question.difficulty}</td>
+                          <td className="px-2 py-2 uppercase">{question.questionType}</td>
                           <td className="px-2 py-2 uppercase">{question.usage}</td>
-                          <td className="px-2 py-2 uppercase">{question.correctOption}</td>
+                          <td className="px-2 py-2 uppercase">
+                            {(question.correctOptions ?? [question.correctOption]).join(", ")}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

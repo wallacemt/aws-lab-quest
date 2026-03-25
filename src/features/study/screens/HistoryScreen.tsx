@@ -5,6 +5,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
+import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOptionMapping, Task } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -13,8 +14,11 @@ type HistoryItem = QuestHistoryItem;
 type StudyAnswerSnapshot = {
   questionId: string;
   statement: string;
+  questionType?: "single" | "multi";
   selectedOption: string;
+  selectedOptions?: string[];
   correctOption: string;
+  correctOptions?: string[];
   options: Record<string, string>;
   explanations: Record<string, string>;
   optionMapping?: QuestionOptionMapping;
@@ -159,9 +163,7 @@ export function HistoryScreen() {
 
         {!loading && !error && history.length === 0 && studyHistory.length === 0 && (
           <PixelCard className="py-12 text-center">
-            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
-              Nenhum registro encontrado ainda.
-            </p>
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Nenhum registro encontrado ainda.</p>
             <p className="mt-3 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
               Complete um lab, KC ou simulado para aparecer no historico.
             </p>
@@ -261,9 +263,7 @@ export function HistoryScreen() {
             <PixelCard className="max-h-[90vh] w-full max-w-3xl overflow-y-auto space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
-                    Revisao do lab
-                  </p>
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Revisao do lab</p>
                   <h2 className="mt-1 font-[var(--font-body)] text-xl">{selectedItem.title}</h2>
                   <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
                     Tema: {selectedItem.theme} · {new Date(selectedItem.completedAt).toLocaleString("pt-BR")}
@@ -294,9 +294,7 @@ export function HistoryScreen() {
 
               {selectedItem.sourceLabText && (
                 <div className="space-y-2">
-                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                    Texto base do lab
-                  </p>
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Texto base do lab</p>
                   <div className="max-h-48 overflow-auto border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] p-3">
                     <p className="whitespace-pre-wrap font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
                       {selectedItem.sourceLabText}
@@ -306,9 +304,7 @@ export function HistoryScreen() {
               )}
 
               <div className="space-y-2">
-                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                  Tarefas realizadas
-                </p>
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Tarefas realizadas</p>
                 {normalizeSnapshot(selectedItem.taskSnapshot).length === 0 ? (
                   <div className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] p-3">
                     <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
@@ -402,9 +398,7 @@ export function HistoryScreen() {
               </div>
 
               <div className="space-y-2">
-                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                  Revisao de questoes
-                </p>
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Revisao de questoes</p>
 
                 {selectedStudyItem.answersSnapshot.length === 0 ? (
                   <div className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] p-3">
@@ -414,42 +408,68 @@ export function HistoryScreen() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {selectedStudyItem.answersSnapshot.map((item, index) => (
-                      <div
-                        key={`${item.questionId}-${index}`}
-                        className="space-y-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] p-3"
-                      >
-                        <p className="font-[var(--font-body)] text-sm">
-                          {index + 1}. {item.statement}
-                        </p>
-                        <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                          Sua resposta: {item.selectedOption} · Correta: {item.correctOption}
-                        </p>
-                        <div className="space-y-1">
-                          {Object.entries(item.options).map(([option, optionText]) => (
-                            <div
-                              key={`${item.questionId}-${option}`}
-                              className={`border-2 px-2 py-2 ${
-                                option === item.correctOption
-                                  ? "border-[#2ecc71] bg-green-900/25"
-                                  : option === item.selectedOption && option !== item.correctOption
-                                    ? "border-[#e74c3c] bg-red-900/25"
-                                    : "border-[var(--pixel-border)] bg-[var(--pixel-card)]"
-                              }`}
-                            >
-                              <p className="font-[var(--font-body)] text-xs">
-                                {option}) {optionText}
-                                {option === item.correctOption ? " · correta" : ""}
-                                {option === item.selectedOption ? " · sua resposta" : ""}
-                              </p>
-                              <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                                {item.explanations[option] ?? "Sem explicacao adicional."}
-                              </p>
-                            </div>
-                          ))}
+                    {selectedStudyItem.answersSnapshot.map((item, index) => {
+                      const questionType = normalizeQuestionType(item.questionType);
+                      const selectedLabels =
+                        Array.isArray(item.selectedOptions) && item.selectedOptions.length > 0
+                          ? item.selectedOptions
+                          : [item.selectedOption];
+                      const correctLabels =
+                        Array.isArray(item.correctOptions) && item.correctOptions.length > 0
+                          ? item.correctOptions
+                          : [item.correctOption];
+                      const selectedLabel = selectedLabels.join(", ");
+                      const correctLabel = correctLabels.join(", ");
+
+                      return (
+                        <div
+                          key={`${item.questionId}-${index}`}
+                          className="space-y-2 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] p-3"
+                        >
+                          <p className="font-[var(--font-body)] text-sm">
+                            {index + 1}. {item.statement}
+                          </p>
+                          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                            {questionType === "multi" ? "Tipo: multipla escolha · " : ""}
+                            Sua resposta: {selectedLabel} · Correta: {correctLabel}
+                          </p>
+                          <div className="space-y-1">
+                            {Object.entries(item.options).map(([option, optionText]) => (
+                              <div
+                                key={`${item.questionId}-${option}`}
+                                className={`border-2 px-2 py-2 ${
+                                  correctLabels.includes(option)
+                                    ? "border-[#2ecc71] bg-green-900/25"
+                                    : selectedLabels.includes(option) && !correctLabels.includes(option)
+                                      ? "border-[#e74c3c] bg-red-900/25"
+                                      : "border-[var(--pixel-border)] bg-[var(--pixel-card)]"
+                                }`}
+                              >
+                                <p className="font-[var(--font-body)] text-xs">
+                                  {option}) {optionText}
+                                  {correctLabels.includes(option) ? " · correta" : ""}
+                                  {selectedLabels.includes(option) ? " · sua resposta" : ""}
+                                </p>
+                                <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                  {item.explanations[option] ?? "Sem explicacao adicional."}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                            {isCorrectAnswer({
+                              questionType,
+                              selectedOption: item.selectedOption,
+                              selectedOptions: item.selectedOptions,
+                              correctOption: item.correctOption,
+                              correctOptions: item.correctOptions,
+                            })
+                              ? "Resultado: correta"
+                              : "Resultado: incorreta"}
+                          </p>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -15,6 +15,25 @@ function toOptionKey(value: string): OptionKey {
   return "A";
 }
 
+function toQuestionType(value: unknown): "single" | "multi" {
+  return value === "multi" ? "multi" : "single";
+}
+
+function toOptionKeys(values: unknown): OptionKey[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const deduped = new Set<OptionKey>();
+  for (const item of values) {
+    if (item === "A" || item === "B" || item === "C" || item === "D" || item === "E") {
+      deduped.add(item);
+    }
+  }
+
+  return Array.from(deduped);
+}
+
 function shuffleArray<T>(items: T[]): T[] {
   const cloned = [...items];
   for (let index = cloned.length - 1; index > 0; index -= 1) {
@@ -25,7 +44,14 @@ function shuffleArray<T>(items: T[]): T[] {
 }
 
 export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations): StudyQuestion {
+  const rawQuestionType = (question as DbStudyQuestion & { questionType?: unknown }).questionType;
+  const questionType = toQuestionType(rawQuestionType);
   const originalCorrect = toOptionKey(question.correctOption);
+  const rawCorrectOptions = (question as DbStudyQuestion & { correctOptions?: unknown }).correctOptions;
+  const originalCorrectOptions = toOptionKeys(rawCorrectOptions);
+  if (originalCorrectOptions.length === 0) {
+    originalCorrectOptions.push(originalCorrect);
+  }
   const rawOptions: Array<{ key: OptionKey; text: string; explanation: string }> = [
     { key: "A", text: question.optionA, explanation: question.explanationA ?? "" },
     { key: "B", text: question.optionB, explanation: question.explanationB ?? "" },
@@ -52,6 +78,7 @@ export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations):
     originalToDisplay: {},
   };
   let nextCorrect: OptionKey = "A";
+  const nextCorrectSet = new Set<OptionKey>();
 
   shuffled.forEach((option, index) => {
     const mappedKey = targetKeys[index] ?? "E";
@@ -63,7 +90,16 @@ export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations):
     if (option.key === originalCorrect) {
       nextCorrect = mappedKey;
     }
+
+    if (originalCorrectOptions.includes(option.key)) {
+      nextCorrectSet.add(mappedKey);
+    }
   });
+
+  const nextCorrectOptions = Array.from(nextCorrectSet);
+  if (nextCorrectOptions.length === 0) {
+    nextCorrectOptions.push(nextCorrect);
+  }
 
   return {
     id: question.id,
@@ -71,8 +107,10 @@ export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations):
     certificationCode: question.certificationPreset?.code ?? "",
     topic: question.awsService?.name ?? question.topic,
     difficulty: question.difficulty,
+    questionType,
     options: nextOptions,
     correctOption: nextCorrect,
+    correctOptions: nextCorrectOptions,
     explanations: nextExplanations,
     optionMapping,
   };

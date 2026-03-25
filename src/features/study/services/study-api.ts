@@ -1,5 +1,12 @@
 import { StudyExplanationResult } from "@/features/study/types";
-import { QuestionOption, QuestionOptionMapping, StudyQuestion, TaskDifficulty, Task } from "@/lib/types";
+import {
+  QuestionOption,
+  QuestionOptionMapping,
+  StudyQuestion,
+  StudyQuestionType,
+  TaskDifficulty,
+  Task,
+} from "@/lib/types";
 
 export type StudyServiceItem = {
   id: string;
@@ -11,8 +18,11 @@ export type StudyServiceItem = {
 export type StudyAnswerSnapshotPayload = {
   questionId: string;
   statement: string;
+  questionType?: StudyQuestionType;
   selectedOption: string;
+  selectedOptions?: string[];
   correctOption: string;
+  correctOptions?: string[];
   options: Record<string, string>;
   explanations: Record<string, string>;
   optionMapping?: QuestionOptionMapping;
@@ -68,7 +78,8 @@ export type WeakServiceItem = {
 
 type StudyExplainPayload = {
   questionId: string;
-  selectedOption: QuestionOption;
+  selectedOption?: QuestionOption;
+  selectedOptions?: QuestionOption[];
   optionMapping?: QuestionOptionMapping;
 };
 

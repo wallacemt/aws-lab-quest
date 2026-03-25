@@ -61,11 +61,12 @@ export type AdminQuestionsListParams = {
   pageSize: number;
   search?: string;
   difficulty?: "easy" | "medium" | "hard";
+  questionType?: "single" | "multi";
   usage?: "KC" | "SIMULADO" | "BOTH";
   active?: "true" | "false";
   certificationCode?: string;
   awsServiceCode?: string;
-  sortBy?: "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active";
+  sortBy?: "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active" | "questionType";
   sortOrder?: AdminListSortOrder;
 };
 
@@ -75,9 +76,11 @@ export type AdminQuestionListItem = {
   statement: string;
   topic: string;
   difficulty: "easy" | "medium" | "hard";
+  questionType: "single" | "multi";
   usage: "KC" | "SIMULADO" | "BOTH";
   active: boolean;
   correctOption: string;
+  correctOptions?: string[] | null;
   optionA: string;
   optionB: string;
   optionC: string;
@@ -233,8 +236,10 @@ export type AdminUploadGeneratedQuestionItem = {
   statement: string;
   topic: string;
   difficulty: "easy" | "medium" | "hard";
+  questionType: "single" | "multi";
   usage: "KC" | "SIMULADO" | "BOTH";
   correctOption: string;
+  correctOptions?: string[] | null;
   createdAt: string;
 };
 

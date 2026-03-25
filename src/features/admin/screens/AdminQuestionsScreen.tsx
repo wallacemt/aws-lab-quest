@@ -23,9 +23,9 @@ export function AdminQuestionsScreen() {
   const [active, setActive] = useState<"" | "true" | "false">("");
   const [certificationCode, setCertificationCode] = useState("");
   const [awsServiceCode, setAwsServiceCode] = useState("");
-  const [sortBy, setSortBy] = useState<"createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active">(
-    "createdAt",
-  );
+  const [sortBy, setSortBy] = useState<
+    "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active" | "questionType"
+  >("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -199,7 +199,14 @@ export function AdminQuestionsScreen() {
               onChange={(event) => {
                 setPage(1);
                 setSortBy(
-                  event.target.value as "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active",
+                  event.target.value as
+                    | "createdAt"
+                    | "difficulty"
+                    | "usage"
+                    | "topic"
+                    | "externalId"
+                    | "active"
+                    | "questionType",
                 );
               }}
               className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
@@ -210,6 +217,7 @@ export function AdminQuestionsScreen() {
               <option value="topic">Topico</option>
               <option value="externalId">External ID</option>
               <option value="active">Status</option>
+              <option value="questionType">Tipo</option>
             </select>
 
             <select
@@ -239,6 +247,7 @@ export function AdminQuestionsScreen() {
                   <th className="px-3 py-2">Enunciado</th>
                   <th className="px-3 py-2">Topico</th>
                   <th className="px-3 py-2">Dificuldade</th>
+                  <th className="px-3 py-2">Tipo</th>
                   <th className="px-3 py-2">Uso</th>
                   <th className="px-3 py-2">Certificacao</th>
                   <th className="px-3 py-2">Servico</th>
@@ -254,6 +263,7 @@ export function AdminQuestionsScreen() {
                     <td className="px-3 py-2">{item.statement.slice(0, 120)}...</td>
                     <td className="px-3 py-2">{item.topic}</td>
                     <td className="px-3 py-2 uppercase">{item.difficulty}</td>
+                    <td className="px-3 py-2 uppercase">{item.questionType}</td>
                     <td className="px-3 py-2 uppercase">{item.usage}</td>
                     <td className="px-3 py-2">{item.certificationPreset?.code ?? "-"}</td>
                     <td className="px-3 py-2">{item.awsService?.code ?? "-"}</td>
@@ -318,6 +328,9 @@ export function AdminQuestionsScreen() {
                 {selectedQuestion.usage}
               </p>
               <p>
+                <strong>Tipo:</strong> {selectedQuestion.questionType.toUpperCase()}
+              </p>
+              <p>
                 <strong>Servico:</strong> {selectedQuestion.awsService?.code ?? "-"} | <strong>Certificacao:</strong>{" "}
                 {selectedQuestion.certificationPreset?.code ?? "-"}
               </p>
@@ -331,7 +344,7 @@ export function AdminQuestionsScreen() {
               <p>D) {selectedQuestion.optionD}</p>
               {selectedQuestion.optionE && <p>E) {selectedQuestion.optionE}</p>}
               <p className="mt-1 font-mono text-xs uppercase text-[#22c55e]">
-                Gabarito: {selectedQuestion.correctOption}
+                Gabarito: {(selectedQuestion.correctOptions ?? [selectedQuestion.correctOption]).join(", ")}
               </p>
             </div>
 
