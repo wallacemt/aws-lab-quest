@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 const MAX_GUIDE_CONTEXT_CHARS = 4_500;
 const MAX_SOURCE_CONTEXT_CHARS = 7_500;
 const MAX_EXTRACT_CHUNK_CHARS = 6_500;
+const EXTRACT_QUESTIONS_PER_CHUNK = 6;
 const TOKEN_ESTIMATE_CHARS_PER_TOKEN = 4;
 const SAFE_TOKENS_PER_MINUTE = Number(process.env.GEMINI_SAFE_TOKENS_PER_MINUTE ?? 9_000);
 const MIN_CALL_INTERVAL_MS = Number(process.env.GEMINI_MIN_CALL_INTERVAL_MS ?? 2_500);
@@ -186,13 +187,25 @@ function normalizeStatementKey(value: string): string {
     .trim();
 }
 
+function preprocessExtractedText(rawText: string): string {
+  return rawText
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/([A-Za-z\u00C0-\u024F])\-\s*\n\s*([A-Za-z\u00C0-\u024F])/g, "$1$2")
+    .replace(/\n\s*(\d{1,3})\s*(?=\n\s*(?:Pergunta|Quest[aã]o|\d{1,3}\s*[\)\.\-:]))/gim, "\n")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 function extractQuestionBlocksFromText(rawText: string): string[] {
   const text = rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
   if (!text) {
     return [];
   }
 
-  const markerRegex = /(?:^|\n)\s*(?:quest[aã]o\s*)?\d{1,3}\s*[\)\.\-:]/gim;
+  const markerRegex = /(?:^|\n)\s*(?:pergunta\s+|quest[aã]o\s*)?\d{1,3}\s*[\)\.\-:]/gim;
   const starts: number[] = [];
 
   for (const match of text.matchAll(markerRegex)) {
@@ -220,6 +233,66 @@ function extractQuestionBlocksFromText(rawText: string): string[] {
   }
 
   return blocks;
+}
+
+function chunkQuestionBlocksSemantically(blocks: string[]): string[] {
+  if (blocks.length === 0) {
+    return [];
+  }
+
+  const chunks: string[] = [];
+  let currentBlocks: string[] = [];
+  let currentLength = 0;
+
+  for (const block of blocks) {
+    const blockLength = block.length;
+    const nextCount = currentBlocks.length + 1;
+    const nextLength = currentLength + blockLength + 2;
+    const overflowByCount = nextCount > EXTRACT_QUESTIONS_PER_CHUNK;
+    const overflowByChars = nextLength > MAX_EXTRACT_CHUNK_CHARS;
+
+    if (currentBlocks.length > 0 && (overflowByCount || overflowByChars)) {
+      chunks.push(currentBlocks.join("\n\n"));
+      currentBlocks = [block];
+      currentLength = blockLength;
+      continue;
+    }
+
+    currentBlocks.push(block);
+    currentLength = nextLength;
+  }
+
+  if (currentBlocks.length > 0) {
+    chunks.push(currentBlocks.join("\n\n"));
+  }
+
+  return chunks;
+}
+
+async function preprocessChunkWithAi(input: {
+  certification: CertificationContext;
+  sourceChunk: string;
+}): Promise<string> {
+  const prompt = `
+Voce recebera um lote de questoes OCR de simulado AWS.
+
+Objetivo:
+- Limpar ruido de OCR sem criar questoes novas.
+- Corrigir palavras quebradas por hifenizacao de linha.
+- Reorganizar o texto de forma clara mantendo o conteudo original.
+
+Regras obrigatorias:
+- Nao invente enunciados, alternativas ou respostas.
+- Nao remova questoes validas.
+- Preserve numeracao existente quando houver.
+- Retorne SOMENTE texto limpo (sem JSON, sem markdown).
+
+Lote OCR:
+${input.sourceChunk}
+`;
+
+  const cleaned = (await generateContentWithQuotaProtection(prompt)).trim();
+  return cleaned || input.sourceChunk;
 }
 
 function splitTextByCharLimit(text: string, maxChars: number): string[] {
@@ -382,23 +455,22 @@ async function extractExistingQuestionsWithAi(input: {
     ? String(input.certification.examGuide).trim().slice(0, MAX_GUIDE_CONTEXT_CHARS)
     : "";
 
-  const blocks = extractQuestionBlocksFromText(input.sourceText);
-  const chunks: string[] = [];
-
-  if (blocks.length <= 1) {
-    chunks.push(...splitTextByCharLimit(input.sourceText, MAX_EXTRACT_CHUNK_CHARS));
-  } else {
-    const perChunk = 8;
-    for (let index = 0; index < blocks.length; index += perChunk) {
-      const combined = blocks.slice(index, index + perChunk).join("\n\n");
-      chunks.push(...splitTextByCharLimit(combined, MAX_EXTRACT_CHUNK_CHARS));
-    }
-  }
+  const preprocessedSourceText = preprocessExtractedText(input.sourceText);
+  const blocks = extractQuestionBlocksFromText(preprocessedSourceText);
+  const chunks =
+    blocks.length > 0
+      ? chunkQuestionBlocksSemantically(blocks)
+      : splitTextByCharLimit(preprocessedSourceText, MAX_EXTRACT_CHUNK_CHARS);
 
   const extracted: GeneratedQuestion[] = [];
 
   for (let index = 0; index < chunks.length; index += 1) {
     await input.onBatchProgress?.(index + 1, chunks.length);
+
+    const cleanedChunk = await preprocessChunkWithAi({
+      certification: input.certification,
+      sourceChunk: chunks[index],
+    });
 
     const prompt =
       `
@@ -420,7 +492,7 @@ Servicos permitidos (serviceCode):
 ${servicesList}
 
 Texto OCR do lote:
-${chunks[index]}
+${cleanedChunk}
 
 Regras obrigatorias:
 - Retorne APENAS um array JSON valido (sem markdown).

@@ -98,6 +98,15 @@ type UploadDashboardPayload = AdminUploadsPayload;
 
 type UploadAction = "exam-guide" | "simulado" | "simulado-completo";
 
+type SimuladoQueueItem = {
+  id: string;
+  fileName: string;
+  status: "PENDING" | "EXTRACTING" | "INGESTING" | "COMPLETED" | "FAILED";
+  generatedCount?: number;
+  savedCount?: number;
+  error?: string;
+};
+
 function formatBytes(value: number): string {
   if (value < 1024) {
     return `${value} B`;
@@ -137,6 +146,7 @@ export function AdminPdfUploadScreen() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [auditPayload, setAuditPayload] = useState<AdminUploadQuestionsPayload | null>(null);
+  const [simuladoQueue, setSimuladoQueue] = useState<SimuladoQueueItem[]>([]);
 
   useEffect(() => {
     async function loadCertifications() {
@@ -295,6 +305,7 @@ export function AdminPdfUploadScreen() {
     setIngestResult(null);
     setJobSnapshot(null);
     setOverwriteExamGuide(false);
+    setSimuladoQueue([]);
   }
 
   async function reloadAdminUploadData() {
@@ -333,6 +344,50 @@ export function AdminPdfUploadScreen() {
     setAuditError(null);
   }
 
+  function updateQueueItem(id: string, next: Partial<SimuladoQueueItem>) {
+    setSimuladoQueue((previous) => previous.map((item) => (item.id === id ? { ...item, ...next } : item)));
+  }
+
+  async function requestSimuladoExtract(formData: FormData): Promise<ExtractionResponse> {
+    const response = await fetch("/api/admin/pdf/extract", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+
+    const payload = (await response.json()) as ExtractionResponse | { error: string };
+    if (!response.ok || "error" in payload) {
+      throw new Error("error" in payload ? payload.error : "Falha ao processar PDF.");
+    }
+
+    return payload;
+  }
+
+  async function requestSimuladoIngest(input: {
+    certificationCode: string;
+    extractedText: string;
+    ingestMode: "extract-existing" | "generate-new";
+    jobId: string;
+    uploadedFileId: string;
+    desiredCount?: number;
+  }): Promise<IngestResponse> {
+    const response = await fetch("/api/admin/pdf/ingest", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    const payload = (await response.json()) as IngestResponse | { error: string };
+    if (!response.ok || "error" in payload) {
+      throw new Error("error" in payload ? payload.error : "Falha ao salvar questoes no banco.");
+    }
+
+    return payload;
+  }
+
   async function uploadExamGuide(formData: FormData) {
     const response = await fetch("/api/admin/pdf/exam-guide", {
       method: "POST",
@@ -357,20 +412,13 @@ export function AdminPdfUploadScreen() {
   }
 
   async function extractSimuladoPdf(formData: FormData) {
-    const response = await fetch("/api/admin/pdf/extract", {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-
-    const payload = (await response.json()) as ExtractionResponse | { error: string };
-    if (!response.ok || "error" in payload) {
-      setError("error" in payload ? payload.error : "Falha ao processar PDF.");
-      return;
+    try {
+      const payload = await requestSimuladoExtract(formData);
+      setActiveJobId(payload.jobId);
+      setSimuladoResult(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao processar PDF.");
     }
-
-    setActiveJobId(payload.jobId);
-    setSimuladoResult(payload);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -378,11 +426,17 @@ export function AdminPdfUploadScreen() {
     resetStatus();
 
     const formData = new FormData(event.currentTarget);
-    const file = formData.get("file");
-    const hasPdf = file instanceof File && file.size > 0;
+    const files = formData.getAll("file").filter((value): value is File => value instanceof File && value.size > 0);
+    const firstFile = files[0] ?? null;
+    const hasPdf = Boolean(firstFile);
     const manualText = manualExamGuideText.trim();
 
-    if (mode === "simulado" && !hasPdf) {
+    if (mode === "simulado" && files.length > 1) {
+      setError("No modo 2 etapas, envie apenas um PDF por vez.");
+      return;
+    }
+
+    if ((mode === "simulado" || mode === "simulado-completo") && !hasPdf) {
       setError("Selecione um PDF antes de continuar.");
       return;
     }
@@ -409,53 +463,61 @@ export function AdminPdfUploadScreen() {
       if (mode === "exam-guide") {
         await uploadExamGuide(formData);
       } else if (mode === "simulado-completo") {
-        const extracted = await (async () => {
-          const response = await fetch("/api/admin/pdf/extract", {
-            method: "POST",
-            body: formData,
-            credentials: "include",
-          });
+        const initialQueue = files.map((file, index) => ({
+          id: `${Date.now()}-${index}`,
+          fileName: file.name,
+          status: "PENDING" as const,
+        }));
+        setSimuladoQueue(initialQueue);
 
-          const payload = (await response.json()) as ExtractionResponse | { error: string };
-          if (!response.ok || "error" in payload) {
-            setError("error" in payload ? payload.error : "Falha ao processar PDF.");
-            return null;
+        let completed = 0;
+        let failed = 0;
+
+        for (let index = 0; index < files.length; index += 1) {
+          const file = files[index];
+          const queueItem = initialQueue[index];
+
+          try {
+            updateQueueItem(queueItem.id, { status: "EXTRACTING" });
+
+            const singleFileFormData = new FormData();
+            singleFileFormData.set("file", file);
+            singleFileFormData.set("certificationCode", selectedCertificationCode);
+
+            const extracted = await requestSimuladoExtract(singleFileFormData);
+            setActiveJobId(extracted.jobId);
+            setSimuladoResult(extracted);
+
+            updateQueueItem(queueItem.id, { status: "INGESTING" });
+            const ingestPayload = await requestSimuladoIngest({
+              certificationCode: extracted.certification.code,
+              extractedText: extracted.extractedText,
+              ingestMode: "extract-existing",
+              jobId: extracted.jobId,
+              uploadedFileId: extracted.uploadedFileId,
+            });
+
+            completed += 1;
+            setIngestResult(ingestPayload);
+            setActiveJobId(ingestPayload.jobId);
+            updateQueueItem(queueItem.id, {
+              status: "COMPLETED",
+              generatedCount: ingestPayload.generatedCount,
+              savedCount: ingestPayload.savedCount,
+            });
+          } catch (err) {
+            failed += 1;
+            updateQueueItem(queueItem.id, {
+              status: "FAILED",
+              error: err instanceof Error ? err.message : "Falha no processamento do arquivo.",
+            });
           }
-
-          return payload;
-        })();
-
-        if (!extracted) {
-          return;
         }
 
-        setActiveJobId(extracted.jobId);
-        setSimuladoResult(extracted);
-
-        setSaving(true);
-        const response = await fetch("/api/admin/pdf/ingest", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            certificationCode: extracted.certification.code,
-            extractedText: extracted.extractedText,
-            ingestMode: "extract-existing",
-            jobId: extracted.jobId,
-            uploadedFileId: extracted.uploadedFileId,
-          }),
-        });
-
-        const payload = (await response.json()) as IngestResponse | { error: string };
-        if (!response.ok || "error" in payload) {
-          setError("error" in payload ? payload.error : "Falha ao salvar questoes no banco.");
-          return;
+        if (failed > 0) {
+          setError(`Fila finalizada com falhas: ${failed} arquivo(s) com erro e ${completed} concluido(s).`);
         }
 
-        setActiveJobId(payload.jobId);
-        setIngestResult(payload);
         await reloadAdminUploadData();
       } else {
         await extractSimuladoPdf(formData);
@@ -478,27 +540,14 @@ export function AdminPdfUploadScreen() {
     setIngestResult(null);
 
     try {
-      const response = await fetch("/api/admin/pdf/ingest", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          certificationCode: simuladoResult.certification.code,
-          extractedText: simuladoResult.extractedText,
-          desiredCount: 20,
-          ingestMode: "generate-new",
-          jobId: simuladoResult.jobId,
-          uploadedFileId: simuladoResult.uploadedFileId,
-        }),
+      const payload = await requestSimuladoIngest({
+        certificationCode: simuladoResult.certification.code,
+        extractedText: simuladoResult.extractedText,
+        desiredCount: 20,
+        ingestMode: "generate-new",
+        jobId: simuladoResult.jobId,
+        uploadedFileId: simuladoResult.uploadedFileId,
       });
-
-      const payload = (await response.json()) as IngestResponse | { error: string };
-      if (!response.ok || "error" in payload) {
-        setError("error" in payload ? payload.error : "Falha ao salvar questoes no banco.");
-        return;
-      }
 
       setIngestResult(payload);
       setActiveJobId(payload.jobId);
@@ -645,8 +694,14 @@ export function AdminPdfUploadScreen() {
               type="file"
               name="file"
               accept="application/pdf,.pdf"
+              multiple={mode === "simulado-completo"}
               className="w-full rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-sm"
             />
+            {mode === "simulado-completo" && (
+              <p className="text-xs text-[var(--pixel-subtext)]">
+                Voce pode selecionar varios PDFs. O processamento sera feito em fila (um por vez).
+              </p>
+            )}
           </label>
 
           {mode === "exam-guide" && (
@@ -670,7 +725,7 @@ export function AdminPdfUploadScreen() {
                 : mode === "exam-guide"
                   ? "Salvar Exam Guide"
                   : mode === "simulado-completo"
-                    ? "Extrair questoes + Enriquecer + Salvar"
+                    ? "Processar fila de simulados (1 clique)"
                     : "Extrair texto do simulado"}
             </PixelButton>
 
@@ -709,6 +764,27 @@ export function AdminPdfUploadScreen() {
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
             {jobSnapshot.progressPercent}% concluido
           </p>
+        </PixelCard>
+      )}
+
+      {simuladoQueue.length > 0 && (
+        <PixelCard className="space-y-3">
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Fila de simulados</p>
+          <div className="space-y-2">
+            {simuladoQueue.map((item) => (
+              <div key={item.id} className="rounded border border-[var(--pixel-border)] p-2 text-xs">
+                <p className="font-mono uppercase text-[var(--pixel-text)]">
+                  {item.fileName} | {item.status}
+                </p>
+                {typeof item.savedCount === "number" && (
+                  <p className="text-[var(--pixel-subtext)]">
+                    Geradas: {item.generatedCount ?? 0} | Salvas: {item.savedCount}
+                  </p>
+                )}
+                {item.error && <p className="text-[var(--pixel-danger)]">{item.error}</p>}
+              </div>
+            ))}
+          </div>
         </PixelCard>
       )}
 

@@ -2,8 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   env: {
-    DATABASE_URL: process.env.DATABASE_URL,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    GEMINI_MODEL: process.env.GEMINI_MODEL,
+    GEMINI_SAFE_TOKENS_PER_MINUTE: process.env.GEMINI_SAFE_TOKENS_PER_MINUTE,
+    GEMINI_MIN_CALL_INTERVAL_MS: process.env.GEMINI_MIN_CALL_INTERVAL_MS,
+
+    DATABASE_URL: process.env.DATABASE_URL,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     APP_URL: process.env.APP_URL,

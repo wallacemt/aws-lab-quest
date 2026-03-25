@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { containsPromptInjection, isLikelyAwsLabText, sanitizeUserText } from "@/lib/input-validation";
 import { parseTasksFromText } from "@/lib/parser";
 import { GenerateQuestInput } from "@/lib/types";
+import { getAiModel } from "@/lib/ai";
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,8 +85,8 @@ Regras obrigatorias:
   }
 ]`;
 
-    const client = new GoogleGenerativeAI(apiKey);
-    const model = client.getGenerativeModel({ model: "gemma-3-4b-it" });
+
+    const model = getAiModel()
 
     const result = await model.generateContent(prompt);
     const rawText = result.response.text();
