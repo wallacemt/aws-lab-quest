@@ -4,14 +4,18 @@ import { auth } from "@/lib/auth";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
 import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
+import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOptionMapping } from "@/lib/types";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight, XpActivityType } from "@/lib/xp-weights";
 
 type StudyHistoryItem = {
   questionId: string;
   statement: string;
+  questionType?: "single" | "multi";
   selectedOption: string;
+  selectedOptions?: string[];
   correctOption: string;
+  correctOptions?: string[];
   options: Record<string, string>;
   explanations: Record<string, string>;
   optionMapping?: QuestionOptionMapping;
@@ -95,7 +99,15 @@ export async function POST(request: NextRequest) {
       const questionMap = new Map(questions.map((question) => [question.id, question]));
 
       computedXp = snapshot.reduce((total, answer) => {
-        if (answer.selectedOption !== answer.correctOption) {
+        const isCorrect = isCorrectAnswer({
+          questionType: normalizeQuestionType(answer.questionType),
+          selectedOption: answer.selectedOption,
+          selectedOptions: answer.selectedOptions,
+          correctOption: answer.correctOption,
+          correctOptions: answer.correctOptions,
+        });
+
+        if (!isCorrect) {
           return total;
         }
 

@@ -16,13 +16,16 @@ function parseSortOrder(value: string | null): Prisma.SortOrder {
   return value === "asc" ? "asc" : "desc";
 }
 
-function parseSortBy(value: string | null): "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active" {
+function parseSortBy(
+  value: string | null,
+): "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active" | "questionType" {
   if (
     value === "difficulty" ||
     value === "usage" ||
     value === "topic" ||
     value === "externalId" ||
-    value === "active"
+    value === "active" ||
+    value === "questionType"
   ) {
     return value;
   }
@@ -95,9 +98,11 @@ export async function GET(request: NextRequest) {
         statement: true,
         topic: true,
         difficulty: true,
+        questionType: true,
         usage: true,
         active: true,
         correctOption: true,
+        correctOptions: true,
         optionA: true,
         optionB: true,
         optionC: true,

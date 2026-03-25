@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getAiModel, extractJsonObject } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
+import { normalizeOptionArray, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOption, QuestionOptionMapping } from "@/lib/types";
 
 type Body = {
   questionId?: string;
   selectedOption?: QuestionOption;
+  selectedOptions?: QuestionOption[];
   optionMapping?: QuestionOptionMapping;
 };
 
@@ -43,6 +45,14 @@ function toDisplayCorrectOption(
 ): QuestionOption {
   const mapped = optionMapping?.originalToDisplay?.[originalCorrectOption];
   return mapped && isOptionKey(mapped) ? mapped : originalCorrectOption;
+}
+
+function toDisplayCorrectOptions(
+  originalCorrectOptions: QuestionOption[],
+  optionMapping?: QuestionOptionMapping,
+): QuestionOption[] {
+  const mapped = originalCorrectOptions.map((option) => toDisplayCorrectOption(option, optionMapping));
+  return Array.from(new Set(mapped)).sort();
 }
 
 function toDisplayFrameOptions(
@@ -85,8 +95,10 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json()) as Body;
-  if (!body.questionId || !body.selectedOption) {
-    return NextResponse.json({ error: "Informe questionId e selectedOption." }, { status: 400 });
+  const selectedOptionsInput = normalizeOptionArray(body.selectedOptions);
+  const selectedSingleInput = body.selectedOption;
+  if (!body.questionId || (!selectedSingleInput && selectedOptionsInput.length === 0)) {
+    return NextResponse.json({ error: "Informe questionId e selectedOption/selectedOptions." }, { status: 400 });
   }
 
   const question = await prisma.studyQuestion.findUnique({
@@ -109,9 +121,19 @@ export async function POST(request: NextRequest) {
     E: question.explanationE ?? "Nao aplicavel.",
   };
 
+  const questionType = normalizeQuestionType((question as { questionType?: unknown }).questionType);
   const originalCorrectOption = isOptionKey(question.correctOption) ? question.correctOption : "A";
-  const originalSelectedOption = toOriginalOptionFrame(body.selectedOption, body.optionMapping);
+  const rawCorrectOptions = normalizeOptionArray((question as { correctOptions?: unknown }).correctOptions);
+  const originalCorrectOptions = rawCorrectOptions.length > 0 ? rawCorrectOptions : [originalCorrectOption];
+  const originalSelectedOptions =
+    selectedOptionsInput.length > 0
+      ? selectedOptionsInput.map((option) => toOriginalOptionFrame(option, body.optionMapping))
+      : selectedSingleInput
+        ? [toOriginalOptionFrame(selectedSingleInput, body.optionMapping)]
+        : [];
+
   const displayCorrectOption = toDisplayCorrectOption(originalCorrectOption, body.optionMapping);
+  const displayCorrectOptions = toDisplayCorrectOptions(originalCorrectOptions, body.optionMapping);
 
   if (isCacheValid(question.cachedExplainAt, question.cachedExplainVersion)) {
     const cachedOriginalOptions: ExplainOptions = {
@@ -126,7 +148,9 @@ export async function POST(request: NextRequest) {
       summary: question.cachedExplainSummary ?? "Resumo indisponivel.",
       options: toDisplayFrameOptions(cachedOriginalOptions, body.optionMapping),
       correctOption: displayCorrectOption,
-      selectedOption: body.selectedOption,
+      correctOptions: displayCorrectOptions,
+      selectedOption: selectedSingleInput ?? originalSelectedOptions[0] ?? "A",
+      selectedOptions: originalSelectedOptions,
       fromCache: true,
     });
   }
@@ -141,8 +165,9 @@ Contexto:
 - Certificação: ${question.certificationPreset?.name ?? question.certificationPreset?.code ?? "AWS"}
 - Assunto: ${question.awsService?.name ?? question.topic}
 - Enunciado: ${question.statement}
-- Alternativa marcada pelo aluno: ${originalSelectedOption}
-- Alternativa correta oficial: ${originalCorrectOption}
+- Tipo da questao: ${questionType}
+- Alternativas marcadas pelo aluno: ${originalSelectedOptions.join(", ") || "nenhuma"}
+- Alternativas corretas oficiais: ${originalCorrectOptions.join(", ")}
 
 Alternativas:
 A) ${question.optionA}
@@ -164,7 +189,7 @@ Regras:
     "E": "por que está certa/errada ou não aplicável"
   }
 }
-- Seja consistente com a alternativa correta oficial (${originalCorrectOption}).
+- Seja consistente com as alternativas corretas oficiais (${originalCorrectOptions.join(", ")}).
 - Se uma alternativa não existir, explique como "nao aplicavel".
 `;
 
@@ -209,7 +234,9 @@ Regras:
       summary: normalizedOriginal.summary,
       options: toDisplayFrameOptions(normalizedOriginal.options, body.optionMapping),
       correctOption: displayCorrectOption,
-      selectedOption: body.selectedOption,
+      correctOptions: displayCorrectOptions,
+      selectedOption: selectedSingleInput ?? originalSelectedOptions[0] ?? "A",
+      selectedOptions: originalSelectedOptions,
     });
   } catch (error) {
     const fallbackDisplayOptions = toDisplayFrameOptions(fallbackOriginalOptions, body.optionMapping);
@@ -219,7 +246,9 @@ Regras:
         summary: "Explicacao offline usando base local.",
         options: fallbackDisplayOptions,
         correctOption: displayCorrectOption,
-        selectedOption: body.selectedOption,
+        correctOptions: displayCorrectOptions,
+        selectedOption: selectedSingleInput ?? originalSelectedOptions[0] ?? "A",
+        selectedOptions: originalSelectedOptions,
         aiError: error instanceof Error ? error.message : "Erro desconhecido",
       },
       { status: 200 },

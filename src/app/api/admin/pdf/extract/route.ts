@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { extractPdfText } from "@/features/admin/services/pdf-extraction";
+import { extractPdfTextWithGeminiOcr } from "@/features/admin/services/pdf-extraction";
 import {
   buildSha256,
   createIngestionJob,
@@ -96,16 +96,16 @@ export async function POST(request: NextRequest) {
     await updateIngestionJob(ingestJob.id, {
       status: "EXTRACTING",
       progressPercent: 35,
-      message: "Extraindo texto do PDF...",
+      message: "Executando OCR com IA no PDF...",
       uploadedFileId: uploadedFile.id,
     });
 
-    const extractedText = await extractPdfText(buffer);
+    const extractedText = await extractPdfTextWithGeminiOcr(buffer, file.type || "application/pdf");
 
     await updateIngestionJob(ingestJob.id, {
       status: "COMPLETED",
       progressPercent: 100,
-      message: "Texto extraido com sucesso.",
+      message: "Texto extraido com OCR com sucesso.",
       finished: true,
     });
 

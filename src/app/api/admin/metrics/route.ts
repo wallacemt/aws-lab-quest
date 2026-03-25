@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 
 type SnapshotAnswer = {
   questionId?: unknown;
+  questionType?: unknown;
   selectedOption?: unknown;
+  selectedOptions?: unknown;
   correctOption?: unknown;
+  correctOptions?: unknown;
 };
 
 type WeakAggregate = {
@@ -185,13 +189,19 @@ export async function GET(request: NextRequest) {
       const question = questionById.get(answer.questionId);
       const serviceCode = question?.awsService?.code ?? question?.topic ?? "OUTROS";
       const serviceName = question?.awsService?.name ?? question?.topic ?? "OUTROS";
-      const selected = typeof answer.selectedOption === "string" ? answer.selectedOption : "";
-      const correct = typeof answer.correctOption === "string" ? answer.correctOption : "";
       const current =
         weakAggregate.get(serviceCode) ?? ({ serviceCode, serviceName, attempts: 0, errors: 0 } as WeakAggregate);
 
       current.attempts += 1;
-      if (!selected || !correct || selected !== correct) {
+      const isCorrect = isCorrectAnswer({
+        questionType: normalizeQuestionType(answer.questionType),
+        selectedOption: answer.selectedOption,
+        selectedOptions: answer.selectedOptions,
+        correctOption: answer.correctOption,
+        correctOptions: answer.correctOptions,
+      });
+
+      if (!isCorrect) {
         current.errors += 1;
       }
 

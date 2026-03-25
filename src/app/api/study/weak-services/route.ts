@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 
 type SnapshotAnswer = {
   questionId?: unknown;
+  questionType?: unknown;
   selectedOption?: unknown;
+  selectedOptions?: unknown;
   correctOption?: unknown;
+  correctOptions?: unknown;
 };
 
 type WeakServiceStat = {
@@ -111,10 +115,15 @@ export async function GET(request: NextRequest) {
 
       current.attempts += 1;
 
-      const selected = typeof answer.selectedOption === "string" ? answer.selectedOption : "";
-      const correct = typeof answer.correctOption === "string" ? answer.correctOption : "";
+      const isCorrect = isCorrectAnswer({
+        questionType: normalizeQuestionType(answer.questionType),
+        selectedOption: answer.selectedOption,
+        selectedOptions: answer.selectedOptions,
+        correctOption: answer.correctOption,
+        correctOptions: answer.correctOptions,
+      });
 
-      if (selected && correct && selected === correct) {
+      if (isCorrect) {
         current.correct += 1;
       } else {
         current.errors += 1;
