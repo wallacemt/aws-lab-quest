@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 
 const MAX_GUIDE_CONTEXT_CHARS = 4_500;
 const MAX_SOURCE_CONTEXT_CHARS = 7_500;
-const MAX_EXTRACT_CHUNK_CHARS = 6_500;
-const EXTRACT_QUESTIONS_PER_CHUNK = 6;
 const TOKEN_ESTIMATE_CHARS_PER_TOKEN = 4;
 const SAFE_TOKENS_PER_MINUTE = Number(process.env.GEMINI_SAFE_TOKENS_PER_MINUTE ?? 9_000);
 const MIN_CALL_INTERVAL_MS = Number(process.env.GEMINI_MIN_CALL_INTERVAL_MS ?? 2_500);
@@ -29,12 +27,14 @@ type GeneratedQuestion = {
   statement: string;
   serviceCode: string;
   difficulty: "easy" | "medium" | "hard";
+  questionType?: "single" | "multi";
   optionA: string;
   optionB: string;
   optionC: string;
   optionD: string;
   optionE?: string;
   correctOption: "A" | "B" | "C" | "D" | "E";
+  correctOptions?: Array<"A" | "B" | "C" | "D" | "E">;
   explanationA: string;
   explanationB: string;
   explanationC: string;
@@ -148,6 +148,36 @@ function normalizeCorrectOption(value: string): "A" | "B" | "C" | "D" | "E" {
   return "A";
 }
 
+function normalizeQuestionType(value: string | undefined): "single" | "multi" {
+  return value === "multi" ? "multi" : "single";
+}
+
+function normalizeCorrectOptions(
+  value: unknown,
+  fallback: "A" | "B" | "C" | "D" | "E",
+  questionType: "single" | "multi",
+): Array<"A" | "B" | "C" | "D" | "E"> {
+  const deduped = new Set<"A" | "B" | "C" | "D" | "E">();
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (item === "A" || item === "B" || item === "C" || item === "D" || item === "E") {
+        deduped.add(item);
+      }
+    }
+  }
+
+  const options = Array.from(deduped);
+  if (questionType === "multi" && options.length >= 2) {
+    return options;
+  }
+
+  if (options.length > 0) {
+    return [options[0]];
+  }
+
+  return [fallback];
+}
+
 function tryParseJsonArray(raw: string): unknown[] {
   const direct = raw.trim();
   try {
@@ -199,76 +229,6 @@ function preprocessExtractedText(rawText: string): string {
     .trim();
 }
 
-function extractQuestionBlocksFromText(rawText: string): string[] {
-  const text = rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-  if (!text) {
-    return [];
-  }
-
-  const markerRegex = /(?:^|\n)\s*(?:pergunta\s+|quest[aã]o\s*)?\d{1,3}\s*[\)\.\-:]/gim;
-  const starts: number[] = [];
-
-  for (const match of text.matchAll(markerRegex)) {
-    if (typeof match.index !== "number") {
-      continue;
-    }
-
-    const marker = match[0];
-    const markerStart = marker.startsWith("\n") ? match.index + 1 : match.index;
-    starts.push(markerStart);
-  }
-
-  if (starts.length === 0) {
-    return [text];
-  }
-
-  const blocks: string[] = [];
-  for (let index = 0; index < starts.length; index += 1) {
-    const start = starts[index];
-    const end = index + 1 < starts.length ? starts[index + 1] : text.length;
-    const block = text.slice(start, end).trim();
-    if (block.length >= 60) {
-      blocks.push(block);
-    }
-  }
-
-  return blocks;
-}
-
-function chunkQuestionBlocksSemantically(blocks: string[]): string[] {
-  if (blocks.length === 0) {
-    return [];
-  }
-
-  const chunks: string[] = [];
-  let currentBlocks: string[] = [];
-  let currentLength = 0;
-
-  for (const block of blocks) {
-    const blockLength = block.length;
-    const nextCount = currentBlocks.length + 1;
-    const nextLength = currentLength + blockLength + 2;
-    const overflowByCount = nextCount > EXTRACT_QUESTIONS_PER_CHUNK;
-    const overflowByChars = nextLength > MAX_EXTRACT_CHUNK_CHARS;
-
-    if (currentBlocks.length > 0 && (overflowByCount || overflowByChars)) {
-      chunks.push(currentBlocks.join("\n\n"));
-      currentBlocks = [block];
-      currentLength = blockLength;
-      continue;
-    }
-
-    currentBlocks.push(block);
-    currentLength = nextLength;
-  }
-
-  if (currentBlocks.length > 0) {
-    chunks.push(currentBlocks.join("\n\n"));
-  }
-
-  return chunks;
-}
-
 async function preprocessChunkWithAi(input: {
   certification: CertificationContext;
   sourceChunk: string;
@@ -295,62 +255,6 @@ ${input.sourceChunk}
   return cleaned || input.sourceChunk;
 }
 
-function splitTextByCharLimit(text: string, maxChars: number): string[] {
-  const clean = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-  if (!clean) {
-    return [];
-  }
-
-  if (clean.length <= maxChars) {
-    return [clean];
-  }
-
-  const paragraphs = clean
-    .split(/\n{2,}/)
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-
-  if (paragraphs.length === 0) {
-    const chunks: string[] = [];
-    for (let index = 0; index < clean.length; index += maxChars) {
-      chunks.push(clean.slice(index, index + maxChars));
-    }
-    return chunks;
-  }
-
-  const chunks: string[] = [];
-  let current = "";
-
-  for (const paragraph of paragraphs) {
-    if (paragraph.length > maxChars) {
-      if (current) {
-        chunks.push(current.trim());
-        current = "";
-      }
-
-      for (let index = 0; index < paragraph.length; index += maxChars) {
-        chunks.push(paragraph.slice(index, index + maxChars).trim());
-      }
-
-      continue;
-    }
-
-    const candidate = current ? `${current}\n\n${paragraph}` : paragraph;
-    if (candidate.length > maxChars) {
-      chunks.push(current.trim());
-      current = paragraph;
-    } else {
-      current = candidate;
-    }
-  }
-
-  if (current) {
-    chunks.push(current.trim());
-  }
-
-  return chunks;
-}
-
 function sanitizeGeneratedQuestion(
   question: GeneratedQuestion,
   allowedServiceCodes: Set<string>,
@@ -364,12 +268,18 @@ function sanitizeGeneratedQuestion(
     statement: String(question.statement ?? "Questao AWS").trim(),
     serviceCode,
     difficulty,
+    questionType: normalizeQuestionType(question.questionType),
     optionA: String(question.optionA ?? "Opcao A").trim(),
     optionB: String(question.optionB ?? "Opcao B").trim(),
     optionC: String(question.optionC ?? "Opcao C").trim(),
     optionD: String(question.optionD ?? "Opcao D").trim(),
     optionE: question.optionE ? String(question.optionE).trim() : "",
     correctOption: normalizeCorrectOption(String(question.correctOption ?? "A").trim()),
+    correctOptions: normalizeCorrectOptions(
+      question.correctOptions,
+      normalizeCorrectOption(String(question.correctOption ?? "A").trim()),
+      normalizeQuestionType(question.questionType),
+    ),
     explanationA: String(question.explanationA ?? "Sem explicacao.").trim(),
     explanationB: String(question.explanationB ?? "Sem explicacao.").trim(),
     explanationC: String(question.explanationC ?? "Sem explicacao.").trim(),
@@ -416,12 +326,14 @@ Regras obrigatorias:
   "statement": "...",
   "serviceCode": "...",
   "difficulty": "easy|medium|hard",
+  "questionType": "single|multi",
   "optionA": "...",
   "optionB": "...",
   "optionC": "...",
   "optionD": "...",
   "optionE": "...",
   "correctOption": "A|B|C|D|E",
+  "correctOptions": ["A","C"],
   "explanationA": "...",
   "explanationB": "...",
   "explanationC": "...",
@@ -429,6 +341,8 @@ Regras obrigatorias:
   "explanationE": "..."
 }
 - A questao deve realmente tratar do serviceCode escolhido.
+- Em questao multi, use no minimo 2 alternativas corretas em correctOptions.
+- Em questao single, use somente 1 alternativa em correctOptions.
 - As alternativas incorretas devem ser plausiveis e tecnicamente distintas.
 - Nao invente serviceCode fora da lista permitida.
 - Use portugues brasileiro.
@@ -456,11 +370,7 @@ async function extractExistingQuestionsWithAi(input: {
     : "";
 
   const preprocessedSourceText = preprocessExtractedText(input.sourceText);
-  const blocks = extractQuestionBlocksFromText(preprocessedSourceText);
-  const chunks =
-    blocks.length > 0
-      ? chunkQuestionBlocksSemantically(blocks)
-      : splitTextByCharLimit(preprocessedSourceText, MAX_EXTRACT_CHUNK_CHARS);
+  const chunks = [preprocessedSourceText];
 
   const extracted: GeneratedQuestion[] = [];
 
@@ -505,12 +415,14 @@ Regras obrigatorias:
   "statement": "...",
   "serviceCode": "...",
   "difficulty": "easy|medium|hard",
+  "questionType": "single|multi",
   "optionA": "...",
   "optionB": "...",
   "optionC": "...",
   "optionD": "...",
   "optionE": "...",
   "correctOption": "A|B|C|D|E",
+  "correctOptions": ["A","C"],
   "explanationA": "...",
   "explanationB": "...",
   "explanationC": "...",
@@ -559,12 +471,14 @@ async function saveGeneratedQuestions(input: {
         usage: input.usage,
         difficulty: item.difficulty,
         topic: item.serviceCode,
+        questionType: item.questionType === "multi" ? "multi" : "single",
         optionA: item.optionA,
         optionB: item.optionB,
         optionC: item.optionC,
         optionD: item.optionD,
         optionE: item.optionE || null,
         correctOption: item.correctOption,
+        correctOptions: item.correctOptions,
         explanationA: item.explanationA,
         explanationB: item.explanationB,
         explanationC: item.explanationC,

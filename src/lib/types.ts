@@ -29,7 +29,7 @@ export type UserProfile = {
   favoriteTheme: string;
   username: string;
   totalXp?: number;
-  role?:string
+  role?: string;
 };
 
 export type CertificationPreset = {
@@ -43,6 +43,8 @@ export type CertificationPreset = {
 };
 
 export type QuestionOption = "A" | "B" | "C" | "D" | "E";
+export type StudyQuestionType = "single" | "multi";
+export type StudyAnswerValue = QuestionOption | QuestionOption[];
 
 export type QuestionOptionMapping = {
   displayToOriginal: Partial<Record<QuestionOption, QuestionOption>>;
@@ -55,8 +57,10 @@ export type StudyQuestion = {
   certificationCode: string;
   topic: string;
   difficulty: TaskDifficulty;
+  questionType: StudyQuestionType;
   options: Record<QuestionOption, string>;
   correctOption: QuestionOption;
+  correctOptions: QuestionOption[];
   explanations: Partial<Record<QuestionOption, string>>;
   optionMapping?: QuestionOptionMapping;
 };

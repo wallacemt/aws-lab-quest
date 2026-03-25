@@ -9,6 +9,7 @@ export type SeedQuestion = {
   statement: string;
   usage: "KC" | "SIMULADO" | "BOTH";
   difficulty: "easy" | "medium" | "hard";
+  questionType?: "single" | "multi";
   topic: string;
   optionA: string;
   optionB: string;
@@ -16,6 +17,7 @@ export type SeedQuestion = {
   optionD: string;
   optionE?: string;
   correctOption: "A" | "B" | "C" | "D" | "E";
+  correctOptions?: Array<"A" | "B" | "C" | "D" | "E">;
   explanationA: string;
   explanationB: string;
   explanationC: string;

@@ -1,13 +1,23 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export function getAiModel() {
+function getAiClient() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY nao configurada.");
   }
 
-  const client = new GoogleGenerativeAI(apiKey);
+  return new GoogleGenerativeAI(apiKey);
+}
+
+export function getAiModel() {
+  const client = getAiClient();
   const preferredModel = process.env.GEMINI_MODEL ?? "gemma-3-4b-it";
+  return client.getGenerativeModel({ model: preferredModel });
+}
+
+export function getOcrAiModel() {
+  const client = getAiClient();
+  const preferredModel = process.env.GEMINI_OCR_MODEL ?? process.env.GEMINI_MODEL ?? "gemma-3-4b-it";
   return client.getGenerativeModel({ model: preferredModel });
 }
 

@@ -137,6 +137,11 @@ enum StudyQuestionDifficulty {
   hard
 }
 
+enum StudyQuestionType {
+  single
+  multi
+}
+
 enum StudySessionType {
   KC
   SIMULADO
@@ -164,6 +169,7 @@ model StudyQuestion {
   statement             String
   usage                 StudyQuestionUsage      @default(BOTH)
   difficulty            StudyQuestionDifficulty @default(medium)
+  questionType          StudyQuestionType       @default(single)
   topic                 String
   optionA               String
   optionB               String
@@ -171,6 +177,7 @@ model StudyQuestion {
   optionD               String
   optionE               String?
   correctOption         String
+  correctOptions        Json?
   explanationA          String?
   explanationB          String?
   explanationC          String?
@@ -196,6 +203,7 @@ model StudyQuestion {
 
   @@index([usage, active])
   @@index([difficulty, active])
+  @@index([questionType, active])
   @@index([certificationPresetId])
   @@index([awsServiceId])
   @@index([sourceUploadedFileId])
