@@ -89,7 +89,7 @@ export function AchievementsView({
                       >
                         Compartilhar conquista
                       </PixelButton>
-                      {shareMsg && (
+                      {shareMsg?.type === "achievement" && (
                         <p className="mt-1 text-center font-mono text-[8px] uppercase text-accent">
                           {shareMsg.message}
                         </p>

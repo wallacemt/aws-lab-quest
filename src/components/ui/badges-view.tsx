@@ -35,15 +35,19 @@ const TONE_TEXT: Record<string, string> = {
 interface BadgesViewProps {
   xp: number;
   levelBadges: LevelBadge[];
+  ownedBadgeIds?: string[];
+  onShareBadge?: (badgeId: string) => void | Promise<void>;
+  shareMsg?: string | null;
 }
 
-export function BadgesView({ xp, levelBadges }: BadgesViewProps) {
+export function BadgesView({ xp, levelBadges, ownedBadgeIds = [], onShareBadge, shareMsg = null }: BadgesViewProps) {
   const currentLevelNumber = [...LEVELS].reverse().find((l) => xp >= l.min)?.number ?? 1;
   const nextLevelNumber = currentLevelNumber < 6 ? currentLevelNumber + 1 : null;
 
   return (
     <div className="space-y-3">
       <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Coleção de Badges</h3>
+      {shareMsg && <p className="font-mono text-[8px] uppercase text-[var(--pixel-accent)]">{shareMsg}</p>}
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
         {LEVELS.map((level) => {
@@ -66,6 +70,14 @@ export function BadgesView({ xp, levelBadges }: BadgesViewProps) {
               isFar={isFar}
               isLegendary={isLegendary}
               currentXp={xp}
+              canShare={Boolean(badge?.id && onShareBadge && ownedBadgeIds.includes(badge.id) && isUnlocked)}
+              onShare={
+                badge?.id && onShareBadge
+                  ? () => {
+                      void onShareBadge(badge.id);
+                    }
+                  : undefined
+              }
             />
           );
         })}
@@ -85,6 +97,8 @@ interface BadgeCellProps {
   isFar: boolean;
   isLegendary: boolean;
   currentXp: number;
+  canShare: boolean;
+  onShare?: () => void;
 }
 
 function BadgeCell({
@@ -98,6 +112,8 @@ function BadgeCell({
   isFar,
   isLegendary,
   currentXp,
+  canShare,
+  onShare,
 }: BadgeCellProps) {
   const glowClass = TONE_GLOW[tone] ?? "shadow-white/20";
   const borderClass = TONE_BORDER[tone] ?? "border-white/20";
@@ -109,7 +125,7 @@ function BadgeCell({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: level * 0.07, duration: 0.35, ease: "easeOut" }}
-      className="flex flex-col items-center gap-1"
+      className="group flex flex-col items-center gap-1"
     >
       {/* Badge image / placeholder */}
       <div className="relative">
@@ -163,6 +179,20 @@ function BadgeCell({
             <div className="absolute inset-0 flex items-center justify-center bg-black/60">
               <span className="text-lg">🔒</span>
             </div>
+          </div>
+        )}
+
+        {canShare && onShare && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={onShare}
+              title="Compartilhar badge"
+              aria-label="Compartilhar badge"
+              className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-mono text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
+            >
+              Link
+            </button>
           </div>
         )}
       </div>
