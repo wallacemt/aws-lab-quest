@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
     ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
     ADMIN_NAME: process.env.ADMIN_NAME,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    MAIL_USERNAME:process.env.MAIL_USERNAME,
+    MAIL_PASSWORD: process.env.MAIL_PASSWORD,
   },
   images: {
     remotePatterns: [{ protocol: "https", hostname: new URL(process.env.SUPABASE_URL || "").hostname || "" }],

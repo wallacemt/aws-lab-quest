@@ -1,9 +1,12 @@
 import { StudyQuestionDifficulty, StudyQuestionUsage } from "@prisma/client";
 import { getAiModel } from "@/lib/ai";
+import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 
 const MAX_GUIDE_CONTEXT_CHARS = 4_500;
 const MAX_SOURCE_CONTEXT_CHARS = 7_500;
+const MAX_EXTRACT_CHUNK_CHARS = 14_000;
+const EXTRACT_QUESTIONS_PER_CHUNK = 8;
 const TOKEN_ESTIMATE_CHARS_PER_TOKEN = 4;
 const SAFE_TOKENS_PER_MINUTE = Number(process.env.GEMINI_SAFE_TOKENS_PER_MINUTE ?? 9_000);
 const MIN_CALL_INTERVAL_MS = Number(process.env.GEMINI_MIN_CALL_INTERVAL_MS ?? 2_500);
@@ -51,6 +54,11 @@ type EnsurePoolInput = {
 };
 
 type IngestMode = "generate-new" | "extract-existing";
+
+type TaggedQuestionBlock = {
+  qid: number;
+  content: string;
+};
 
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) {
@@ -229,6 +237,97 @@ function preprocessExtractedText(rawText: string): string {
     .trim();
 }
 
+function extractQuestionBlocksFromText(rawText: string): TaggedQuestionBlock[] {
+  const text = rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!text) {
+    return [];
+  }
+
+  const markerRegex = /(?:^|\n)\s*(?:pergunta\s+|quest[aã]o\s*)?\d{1,3}\s*[\)\.\-:]/gim;
+  const starts: number[] = [];
+
+  for (const match of text.matchAll(markerRegex)) {
+    if (typeof match.index !== "number") {
+      continue;
+    }
+
+    const marker = match[0];
+    const markerStart = marker.startsWith("\n") ? match.index + 1 : match.index;
+    starts.push(markerStart);
+  }
+
+  if (starts.length === 0) {
+    return [];
+  }
+
+  const blocks: TaggedQuestionBlock[] = [];
+  for (let index = 0; index < starts.length; index += 1) {
+    const start = starts[index];
+    const end = index + 1 < starts.length ? starts[index + 1] : text.length;
+    const content = text.slice(start, end).trim();
+    if (content.length >= 60) {
+      blocks.push({
+        qid: index + 1,
+        content,
+      });
+    }
+  }
+
+  return blocks;
+}
+
+function chunkQuestionBlocksSemantically(blocks: TaggedQuestionBlock[]): TaggedQuestionBlock[][] {
+  if (blocks.length === 0) {
+    return [];
+  }
+
+  const chunks: TaggedQuestionBlock[][] = [];
+  let current: TaggedQuestionBlock[] = [];
+  let currentLength = 0;
+
+  for (const block of blocks) {
+    const blockLength = block.content.length + 20;
+    const nextCount = current.length + 1;
+    const nextLength = currentLength + blockLength;
+    const overflowByCount = nextCount > EXTRACT_QUESTIONS_PER_CHUNK;
+    const overflowByChars = nextLength > MAX_EXTRACT_CHUNK_CHARS;
+
+    if (current.length > 0 && (overflowByCount || overflowByChars)) {
+      chunks.push(current);
+      current = [block];
+      currentLength = blockLength;
+      continue;
+    }
+
+    current.push(block);
+    currentLength = nextLength;
+  }
+
+  if (current.length > 0) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
+function splitTextByCharLimit(text: string, maxChars: number): string[] {
+  const clean = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!clean) {
+    return [];
+  }
+
+  if (clean.length <= maxChars) {
+    return [clean];
+  }
+
+  const chunks: string[] = [];
+  for (let index = 0; index < clean.length; index += maxChars) {
+    chunks.push(clean.slice(index, index + maxChars).trim());
+  }
+
+  return chunks.filter((item) => item.length > 0);
+}
+
 async function preprocessChunkWithAi(input: {
   certification: CertificationContext;
   sourceChunk: string;
@@ -370,20 +469,124 @@ async function extractExistingQuestionsWithAi(input: {
     : "";
 
   const preprocessedSourceText = preprocessExtractedText(input.sourceText);
-  const chunks = [preprocessedSourceText];
+  const taggedBlocks = extractQuestionBlocksFromText(preprocessedSourceText);
+  const semanticChunks = chunkQuestionBlocksSemantically(taggedBlocks);
+  const fallbackChunks = splitTextByCharLimit(preprocessedSourceText, MAX_EXTRACT_CHUNK_CHARS);
+  const totalChunks = semanticChunks.length > 0 ? semanticChunks.length : fallbackChunks.length;
+
+  devAuditLog("study.extract-existing.chunk-plan", {
+    certificationCode: input.certification.code,
+    taggedBlocks: taggedBlocks.length,
+    semanticChunks: semanticChunks.length,
+    fallbackChunks: fallbackChunks.length,
+    usingSemanticChunks: semanticChunks.length > 0,
+  });
 
   const extracted: GeneratedQuestion[] = [];
 
-  for (let index = 0; index < chunks.length; index += 1) {
-    await input.onBatchProgress?.(index + 1, chunks.length);
-
+  async function processTaggedChunk(chunkBlocks: TaggedQuestionBlock[]): Promise<void> {
+    const chunkInput = chunkBlocks.map((block) => `[QID:${block.qid}]\n${block.content}`).join("\n\n");
     const cleanedChunk = await preprocessChunkWithAi({
       certification: input.certification,
-      sourceChunk: chunks[index],
+      sourceChunk: chunkInput,
     });
 
-    const prompt =
+    const buildPrompt = (batchText: string) =>
       `
+Voce e um especialista em certificacoes AWS.
+Recebera texto OCR de questoes de simulado.
+
+Objetivo:
+- Extrair as questoes que JA EXISTEM no texto.
+- Nao criar novas questoes.
+- Nao alterar o sentido das alternativas.
+- Completar metadados para o app (serviceCode, difficulty e explicacoes) com base no contexto tecnico.
+
+Contexto da certificacao:
+- ${input.certification.code} - ${input.certification.name}
+
+${guideContext ? `Guia oficial para contexto de enriquecimento:\n${guideContext}\n` : ""}
+
+Servicos permitidos (serviceCode):
+${servicesList}
+
+Texto OCR do lote:
+${batchText}
+
+Regras obrigatorias:
+- Retorne APENAS um array JSON valido (sem markdown).
+- Nao invente questoes fora do texto recebido.
+- Se uma questao estiver incompleta (sem alternativas suficientes), descarte.
+- Se o lote tiver tags [QID:N], mantenha o mesmo QID no item de saida.
+- Preserve o enunciado e alternativas no idioma original do texto (portugues).
+- ` +
+      `Cada item precisa ter exatamente este formato:
+{
+  "qid": 1,
+  "statement": "...",
+  "serviceCode": "...",
+  "difficulty": "easy|medium|hard",
+  "questionType": "single|multi",
+  "optionA": "...",
+  "optionB": "...",
+  "optionC": "...",
+  "optionD": "...",
+  "optionE": "...",
+  "correctOption": "A|B|C|D|E",
+  "correctOptions": ["A","C"],
+  "explanationA": "...",
+  "explanationB": "...",
+  "explanationC": "...",
+  "explanationD": "...",
+  "explanationE": "..."
+}
+`;
+
+    const parseTagged = (raw: string) => {
+      const parsed = tryParseJsonArray(raw) as Array<GeneratedQuestion & { qid?: number | string }>;
+      return parsed
+        .map((item) => ({
+          qid: typeof item.qid === "number" ? item.qid : Number(item.qid),
+          question: item,
+        }))
+        .filter((item) => Number.isFinite(item.qid) && item.qid > 0);
+    };
+
+    const firstResponse = await generateContentWithQuotaProtection(buildPrompt(cleanedChunk));
+    const firstItems = parseTagged(firstResponse);
+    const covered = new Set(firstItems.map((item) => item.qid));
+
+    const missingBlocks = chunkBlocks.filter((block) => !covered.has(block.qid));
+    let mergedItems = [...firstItems];
+
+    if (missingBlocks.length > 0) {
+      const retryInput = missingBlocks.map((block) => `[QID:${block.qid}]\n${block.content}`).join("\n\n");
+      const retryResponse = await generateContentWithQuotaProtection(buildPrompt(retryInput));
+      const retryItems = parseTagged(retryResponse).filter((item) => !covered.has(item.qid));
+      mergedItems = [...mergedItems, ...retryItems];
+    }
+
+    if (mergedItems.length === 0) {
+      return;
+    }
+
+    devAuditLog("study.extract-existing.chunk-result", {
+      chunkBlocks: chunkBlocks.length,
+      firstPass: firstItems.length,
+      missingAfterFirstPass: missingBlocks.length,
+      mergedItems: mergedItems.length,
+    });
+
+    extracted.push(...mergedItems.map((item) => item.question));
+  }
+
+  async function processFallbackChunk(chunkText: string): Promise<void> {
+    const cleanedChunk = await preprocessChunkWithAi({
+      certification: input.certification,
+      sourceChunk: chunkText,
+    });
+
+    const prompt = `
 Voce e um especialista em certificacoes AWS.
 Recebera texto OCR de questoes de simulado.
 
@@ -409,8 +612,7 @@ Regras obrigatorias:
 - Nao invente questoes fora do texto recebido.
 - Se uma questao estiver incompleta (sem alternativas suficientes), descarte.
 - Preserve o enunciado e alternativas no idioma original do texto (portugues).
-- ` +
-      `Cada item precisa ter exatamente este formato:
+- Cada item precisa ter exatamente este formato:
 {
   "statement": "...",
   "serviceCode": "...",
@@ -435,10 +637,21 @@ Regras obrigatorias:
     const items = tryParseJsonArray(text);
 
     if (items.length === 0) {
-      continue;
+      return;
     }
 
     extracted.push(...(items as GeneratedQuestion[]));
+  }
+
+  for (let index = 0; index < totalChunks; index += 1) {
+    await input.onBatchProgress?.(index + 1, totalChunks);
+
+    if (semanticChunks.length > 0) {
+      await processTaggedChunk(semanticChunks[index]);
+      continue;
+    }
+
+    await processFallbackChunk(fallbackChunks[index]);
   }
 
   return extracted;

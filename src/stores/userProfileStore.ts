@@ -32,6 +32,7 @@ type UserProfileState = {
   hydrated: boolean;
   loading: boolean;
   loadProfile: () => Promise<void>;
+  reloadProfile: () => Promise<void>;
   refreshTotalXp: () => Promise<void>;
   setProfile: (next: UserProfile) => Promise<ApiProfileResponse>;
   setNeedsCertificationReview: (next: boolean) => void;
@@ -39,6 +40,22 @@ type UserProfileState = {
 };
 
 let inFlightLoad: Promise<void> | null = null;
+
+async function fetchProfileSnapshot(): Promise<{
+  profileData: ApiProfileResponse;
+  certData: { certifications?: CertificationPreset[] };
+  totalXp: number;
+}> {
+  const [profileData, certData, totalXp] = await Promise.all([
+    fetch("/api/user/profile", { cache: "no-store" }).then((r) => r.json() as Promise<ApiProfileResponse>),
+    fetch("/api/certifications", { cache: "no-store" }).then(
+      (r) => r.json() as Promise<{ certifications?: CertificationPreset[] }>,
+    ),
+    fetchTotalXpFromHistory(),
+  ]);
+
+  return { profileData, certData, totalXp };
+}
 
 async function fetchTotalXpFromHistory(): Promise<number> {
   const [questData, studyData] = await Promise.all([
@@ -70,35 +87,25 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
 
     set({ loading: true });
 
-    inFlightLoad = Promise.all([
-      fetch("/api/user/profile").then((r) => r.json()),
-      fetch("/api/certifications").then((r) => r.json()),
-      fetchTotalXpFromHistory(),
-    ])
-      .then(
-        ([profileData, certData, totalXp]: [
-          ApiProfileResponse,
-          { certifications?: CertificationPreset[] },
-          number,
-        ]) => {
-          set({
-            profile: {
-              name: profileData.user?.name ?? "",
-              username: profileData.user?.username ?? "",
-              certification: profileData.certification ?? "",
-              certificationPresetCode: profileData.certificationPresetCode ?? "",
-              role: profileData.role ?? "",
-              favoriteTheme: profileData.favoriteTheme ?? "",
-              totalXp,
-            },
-            needsCertificationReview: Boolean(profileData.needsCertificationReview),
-            avatarUrl: profileData.avatarUrl,
-            certificationOptions: certData.certifications ?? [],
-            hydrated: true,
-            loading: false,
-          });
-        },
-      )
+    inFlightLoad = fetchProfileSnapshot()
+      .then(({ profileData, certData, totalXp }) => {
+        set({
+          profile: {
+            name: profileData.user?.name ?? "",
+            username: profileData.user?.username ?? "",
+            certification: profileData.certification ?? "",
+            certificationPresetCode: profileData.certificationPresetCode ?? "",
+            role: profileData.role ?? "",
+            favoriteTheme: profileData.favoriteTheme ?? "",
+            totalXp,
+          },
+          needsCertificationReview: Boolean(profileData.needsCertificationReview),
+          avatarUrl: profileData.avatarUrl,
+          certificationOptions: certData.certifications ?? [],
+          hydrated: true,
+          loading: false,
+        });
+      })
       .catch(() => {
         set({ hydrated: true, loading: false });
       })
@@ -107,6 +114,31 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
       });
 
     return inFlightLoad;
+  },
+  reloadProfile: async () => {
+    set({ loading: true });
+
+    try {
+      const { profileData, certData, totalXp } = await fetchProfileSnapshot();
+      set({
+        profile: {
+          name: profileData.user?.name ?? "",
+          username: profileData.user?.username ?? "",
+          certification: profileData.certification ?? "",
+          certificationPresetCode: profileData.certificationPresetCode ?? "",
+          role: profileData.role ?? "",
+          favoriteTheme: profileData.favoriteTheme ?? "",
+          totalXp,
+        },
+        needsCertificationReview: Boolean(profileData.needsCertificationReview),
+        avatarUrl: profileData.avatarUrl,
+        certificationOptions: certData.certifications ?? [],
+        hydrated: true,
+        loading: false,
+      });
+    } catch {
+      set({ loading: false });
+    }
   },
   refreshTotalXp: async () => {
     try {
