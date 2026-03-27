@@ -7,7 +7,6 @@ import Image from "next/image";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { authClient } from "@/lib/auth-client";
-import { setOnboardingStep } from "@/lib/onboarding";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import appLogo from "@/assets/logo.png";
 import { EyeClosed, EyeIcon } from "lucide-react";
@@ -22,6 +21,7 @@ export function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   function normalizeUsername(value: string) {
@@ -39,6 +39,7 @@ export function RegisterScreen() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
 
     const normalizedUsername = normalizeUsername(username);
 
@@ -67,8 +68,11 @@ export function RegisterScreen() {
       return;
     }
 
-    setOnboardingStep("manual");
-    router.replace("/help");
+    await authClient.signOut();
+    setSuccess("Conta criada com sucesso. Aguarde a aprovacao do administrador para fazer login.");
+    window.setTimeout(() => {
+      router.replace("/login");
+    }, 1200);
   }
   const generateRandomUsername = async () => {
     setLoading(true);
@@ -115,9 +119,7 @@ export function RegisterScreen() {
         </div>
 
         <PixelCard className="w-full max-w-md space-y-5">
-          <h2 className="text-center font-mono text-xs uppercase text-[var(--pixel-primary)]">
-            Criar Conta
-          </h2>
+          <h2 className="text-center font-mono text-xs uppercase text-[var(--pixel-primary)]">Criar Conta</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <label className="block font-[var(--font-body)] text-sm">
@@ -216,6 +218,12 @@ export function RegisterScreen() {
             {error && (
               <PixelCard className="border-red-500 bg-red-900/30 py-2">
                 <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>
+              </PixelCard>
+            )}
+
+            {success && (
+              <PixelCard className="border-green-500 bg-green-900/30 py-2">
+                <p className="font-[var(--font-body)] text-sm text-green-300">{success}</p>
               </PixelCard>
             )}
 

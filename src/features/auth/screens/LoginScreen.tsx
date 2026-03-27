@@ -37,6 +37,26 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
     return response.ok;
   }
 
+  async function checkUserAccessStatus(): Promise<{
+    active: boolean;
+    accessStatus: "pending" | "approved" | "rejected";
+  } | null> {
+    const response = await fetch("/api/user/access-status", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return (await response.json()) as {
+      active: boolean;
+      accessStatus: "pending" | "approved" | "rejected";
+    };
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -46,6 +66,28 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
 
     if (authError) {
       setError(authError.message ?? "Credenciais inválidas. Verifique e-mail e senha.");
+      setLoading(false);
+      return;
+    }
+
+    const access = await checkUserAccessStatus();
+    if (!access || !access.active) {
+      await authClient.signOut();
+      setError("Conta desativada. Entre em contato com o administrador.");
+      setLoading(false);
+      return;
+    }
+
+    if (access.accessStatus === "pending") {
+      await authClient.signOut();
+      setError("Cadastro recebido. Aguarde a aprovacao de um administrador para acessar.");
+      setLoading(false);
+      return;
+    }
+
+    if (access.accessStatus === "rejected") {
+      await authClient.signOut();
+      setError("Seu cadastro foi recusado. Entre em contato com o administrador.");
       setLoading(false);
       return;
     }
