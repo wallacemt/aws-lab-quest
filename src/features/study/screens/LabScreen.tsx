@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SetupPanel } from "@/components/ui/setup-panel";
 import { PixelCard } from "@/components/ui/pixel-card";
@@ -18,6 +18,7 @@ type QuestDraft = {
 
 export function LabScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile, setProfile, hydrated } = useUserProfile();
   const { startQuest, activeQuest, hydrated: questHydrated } = useQuest();
 
@@ -46,6 +47,34 @@ export function LabScreen() {
     setDraft(nextDraft);
     setDraftHydrated(true);
   }, [initialTheme]);
+
+  useEffect(() => {
+    if (!draftHydrated) {
+      return;
+    }
+
+    const focus = searchParams.get("focus")?.trim();
+    const suggestedLabText = searchParams.get("labText")?.trim();
+
+    if (!focus && !suggestedLabText) {
+      return;
+    }
+
+    setDraft((prev) => {
+      if (suggestedLabText) {
+        return { ...prev, labText: suggestedLabText };
+      }
+
+      if (focus && !prev.labText.trim()) {
+        return {
+          ...prev,
+          labText: `Criar laboratorio unico para reforcar os gaps: ${focus}. Inclua etapas praticas, validacao e checklist final.`,
+        };
+      }
+
+      return prev;
+    });
+  }, [draftHydrated, searchParams]);
 
   useEffect(() => {
     if (!draftHydrated) return;

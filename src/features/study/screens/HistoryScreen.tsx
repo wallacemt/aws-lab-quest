@@ -5,6 +5,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
+import { normalizeOptionText } from "@/lib/study-option-text";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOptionMapping, Task } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -418,8 +419,19 @@ export function HistoryScreen() {
                         Array.isArray(item.correctOptions) && item.correctOptions.length > 0
                           ? item.correctOptions
                           : [item.correctOption];
-                      const selectedLabel = selectedLabels.join(", ");
-                      const correctLabel = correctLabels.join(", ");
+                      const renderedOptions = Object.entries(item.options)
+                        .map(([option, optionText]) => ({
+                          option,
+                          text: normalizeOptionText(optionText),
+                        }))
+                        .filter((entry) => entry.text.length > 0);
+                      const renderableOptionLabels = new Set(renderedOptions.map((entry) => entry.option));
+                      const selectedVisibleLabels = selectedLabels.filter((label) => renderableOptionLabels.has(label));
+                      const correctVisibleLabels = correctLabels.filter((label) => renderableOptionLabels.has(label));
+                      const selectedLabel =
+                        selectedVisibleLabels.length > 0 ? selectedVisibleLabels.join(", ") : selectedLabels.join(", ");
+                      const correctLabel =
+                        correctVisibleLabels.length > 0 ? correctVisibleLabels.join(", ") : correctLabels.join(", ");
 
                       return (
                         <div
@@ -434,21 +446,21 @@ export function HistoryScreen() {
                             Sua resposta: {selectedLabel} · Correta: {correctLabel}
                           </p>
                           <div className="space-y-1">
-                            {Object.entries(item.options).map(([option, optionText]) => (
+                            {renderedOptions.map(({ option, text }) => (
                               <div
                                 key={`${item.questionId}-${option}`}
                                 className={`border-2 px-2 py-2 ${
-                                  correctLabels.includes(option)
+                                  correctVisibleLabels.includes(option)
                                     ? "border-[#2ecc71] bg-green-900/25"
-                                    : selectedLabels.includes(option) && !correctLabels.includes(option)
+                                    : selectedVisibleLabels.includes(option) && !correctVisibleLabels.includes(option)
                                       ? "border-[#e74c3c] bg-red-900/25"
                                       : "border-[var(--pixel-border)] bg-[var(--pixel-card)]"
                                 }`}
                               >
                                 <p className="font-[var(--font-body)] text-xs">
-                                  {option}) {optionText}
-                                  {correctLabels.includes(option) ? " · correta" : ""}
-                                  {selectedLabels.includes(option) ? " · sua resposta" : ""}
+                                  {option}) {text}
+                                  {correctVisibleLabels.includes(option) ? " · correta" : ""}
+                                  {selectedVisibleLabels.includes(option) ? " · sua resposta" : ""}
                                 </p>
                                 <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
                                   {item.explanations[option] ?? "Sem explicacao adicional."}

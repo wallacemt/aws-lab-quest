@@ -76,6 +76,13 @@ export type WeakServiceItem = {
   errorRate: number;
 };
 
+export type SimuladoExamGuidePayload = {
+  markdown: string;
+  preview: string;
+  highlights: string[];
+  totalChars: number;
+};
+
 type StudyExplainPayload = {
   questionId: string;
   selectedOption?: QuestionOption;
@@ -115,10 +122,12 @@ export async function createKcQuestions(params: {
   return data.questions;
 }
 
-export async function createSimuladoQuestions(params: {
-  count: number;
-  difficulties: TaskDifficulty[];
-}): Promise<{ questions: StudyQuestion[]; certificationCode: string; examMinutes?: number }> {
+export async function createSimuladoQuestions(params: { count: number; difficulties: TaskDifficulty[] }): Promise<{
+  questions: StudyQuestion[];
+  certificationCode: string;
+  examMinutes?: number;
+  examGuide?: SimuladoExamGuidePayload;
+}> {
   const response = await fetch("/api/study/simulado/questions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -129,6 +138,7 @@ export async function createSimuladoQuestions(params: {
     questions?: StudyQuestion[];
     certificationCode?: string;
     examMinutes?: number;
+    examGuide?: SimuladoExamGuidePayload;
     error?: string;
   }>(response);
 
@@ -140,6 +150,34 @@ export async function createSimuladoQuestions(params: {
     questions: data.questions,
     certificationCode: data.certificationCode,
     examMinutes: data.examMinutes,
+    examGuide: data.examGuide,
+  };
+}
+
+export async function fetchSimuladoExamGuide(): Promise<{
+  certificationCode: string;
+  examMinutes?: number;
+  examGuide: SimuladoExamGuidePayload;
+}> {
+  const response = await fetch("/api/study/simulado/questions", {
+    method: "GET",
+  });
+
+  const data = await parseJson<{
+    certificationCode?: string;
+    examMinutes?: number;
+    examGuide?: SimuladoExamGuidePayload;
+    error?: string;
+  }>(response);
+
+  if (!response.ok || !data.examGuide || !data.certificationCode) {
+    throw new Error(data.error ?? "Nao foi possivel carregar o Exam Guide do simulado.");
+  }
+
+  return {
+    certificationCode: data.certificationCode,
+    examMinutes: data.examMinutes,
+    examGuide: data.examGuide,
   };
 }
 

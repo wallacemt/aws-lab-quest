@@ -1,4 +1,5 @@
 import { QuestionOptionMapping, StudyQuestion } from "@/lib/types";
+import { hasRenderableOptionText, normalizeOptionText } from "@/lib/study-option-text";
 import { StudyQuestion as DbStudyQuestion } from "@prisma/client";
 
 type OptionKey = "A" | "B" | "C" | "D" | "E";
@@ -53,13 +54,13 @@ export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations):
     originalCorrectOptions.push(originalCorrect);
   }
   const rawOptions: Array<{ key: OptionKey; text: string; explanation: string }> = [
-    { key: "A", text: question.optionA, explanation: question.explanationA ?? "" },
-    { key: "B", text: question.optionB, explanation: question.explanationB ?? "" },
-    { key: "C", text: question.optionC, explanation: question.explanationC ?? "" },
-    { key: "D", text: question.optionD, explanation: question.explanationD ?? "" },
-    { key: "E", text: question.optionE ?? "", explanation: question.explanationE ?? "" },
+    { key: "A", text: normalizeOptionText(question.optionA), explanation: question.explanationA ?? "" },
+    { key: "B", text: normalizeOptionText(question.optionB), explanation: question.explanationB ?? "" },
+    { key: "C", text: normalizeOptionText(question.optionC), explanation: question.explanationC ?? "" },
+    { key: "D", text: normalizeOptionText(question.optionD), explanation: question.explanationD ?? "" },
+    { key: "E", text: normalizeOptionText(question.optionE), explanation: question.explanationE ?? "" },
   ];
-  const originalOptions = rawOptions.filter((option) => option.text.trim().length > 0);
+  const originalOptions = rawOptions.filter((option) => hasRenderableOptionText(option.text));
 
   const shuffled = shuffleArray(originalOptions);
   const targetKeys: OptionKey[] = ["A", "B", "C", "D", "E"];

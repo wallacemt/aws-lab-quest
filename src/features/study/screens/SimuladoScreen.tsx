@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import {
   createSimuladoQuestions,
   createStudyExplanation,
+  fetchSimuladoExamGuide,
   fetchWeakServices,
   isAnswerCorrect,
   normalizeAnswerValue,
@@ -19,6 +22,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { getTaskXpByDifficulty } from "@/lib/levels";
+import { normalizeOptionText } from "@/lib/study-option-text";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
@@ -58,6 +62,15 @@ function formatTime(seconds: number): string {
   return `${mm}:${ss}`;
 }
 
+function formatGuideLines(text: string): string[] {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 18)
+    .slice(0, 10);
+}
+
 export function SimuladoScreen() {
   const router = useRouter();
   const { hydrated, isActive, remainingSeconds, session, startSession, submitSession, clearSession } =
@@ -77,6 +90,15 @@ export function SimuladoScreen() {
 
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [rulesAccepted, setRulesAccepted] = useState(false);
+  const [showExamGuidePanel, setShowExamGuidePanel] = useState(true);
+  const [examGuideInfo, setExamGuideInfo] = useState<{
+    markdown: string;
+    preview: string;
+    highlights: string[];
+    totalChars: number;
+  } | null>(null);
+  const [loadingExamGuide, setLoadingExamGuide] = useState(false);
+  const [examGuideError, setExamGuideError] = useState<string | null>(null);
   const [historicalWeakServices, setHistoricalWeakServices] = useState<WeakServiceMetric[]>([]);
   const [loadingWeakServices, setLoadingWeakServices] = useState(false);
 
@@ -144,6 +166,40 @@ export function SimuladoScreen() {
 
   const currentReview = currentQuestion ? reviewByQuestion[currentQuestion.id] : undefined;
   const consentScope = profile.certificationPresetCode?.trim() || "default";
+  const guidePreviewLines = useMemo(() => formatGuideLines(examGuideInfo?.preview ?? ""), [examGuideInfo?.preview]);
+  const strongestGapTopics = useMemo(() => {
+    const source = historicalWeakServices.length > 0 ? historicalWeakServices : weakServicesCurrentExam;
+    return source
+      .map((item) => item.topic.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }, [historicalWeakServices, weakServicesCurrentExam]);
+  const allQuestionsAnswered = answeredCount === questions.length && questions.length > 0;
+
+  function toTopicCode(topic: string): string {
+    const cleaned = topic
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .trim();
+    return cleaned || topic.toUpperCase();
+  }
+
+  function buildGapLabSeed(topics: string[]): string {
+    const heading = `Revisao focada nos gaps do simulado (${session?.certificationCode ?? "AWS"})`;
+    const bullets = topics.map((topic, index) => `${index + 1}. ${topic}`).join("\n");
+    return [
+      heading,
+      "",
+      "Objetivo:",
+      "Criar um laboratorio unico para reforcar os topicos abaixo com tarefas praticas e verificaveis:",
+      bullets,
+      "",
+      "Requisitos:",
+      "- Incluir comandos/acoes em AWS Console e/ou CLI",
+      "- Incluir checkpoints de validacao por topico",
+      "- Finalizar com checklist de consolidacao",
+    ].join("\n");
+  }
 
   useEffect(() => {
     if (!hydrated) {
@@ -156,6 +212,43 @@ export function SimuladoScreen() {
       setError("Sessao anterior de simulado expirada ou incompleta. Inicie um novo simulado para continuar.");
     }
   }, [clearSession, hydrated, isActive, loading, questions.length, submitted]);
+
+  useEffect(() => {
+    if (!hydrated || inExamFlow || inReviewFlow) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadExamGuide() {
+      setLoadingExamGuide(true);
+      setExamGuideError(null);
+
+      try {
+        const payload = await fetchSimuladoExamGuide();
+        if (!cancelled) {
+          setExamGuideInfo(payload.examGuide);
+        }
+      } catch (requestError) {
+        if (!cancelled) {
+          setExamGuideInfo(null);
+          setExamGuideError(
+            requestError instanceof Error ? requestError.message : "Nao foi possivel carregar o Exam Guide.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingExamGuide(false);
+        }
+      }
+    }
+
+    void loadExamGuide();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, inExamFlow, inReviewFlow, consentScope]);
 
   function hasValidRulesConsent(scope: string): boolean {
     const raw = rulesConsent.value[scope];
@@ -183,7 +276,6 @@ export function SimuladoScreen() {
 
     try {
       const data = await createSimuladoQuestions({ count: 65, difficulties: ["easy", "medium", "hard"] });
-
       setQuestions(data.questions);
       setAnswers({});
       setCurrentIndex(0);
@@ -191,6 +283,7 @@ export function SimuladoScreen() {
       setResult(null);
       setReviewByQuestion({});
       setLoadingReviewByQuestion({});
+      setExamGuideInfo(data.examGuide ?? null);
       startSession(data.certificationCode, data.examMinutes ?? 90);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Erro ao iniciar simulado.");
@@ -375,6 +468,7 @@ export function SimuladoScreen() {
     setResult(null);
     setReviewByQuestion({});
     setLoadingReviewByQuestion({});
+    setExamGuideInfo(null);
     setHistoricalWeakServices([]);
     setLoadingWeakServices(false);
     setError(null);
@@ -402,35 +496,202 @@ export function SimuladoScreen() {
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
-      <PixelCard>
-        <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
-        <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-          Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
-        </p>
-      </PixelCard>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+      >
+        <PixelCard>
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
+          <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+            Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
+          </p>
+        </PixelCard>
+      </motion.div>
 
       {!inExamFlow && !inReviewFlow && (
-        <PixelCard className="space-y-4">
-          <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Configurar Simulado</h2>
-          <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            O filtro da certificacao e automatico pelo seu perfil. Selecione dificuldade e inicie a prova.
-          </p>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
+        >
+          <PixelCard className="space-y-4">
+            <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Configurar Simulado</h2>
+            <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+              O filtro da certificacao e automatico pelo seu perfil. Selecione dificuldade e inicie a prova.
+            </p>
 
-          {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
+            <div className="grid gap-3 md:grid-cols-3">
+              {[
+                {
+                  title: "Formato oficial",
+                  description: "65 questoes com tempo controlado para simular a pressao real da certificacao.",
+                },
+                {
+                  title: "Correcao orientada",
+                  description: "Ao finalizar, voce recebe score, revisao por questao e pontos fracos por topico.",
+                },
+                {
+                  title: "Treino progressivo",
+                  description:
+                    "Seu historico alimenta priorizacao de revisao para melhorar desempenho nas proximas provas.",
+                },
+              ].map((item, index) => (
+                <motion.div
+                  key={item.title}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: 0.06 * index }}
+                  className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3"
+                >
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">{item.title}</p>
+                  <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{item.description}</p>
+                </motion.div>
+              ))}
+            </div>
 
-          <div className="flex justify-end">
-            <PixelButton onClick={() => void handleStartWithRulesGate()} disabled={loading}>
-              {loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
-                  Gerando Simulado...
-                </span>
-              ) : (
-                "Iniciar Simulado (65 questoes)"
-              )}
-            </PixelButton>
-          </div>
-        </PixelCard>
+            {loadingExamGuide && (
+              <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Carregando Exam Guide...</p>
+            )}
+
+            {examGuideError && !loadingExamGuide && (
+              <p className="font-[var(--font-body)] text-xs text-yellow-300">{examGuideError}</p>
+            )}
+
+            {examGuideInfo && (
+              <div className="space-y-3 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
+                    Exame guide ativo da certificacao
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowExamGuidePanel((prev) => !prev)}
+                    className="border border-[var(--pixel-border)] px-2 py-1 font-mono text-[10px] uppercase"
+                  >
+                    {showExamGuidePanel ? "Ocultar detalhes" : "Mostrar detalhes"}
+                  </button>
+                </div>
+
+                <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                  Este simulado foi alinhado ao guia oficial definido pelo admin ({examGuideInfo.totalChars}{" "}
+                  caracteres).
+                </p>
+
+                <AnimatePresence initial={false}>
+                  {showExamGuidePanel && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      className="space-y-2 overflow-hidden"
+                    >
+                      {examGuideInfo.highlights.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Topicos de foco</p>
+                          {examGuideInfo.highlights.map((item) => (
+                            <ReactMarkdown
+                              key={item}
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                strong: ({ children }) => (
+                                  <h3 className="mb-1 mt-2 text-[0.7rem] uppercase text-[var(--pixel-subtext)]">
+                                    {children}
+                                  </h3>
+                                ),
+                              }}
+                            >
+                              {item}
+                            </ReactMarkdown>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="space-y-1 border border-[var(--pixel-border)] bg-black/10 p-2">
+                        <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Exam guide</p>
+                        {examGuideInfo.markdown.trim().length > 0 ? (
+                          <div className="max-h-[40rem] overflow-auto rounded border border-[var(--pixel-border)] bg-[var(--pixel-card)] p-3">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                h1: ({ children }) => (
+                                  <h1 className="mb-2 font-mono text-sm uppercase text-primary">{children}</h1>
+                                ),
+                                h2: ({ children }) => (
+                                  <h2 className="mb-2 mt-3 font-mono text-xs uppercase text-accent">{children}</h2>
+                                ),
+                                h3: ({ children }) => (
+                                  <h3 className="mb-1 mt-2 font-mono text-[11px] uppercase text-[var(--pixel-subtext)]">
+                                    {children}
+                                  </h3>
+                                ),
+                                p: ({ children }) => (
+                                  <p className="mb-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                    {children}
+                                  </p>
+                                ),
+                                li: ({ children }) => (
+                                  <li className="mb-1 ml-4 list-disc font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                    {children}
+                                  </li>
+                                ),
+                                table: ({ children }) => (
+                                  <table className="mb-2 w-full border-collapse text-xs">{children}</table>
+                                ),
+                                th: ({ children }) => (
+                                  <th className="border border-[var(--pixel-border)] px-2 py-1 text-left font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+                                    {children}
+                                  </th>
+                                ),
+                                td: ({ children }) => (
+                                  <td className="border border-[var(--pixel-border)] px-2 py-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                    {children}
+                                  </td>
+                                ),
+                              }}
+                            >
+                              {examGuideInfo.markdown}
+                            </ReactMarkdown>
+                          </div>
+                        ) : (
+                          <>
+                            {guidePreviewLines.length > 0 ? (
+                              guidePreviewLines.map((line) => (
+                                <p key={line} className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                  {line}
+                                </p>
+                              ))
+                            ) : (
+                              <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                Sem trecho disponivel no momento.
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
+
+            <div className="flex justify-end">
+              <PixelButton onClick={() => void handleStartWithRulesGate()} disabled={loading}>
+                {loading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                    Gerando Simulado...
+                  </span>
+                ) : (
+                  "Iniciar Simulado (65 questoes)"
+                )}
+              </PixelButton>
+            </div>
+          </PixelCard>
+        </motion.div>
       )}
 
       {showRulesModal && (
@@ -515,165 +776,178 @@ export function SimuladoScreen() {
               </PixelCard>
             )}
 
-            <PixelCard className="space-y-4">
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                Questao {currentIndex + 1} de {questions.length} · {currentQuestion.topic} ·{" "}
-                {currentQuestion.difficulty}
-              </p>
-              <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
-              {currentQuestion.questionType === "multi" && (
-                <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                  Questao multipla: selecione todas as alternativas corretas.
+            <motion.div
+              key={currentQuestion.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              <PixelCard className="space-y-4">
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+                  Questao {currentIndex + 1} de {questions.length} · {currentQuestion.topic} ·{" "}
+                  {currentQuestion.difficulty}
                 </p>
-              )}
+                <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
+                {currentQuestion.questionType === "multi" && (
+                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                    Questao multipla: selecione todas as alternativas corretas.
+                  </p>
+                )}
 
-              <div className="grid gap-2">
-                {OPTIONS.map((option) => {
-                  const text = currentQuestion.options[option];
-                  if (!text) return null;
-                  const isReviewing = submitted;
-                  const selectedOptions = normalizeAnswerValue(answers[currentQuestion.id]);
-                  const correctOptions = normalizeCorrectOptions(currentQuestion);
-                  const isCorrectOption = isReviewing && correctOptions.includes(option);
-                  const isSelectedWrong = isReviewing && selectedOptions.includes(option) && !isCorrectOption;
-                  return (
-                    <label
-                      key={`${currentQuestion.id}-${option}`}
-                      className={`flex items-start gap-2 border-2 px-3 py-2 ${
-                        isCorrectOption
-                          ? "border-[#2ecc71] bg-green-900/35"
-                          : isSelectedWrong
-                            ? "border-[#e74c3c] bg-red-900/35"
-                            : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                      }`}
-                    >
-                      <input
-                        type={currentQuestion.questionType === "multi" ? "checkbox" : "radio"}
-                        name={currentQuestion.id}
-                        checked={selectedOptions.includes(option)}
-                        onChange={() => {
-                          setAnswers((prev) => {
-                            const current = normalizeAnswerValue(prev[currentQuestion.id]);
-                            const nextValue =
-                              currentQuestion.questionType === "multi" ? toggleMultiAnswer(current, option) : option;
+                <div className="grid gap-2">
+                  {OPTIONS.map((option) => {
+                    const text = normalizeOptionText(currentQuestion.options[option]);
+                    if (!text) return null;
+                    const isReviewing = submitted;
+                    const selectedOptions = normalizeAnswerValue(answers[currentQuestion.id]);
+                    const correctOptions = normalizeCorrectOptions(currentQuestion);
+                    const isCorrectOption = isReviewing && correctOptions.includes(option);
+                    const isSelectedWrong = isReviewing && selectedOptions.includes(option) && !isCorrectOption;
+                    return (
+                      <label
+                        key={`${currentQuestion.id}-${option}`}
+                        className={`flex items-start gap-2 border-2 px-3 py-2 ${
+                          isCorrectOption
+                            ? "border-[#2ecc71] bg-green-900/35"
+                            : isSelectedWrong
+                              ? "border-[#e74c3c] bg-red-900/35"
+                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                        }`}
+                      >
+                        <input
+                          type={currentQuestion.questionType === "multi" ? "checkbox" : "radio"}
+                          name={currentQuestion.id}
+                          checked={selectedOptions.includes(option)}
+                          onChange={() => {
+                            setAnswers((prev) => {
+                              const current = normalizeAnswerValue(prev[currentQuestion.id]);
+                              const nextValue =
+                                currentQuestion.questionType === "multi" ? toggleMultiAnswer(current, option) : option;
 
-                            return {
-                              ...prev,
-                              [currentQuestion.id]: nextValue,
-                            };
-                          });
-                        }}
-                        disabled={submitted}
-                      />
-                      <span className="font-[var(--font-body)] text-sm">
-                        {option}) {text}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-
-              {submitted && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <PixelCard
-                    className={
-                      isAnswerCorrect({
-                        questionType: currentQuestion.questionType,
-                        answer: answers[currentQuestion.id],
-                        correctOption: currentQuestion.correctOption,
-                        correctOptions: currentQuestion.correctOptions,
-                      })
-                        ? "border-[#2ecc71] bg-green-900/25"
-                        : "border-[#e74c3c] bg-red-900/25"
-                    }
-                  >
-                    <p className="font-mono text-[10px] uppercase">
-                      {isAnswerCorrect({
-                        questionType: currentQuestion.questionType,
-                        answer: answers[currentQuestion.id],
-                        correctOption: currentQuestion.correctOption,
-                        correctOptions: currentQuestion.correctOptions,
-                      })
-                        ? "✓ Resposta correta"
-                        : "✗ Resposta incorreta"}
-                    </p>
-
-                    {loadingReviewByQuestion[currentQuestion.id] && (
-                      <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
-                          Gerando revisao com IA...
+                              return {
+                                ...prev,
+                                [currentQuestion.id]: nextValue,
+                              };
+                            });
+                          }}
+                          disabled={submitted}
+                        />
+                        <span className="font-[var(--font-body)] text-sm">
+                          {option}) {text}
                         </span>
-                      </p>
-                    )}
-
-                    {currentReview && (
-                      <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                        {currentReview.summary}
-                      </p>
-                    )}
-
-                    <div className="mt-2 space-y-2">
-                      {OPTIONS.map((option) => {
-                        const text = currentQuestion.options[option];
-                        if (!text) return null;
-
-                        const isCorrectOption = normalizeCorrectOptions(currentQuestion).includes(option);
-                        const isSelected = normalizeAnswerValue(answers[currentQuestion.id]).includes(option);
-
-                        return (
-                          <div
-                            key={`${currentQuestion.id}-review-${option}`}
-                            className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
-                          >
-                            <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
-                              {option}) {isCorrectOption ? "correta" : "incorreta"}
-                              {isSelected ? " · sua resposta" : ""}
-                            </p>
-                            <p className="mt-1 font-[var(--font-body)] text-sm">
-                              {currentReview?.options[option] ??
-                                currentQuestion.explanations[option] ??
-                                "Sem explicacao adicional."}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </PixelCard>
-                </motion.div>
-              )}
-
-              <div className="flex flex-wrap justify-between gap-2">
-                <div className="flex gap-2">
-                  <PixelButton variant="ghost" onClick={() => void goToQuestion(currentIndex - 1)}>
-                    Anterior
-                  </PixelButton>
-                  <PixelButton onClick={() => void goToQuestion(currentIndex + 1)}>Proxima</PixelButton>
+                      </label>
+                    );
+                  })}
                 </div>
 
-                <div className="flex gap-2">
-                  {inExamFlow ? (
-                    <>
-                      <PixelButton variant="ghost" onClick={handleForceExit}>
-                        Encerrar
-                      </PixelButton>
-                      <PixelButton onClick={handleSubmitExam}>Enviar Simulado</PixelButton>
-                    </>
-                  ) : (
-                    <>
-                      <PixelButton variant="ghost" onClick={() => router.replace("/")}>
-                        Voltar ao inicio
-                      </PixelButton>
-                      <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
-                    </>
-                  )}
+                {submitted && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <PixelCard
+                      className={
+                        isAnswerCorrect({
+                          questionType: currentQuestion.questionType,
+                          answer: answers[currentQuestion.id],
+                          correctOption: currentQuestion.correctOption,
+                          correctOptions: currentQuestion.correctOptions,
+                        })
+                          ? "border-[#2ecc71] bg-green-900/25"
+                          : "border-[#e74c3c] bg-red-900/25"
+                      }
+                    >
+                      <p className="font-mono text-[10px] uppercase">
+                        {isAnswerCorrect({
+                          questionType: currentQuestion.questionType,
+                          answer: answers[currentQuestion.id],
+                          correctOption: currentQuestion.correctOption,
+                          correctOptions: currentQuestion.correctOptions,
+                        })
+                          ? "✓ Resposta correta"
+                          : "✗ Resposta incorreta"}
+                      </p>
+
+                      {loadingReviewByQuestion[currentQuestion.id] && (
+                        <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                            Gerando revisao com IA...
+                          </span>
+                        </p>
+                      )}
+
+                      {currentReview && (
+                        <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                          {currentReview.summary}
+                        </p>
+                      )}
+
+                      <div className="mt-2 space-y-2">
+                        {OPTIONS.map((option) => {
+                          const text = normalizeOptionText(currentQuestion.options[option]);
+                          if (!text) return null;
+
+                          const isCorrectOption = normalizeCorrectOptions(currentQuestion).includes(option);
+                          const isSelected = normalizeAnswerValue(answers[currentQuestion.id]).includes(option);
+
+                          return (
+                            <div
+                              key={`${currentQuestion.id}-review-${option}`}
+                              className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                            >
+                              <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
+                                {option}) {isCorrectOption ? "correta" : "incorreta"}
+                                {isSelected ? " · sua resposta" : ""}
+                              </p>
+                              <p className="mt-1 font-[var(--font-body)] text-sm">
+                                {currentReview?.options[option] ??
+                                  currentQuestion.explanations[option] ??
+                                  "Sem explicacao adicional."}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </PixelCard>
+                  </motion.div>
+                )}
+
+                <div className="flex flex-wrap justify-between gap-2">
+                  <div className="flex gap-2">
+                    <PixelButton variant="ghost" onClick={() => void goToQuestion(currentIndex - 1)}>
+                      Anterior
+                    </PixelButton>
+                    <PixelButton onClick={() => void goToQuestion(currentIndex + 1)}>Proxima</PixelButton>
+                  </div>
+
+                  <div className="flex gap-2">
+                    {inExamFlow ? (
+                      <>
+                        <PixelButton variant="ghost" onClick={handleForceExit}>
+                          Encerrar
+                        </PixelButton>
+                        {allQuestionsAnswered ? (
+                          <PixelButton onClick={handleSubmitExam}>Enviar Simulado</PixelButton>
+                        ) : (
+                          <p className="self-center font-[var(--font-body)] text-xs text-yellow-300">
+                            Responda todas as {questions.length} questoes para enviar o simulado.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <PixelButton variant="ghost" onClick={() => router.replace("/")}>
+                          Voltar ao inicio
+                        </PixelButton>
+                        <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </PixelCard>
+              </PixelCard>
+            </motion.div>
           </section>
 
           <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
@@ -738,6 +1012,35 @@ export function SimuladoScreen() {
                         {item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)
                       </p>
                     ))}
+                  </div>
+                )}
+
+                {!loadingWeakServices && strongestGapTopics.length > 0 && (
+                  <div className="space-y-3 border-t border-[var(--pixel-border)] pt-3">
+                    <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                      Plano de acao sugerido com base nos gaps detectados.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <PixelButton
+                        onClick={() =>
+                          router.push(`/kc?topics=${encodeURIComponent(strongestGapTopics.map(toTopicCode).join(","))}`)
+                        }
+                      >
+                        Fazer KC dos gaps
+                      </PixelButton>
+                      <PixelButton
+                        variant="ghost"
+                        onClick={() =>
+                          router.push(
+                            `/lab?focus=${encodeURIComponent(strongestGapTopics.join(", "))}&labText=${encodeURIComponent(
+                              buildGapLabSeed(strongestGapTopics),
+                            )}`,
+                          )
+                        }
+                      >
+                        Criar Lab unico dos gaps
+                      </PixelButton>
+                    </div>
                   </div>
                 )}
               </PixelCard>

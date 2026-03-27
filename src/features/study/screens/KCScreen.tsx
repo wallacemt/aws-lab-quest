@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
@@ -19,12 +19,14 @@ import {
   StudyServiceItem,
 } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
+import { normalizeOptionText } from "@/lib/study-option-text";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const DIFFICULTIES: TaskDifficulty[] = STUDY_DIFFICULTIES;
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const SERVICES_PAGE_SIZE = 12;
+const MAX_KC_TOPICS = 3;
 
 function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): QuestionOption[] {
   if (current.includes(option)) {
@@ -35,6 +37,7 @@ function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): Q
 
 export function KCScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { refreshTotalXp } = useUserProfile();
 
   const [services, setServices] = useState<StudyServiceItem[]>([]);
@@ -71,6 +74,31 @@ export function KCScreen() {
       .catch((error) => setServicesError(error instanceof Error ? error.message : "Falha ao carregar serviços AWS."))
       .finally(() => setServicesLoading(false));
   }, []);
+
+  useEffect(() => {
+    const topicsRaw = searchParams.get("topics");
+    if (!topicsRaw || services.length === 0) {
+      return;
+    }
+
+    const requested = topicsRaw
+      .split(",")
+      .map((item) => item.trim().toUpperCase())
+      .filter(Boolean);
+
+    if (requested.length === 0) {
+      return;
+    }
+
+    const availableCodes = new Set(services.map((service) => service.code.toUpperCase()));
+    const preselected = Array.from(new Set(requested))
+      .filter((code) => availableCodes.has(code))
+      .slice(0, MAX_KC_TOPICS);
+
+    if (preselected.length > 0) {
+      setSelectedTopics(preselected);
+    }
+  }, [searchParams, services]);
 
   const inProgress = questions.length > 0;
   const currentQuestion = questions[currentIndex] ?? null;
@@ -132,7 +160,19 @@ export function KCScreen() {
   const currentExplanation = currentQuestion ? explanationByQuestion[currentQuestion.id] : undefined;
 
   function toggleTopic(code: string) {
-    setSelectedTopics((prev) => (prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]));
+    setSelectedTopics((prev) => {
+      if (prev.includes(code)) {
+        return prev.filter((item) => item !== code);
+      }
+
+      if (prev.length >= MAX_KC_TOPICS) {
+        setFlowError(`Selecione no maximo ${MAX_KC_TOPICS} servicos por KC.`);
+        return prev;
+      }
+
+      setFlowError(null);
+      return [...prev, code];
+    });
   }
 
   async function startKC() {
@@ -141,6 +181,11 @@ export function KCScreen() {
 
     if (selectedTopics.length === 0) {
       setFlowError("Selecione pelo menos um assunto para iniciar o KC.");
+      return;
+    }
+
+    if (selectedTopics.length > MAX_KC_TOPICS) {
+      setFlowError(`Selecione no maximo ${MAX_KC_TOPICS} servicos por KC.`);
       return;
     }
 
@@ -378,16 +423,18 @@ export function KCScreen() {
                   <div className="grid gap-2 sm:grid-cols-2">
                     {pagedServices.map((service) => {
                       const selected = selectedTopics.includes(service.code);
+                      const blockedByLimit = !selected && selectedTopics.length >= MAX_KC_TOPICS;
                       return (
                         <button
                           key={service.id}
                           type="button"
                           onClick={() => toggleTopic(service.code)}
+                          disabled={blockedByLimit}
                           className={`border px-3 py-2 text-left font-[var(--font-body)] text-sm ${
                             selected
                               ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
                               : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                          }`}
+                          } ${blockedByLimit ? "cursor-not-allowed opacity-45" : ""}`}
                         >
                           <p className="font-sans text-sm">{service.name}</p>
                           <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">{service.code}</p>
@@ -399,6 +446,9 @@ export function KCScreen() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
                       Pagina {currentServicesPage}/{servicePageCount} · {filteredServices.length} servicos encontrados
+                    </p>
+                    <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                      Selecionados: {selectedTopics.length}/{MAX_KC_TOPICS}
                     </p>
                     <div className="flex gap-2">
                       <PixelButton
@@ -518,7 +568,7 @@ export function KCScreen() {
 
               <div className="grid gap-4">
                 {OPTIONS.map((option) => {
-                  const optionText = currentQuestion.options[option];
+                  const optionText = normalizeOptionText(currentQuestion.options[option]);
                   if (!optionText) return null;
                   const selectedOptions = normalizeAnswerValue(answers[currentQuestion.id]);
                   const checked = selectedOptions.includes(option);
@@ -592,7 +642,7 @@ export function KCScreen() {
 
                   <div className="mt-2 space-y-2">
                     {OPTIONS.map((option) => {
-                      const text = currentQuestion.options[option];
+                      const text = normalizeOptionText(currentQuestion.options[option]);
                       if (!text) return null;
 
                       const isCorrectOption = normalizeCorrectOptions(currentQuestion).includes(option);
