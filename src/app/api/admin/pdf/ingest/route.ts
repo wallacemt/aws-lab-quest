@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { createIngestionJob, deleteAdminUploadedFileById, updateIngestionJob } from "@/lib/admin-ingestion";
+import {
+  createIngestionJob,
+  deleteAdminUploadedFileById,
+  ensureIngestionJobNotCancelled,
+  updateIngestionJob,
+} from "@/lib/admin-ingestion";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 import { ingestQuestionsFromPdf } from "@/lib/study-question-generation";
@@ -89,6 +94,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    await ensureIngestionJobNotCancelled(jobId);
+
     const result = await ingestQuestionsFromPdf({
       certificationCode,
       extractedText,
@@ -99,6 +106,8 @@ export async function POST(request: NextRequest) {
         if (!jobId) {
           return;
         }
+
+        await ensureIngestionJobNotCancelled(jobId);
 
         await updateIngestionJob(jobId, {
           status: progress.status,
@@ -117,7 +126,10 @@ export async function POST(request: NextRequest) {
       ...result,
     });
   } catch (error) {
-    if (body.uploadedFileId?.trim()) {
+    const message = error instanceof Error ? error.message : "Falha ao gerar e salvar questoes.";
+    const cancelledByAdmin = message.includes("cancelado manualmente");
+
+    if (body.uploadedFileId?.trim() && !cancelledByAdmin) {
       await deleteAdminUploadedFileById(body.uploadedFileId.trim()).catch(() => undefined);
     }
 
@@ -125,13 +137,12 @@ export async function POST(request: NextRequest) {
       await updateIngestionJob(jobId, {
         status: "FAILED",
         progressPercent: 100,
-        message: "Falha na ingestao de questoes.",
-        errorMessage: error instanceof Error ? error.message : "Falha ao gerar e salvar questoes.",
+        message: cancelledByAdmin ? "Ingestao cancelada manualmente." : "Falha na ingestao de questoes.",
+        errorMessage: cancelledByAdmin ? "CANCELLED_BY_ADMIN" : message,
         finished: true,
       }).catch(() => undefined);
     }
 
-    const message = error instanceof Error ? error.message : "Falha ao gerar e salvar questoes.";
     devAuditLog("admin.pdf.ingest.failed", {
       adminUserId: adminCheck.userId,
       certificationCode,
@@ -139,6 +150,6 @@ export async function POST(request: NextRequest) {
       jobId,
       error: message,
     });
-    return NextResponse.json({ error: message }, { status: 422 });
+    return NextResponse.json({ error: message }, { status: cancelledByAdmin ? 409 : 422 });
   }
 }

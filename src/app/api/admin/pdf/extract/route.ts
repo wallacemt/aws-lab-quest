@@ -6,6 +6,7 @@ import {
   createIngestionJob,
   createUploadedFileRecord,
   deleteAdminUploadedFileById,
+  ensureIngestionJobNotCancelled,
   updateIngestionJob,
   uploadAdminFileToSupabase,
 } from "@/lib/admin-ingestion";
@@ -111,7 +112,11 @@ export async function POST(request: NextRequest) {
       uploadedFileId,
     });
 
+    await ensureIngestionJobNotCancelled(ingestJob.id);
+
     const extractedText = await extractPdfTextWithGeminiOcr(buffer, file.type || "application/pdf");
+
+    await ensureIngestionJobNotCancelled(ingestJob.id);
 
     devAuditLog("admin.pdf.extract.completed", {
       adminUserId: adminCheck.userId,
@@ -138,7 +143,7 @@ export async function POST(request: NextRequest) {
       certification,
     });
   } catch (e) {
-    if (uploadedFileId) {
+    if (uploadedFileId && !(e instanceof Error && e.message.includes("cancelado manualmente"))) {
       await deleteAdminUploadedFileById(uploadedFileId).catch(() => undefined);
     }
 

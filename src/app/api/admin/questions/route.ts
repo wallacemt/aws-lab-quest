@@ -40,9 +40,10 @@ export async function GET(request: NextRequest) {
   }
 
   const page = parsePageParam(request.nextUrl.searchParams.get("page"), 1);
-  const pageSize = Math.min(50, parsePageParam(request.nextUrl.searchParams.get("pageSize"), 10));
+  const pageSize = Math.min(200, parsePageParam(request.nextUrl.searchParams.get("pageSize"), 10));
   const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
   const difficulty = request.nextUrl.searchParams.get("difficulty")?.trim() ?? "";
+  const questionType = request.nextUrl.searchParams.get("questionType")?.trim() ?? "";
   const usage = request.nextUrl.searchParams.get("usage")?.trim() ?? "";
   const activeParam = request.nextUrl.searchParams.get("active")?.trim() ?? "";
   const certificationCode = request.nextUrl.searchParams.get("certificationCode")?.trim() ?? "";
@@ -62,6 +63,10 @@ export async function GET(request: NextRequest) {
 
   if (difficulty === "easy" || difficulty === "medium" || difficulty === "hard") {
     where.difficulty = difficulty;
+  }
+
+  if (questionType === "single" || questionType === "multi") {
+    where.questionType = questionType;
   }
 
   if (usage === "KC" || usage === "SIMULADO" || usage === "BOTH") {

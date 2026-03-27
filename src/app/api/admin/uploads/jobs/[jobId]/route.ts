@@ -64,3 +64,56 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   return NextResponse.json({ job });
 }
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  const adminCheck = await requireAdmin(request);
+  if (!adminCheck.ok) {
+    return adminCheck.response;
+  }
+
+  const { jobId } = await context.params;
+  const body = (await request.json().catch(() => ({}))) as { action?: string };
+
+  if (body.action !== "cancel") {
+    return NextResponse.json({ error: "Acao invalida." }, { status: 400 });
+  }
+
+  const current = await prisma.adminIngestionJob.findUnique({
+    where: { id: jobId },
+    select: {
+      id: true,
+      status: true,
+    },
+  });
+
+  if (!current) {
+    return NextResponse.json({ error: "Job nao encontrado." }, { status: 404 });
+  }
+
+  if (current.status === "COMPLETED" || current.status === "FAILED") {
+    return NextResponse.json({
+      cancelled: false,
+      message: "Job ja finalizado.",
+      status: current.status,
+    });
+  }
+
+  const cancelled = await prisma.adminIngestionJob.update({
+    where: { id: jobId },
+    data: {
+      status: "FAILED",
+      progressPercent: 100,
+      message: "Processamento cancelado manualmente pelo admin.",
+      errorMessage: "CANCELLED_BY_ADMIN",
+      finishedAt: new Date(),
+    },
+    select: {
+      id: true,
+      status: true,
+      message: true,
+      errorMessage: true,
+    },
+  });
+
+  return NextResponse.json({ cancelled: true, job: cancelled });
+}
