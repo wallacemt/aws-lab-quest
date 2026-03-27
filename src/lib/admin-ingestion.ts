@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 
-const ADMIN_UPLOADS_BUCKET = 'aws-lab-quest';
+const ADMIN_UPLOADS_BUCKET = "aws-lab-quest";
 
 function sanitizeFileName(fileName: string): string {
   return fileName
@@ -49,6 +49,47 @@ export async function uploadAdminFileToSupabase(input: {
     bucket: ADMIN_UPLOADS_BUCKET,
     path: key,
   };
+}
+
+export async function removeAdminFileFromSupabase(input: { bucket: string; path: string }): Promise<void> {
+  const remove = await supabase.storage.from(input.bucket).remove([input.path]);
+  if (remove.error) {
+    throw new Error(`Falha ao remover arquivo do storage: ${remove.error.message}`);
+  }
+}
+
+export async function deleteAdminUploadedFileById(fileId: string): Promise<{
+  id: string;
+  fileName: string;
+  storageBucket: string;
+  storagePath: string;
+}> {
+  const file = await prisma.adminUploadedFile.findUnique({
+    where: { id: fileId },
+    select: {
+      id: true,
+      fileName: true,
+      storageBucket: true,
+      storagePath: true,
+    },
+  });
+
+  if (!file) {
+    throw new Error("Arquivo nao encontrado para remocao.");
+  }
+
+  try {
+    await removeAdminFileFromSupabase({
+      bucket: file.storageBucket,
+      path: file.storagePath,
+    });
+  } catch {
+    // Continue with DB cleanup even if storage object is already missing.
+  }
+
+  await prisma.adminUploadedFile.delete({ where: { id: file.id } });
+
+  return file;
 }
 
 export async function createUploadedFileRecord(input: {
