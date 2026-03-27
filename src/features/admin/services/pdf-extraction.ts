@@ -3,6 +3,7 @@ import { OCR_PROMPT } from "@/utils/prompt.utils";
 
 import PDFParser from "pdf2json";
 const MAX_TEXT_LENGTH = 120_000;
+const MAX_MARKDOWN_SOURCE_CHARS = 100_000;
 
 function normalizeText(input: string): string {
   return input
@@ -10,6 +11,43 @@ function normalizeText(input: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, MAX_TEXT_LENGTH);
+}
+
+function normalizeMarkdown(input: string): string {
+  return input
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, MAX_TEXT_LENGTH);
+}
+
+function fallbackExamGuideMarkdown(rawText: string): string {
+  const normalized = normalizeText(rawText);
+  if (!normalized) {
+    return "";
+  }
+
+  const lines = normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const bullets = lines
+    .filter((line) => /\d+\s*%|domain|dominio|objective|objetivo|task statement/i.test(line))
+    .slice(0, 12)
+    .map((line) => `- ${line}`);
+
+  return normalizeMarkdown(
+    [
+      "# Exam Guide",
+      "",
+      bullets.length > 0 ? "## Dominios e foco" : "## Conteudo extraido",
+      ...(bullets.length > 0 ? bullets : lines.slice(0, 20).map((line) => `- ${line}`)),
+      "",
+      "## Texto completo",
+      normalized,
+    ].join("\n"),
+  );
 }
 
 function decodePdf2JsonPayload(payload: unknown): string {
@@ -127,4 +165,46 @@ export async function extractPdfTextWithGeminiOcr(buffer: Buffer, mimeType = "ap
   }
 
   return normalizeText(responseText);
+}
+
+export async function buildExamGuideMarkdownWithAi(rawText: string): Promise<string> {
+  const normalized = normalizeText(rawText);
+  if (!normalized) {
+    throw new Error("Texto vazio para estruturar em markdown.");
+  }
+
+  const model = getOcrAiModel();
+  const prompt = [
+    "Voce recebera texto OCR de um AWS Certification Exam Guide.",
+    "Converta para markdown limpo, legivel e objetivo.",
+    "",
+    "Regras obrigatorias:",
+    "- Nao invente conteudo.",
+    "- Preserve numeros, percentuais e codigos exatamente.",
+    "- Organize com titulos (##), listas e tabelas quando fizer sentido.",
+    "- Crie uma secao inicial '## Resumo rapido' com 5 a 8 bullets.",
+    "- Se houver dominios com peso, crie '## Dominios e pesos'.",
+    "- Mantenha uma secao final '## Texto de referencia' com o texto consolidado e limpo.",
+    "- Retorne apenas markdown puro, sem bloco de codigo.",
+    "",
+    "Texto fonte:",
+    normalized.slice(0, MAX_MARKDOWN_SOURCE_CHARS),
+  ].join("\n");
+
+  const result = await model.generateContent(prompt);
+  const markdown = normalizeMarkdown(result.response.text());
+
+  if (!markdown || markdown.length < 120) {
+    throw new Error("IA retornou markdown insuficiente para o Exam Guide.");
+  }
+
+  return markdown;
+}
+
+export async function toExamGuideMarkdown(rawText: string): Promise<string> {
+  try {
+    return await buildExamGuideMarkdownWithAi(rawText);
+  } catch {
+    return fallbackExamGuideMarkdown(rawText);
+  }
 }
