@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { extractPdfText } from "@/features/admin/services/pdf-extraction";
 import { buildSha256, createUploadedFileRecord, uploadAdminFileToSupabase } from "@/lib/admin-ingestion";
+import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -64,6 +65,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  devAuditLog("admin.exam-guide.request", {
+    adminUserId: adminCheck.userId,
+    certificationCode: certification.code,
+    hasPdfFile,
+    hasManualText,
+    overwriteConfirmed,
+  });
+
   try {
     let extractedText = manualText;
     let fileName = "manual-input";
@@ -124,6 +133,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    devAuditLog("admin.exam-guide.saved", {
+      adminUserId: adminCheck.userId,
+      certificationCode: certification.code,
+      fileName,
+      uploadedFileId,
+      characters: extractedText.length,
+    });
+
     return NextResponse.json({
       uploadedFileId,
       fileName,
@@ -137,6 +154,11 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao processar e salvar o Exam Guide.";
+    devAuditLog("admin.exam-guide.failed", {
+      adminUserId: adminCheck.userId,
+      certificationCode: certification.code,
+      error: message,
+    });
     return NextResponse.json({ error: message }, { status: 422 });
   }
 }

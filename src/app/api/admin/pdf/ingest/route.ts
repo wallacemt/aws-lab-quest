@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { createIngestionJob, updateIngestionJob } from "@/lib/admin-ingestion";
+import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 import { ingestQuestionsFromPdf } from "@/lib/study-question-generation";
 
@@ -42,6 +43,15 @@ export async function POST(request: NextRequest) {
       ? Math.max(5, Math.min(50, Math.round(body.desiredCount)))
       : 20;
   const ingestMode = body.ingestMode === "extract-existing" ? "extract-existing" : "generate-new";
+
+  devAuditLog("admin.pdf.ingest.request", {
+    adminUserId: adminCheck.userId,
+    certificationCode,
+    ingestMode,
+    desiredCount,
+    extractedLength: extractedText.length,
+    hasUploadedFileId: Boolean(body.uploadedFileId),
+  });
 
   let jobId = body.jobId?.trim() || null;
 
@@ -118,6 +128,13 @@ export async function POST(request: NextRequest) {
     }
 
     const message = error instanceof Error ? error.message : "Falha ao gerar e salvar questoes.";
+    devAuditLog("admin.pdf.ingest.failed", {
+      adminUserId: adminCheck.userId,
+      certificationCode,
+      ingestMode,
+      jobId,
+      error: message,
+    });
     return NextResponse.json({ error: message }, { status: 422 });
   }
 }

@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(50, parsePageParam(request.nextUrl.searchParams.get("pageSize"), 10));
   const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
   const role = request.nextUrl.searchParams.get("role")?.trim() ?? "";
+  const accessStatus = request.nextUrl.searchParams.get("accessStatus")?.trim() ?? "";
+  const activeParam = request.nextUrl.searchParams.get("active")?.trim() ?? "";
   const certificationCode = request.nextUrl.searchParams.get("certificationCode")?.trim() ?? "";
   const createdFrom = parseDateParam(request.nextUrl.searchParams.get("createdFrom"));
   const createdTo = parseDateParam(request.nextUrl.searchParams.get("createdTo"));
@@ -67,6 +69,14 @@ export async function GET(request: NextRequest) {
 
   if (role) {
     where.role = role;
+  }
+
+  if (accessStatus === "pending" || accessStatus === "approved" || accessStatus === "rejected") {
+    where.accessStatus = accessStatus;
+  }
+
+  if (activeParam === "true" || activeParam === "false") {
+    where.active = activeParam === "true";
   }
 
   if (certificationCode) {
@@ -103,6 +113,10 @@ export async function GET(request: NextRequest) {
         email: true,
         username: true,
         role: true,
+        accessStatus: true,
+        active: true,
+        accessDecisionAt: true,
+        accessDecisionReason: true,
         createdAt: true,
         lastSeen: true,
         profile: {

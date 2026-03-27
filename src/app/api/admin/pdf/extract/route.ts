@@ -8,6 +8,7 @@ import {
   updateIngestionJob,
   uploadAdminFileToSupabase,
 } from "@/lib/admin-ingestion";
+import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -54,6 +55,13 @@ export async function POST(request: NextRequest) {
   if (file.size > MAX_FILE_SIZE) {
     return NextResponse.json({ error: "PDF excede o limite de 20MB." }, { status: 413 });
   }
+
+  devAuditLog("admin.pdf.extract.request", {
+    adminUserId: adminCheck.userId,
+    certificationCode: certification.code,
+    fileName: file.name,
+    fileSize: file.size,
+  });
 
   let jobId: string | null = null;
 
@@ -102,6 +110,14 @@ export async function POST(request: NextRequest) {
 
     const extractedText = await extractPdfTextWithGeminiOcr(buffer, file.type || "application/pdf");
 
+    devAuditLog("admin.pdf.extract.completed", {
+      adminUserId: adminCheck.userId,
+      certificationCode: certification.code,
+      fileName: file.name,
+      characters: extractedText.length,
+      jobId: ingestJob.id,
+    });
+
     await updateIngestionJob(ingestJob.id, {
       status: "COMPLETED",
       progressPercent: 100,
@@ -129,7 +145,13 @@ export async function POST(request: NextRequest) {
       }).catch(() => undefined);
     }
 
-    console.log(`[Extract PDF]: Erro ao processar documento: ${e}`);
+    devAuditLog("admin.pdf.extract.failed", {
+      adminUserId: adminCheck.userId,
+      certificationCode: certification.code,
+      fileName: file.name,
+      jobId,
+      error: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json({ error: "Falha ao processar PDF." }, { status: 422 });
   }
 }
