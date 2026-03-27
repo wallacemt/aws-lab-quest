@@ -5,6 +5,7 @@ import {
   buildSha256,
   createIngestionJob,
   createUploadedFileRecord,
+  deleteAdminUploadedFileById,
   updateIngestionJob,
   uploadAdminFileToSupabase,
 } from "@/lib/admin-ingestion";
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
   });
 
   let jobId: string | null = null;
+  let uploadedFileId: string | null = null;
 
   try {
     const ingestJob = await createIngestionJob({
@@ -100,12 +102,13 @@ export async function POST(request: NextRequest) {
         stage: "extract",
       },
     });
+    uploadedFileId = uploadedFile.id;
 
     await updateIngestionJob(ingestJob.id, {
       status: "EXTRACTING",
       progressPercent: 35,
       message: "Executando OCR com IA no PDF...",
-      uploadedFileId: uploadedFile.id,
+      uploadedFileId,
     });
 
     const extractedText = await extractPdfTextWithGeminiOcr(buffer, file.type || "application/pdf");
@@ -127,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       jobId: ingestJob.id,
-      uploadedFileId: uploadedFile.id,
+      uploadedFileId,
       fileName: file.name,
       characters: extractedText.length,
       preview: extractedText.slice(0, 4000),
@@ -135,6 +138,10 @@ export async function POST(request: NextRequest) {
       certification,
     });
   } catch (e) {
+    if (uploadedFileId) {
+      await deleteAdminUploadedFileById(uploadedFileId).catch(() => undefined);
+    }
+
     if (jobId) {
       await updateIngestionJob(jobId, {
         status: "FAILED",

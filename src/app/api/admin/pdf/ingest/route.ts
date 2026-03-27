@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { createIngestionJob, updateIngestionJob } from "@/lib/admin-ingestion";
+import { createIngestionJob, deleteAdminUploadedFileById, updateIngestionJob } from "@/lib/admin-ingestion";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 import { ingestQuestionsFromPdf } from "@/lib/study-question-generation";
@@ -117,6 +117,10 @@ export async function POST(request: NextRequest) {
       ...result,
     });
   } catch (error) {
+    if (body.uploadedFileId?.trim()) {
+      await deleteAdminUploadedFileById(body.uploadedFileId.trim()).catch(() => undefined);
+    }
+
     if (jobId) {
       await updateIngestionJob(jobId, {
         status: "FAILED",
