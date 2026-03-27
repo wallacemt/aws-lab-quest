@@ -9,19 +9,29 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserAccessStatus {
+  pending
+  approved
+  rejected
+}
+
 // ─── Better Auth required tables ──────────────────────────────────────────────
 
 model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String   @unique
-  username      String?  @unique
-  role          String   @default("user")
-  lastSeen      DateTime @default(now())
-  emailVerified Boolean  @default(false)
-  image         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                   String           @id @default(cuid())
+  name                 String
+  email                String           @unique
+  username             String?          @unique
+  role                 String           @default("user")
+  accessStatus         UserAccessStatus @default(pending)
+  active               Boolean          @default(true)
+  accessDecisionAt     DateTime?
+  accessDecisionReason String?
+  lastSeen             DateTime         @default(now())
+  emailVerified        Boolean          @default(false)
+  image                String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   sessions      Session[]
   accounts      Account[]
@@ -33,6 +43,7 @@ model User {
   uploadedFiles AdminUploadedFile[]
   ingestionJobs AdminIngestionJob[]
 
+  @@index([accessStatus, active])
   @@map("user")
 }
 
@@ -368,4 +379,22 @@ model AdminIngestionJob {
   @@index([certificationPresetId, createdAt])
   @@index([createdByUserId, createdAt])
   @@index([uploadedFileId])
+}
+
+model AdminEmailTemplate {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  name            String
+  description     String?
+  subject         String
+  html            String
+  text            String?
+  active          Boolean  @default(true)
+  isSystem        Boolean  @default(false)
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([active, updatedAt])
+  @@index([isSystem, updatedAt])
 }

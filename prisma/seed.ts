@@ -366,7 +366,13 @@ async function seedAdminIfConfigured() {
 
   await prisma.user.update({
     where: { email: adminEmail },
-    data: { role: "admin" },
+    data: {
+      role: "admin",
+      active: true,
+      accessStatus: "approved",
+      accessDecisionAt: new Date(),
+      accessDecisionReason: "Conta administrativa liberada via seed.",
+    },
   });
 
   console.log(`Admin user ready: ${adminEmail}`);
