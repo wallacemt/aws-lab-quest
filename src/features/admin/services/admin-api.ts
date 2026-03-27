@@ -329,3 +329,26 @@ export async function listAdminUploadQuestions(
 
   return (await response.json()) as AdminUploadQuestionsPayload;
 }
+
+export async function deleteAdminUploadFile(fileId: string): Promise<void> {
+  const response = await fetch(`/api/admin/uploads/${fileId}`, {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    let message = "Nao foi possivel remover upload.";
+
+    try {
+      const payload = (await response.json()) as AdminApiError;
+      if (payload?.error) {
+        message = payload.error;
+      }
+    } catch {
+      // Keep fallback message.
+    }
+
+    throw new Error(message);
+  }
+}

@@ -53,6 +53,22 @@ type WeakServiceMetric = {
   errorRate: number;
 };
 
+type TopicPerformance = {
+  topic: string;
+  attempts: number;
+  correct: number;
+  wrong: number;
+  accuracyPercent: number;
+};
+
+type ScoreOverviewData = {
+  points: number;
+  maxPoints: number;
+  minimumCertificationPoints: number;
+  bestArea: TopicPerformance | null;
+  weakestArea: TopicPerformance | null;
+};
+
 function formatTime(seconds: number): string {
   const clamped = Math.max(0, seconds);
   const mm = Math.floor(clamped / 60)
@@ -69,6 +85,65 @@ function formatGuideLines(text: string): string[] {
     .map((line) => line.trim())
     .filter((line) => line.length >= 18)
     .slice(0, 10);
+}
+
+function buildTopicPerformance(questions: StudyQuestion[], answers: StudyAnswerMap): TopicPerformance[] {
+  const byTopic = new Map<string, TopicPerformance>();
+
+  for (const question of questions) {
+    const topic = question.topic?.trim() || "OUTROS";
+    const key = topic.toUpperCase();
+    const current =
+      byTopic.get(key) ??
+      ({
+        topic,
+        attempts: 0,
+        correct: 0,
+        wrong: 0,
+        accuracyPercent: 0,
+      } satisfies TopicPerformance);
+
+    current.attempts += 1;
+    const correct = isAnswerCorrect({
+      questionType: question.questionType,
+      answer: answers[question.id],
+      correctOption: question.correctOption,
+      correctOptions: question.correctOptions,
+    });
+
+    if (correct) {
+      current.correct += 1;
+    } else {
+      current.wrong += 1;
+    }
+
+    byTopic.set(key, current);
+  }
+
+  return Array.from(byTopic.values())
+    .map((item) => ({
+      ...item,
+      accuracyPercent: item.attempts > 0 ? Math.round((item.correct / item.attempts) * 100) : 0,
+    }))
+    .sort((a, b) => b.accuracyPercent - a.accuracyPercent || b.correct - a.correct || b.attempts - a.attempts);
+}
+
+function buildScoreOverview(correct: number, total: number, topicPerformance: TopicPerformance[]): ScoreOverviewData {
+  const maxPoints = 1000;
+  const minimumCertificationPoints = 700;
+  const points = total > 0 ? Math.round((correct / total) * maxPoints) : 0;
+
+  const bestArea = topicPerformance.length > 0 ? topicPerformance[0] : null;
+  const weakestArea =
+    topicPerformance.length > 0 ? [...topicPerformance].sort((a, b) => a.accuracyPercent - b.accuracyPercent)[0] : null;
+
+  return {
+    points,
+    maxPoints,
+    minimumCertificationPoints,
+    bestArea,
+    weakestArea,
+  };
 }
 
 export function SimuladoScreen() {
@@ -101,6 +176,9 @@ export function SimuladoScreen() {
   const [examGuideError, setExamGuideError] = useState<string | null>(null);
   const [historicalWeakServices, setHistoricalWeakServices] = useState<WeakServiceMetric[]>([]);
   const [loadingWeakServices, setLoadingWeakServices] = useState(false);
+  const [scoreOverview, setScoreOverview] = useState<ScoreOverviewData | null>(null);
+  const [showScoreOverview, setShowScoreOverview] = useState(false);
+  const [mockScoreOverview, setMockScoreOverview] = useState<ScoreOverviewData | null>(null);
 
   const inExamFlow = isActive && questions.length > 0 && !submitted;
   const inReviewFlow = submitted && questions.length > 0;
@@ -175,6 +253,23 @@ export function SimuladoScreen() {
       .slice(0, 3);
   }, [historicalWeakServices, weakServicesCurrentExam]);
   const allQuestionsAnswered = answeredCount === questions.length && questions.length > 0;
+  const activeOverview = showScoreOverview ? (mockScoreOverview ?? scoreOverview) : null;
+  const activeOverviewProgress = activeOverview
+    ? Math.min(1, Math.max(0, activeOverview.points / activeOverview.maxPoints))
+    : 0;
+  const activeOverviewThresholdProgress = activeOverview
+    ? Math.min(1, Math.max(0, activeOverview.minimumCertificationPoints / activeOverview.maxPoints))
+    : 0;
+  const gaugeCenterX = 160;
+  const gaugeCenterY = 160;
+  const gaugeRadius = 120;
+  const gaugeNeedleRadius = 96;
+  const activeOverviewNeedleRadians = Math.PI * (1 - activeOverviewProgress);
+  const activeOverviewThresholdRadians = Math.PI * (1 - activeOverviewThresholdProgress);
+  const activeOverviewNeedleX = gaugeCenterX + Math.cos(activeOverviewNeedleRadians) * gaugeNeedleRadius;
+  const activeOverviewNeedleY = gaugeCenterY - Math.sin(activeOverviewNeedleRadians) * gaugeNeedleRadius;
+  const activeOverviewThresholdX = gaugeCenterX + Math.cos(activeOverviewThresholdRadians) * gaugeRadius;
+  const activeOverviewThresholdY = gaugeCenterY - Math.sin(activeOverviewThresholdRadians) * gaugeRadius;
 
   function toTopicCode(topic: string): string {
     const cleaned = topic
@@ -421,6 +516,9 @@ export function SimuladoScreen() {
 
     setSubmitted(true);
     setCurrentIndex(0);
+    const performance = buildTopicPerformance(questions, answers);
+    setScoreOverview(buildScoreOverview(correctAnswers, totalQuestions, performance));
+    setShowScoreOverview(true);
     setResult({
       certificationCode: session.certificationCode,
       correct: correctAnswers,
@@ -471,6 +569,8 @@ export function SimuladoScreen() {
     setExamGuideInfo(null);
     setHistoricalWeakServices([]);
     setLoadingWeakServices(false);
+    setScoreOverview(null);
+    setShowScoreOverview(false);
     setError(null);
   }
 
@@ -496,6 +596,213 @@ export function SimuladoScreen() {
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
+      {process.env.NODE_ENV !== "production" && !inExamFlow && !inReviewFlow && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              setMockScoreOverview({
+                points: 742,
+                maxPoints: 1000,
+                minimumCertificationPoints: 700,
+                bestArea: {
+                  topic: "IAM",
+                  attempts: 12,
+                  correct: 10,
+                  wrong: 2,
+                  accuracyPercent: 83,
+                },
+                weakestArea: {
+                  topic: "Billing and Pricing",
+                  attempts: 8,
+                  correct: 3,
+                  wrong: 5,
+                  accuracyPercent: 38,
+                },
+              });
+              setShowScoreOverview(true);
+            }}
+            className="border border-[#334155] px-3 py-2 text-xs uppercase text-[#cbd5e1]"
+          >
+            Visualizar score mock (dev)
+          </button>
+        </div>
+      )}
+
+      {activeOverview && (
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <PixelCard className="space-y-5 border-[var(--pixel-accent)] bg-[var(--pixel-card)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Score do Simulado</p>
+                <h2 className="mt-1 font-sans text-2xl">Overview de Desempenho</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScoreOverview(false)}
+                className="border border-[var(--pixel-border)] px-3 py-2 text-[10px] uppercase"
+              >
+                Ocultar overview
+              </button>
+            </div>
+
+            <div className="border border-[var(--pixel-border)] bg-[repeating-linear-gradient(45deg,rgba(148,163,184,0.07),rgba(148,163,184,0.07)_8px,rgba(15,23,42,0.22)_8px,rgba(15,23,42,0.22)_16px)] p-3 sm:p-4">
+              <div className="mx-auto w-full max-w-[34rem] overflow-hidden">
+                <div className="relative">
+                  <svg viewBox="0 0 320 210" className="w-full h-auto" role="img" aria-label="Velocimetro de pontuacao">
+                    <defs>
+                      <linearGradient id="retroGaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#b91c1c" />
+                        <stop offset="40%" stopColor="#f59e0b" />
+                        <stop offset="72%" stopColor="#84cc16" />
+                        <stop offset="100%" stopColor="#22c55e" />
+                      </linearGradient>
+                    </defs>
+
+                    <path
+                      d="M 40 160 A 120 120 0 0 1 280 160"
+                      stroke="rgba(148,163,184,0.2)"
+                      strokeWidth="26"
+                      fill="none"
+                    />
+                    <path
+                      d="M 40 160 A 120 120 0 0 1 280 160"
+                      stroke="url(#retroGaugeGradient)"
+                      strokeWidth="20"
+                      fill="none"
+                    />
+
+                    <line
+                      x1={gaugeCenterX}
+                      y1={gaugeCenterY}
+                      x2={activeOverviewThresholdX}
+                      y2={activeOverviewThresholdY}
+                      stroke="#fca5a5"
+                      strokeWidth="2"
+                      strokeDasharray="4 4"
+                    />
+
+                    <line
+                      x1={gaugeCenterX}
+                      y1={gaugeCenterY}
+                      x2={activeOverviewNeedleX}
+                      y2={activeOverviewNeedleY}
+                      stroke="#f8fafc"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                    />
+                    <circle cx={gaugeCenterX} cy={gaugeCenterY} r="8" fill="#e2e8f0" stroke="#0f172a" strokeWidth="2" />
+
+                    <text
+                      x="40"
+                      y="184"
+                      textAnchor="middle"
+                      className="fill-[var(--pixel-subtext)] text-[10px] font-mono"
+                    >
+                      0
+                    </text>
+                    <text
+                      x="280"
+                      y="184"
+                      textAnchor="middle"
+                      className="fill-[var(--pixel-subtext)] text-[10px] font-mono"
+                    >
+                      {activeOverview.maxPoints}
+                    </text>
+                    <text
+                      x={activeOverviewThresholdX}
+                      y={activeOverviewThresholdY - 8}
+                      textAnchor="middle"
+                      className="fill-red-300 text-[10px] font-mono"
+                    >
+                      {activeOverview.minimumCertificationPoints}
+                    </text>
+                  </svg>
+
+                  <div className="pointer-events-none absolute inset-x-0 bottom-1 text-center">
+                    <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Pontuacao</p>
+                    <p className="font-mono text-xl sm:text-2xl text-[var(--pixel-text)]">
+                      {activeOverview.points}
+                      <span className="text-xs sm:text-sm text-[var(--pixel-subtext)]">
+                        {" "}
+                        / {activeOverview.maxPoints}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-center font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                Corte de certificacao marcado em vermelho: {activeOverview.minimumCertificationPoints} pontos.
+              </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="border border-[#14532d] bg-green-900/20 p-3">
+                <p className="font-mono text-[10px] uppercase text-green-300">Area com maior acerto</p>
+                <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+                  {activeOverview.bestArea?.topic ?? "Sem dados"}
+                </p>
+                {activeOverview.bestArea && (
+                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                    {activeOverview.bestArea.correct}/{activeOverview.bestArea.attempts} corretas (
+                    {activeOverview.bestArea.accuracyPercent}%)
+                  </p>
+                )}
+              </div>
+
+              <div className="border border-[#7f1d1d] bg-red-900/20 p-3">
+                <p className="font-mono text-[10px] uppercase text-red-300">Area com menor acerto</p>
+                <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+                  {activeOverview.weakestArea?.topic ?? "Sem dados"}
+                </p>
+                {activeOverview.weakestArea && (
+                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                    {activeOverview.weakestArea.correct}/{activeOverview.weakestArea.attempts} corretas (
+                    {activeOverview.weakestArea.accuracyPercent}%)
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              {strongestGapTopics.length > 0 && (
+                <>
+                  <PixelButton
+                    onClick={() => {
+                      setShowScoreOverview(false);
+                      router.push(`/kc?topics=${encodeURIComponent(strongestGapTopics.map(toTopicCode).join(","))}`);
+                    }}
+                  >
+                    Fazer KC dos gaps
+                  </PixelButton>
+                  <PixelButton
+                    variant="ghost"
+                    onClick={() => {
+                      setShowScoreOverview(false);
+                      router.push(
+                        `/lab?focus=${encodeURIComponent(strongestGapTopics.join(", "))}&labText=${encodeURIComponent(
+                          buildGapLabSeed(strongestGapTopics),
+                        )}`,
+                      );
+                    }}
+                  >
+                    Criar Lab unico dos gaps
+                  </PixelButton>
+                </>
+              )}
+              <PixelButton variant="ghost" onClick={() => setShowScoreOverview(false)}>
+                Continuar revisao
+              </PixelButton>
+            </div>
+          </PixelCard>
+        </motion.div>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

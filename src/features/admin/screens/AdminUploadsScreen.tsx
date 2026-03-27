@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminUploadSignedUrl, listAdminUploads } from "@/features/admin/services/admin-api";
+import { deleteAdminUploadFile, getAdminUploadSignedUrl, listAdminUploads } from "@/features/admin/services/admin-api";
 import { AdminUploadedFileItem, AdminUploadJobItem, AdminUploadType } from "@/features/admin/types";
 
 type CertificationOption = {
@@ -34,6 +34,7 @@ export function AdminUploadsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [files, setFiles] = useState<AdminUploadedFileItem[]>([]);
   const [recentJobs, setRecentJobs] = useState<AdminUploadJobItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
@@ -101,6 +102,24 @@ export function AdminUploadsScreen() {
       setError(err instanceof Error ? err.message : "Falha ao abrir arquivo.");
     } finally {
       setDownloadingId(null);
+    }
+  }
+
+  async function handleDeleteFile(file: AdminUploadedFileItem) {
+    if (!window.confirm(`Remover o arquivo ${file.fileName}?`)) {
+      return;
+    }
+
+    setDeletingId(file.id);
+    setError(null);
+
+    try {
+      await deleteAdminUploadFile(file.id);
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao remover upload.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -200,16 +219,28 @@ export function AdminUploadsScreen() {
                     <td className="px-3 py-2">{file.uploadedBy?.name ?? file.uploadedBy?.email ?? "-"}</td>
                     <td className="px-3 py-2">{formatDate(file.createdAt)}</td>
                     <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void handleOpenFile(file.id);
-                        }}
-                        disabled={downloadingId === file.id}
-                        className="border border-[#334155] px-2 py-1 text-xs uppercase disabled:opacity-50"
-                      >
-                        {downloadingId === file.id ? "Abrindo..." : "Abrir"}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleOpenFile(file.id);
+                          }}
+                          disabled={downloadingId === file.id || deletingId === file.id}
+                          className="border border-[#334155] px-2 py-1 text-xs uppercase disabled:opacity-50"
+                        >
+                          {downloadingId === file.id ? "Abrindo..." : "Abrir"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleDeleteFile(file);
+                          }}
+                          disabled={downloadingId === file.id || deletingId === file.id}
+                          className="border border-[#7f1d1d] px-2 py-1 text-xs uppercase text-[#fca5a5] disabled:opacity-50"
+                        >
+                          {deletingId === file.id ? "Removendo..." : "Remover"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

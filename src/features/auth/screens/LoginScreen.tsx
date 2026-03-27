@@ -69,7 +69,7 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
       setLoading(false);
       return;
     }
-
+    
     const access = await checkUserAccessStatus();
     if (!access || !access.active) {
       await authClient.signOut();
