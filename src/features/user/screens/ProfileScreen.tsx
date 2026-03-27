@@ -28,6 +28,7 @@ export function ProfileScreen() {
     profile,
     setProfile,
     hydrated,
+    reloadProfile,
     avatarUrl,
     setAvatarUrl,
     certificationOptions,
@@ -263,19 +264,6 @@ export function ProfileScreen() {
                 <p className="mt-1 text-center font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
                   {currentBadge.name}
                 </p>
-                {ownedBadgeIds.includes(currentBadge.id) && user?.id && (
-                  <div className="mt-2 text-center">
-                    <button
-                      onClick={() => handleCopyShareLink("badge", currentBadge.id)}
-                      className="border border-pixel-border bg-pixel-card px-2 py-1 font-mono text-[0.4rem] uppercase hover:bg-muted"
-                    >
-                      Compartilhar Badge
-                    </button>
-                  </div>
-                )}
-                {shareMsg?.type === "badge" && (
-                  <p className="mt-1 text-center font-mono text-[8px] uppercase text-accent">{shareMsg.message}</p>
-                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -283,7 +271,13 @@ export function ProfileScreen() {
 
         {/* Badges collection */}
         <PixelCard>
-          <BadgesView xp={profile.totalXp ?? 0} levelBadges={levelBadges} />
+          <BadgesView
+            xp={profile.totalXp ?? 0}
+            levelBadges={levelBadges}
+            ownedBadgeIds={ownedBadgeIds}
+            onShareBadge={(badgeId) => handleCopyShareLink("badge", badgeId)}
+            shareMsg={shareMsg?.type === "badge" ? shareMsg.message : null}
+          />
         </PixelCard>
 
         {achievements.length > 0 && (
@@ -357,6 +351,17 @@ export function ProfileScreen() {
           <div className="flex items-center gap-3">
             <PixelButton onClick={() => setEditProfileOpen(true)} disabled={saving}>
               {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
+            </PixelButton>
+            <PixelButton
+              variant="ghost"
+              onClick={() => {
+                setSaveMsg(null);
+                setSaveError(null);
+                void reloadProfile();
+              }}
+              disabled={saving}
+            >
+              Atualizar dados
             </PixelButton>
             {saveMsg && <span className="font-sans text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
           </div>
