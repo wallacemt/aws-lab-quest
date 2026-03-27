@@ -3,6 +3,8 @@ import {
   AdminMetricsPayload,
   AdminQuestionsListParams,
   AdminQuestionListItem,
+  AdminQuestionsCleanupPayload,
+  AdminQuestionUpdatePayload,
   AdminUploadSignedUrlPayload,
   AdminUploadQuestionsPayload,
   AdminUploadsListParams,
@@ -243,6 +245,63 @@ export async function listAdminQuestions(
   return (await response.json()) as PaginatedResult<AdminQuestionListItem>;
 }
 
+export async function updateAdminQuestion(
+  questionId: string,
+  payload: AdminQuestionUpdatePayload,
+): Promise<AdminQuestionListItem> {
+  const response = await fetch(`/api/admin/questions/${questionId}`, {
+    method: "PATCH",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(errorPayload.error ?? "Nao foi possivel atualizar questao.");
+  }
+
+  const data = (await response.json()) as { question: AdminQuestionListItem };
+  return data.question;
+}
+
+export async function deleteAdminQuestion(questionId: string): Promise<void> {
+  const response = await fetch(`/api/admin/questions/${questionId}`, {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(errorPayload.error ?? "Nao foi possivel remover questao.");
+  }
+}
+
+export async function cleanupAdminQuestions(input?: {
+  dryRun?: boolean;
+  limit?: number;
+}): Promise<AdminQuestionsCleanupPayload> {
+  const response = await fetch("/api/admin/questions/cleanup", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      dryRun: input?.dryRun ?? false,
+      limit: input?.limit ?? 4000,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel tratar dados de questoes.");
+  }
+
+  return (await response.json()) as AdminQuestionsCleanupPayload;
+}
+
 export async function getAdminMetrics(days = 30): Promise<AdminMetricsPayload> {
   const response = await fetch(`/api/admin/metrics?days=${days}`, {
     method: "GET",
@@ -350,5 +409,20 @@ export async function deleteAdminUploadFile(fileId: string): Promise<void> {
     }
 
     throw new Error(message);
+  }
+}
+
+export async function cancelAdminIngestionJob(jobId: string): Promise<void> {
+  const response = await fetch(`/api/admin/uploads/jobs/${jobId}`, {
+    method: "PATCH",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "cancel" }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel cancelar processamento.");
   }
 }

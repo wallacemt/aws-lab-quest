@@ -173,3 +173,21 @@ export async function updateIngestionJob(
     },
   });
 }
+
+export async function ensureIngestionJobNotCancelled(jobId: string): Promise<void> {
+  const job = await prisma.adminIngestionJob.findUnique({
+    where: { id: jobId },
+    select: {
+      status: true,
+      errorMessage: true,
+    },
+  });
+
+  if (!job) {
+    throw new Error("Job de ingestao nao encontrado.");
+  }
+
+  if (job.status === "FAILED" && job.errorMessage === "CANCELLED_BY_ADMIN") {
+    throw new Error("Processamento cancelado manualmente pelo admin.");
+  }
+}

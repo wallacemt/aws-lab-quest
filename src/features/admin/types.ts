@@ -116,6 +116,39 @@ export type AdminQuestionListItem = {
   } | null;
 };
 
+export type AdminQuestionUpdatePayload = {
+  statement?: string;
+  topic?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  questionType?: "single" | "multi";
+  usage?: "KC" | "SIMULADO" | "BOTH";
+  active?: boolean;
+  optionA?: string;
+  optionB?: string;
+  optionC?: string;
+  optionD?: string;
+  optionE?: string | null;
+  correctOption?: string;
+  correctOptions?: string[] | null;
+  explanationA?: string | null;
+  explanationB?: string | null;
+  explanationC?: string | null;
+  explanationD?: string | null;
+  explanationE?: string | null;
+};
+
+export type AdminQuestionsCleanupPayload = {
+  scanned: number;
+  irregularCount: number;
+  removedCount: number;
+  dryRun: boolean;
+  sample: Array<{
+    id: string;
+    externalId: string;
+    reasons: string[];
+  }>;
+};
+
 export type AdminMetricsOverview = {
   totals: {
     users: number;

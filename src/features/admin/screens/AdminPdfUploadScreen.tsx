@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
-import { listAdminUploadQuestions, listAdminUploads } from "@/features/admin/services/admin-api";
+import {
+  cancelAdminIngestionJob,
+  listAdminUploadQuestions,
+  listAdminUploads,
+} from "@/features/admin/services/admin-api";
 import { AdminUploadQuestionsPayload, AdminUploadsPayload } from "@/features/admin/types";
 
 type CertificationOption = {
@@ -163,6 +167,8 @@ export function AdminPdfUploadScreen() {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [auditPayload, setAuditPayload] = useState<AdminUploadQuestionsPayload | null>(null);
   const [simuladoQueue, setSimuladoQueue] = useState<SimuladoQueueItem[]>([]);
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const queueCancelRef = useRef(false);
 
   useEffect(() => {
     async function loadCertifications() {
@@ -322,6 +328,27 @@ export function AdminPdfUploadScreen() {
     setJobSnapshot(null);
     setOverwriteExamGuide(false);
     setSimuladoQueue([]);
+    setCancelRequested(false);
+    queueCancelRef.current = false;
+  }
+
+  async function handleCancelActiveProcessing() {
+    const targetJobId = activeJobId ?? jobSnapshot?.id ?? null;
+    if (!targetJobId) {
+      return;
+    }
+
+    setCancelRequested(true);
+    queueCancelRef.current = true;
+
+    try {
+      await cancelAdminIngestionJob(targetJobId);
+      setWarning("Cancelamento solicitado. O processamento sera interrompido na proxima etapa segura.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nao foi possivel cancelar o processamento.");
+      setCancelRequested(false);
+      queueCancelRef.current = false;
+    }
   }
 
   async function reloadAdminUploadData() {
@@ -479,6 +506,9 @@ export function AdminPdfUploadScreen() {
       if (mode === "exam-guide") {
         await uploadExamGuide(formData);
       } else if (mode === "simulado-completo") {
+        setCancelRequested(false);
+        queueCancelRef.current = false;
+
         const initialQueue = files.map((file, index) => ({
           id: `${Date.now()}-${index}`,
           fileName: file.name,
@@ -490,6 +520,10 @@ export function AdminPdfUploadScreen() {
         let failed = 0;
 
         for (let index = 0; index < files.length; index += 1) {
+          if (queueCancelRef.current) {
+            break;
+          }
+
           const file = files[index];
           const queueItem = initialQueue[index];
 
@@ -503,6 +537,15 @@ export function AdminPdfUploadScreen() {
             const extracted = await requestSimuladoExtract(singleFileFormData);
             setActiveJobId(extracted.jobId);
             setSimuladoResult(extracted);
+
+            if (queueCancelRef.current) {
+              await cancelAdminIngestionJob(extracted.jobId).catch(() => undefined);
+              updateQueueItem(queueItem.id, {
+                status: "FAILED",
+                error: "Processamento cancelado manualmente.",
+              });
+              break;
+            }
 
             updateQueueItem(queueItem.id, { status: "INGESTING" });
             const ingestPayload = await requestSimuladoIngest({
@@ -530,7 +573,9 @@ export function AdminPdfUploadScreen() {
           }
         }
 
-        if (failed > 0) {
+        if (queueCancelRef.current) {
+          setWarning("Fila interrompida por cancelamento manual.");
+        } else if (failed > 0) {
           setError(`Fila finalizada com falhas: ${failed} arquivo(s) com erro e ${completed} concluido(s).`);
         }
 
@@ -779,6 +824,12 @@ export function AdminPdfUploadScreen() {
                   Dica: use Modo 1 para preservar as questoes do PDF. Use Modo 2 para criar versao totalmente nova.
                 </p>
               </div>
+            )}
+
+            {(loading || activeJobId) && (
+              <PixelButton type="button" variant="ghost" onClick={() => void handleCancelActiveProcessing()}>
+                {cancelRequested ? "Cancelamento solicitado..." : "Cancelar processamento"}
+              </PixelButton>
             )}
           </div>
 
