@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { extractPdfText } from "@/features/admin/services/pdf-extraction";
+import {
+  extractPdfText,
+  extractPdfTextWithGeminiOcr,
+  toExamGuideMarkdown,
+} from "@/features/admin/services/pdf-extraction";
 import { buildSha256, createUploadedFileRecord, uploadAdminFileToSupabase } from "@/lib/admin-ingestion";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
@@ -75,8 +79,10 @@ export async function POST(request: NextRequest) {
 
   try {
     let extractedText = manualText;
+    let markdownGuide = "";
     let fileName = "manual-input";
     let uploadedFileId: string | null = null;
+    let extractionEngine: "manual" | "pdf2json" | "gemini-ocr" = hasManualText ? "manual" : "pdf2json";
 
     if (hasPdfFile) {
       if (!isPdfFile(file)) {
@@ -88,7 +94,13 @@ export async function POST(request: NextRequest) {
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
-      extractedText = await extractPdfText(buffer);
+      try {
+        extractedText = await extractPdfText(buffer);
+        extractionEngine = "pdf2json";
+      } catch {
+        extractedText = await extractPdfTextWithGeminiOcr(buffer, file.type || "application/pdf");
+        extractionEngine = "gemini-ocr";
+      }
       fileName = file.name;
 
       const storage = await uploadAdminFileToSupabase({
@@ -126,10 +138,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    markdownGuide = await toExamGuideMarkdown(extractedText);
+
+    if (markdownGuide.trim().length < 200) {
+      return NextResponse.json(
+        {
+          error: "Nao foi possivel gerar markdown suficiente do Exam Guide. Tente reenviar o PDF com melhor qualidade.",
+        },
+        { status: 422 },
+      );
+    }
+
     await prisma.certificationPreset.update({
       where: { id: certification.id },
       data: {
-        examGuide: extractedText,
+        examGuide: markdownGuide,
       },
     });
 
@@ -138,14 +161,16 @@ export async function POST(request: NextRequest) {
       certificationCode: certification.code,
       fileName,
       uploadedFileId,
-      characters: extractedText.length,
+      extractionEngine,
+      characters: markdownGuide.length,
     });
 
     return NextResponse.json({
       uploadedFileId,
       fileName,
-      characters: extractedText.length,
-      preview: extractedText.slice(0, 4000),
+      extractionEngine,
+      characters: markdownGuide.length,
+      preview: markdownGuide.slice(0, 4000),
       certification: {
         code: certification.code,
         name: certification.name,

@@ -11,6 +11,83 @@ type Body = {
   difficulties?: string[];
 };
 
+function buildExamGuidePreview(guide: string): {
+  markdown: string;
+  preview: string;
+  highlights: string[];
+  totalChars: number;
+} {
+  const normalized = guide.replace(/\r\n/g, "\n").trim();
+  const plainText = normalized
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1");
+
+  const lines = normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 8)
+    .slice(0, 30);
+
+  const highlights = lines
+    .filter((line) => /\d+\s*%|domain|dominio|area|objetivo|task statement|\b[A-Z]{2,6}-\w+/.test(line))
+    .slice(0, 6);
+
+  return {
+    markdown: normalized,
+    preview: plainText.slice(0, 2400),
+    highlights,
+    totalChars: normalized.length,
+  };
+}
+
+async function getUserCertificationContext(userId: string) {
+  return prisma.userProfile.findUnique({
+    where: { userId },
+    select: {
+      certificationPresetId: true,
+      certificationPreset: { select: { code: true, name: true, examMinutes: true, examGuide: true } },
+    },
+  });
+}
+
+function buildGuideErrorResponse() {
+  return NextResponse.json(
+    {
+      error:
+        "Guia oficial da certificacao nao encontrado. O admin precisa enviar o Exam Guide antes de liberar simulados.",
+    },
+    { status: 400 },
+  );
+}
+
+export async function GET(request: NextRequest) {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const profile = await getUserCertificationContext(session.user.id);
+
+  if (!profile?.certificationPresetId || !profile.certificationPreset?.code) {
+    return NextResponse.json(
+      { error: "Defina sua certificacao alvo no perfil antes de iniciar um simulado." },
+      { status: 400 },
+    );
+  }
+
+  if (!profile.certificationPreset.examGuide || profile.certificationPreset.examGuide.trim().length < 120) {
+    return buildGuideErrorResponse();
+  }
+
+  return NextResponse.json({
+    certificationCode: profile.certificationPreset.code,
+    examMinutes: profile.certificationPreset.examMinutes,
+    examGuide: buildExamGuidePreview(profile.certificationPreset.examGuide),
+  });
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
@@ -23,13 +100,7 @@ export async function POST(request: NextRequest) {
     "easy" | "medium" | "hard"
   >;
 
-  const profile = await prisma.userProfile.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      certificationPresetId: true,
-      certificationPreset: { select: { code: true, name: true, examMinutes: true, examGuide: true } },
-    },
-  });
+  const profile = await getUserCertificationContext(session.user.id);
 
   if (!profile?.certificationPresetId || !profile.certificationPreset?.code) {
     return NextResponse.json(
@@ -39,13 +110,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!profile.certificationPreset.examGuide || profile.certificationPreset.examGuide.trim().length < 120) {
-    return NextResponse.json(
-      {
-        error:
-          "Guia oficial da certificacao nao encontrado. O admin precisa enviar o Exam Guide antes de liberar simulados.",
-      },
-      { status: 400 },
-    );
+    return buildGuideErrorResponse();
   }
 
   const selectedDifficulties = difficulties.length > 0 ? difficulties : (["easy", "medium", "hard"] as const);
@@ -92,5 +157,6 @@ export async function POST(request: NextRequest) {
     questions,
     certificationCode: profile.certificationPreset.code,
     examMinutes: profile.certificationPreset.examMinutes,
+    examGuide: buildExamGuidePreview(profile.certificationPreset.examGuide),
   });
 }
