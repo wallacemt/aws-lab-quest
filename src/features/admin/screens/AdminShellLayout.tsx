@@ -11,6 +11,7 @@ const ADMIN_MENU = [
   { href: "/admin/upload", label: "Upload PDF" },
   { href: "/admin/uploads", label: "Historico Uploads" },
   { href: "/admin/users", label: "Usuarios" },
+  { href: "/admin/email", label: "Email" },
   { href: "/admin/questions", label: "Banco de Questoes" },
 ];
 
@@ -70,7 +71,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1220] text-[#e2e8f0]">
+    <div className="min-h-screen  bg-[#0b1220] text-[#e2e8f0]">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#1e293b] bg-[#0f172a]/95 px-4 py-3 backdrop-blur lg:hidden">
         <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>
         <button
@@ -145,7 +146,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <section className="flex-1 p-4 sm:p-6 lg:p-8">{children}</section>
+        <section className="flex-1 overflow-y-auto p-4 ">{children}</section>
       </div>
     </div>
   );

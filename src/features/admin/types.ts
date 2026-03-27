@@ -25,6 +25,10 @@ export type AdminUserListItem = {
   email: string;
   username: string | null;
   role: string;
+  accessStatus: "pending" | "approved" | "rejected";
+  active: boolean;
+  accessDecisionAt?: string | null;
+  accessDecisionReason?: string | null;
   createdAt: string;
   lastSeen: string;
   profile: {
@@ -47,6 +51,8 @@ export type AdminUsersListParams = {
   pageSize: number;
   search?: string;
   role?: string;
+  accessStatus?: "pending" | "approved" | "rejected";
+  active?: "true" | "false";
   certificationCode?: string;
   createdFrom?: string;
   createdTo?: string;
@@ -54,6 +60,14 @@ export type AdminUsersListParams = {
   lastSeenTo?: string;
   sortBy?: "createdAt" | "lastSeen" | "name" | "email" | "role";
   sortOrder?: AdminListSortOrder;
+};
+
+export type AdminUserUpdatePayload = {
+  name?: string;
+  role?: string;
+  accessStatus?: "pending" | "approved" | "rejected";
+  accessDecisionReason?: string;
+  active?: boolean;
 };
 
 export type AdminQuestionsListParams = {
@@ -258,4 +272,44 @@ export type AdminUploadQuestionsPayload = {
   pageSize: number;
   total: number;
   totalPages: number;
+};
+
+export type AdminEmailTemplateItem = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  subject: string;
+  html: string;
+  text: string | null;
+  active: boolean;
+  isSystem: boolean;
+  createdByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminEmailTemplateCreatePayload = {
+  code: string;
+  name: string;
+  description?: string;
+  subject: string;
+  html: string;
+  text?: string;
+  active?: boolean;
+};
+
+export type AdminEmailTemplateUpdatePayload = {
+  name?: string;
+  description?: string;
+  subject?: string;
+  html?: string;
+  text?: string;
+  active?: boolean;
+};
+
+export type AdminEmailSendPayload = {
+  templateId: string;
+  targetMode: "all-users" | "single-user";
+  userId?: string;
 };

@@ -8,6 +8,11 @@ import {
   AdminUploadsListParams,
   AdminUploadsPayload,
   AdminStatus,
+  AdminEmailSendPayload,
+  AdminEmailTemplateCreatePayload,
+  AdminEmailTemplateItem,
+  AdminEmailTemplateUpdatePayload,
+  AdminUserUpdatePayload,
   AdminUsersListParams,
   AdminUserListItem,
   PaginatedResult,
@@ -65,6 +70,160 @@ export async function listAdminUsers(input: AdminUsersListParams): Promise<Pagin
   }
 
   return (await response.json()) as PaginatedResult<AdminUserListItem>;
+}
+
+export async function approveAdminUser(userId: string): Promise<void> {
+  const response = await fetch(`/api/admin/users/${userId}/approve`, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel aprovar usuario.");
+  }
+}
+
+export async function rejectAdminUser(userId: string, reason?: string): Promise<void> {
+  const response = await fetch(`/api/admin/users/${userId}/reject`, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel recusar usuario.");
+  }
+}
+
+export async function updateAdminUser(userId: string, payload: AdminUserUpdatePayload): Promise<void> {
+  const response = await fetch(`/api/admin/users/${userId}`, {
+    method: "PATCH",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel atualizar usuario.");
+  }
+}
+
+export async function deactivateAdminUser(userId: string): Promise<void> {
+  const response = await fetch(`/api/admin/users/${userId}`, {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel desativar usuario.");
+  }
+}
+
+export async function sendDailyPracticeInvite(userIds?: string[]): Promise<{ sent: number }> {
+  const response = await fetch("/api/admin/users/engagement-invite", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userIds }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel enviar convites de pratica diaria.");
+  }
+
+  return (await response.json()) as { sent: number };
+}
+
+export async function listAdminEmailTemplates(): Promise<AdminEmailTemplateItem[]> {
+  const response = await fetch("/api/admin/email/templates", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar templates de email.");
+  }
+
+  const payload = (await response.json()) as { templates: AdminEmailTemplateItem[] };
+  return payload.templates;
+}
+
+export async function createAdminEmailTemplate(
+  input: AdminEmailTemplateCreatePayload,
+): Promise<AdminEmailTemplateItem> {
+  const response = await fetch("/api/admin/email/templates", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel criar template.");
+  }
+
+  const payload = (await response.json()) as { template: AdminEmailTemplateItem };
+  return payload.template;
+}
+
+export async function updateAdminEmailTemplate(
+  templateId: string,
+  input: AdminEmailTemplateUpdatePayload,
+): Promise<AdminEmailTemplateItem> {
+  const response = await fetch(`/api/admin/email/templates/${templateId}`, {
+    method: "PATCH",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel atualizar template.");
+  }
+
+  const payload = (await response.json()) as { template: AdminEmailTemplateItem };
+  return payload.template;
+}
+
+export async function deleteAdminEmailTemplate(templateId: string): Promise<void> {
+  const response = await fetch(`/api/admin/email/templates/${templateId}`, {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel remover template.");
+  }
+}
+
+export async function sendAdminEmailTemplate(input: AdminEmailSendPayload): Promise<{ sent: number; failed: number }> {
+  const response = await fetch("/api/admin/email/send", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel enviar email.");
+  }
+
+  return (await response.json()) as { sent: number; failed: number };
 }
 
 export async function listAdminQuestions(

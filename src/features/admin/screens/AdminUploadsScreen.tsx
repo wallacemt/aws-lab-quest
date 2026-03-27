@@ -32,6 +32,7 @@ export function AdminUploadsScreen() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [files, setFiles] = useState<AdminUploadedFileItem[]>([]);
   const [recentJobs, setRecentJobs] = useState<AdminUploadJobItem[]>([]);
@@ -87,7 +88,7 @@ export function AdminUploadsScreen() {
     }
 
     void loadUploads();
-  }, [page, search, uploadType, certificationCode]);
+  }, [page, search, uploadType, certificationCode, refreshKey]);
 
   async function handleOpenFile(fileId: string) {
     setDownloadingId(fileId);
@@ -104,13 +105,20 @@ export function AdminUploadsScreen() {
   }
 
   return (
-    <main className="space-y-5">
+    <main className="space-y-5 ">
       <header className="space-y-2">
         <p className="font-mono text-xs uppercase text-[#f97316]">Uploads</p>
         <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Historico de arquivos enviados</h1>
+        <button
+          type="button"
+          onClick={() => setRefreshKey((prev) => prev + 1)}
+          className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
+        >
+          Atualizar dados
+        </button>
       </header>
 
-      <section className="border border-[#1e293b] bg-[#111827] p-4">
+      <section className="border  border-[#1e293b] bg-[#111827] p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <input
             value={search}

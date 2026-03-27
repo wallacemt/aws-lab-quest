@@ -123,6 +123,21 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleString("pt-BR");
 }
 
+function inferQuestionCountFromText(value: string): number {
+  const normalized = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const markerRegex = /(?:^|\n)\s*(?:pergunta\s+|quest[aã]o\s*)?(\d{1,3})\s*[\)\.\-:]/gim;
+  const identifiers = new Set<number>();
+
+  for (const match of normalized.matchAll(markerRegex)) {
+    const numberValue = Number(match[1]);
+    if (Number.isFinite(numberValue) && numberValue > 0) {
+      identifiers.add(numberValue);
+    }
+  }
+
+  return identifiers.size;
+}
+
 export function AdminPdfUploadScreen() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -130,6 +145,7 @@ export function AdminPdfUploadScreen() {
   const [warning, setWarning] = useState<string | null>(null);
   const [mode, setMode] = useState<UploadMode>("exam-guide");
   const [showUploadActions, setShowUploadActions] = useState(false);
+  const [showFlowHelp, setShowFlowHelp] = useState(false);
   const [simuladoResult, setSimuladoResult] = useState<ExtractionResponse | null>(null);
   const [examGuideResult, setExamGuideResult] = useState<ExamGuideResponse | null>(null);
   const [ingestResult, setIngestResult] = useState<IngestResponse | null>(null);
@@ -530,7 +546,7 @@ export function AdminPdfUploadScreen() {
     }
   }
 
-  async function handleIngest() {
+  async function handleIngest(ingestMode: "extract-existing" | "generate-new") {
     if (!simuladoResult) {
       return;
     }
@@ -540,11 +556,17 @@ export function AdminPdfUploadScreen() {
     setIngestResult(null);
 
     try {
+      const inferredQuestionCount = inferQuestionCountFromText(simuladoResult.extractedText);
+      const desiredCount =
+        ingestMode === "generate-new"
+          ? Math.max(10, Math.min(80, inferredQuestionCount > 0 ? inferredQuestionCount : 20))
+          : undefined;
+
       const payload = await requestSimuladoIngest({
         certificationCode: simuladoResult.certification.code,
         extractedText: simuladoResult.extractedText,
-        desiredCount: 20,
-        ingestMode: "generate-new",
+        desiredCount,
+        ingestMode,
         jobId: simuladoResult.jobId,
         uploadedFileId: simuladoResult.uploadedFileId,
       });
@@ -560,6 +582,7 @@ export function AdminPdfUploadScreen() {
   }
 
   const selectedGuideStatus = guideStatuses.find((guideStatus) => guideStatus.code === selectedCertificationCode);
+  const estimatedExtractedQuestions = simuladoResult ? inferQuestionCountFromText(simuladoResult.extractedText) : 0;
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6">
@@ -578,6 +601,9 @@ export function AdminPdfUploadScreen() {
           <Link href="/admin/questions">
             <PixelButton variant="ghost">Ver banco de questoes</PixelButton>
           </Link>
+          <PixelButton type="button" variant="ghost" onClick={() => void reloadAdminUploadData()}>
+            Atualizar dados
+          </PixelButton>
         </div>
       </PixelCard>
 
@@ -642,6 +668,11 @@ export function AdminPdfUploadScreen() {
         <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
           Escolha como o PDF deve ser processado.
         </p>
+        <div className="flex flex-wrap gap-2">
+          <PixelButton type="button" variant="ghost" onClick={() => setShowFlowHelp(true)}>
+            Como funciona o fluxo
+          </PixelButton>
+        </div>
         {!showUploadActions ? (
           <PixelButton type="button" onClick={() => setShowUploadActions(true)}>
             Escolher opcao de upload
@@ -730,9 +761,24 @@ export function AdminPdfUploadScreen() {
             </PixelButton>
 
             {mode === "simulado" && simuladoResult && (
-              <PixelButton type="button" disabled={saving} onClick={handleIngest}>
-                {saving ? "Salvando questoes..." : "Gerar novo simulado com IA"}
-              </PixelButton>
+              <div className="space-y-2">
+                <p className="text-xs text-[var(--pixel-subtext)]">
+                  OCR concluido. Questoes estimadas no texto: {estimatedExtractedQuestions || "nao identificadas"}.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <PixelButton type="button" disabled={saving} onClick={() => void handleIngest("extract-existing")}>
+                    {saving ? "Salvando questoes..." : "Modo 1: Extrair e curar questoes existentes"}
+                  </PixelButton>
+                  <PixelButton type="button" disabled={saving} onClick={() => void handleIngest("generate-new")}>
+                    {saving
+                      ? "Salvando questoes..."
+                      : `Modo 2: Gerar novo simulado (${Math.max(10, Math.min(80, estimatedExtractedQuestions || 20))} questoes)`}
+                  </PixelButton>
+                </div>
+                <p className="text-xs text-[var(--pixel-subtext)]">
+                  Dica: use Modo 1 para preservar as questoes do PDF. Use Modo 2 para criar versao totalmente nova.
+                </p>
+              </div>
             )}
           </div>
 
@@ -974,6 +1020,44 @@ export function AdminPdfUploadScreen() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {showFlowHelp && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-4">
+          <div className="w-full max-w-3xl space-y-4 rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Guia rapido</p>
+                <p className="text-sm text-[var(--pixel-text)]">
+                  Como extrair mais questoes do PDF sem perder qualidade
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFlowHelp(false)}
+                className="border border-[var(--pixel-border)] px-2 py-1 text-xs uppercase"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-2 text-sm text-[var(--pixel-text)]">
+              <p>1) Selecione a certificacao correta antes do upload para melhorar classificacao de servico e nivel.</p>
+              <p>2) Execute OCR primeiro no modo 2 etapas para validar o texto extraido.</p>
+              <p>
+                3) Escolha Modo 1 (Extrair e curar) quando quiser manter as questoes do PDF original. Esse modo busca
+                cobrir todos os blocos de questao identificados.
+              </p>
+              <p>
+                4) Escolha Modo 2 (Gerar novo) quando quiser um simulado novo baseado no contexto extraido. A quantidade
+                alvo usa a estimativa de questoes detectadas.
+              </p>
+              <p>
+                5) Se o OCR vier com muito ruido, recorte o PDF por secoes ou tente novamente com arquivo mais limpo.
+              </p>
+            </div>
           </div>
         </div>
       )}

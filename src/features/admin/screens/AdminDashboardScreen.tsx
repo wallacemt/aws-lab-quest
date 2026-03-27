@@ -106,6 +106,7 @@ export function AdminDashboardScreen() {
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     async function bootstrap() {
@@ -122,7 +123,7 @@ export function AdminDashboardScreen() {
     }
 
     bootstrap();
-  }, [days]);
+  }, [days, refreshKey]);
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6">
@@ -172,6 +173,9 @@ export function AdminDashboardScreen() {
             <Link href="/admin/questions">
               <PixelButton variant="ghost">Banco de questoes</PixelButton>
             </Link>
+            <PixelButton variant="ghost" onClick={() => setRefreshKey((prev) => prev + 1)}>
+              Atualizar dados
+            </PixelButton>
           </div>
 
           <div className="flex items-center gap-2">
