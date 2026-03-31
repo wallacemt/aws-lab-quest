@@ -60,6 +60,30 @@ type TaggedQuestionBlock = {
   content: string;
 };
 
+type QuestionRejectionReason =
+  | "invalid_service_code"
+  | "invalid_statement"
+  | "statement_truncated"
+  | "missing_required_options"
+  | "invalid_correct_answer"
+  | "empty_explanations"
+  | "duplicate_question";
+
+type SanitizationResult = {
+  question: GeneratedQuestion;
+  dedupeKey: string;
+};
+
+type SanitizationFailure = {
+  reason: QuestionRejectionReason;
+  detail: string;
+};
+
+type IngestionSanitizationSummary = {
+  rejectedCount: number;
+  rejectionReasons: Record<QuestionRejectionReason, number>;
+};
+
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) {
     return Promise.resolve();
@@ -225,6 +249,48 @@ function normalizeStatementKey(value: string): string {
     .trim();
 }
 
+function buildQuestionDedupeKey(question: Pick<GeneratedQuestion, "statement" | "optionA" | "serviceCode">): string {
+  return [
+    normalizeStatementKey(question.statement),
+    normalizeStatementKey(question.optionA),
+    normalizeStatementKey(question.serviceCode),
+  ].join("|");
+}
+
+function cleanText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLikelyTruncatedText(value: string): boolean {
+  if (!value) {
+    return true;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length < 40) {
+    return true;
+  }
+
+  if (/\.{3,}$/.test(normalized)) {
+    return true;
+  }
+
+  if (!/[.!?)]$/.test(normalized)) {
+    const trailingToken = normalized.split(/\s+/).pop()?.toLowerCase() ?? "";
+    if (["de", "da", "do", "das", "dos", "e", "ou", "para", "com", "que", "em"].includes(trailingToken)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isValidOptionLabel(value: string): value is "A" | "B" | "C" | "D" | "E" {
+  return value === "A" || value === "B" || value === "C" || value === "D" || value === "E";
+}
+
 function preprocessExtractedText(rawText: string): string {
   return rawText
     .replace(/\r\n/g, "\n")
@@ -357,33 +423,105 @@ ${input.sourceChunk}
 function sanitizeGeneratedQuestion(
   question: GeneratedQuestion,
   allowedServiceCodes: Set<string>,
-  fallbackServiceCode: string,
   fallbackDifficulty: StudyQuestionDifficulty,
-): GeneratedQuestion {
-  const serviceCode = allowedServiceCodes.has(question.serviceCode) ? question.serviceCode : fallbackServiceCode;
+): SanitizationResult | SanitizationFailure {
+  const statement = cleanText(question.statement);
+  const serviceCode = cleanText(question.serviceCode).toUpperCase();
   const difficulty = normalizeDifficulty(question.difficulty ?? fallbackDifficulty);
+  const questionType = normalizeQuestionType(question.questionType);
+  const optionA = cleanText(question.optionA);
+  const optionB = cleanText(question.optionB);
+  const optionC = cleanText(question.optionC);
+  const optionD = cleanText(question.optionD);
+  const optionE = cleanText(question.optionE);
+  const correctOption = normalizeCorrectOption(cleanText(question.correctOption || "A"));
+  const correctOptions = normalizeCorrectOptions(question.correctOptions, correctOption, questionType);
+  const explanationA = cleanText(question.explanationA) || "Sem explicacao.";
+  const explanationB = cleanText(question.explanationB) || "Sem explicacao.";
+  const explanationC = cleanText(question.explanationC) || "Sem explicacao.";
+  const explanationD = cleanText(question.explanationD) || "Sem explicacao.";
+  const explanationE = cleanText(question.explanationE) || "Sem explicacao.";
 
-  return {
-    statement: String(question.statement ?? "Questao AWS").trim(),
+  if (!allowedServiceCodes.has(serviceCode)) {
+    return {
+      reason: "invalid_service_code",
+      detail: `Service code invalido: ${serviceCode || "(vazio)"}`,
+    };
+  }
+
+  if (statement.length < 20) {
+    return {
+      reason: "invalid_statement",
+      detail: "Enunciado abaixo do minimo.",
+    };
+  }
+
+  if (isLikelyTruncatedText(statement)) {
+    return {
+      reason: "statement_truncated",
+      detail: "Enunciado possivelmente truncado.",
+    };
+  }
+
+  const requiredOptions = [optionA, optionB, optionC, optionD];
+  if (requiredOptions.some((item) => item.length < 4)) {
+    return {
+      reason: "missing_required_options",
+      detail: "Alternativas A-D incompletas.",
+    };
+  }
+
+  const availableOptions = new Set<"A" | "B" | "C" | "D" | "E">(["A", "B", "C", "D"]);
+  if (optionE.length >= 4) {
+    availableOptions.add("E");
+  }
+
+  if (!availableOptions.has(correctOption)) {
+    return {
+      reason: "invalid_correct_answer",
+      detail: "Alternativa correta nao corresponde a opcoes disponiveis.",
+    };
+  }
+
+  if (questionType === "multi") {
+    const validCorrectOptions = correctOptions.filter((item) => isValidOptionLabel(item) && availableOptions.has(item));
+    if (validCorrectOptions.length < 2) {
+      return {
+        reason: "invalid_correct_answer",
+        detail: "Questao multipla com menos de duas corretas validas.",
+      };
+    }
+  }
+
+  if (explanationA.length < 8 || explanationB.length < 8 || explanationC.length < 8 || explanationD.length < 8) {
+    return {
+      reason: "empty_explanations",
+      detail: "Explicacoes incompletas nas opcoes obrigatorias.",
+    };
+  }
+
+  const sanitizedQuestion: GeneratedQuestion = {
+    statement,
     serviceCode,
     difficulty,
-    questionType: normalizeQuestionType(question.questionType),
-    optionA: String(question.optionA ?? "Opcao A").trim(),
-    optionB: String(question.optionB ?? "Opcao B").trim(),
-    optionC: String(question.optionC ?? "Opcao C").trim(),
-    optionD: String(question.optionD ?? "Opcao D").trim(),
-    optionE: question.optionE ? String(question.optionE).trim() : "",
-    correctOption: normalizeCorrectOption(String(question.correctOption ?? "A").trim()),
-    correctOptions: normalizeCorrectOptions(
-      question.correctOptions,
-      normalizeCorrectOption(String(question.correctOption ?? "A").trim()),
-      normalizeQuestionType(question.questionType),
-    ),
-    explanationA: String(question.explanationA ?? "Sem explicacao.").trim(),
-    explanationB: String(question.explanationB ?? "Sem explicacao.").trim(),
-    explanationC: String(question.explanationC ?? "Sem explicacao.").trim(),
-    explanationD: String(question.explanationD ?? "Sem explicacao.").trim(),
-    explanationE: question.explanationE ? String(question.explanationE).trim() : "Sem explicacao.",
+    questionType,
+    optionA,
+    optionB,
+    optionC,
+    optionD,
+    optionE,
+    correctOption,
+    correctOptions: questionType === "multi" ? correctOptions : [correctOption],
+    explanationA,
+    explanationB,
+    explanationC,
+    explanationD,
+    explanationE,
+  };
+
+  return {
+    question: sanitizedQuestion,
+    dedupeKey: buildQuestionDedupeKey(sanitizedQuestion),
   };
 }
 
@@ -748,7 +886,6 @@ export async function ensureQuestionPool(input: EnsurePoolInput): Promise<void> 
     candidateServices.map((service) => [service.code, { id: service.id, code: service.code }]),
   );
   const allowedServiceCodes = new Set(candidateServices.map((service) => service.code));
-  const fallbackServiceCode = candidateServices[0].code;
 
   const existingCount = await prisma.studyQuestion.count({
     where: {
@@ -780,8 +917,9 @@ export async function ensureQuestionPool(input: EnsurePoolInput): Promise<void> 
   }
 
   const sanitized = generatedRaw
-    .map((item) => sanitizeGeneratedQuestion(item, allowedServiceCodes, fallbackServiceCode, input.difficulty))
-    .filter((item) => item.statement.length > 10);
+    .map((item) => sanitizeGeneratedQuestion(item, allowedServiceCodes, input.difficulty))
+    .filter((item): item is SanitizationResult => "question" in item)
+    .map((item) => item.question);
 
   if (sanitized.length === 0) {
     return;
@@ -807,6 +945,7 @@ export async function ingestQuestionsFromPdf(input: {
     message: string;
     generatedCount?: number;
     savedCount?: number;
+    rejectedCount?: number;
   }) => Promise<void> | void;
 }) {
   const certification = await prisma.certificationPreset.findUnique({
@@ -890,21 +1029,38 @@ export async function ingestQuestionsFromPdf(input: {
     candidateServices.map((service) => [service.code, { id: service.id, code: service.code }]),
   );
   const allowedServiceCodes = new Set(candidateServices.map((service) => service.code));
-  const fallbackServiceCode = candidateServices[0].code;
-
+  const rejectionReasons: Record<QuestionRejectionReason, number> = {
+    invalid_service_code: 0,
+    invalid_statement: 0,
+    statement_truncated: 0,
+    missing_required_options: 0,
+    invalid_correct_answer: 0,
+    empty_explanations: 0,
+    duplicate_question: 0,
+  };
   const dedupe = new Set<string>();
-  const sanitized = generatedRaw
-    .map((item) => sanitizeGeneratedQuestion(item, allowedServiceCodes, fallbackServiceCode, "medium"))
-    .filter((item) => item.statement.length > 10)
-    .filter((item) => {
-      const key = normalizeStatementKey(item.statement);
-      if (!key || dedupe.has(key)) {
-        return false;
-      }
+  const sanitized: GeneratedQuestion[] = [];
 
-      dedupe.add(key);
-      return true;
-    });
+  for (const item of generatedRaw) {
+    const result = sanitizeGeneratedQuestion(item, allowedServiceCodes, "medium");
+    if (!("question" in result)) {
+      rejectionReasons[result.reason] += 1;
+      devAuditLog("study.ingest.question-rejected", {
+        certificationCode: certification.code,
+        reason: result.reason,
+        detail: result.detail,
+      });
+      continue;
+    }
+
+    if (!result.dedupeKey || dedupe.has(result.dedupeKey)) {
+      rejectionReasons.duplicate_question += 1;
+      continue;
+    }
+
+    dedupe.add(result.dedupeKey);
+    sanitized.push(result.question);
+  }
 
   const finalSanitized =
     mode === "generate-new" && typeof input.desiredCount === "number"
@@ -915,11 +1071,17 @@ export async function ingestQuestionsFromPdf(input: {
     throw new Error("As questoes geradas ficaram invalidas apos sanitizacao.");
   }
 
+  const summary: IngestionSanitizationSummary = {
+    rejectedCount: generatedRaw.length - finalSanitized.length,
+    rejectionReasons,
+  };
+
   await input.onProgress?.({
     status: "SAVING",
     progressPercent: 88,
-    message: "Salvando questoes no banco...",
+    message: `Salvando questoes no banco (${summary.rejectedCount} rejeitadas)...`,
     generatedCount: generatedRaw.length,
+    rejectedCount: summary.rejectedCount,
   });
 
   const savedCount = await saveGeneratedQuestions({
@@ -936,11 +1098,23 @@ export async function ingestQuestionsFromPdf(input: {
     message: "Ingestao concluida com sucesso.",
     generatedCount: generatedRaw.length,
     savedCount,
+    rejectedCount: summary.rejectedCount,
+  });
+
+  devAuditLog("study.ingest.summary", {
+    certificationCode: certification.code,
+    mode,
+    generatedRaw: generatedRaw.length,
+    savedCount,
+    rejectedCount: summary.rejectedCount,
+    rejectionReasons: summary.rejectionReasons,
   });
 
   return {
     certificationCode: certification.code,
-    generatedCount: finalSanitized.length,
+    generatedCount: generatedRaw.length,
     savedCount,
+    rejectedCount: summary.rejectedCount,
+    rejectionReasons: summary.rejectionReasons,
   };
 }
