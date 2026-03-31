@@ -346,3 +346,106 @@ export type AdminEmailSendPayload = {
   targetMode: "all-users" | "single-user";
   userId?: string;
 };
+
+export type CertificationOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type ExtractionResponse = {
+  jobId: string;
+  uploadedFileId: string;
+  fileName: string;
+  characters: number;
+  preview: string;
+  extractedText: string;
+  certification: {
+    code: string;
+    name: string;
+  };
+};
+
+export type IngestResponse = {
+  jobId: string;
+  certificationCode: string;
+  generatedCount: number;
+  savedCount: number;
+  rejectedCount?: number;
+  rejectionReasons?: Record<string, number>;
+};
+
+export type ExamGuideResponse = {
+  uploadedFileId: string | null;
+  fileName: string;
+  characters: number;
+  preview: string;
+  message: string;
+  certification: {
+    code: string;
+    name: string;
+  };
+  conflict?: {
+    certificationCode: string;
+    certificationName: string;
+    updatedAt: string;
+  };
+};
+
+export type ApiErrorResponse = {
+  error: string;
+  conflict?: {
+    certificationCode: string;
+    certificationName: string;
+    updatedAt: string;
+  };
+};
+
+export type UploadMode = "exam-guide" | "simulado" | "simulado-completo";
+
+export type IngestionJobResponse = {
+  job: {
+    id: string;
+    status: "PENDING" | "UPLOADING" | "EXTRACTING" | "GENERATING" | "SAVING" | "COMPLETED" | "FAILED";
+    uploadType: "EXAM_GUIDE" | "SIMULADO_PDF" | "SIMULADO_GENERATION";
+    fileName: string | null;
+    progressPercent: number;
+    message: string | null;
+    generatedCount: number | null;
+    savedCount: number | null;
+    errorMessage: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+};
+
+export type ExamGuideStatusItem = {
+  id: string;
+  code: string;
+  name: string;
+  hasExamGuide: boolean;
+  updatedAt: string;
+  latestUpload: {
+    id: string;
+    fileName: string;
+    createdAt: string;
+    uploadedBy: {
+      name: string | null;
+      email: string;
+    } | null;
+  } | null;
+};
+
+export type UploadDashboardPayload = AdminUploadsPayload;
+
+export type UploadAction = "exam-guide" | "simulado" | "simulado-completo";
+
+export type SimuladoQueueItem = {
+  id: string;
+  fileName: string;
+  status: "PENDING" | "EXTRACTING" | "INGESTING" | "COMPLETED" | "FAILED";
+  generatedCount?: number;
+  savedCount?: number;
+  rejectedCount?: number;
+  error?: string;
+};

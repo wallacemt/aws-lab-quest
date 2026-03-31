@@ -234,6 +234,22 @@ export async function fetchStudyHistory(): Promise<StudyHistoryItem[]> {
   return data.history ?? [];
 }
 
+export async function fetchStudyHistoryItemById(historyId: string): Promise<StudyHistoryItem> {
+  const normalizedId = historyId.trim();
+  if (!normalizedId) {
+    throw new Error("ID do historico invalido.");
+  }
+
+  const response = await fetch(`/api/study/history/${encodeURIComponent(normalizedId)}`);
+  const data = await parseJson<{ item?: StudyHistoryItem; error?: string }>(response);
+
+  if (!response.ok || data.error || !data.item) {
+    throw new Error(data.error ?? "Erro ao carregar sessao de estudo.");
+  }
+
+  return data.item;
+}
+
 export async function fetchWeakServices(params?: { take?: number; sample?: number }): Promise<WeakServiceItem[]> {
   const searchParams = new URLSearchParams();
 

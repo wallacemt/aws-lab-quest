@@ -79,6 +79,45 @@ const manualSections = [
   },
 ];
 
+const tutorialShowcase = [
+  {
+    id: "lab-quest-v1",
+    title: "Tutorial: Criando uma Lab Quest",
+    videoUrl: "https://youtu.be/QdR2LqiS4sQ",
+    summary:
+      "Mostra o fluxo completo para gerar uma quest a partir de um texto de laboratorio, concluir tarefas e finalizar com XP salvo no historico.",
+    highlights: [
+      "Entradas de tema e texto do lab com boas praticas",
+      "Execucao tarefa por tarefa com progresso",
+      "Finalizacao da jornada e validacao de XP/historico",
+    ],
+  },
+  {
+    id: "kc-v1",
+    title: "Tutorial: Criando uma sessao de KC",
+    videoUrl: "https://youtu.be/6Ij6GgQjoLQ",
+    summary:
+      "Explica como configurar topicos e dificuldade, responder com revisao por alternativa e concluir a sessao de Knowledge Check.",
+    highlights: [
+      "Selecao de servicos AWS e dificuldade",
+      "Revisao de resposta com explicacao por alternativa",
+      "Resultado final com score, XP e persistencia no historico",
+    ],
+  },
+  {
+    id: "simulado-v1",
+    title: "Tutorial: Criando uma sessao de Simulado",
+    videoUrl: "https://youtu.be/f1vfjb_ZEJs",
+    summary:
+      "Cobre o gate de regras, prova cronometrada, envio do simulado e revisao dos pontos fracos para orientar os proximos estudos.",
+    highlights: [
+      "Aceite de regras e inicio da prova",
+      "Execucao do simulado com timer e navegacao por questao",
+      "Overview de desempenho e revisao de fraquezas",
+    ],
+  },
+] as const;
+
 export function HelpScreen() {
   const router = useRouter();
   const isOnboardingManual = getOnboardingStep() === "manual";
@@ -93,9 +132,7 @@ export function HelpScreen() {
       <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 xl:px-8">
         <PixelCard className="overflow-hidden bg-[linear-gradient(135deg,var(--pixel-card)_0%,var(--pixel-bg)_100%)]">
           <div className="space-y-4">
-            <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-              Manual do jogador
-            </p>
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Manual do jogador</p>
             <h1 className="font-mono text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
               Como usar o AWS Quest do jeito certo
             </h1>
@@ -109,9 +146,7 @@ export function HelpScreen() {
 
         {isOnboardingManual && (
           <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
-            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
-              Primeiro acesso
-            </p>
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Primeiro acesso</p>
             <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
               Leia os pontos principais abaixo. Quando terminar, confirme para seguir direto para o perfil e completar
               nome, certificacao e tema favorito.
@@ -147,15 +182,56 @@ export function HelpScreen() {
               </div>
 
               <div className="border-t-2 border-dashed border-[var(--pixel-border)] pt-3">
-                <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
-                  Melhor experiencia
-                </p>
+                <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Melhor experiencia</p>
                 <p className="mt-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
                   {section.bestExperience}
                 </p>
               </div>
             </PixelCard>
           ))}
+        </section>
+
+        <section className="space-y-3">
+          <PixelCard className="space-y-2">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Tutoriais em video</p>
+            <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Showcase de fluxos guiados</h2>
+            <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
+              Acesse os videos oficiais de LAB, KC e Simulado com um resumo rapido de cada jornada.
+            </p>
+          </PixelCard>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            {tutorialShowcase.map((tutorial) => (
+              <PixelCard key={tutorial.id} className="space-y-3">
+                <div className="space-y-2">
+                  <h3 className="font-mono text-[10px] uppercase leading-5 text-[var(--pixel-primary)]">
+                    {tutorial.title}
+                  </h3>
+                  <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
+                    {tutorial.summary}
+                  </p>
+                </div>
+
+                <ul className="space-y-1 font-[var(--font-body)] text-xs leading-5 text-[var(--pixel-text)]">
+                  {tutorial.highlights.map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <span className="pt-[2px] font-mono text-[8px] text-[var(--pixel-accent)]">■</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <a
+                  href={tutorial.videoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+                >
+                  Assistir tutorial
+                </a>
+              </PixelCard>
+            ))}
+          </div>
         </section>
 
         {!isOnboardingManual && (

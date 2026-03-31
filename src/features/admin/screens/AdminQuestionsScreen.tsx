@@ -723,8 +723,8 @@ export function AdminQuestionsScreen() {
       )}
 
       {selectedQuestion && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
-          <div className="w-full max-w-4xl space-y-4 rounded border border-[#334155] bg-[#111827] p-4 text-[#e2e8f0]">
+        <div className="fixed inset-0 z-50 grid place-items-center  bg-black/70 p-4">
+          <div className="w-full max-w-4xl space-y-4 rounded border overflow-x-auto max-h-[90%] border-[#334155] bg-[#111827] p-4 text-[#e2e8f0]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-mono text-xs uppercase text-[#f97316]">Detalhes da questao</p>

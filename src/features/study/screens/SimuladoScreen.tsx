@@ -35,14 +35,6 @@ function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): Q
   return [...current, option].sort();
 }
 
-type ExamResult = {
-  certificationCode: string;
-  correct: number;
-  total: number;
-  scorePercent: number;
-  historySaved: boolean;
-};
-
 type RulesConsentMap = Record<string, string>;
 
 type WeakServiceMetric = {
@@ -158,7 +150,6 @@ export function SimuladoScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [result, setResult] = useState<ExamResult | null>(null);
   const [reviewByQuestion, setReviewByQuestion] = useState<Record<string, StudyExplanationResult>>({});
   const [loadingReviewByQuestion, setLoadingReviewByQuestion] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
@@ -375,7 +366,6 @@ export function SimuladoScreen() {
       setAnswers({});
       setCurrentIndex(0);
       setSubmitted(false);
-      setResult(null);
       setReviewByQuestion({});
       setLoadingReviewByQuestion({});
       setExamGuideInfo(data.examGuide ?? null);
@@ -519,13 +509,6 @@ export function SimuladoScreen() {
     const performance = buildTopicPerformance(questions, answers);
     setScoreOverview(buildScoreOverview(correctAnswers, totalQuestions, performance));
     setShowScoreOverview(true);
-    setResult({
-      certificationCode: session.certificationCode,
-      correct: correctAnswers,
-      total: totalQuestions,
-      scorePercent,
-      historySaved,
-    });
 
     setLoadingWeakServices(true);
     try {
@@ -563,7 +546,6 @@ export function SimuladoScreen() {
     setAnswers({});
     setCurrentIndex(0);
     setSubmitted(false);
-    setResult(null);
     setReviewByQuestion({});
     setLoadingReviewByQuestion({});
     setExamGuideInfo(null);
@@ -629,6 +611,19 @@ export function SimuladoScreen() {
         </div>
       )}
 
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+      >
+        <PixelCard>
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
+          <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+            Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
+          </p>
+        </PixelCard>
+      </motion.div>
+
       {activeOverview && (
         <motion.div
           initial={{ opacity: 0, y: 14 }}
@@ -641,13 +636,15 @@ export function SimuladoScreen() {
                 <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Score do Simulado</p>
                 <h2 className="mt-1 font-sans text-2xl">Overview de Desempenho</h2>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowScoreOverview(false)}
-                className="border border-[var(--pixel-border)] px-3 py-2 text-[10px] uppercase"
-              >
-                Ocultar overview
-              </button>
+              {process.env.NODE_ENV !== "production" && (
+                <button
+                  type="button"
+                  onClick={() => setShowScoreOverview(false)}
+                  className="border border-[var(--pixel-border)] px-3 py-2 text-[10px] uppercase"
+                >
+                  Ocultar overview
+                </button>
+              )}
             </div>
 
             <div className="border border-[var(--pixel-border)] bg-[repeating-linear-gradient(45deg,rgba(148,163,184,0.07),rgba(148,163,184,0.07)_8px,rgba(15,23,42,0.22)_8px,rgba(15,23,42,0.22)_16px)] p-3 sm:p-4">
@@ -768,54 +765,9 @@ export function SimuladoScreen() {
                 )}
               </div>
             </div>
-
-            <div className="flex flex-wrap justify-end gap-2">
-              {strongestGapTopics.length > 0 && (
-                <>
-                  <PixelButton
-                    onClick={() => {
-                      setShowScoreOverview(false);
-                      router.push(`/kc?topics=${encodeURIComponent(strongestGapTopics.map(toTopicCode).join(","))}`);
-                    }}
-                  >
-                    Fazer KC dos gaps
-                  </PixelButton>
-                  <PixelButton
-                    variant="ghost"
-                    onClick={() => {
-                      setShowScoreOverview(false);
-                      router.push(
-                        `/lab?focus=${encodeURIComponent(strongestGapTopics.join(", "))}&labText=${encodeURIComponent(
-                          buildGapLabSeed(strongestGapTopics),
-                        )}`,
-                      );
-                    }}
-                  >
-                    Criar Lab unico dos gaps
-                  </PixelButton>
-                </>
-              )}
-              <PixelButton variant="ghost" onClick={() => setShowScoreOverview(false)}>
-                Continuar revisao
-              </PixelButton>
-            </div>
           </PixelCard>
         </motion.div>
       )}
-
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-      >
-        <PixelCard>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
-          <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
-          </p>
-        </PixelCard>
-      </motion.div>
-
       {!inExamFlow && !inReviewFlow && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -1050,39 +1002,6 @@ export function SimuladoScreen() {
               </PixelCard>
             )}
 
-            {inReviewFlow && result && (
-              <PixelCard className="space-y-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
-                <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                  Resultado Final - {result.certificationCode}
-                </p>
-                <p className="font-[var(--font-body)] text-base">
-                  Pontuacao: {result.scorePercent}% ({result.correct}/{result.total})
-                </p>
-                {weakServicesCurrentExam.length > 0 && (
-                  <div className="space-y-2 border-t border-[var(--pixel-border)] pt-2">
-                    <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                      Pontos de fraqueza neste simulado
-                    </p>
-                    <div className="space-y-1">
-                      {weakServicesCurrentExam.slice(0, 3).map((item) => (
-                        <p
-                          key={`exam-${item.topic}`}
-                          className="font-[var(--font-body)] text-xs text-[var(--pixel-text)]"
-                        >
-                          {item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                  {result.historySaved
-                    ? "Resultado salvo no seu historico."
-                    : "Resultado concluido, mas nao foi possivel salvar no historico."}
-                </p>
-              </PixelCard>
-            )}
-
             <motion.div
               key={currentQuestion.id}
               initial={{ opacity: 0, y: 10 }}
@@ -1091,8 +1010,7 @@ export function SimuladoScreen() {
             >
               <PixelCard className="space-y-4">
                 <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                  Questao {currentIndex + 1} de {questions.length} · {currentQuestion.topic} ·{" "}
-                  {currentQuestion.difficulty}
+                  Questao {currentIndex + 1} de {questions.length}
                 </p>
                 <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
                 {currentQuestion.questionType === "multi" && (
@@ -1267,6 +1185,14 @@ export function SimuladoScreen() {
                 {questions.map((question, index) => {
                   const answered = normalizeAnswerValue(answers[question.id]).length > 0;
                   const isCurrent = index === currentIndex;
+                  const isCorrectAfterSubmit =
+                    submitted &&
+                    isAnswerCorrect({
+                      questionType: question.questionType,
+                      answer: answers[question.id],
+                      correctOption: question.correctOption,
+                      correctOptions: question.correctOptions,
+                    });
                   return (
                     <button
                       key={question.id}
@@ -1275,9 +1201,13 @@ export function SimuladoScreen() {
                       className={`border px-2 py-2 font-mono text-[10px] uppercase ${
                         isCurrent
                           ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/20"
-                          : answered
-                            ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15"
-                            : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                          : submitted
+                            ? isCorrectAfterSubmit
+                              ? "border-[#2ecc71] bg-green-900/15"
+                              : "border-[#e74c3c] bg-red-900/20"
+                            : answered
+                              ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15"
+                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
                       }`}
                     >
                       {index + 1}

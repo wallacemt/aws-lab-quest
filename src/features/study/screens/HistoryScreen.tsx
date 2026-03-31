@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
@@ -48,6 +49,7 @@ function normalizeSnapshot(tasks: Task[] | undefined): Task[] {
 }
 
 export function HistoryScreen() {
+  const router = useRouter();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [studyHistory, setStudyHistory] = useState<StudySessionItem[]>([]);
   const [search, setSearch] = useState("");
@@ -118,7 +120,7 @@ export function HistoryScreen() {
             <div className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
               <span className="font-mono text-[10px] uppercase">
                 {filteredLabs.length}/{history.length} labs · {filteredStudyHistory.length}/{studyHistory.length}{" "}
-                estudos · {filteredLabsXp}/{totalXp} XP
+                estudos ·
               </span>
             </div>
           )}
@@ -226,7 +228,19 @@ export function HistoryScreen() {
             <ScrollArea className="h-72 w-full rounded-md  border border-pixel-border">
               <div className="grid gap-3 grid-cols-1 p-4 sm:grid-cols-2">
                 {filteredStudyHistory.map((item) => (
-                  <button key={item.id} type="button" onClick={() => setSelectedStudyItem(item)} className="text-left">
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (item.sessionType === "SIMULADO") {
+                        router.push(`/simulado/historico/${item.id}`);
+                        return;
+                      }
+
+                      setSelectedStudyItem(item);
+                    }}
+                    className="text-left"
+                  >
                     <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
