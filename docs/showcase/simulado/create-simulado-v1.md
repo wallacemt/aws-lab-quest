@@ -6,11 +6,11 @@ Este guia cobre o fluxo do Simulado AWS, incluindo aceite de regras, prova crono
 
 Troque apenas o link abaixo pela URL final do seu video:
 
-[Assistir tutorial de Simulado](https://SEU_LINK_DE_VIDEO_AQUI)
+[Assistir tutorial de Simulado](https://youtu.be/f1vfjb_ZEJs)
 
 Opcional (thumbnail YouTube):
 
-`https://img.youtube.com/vi/SEU_VIDEO_ID/0.jpg`
+`https://img.youtube.com/vi/f1vfjb_ZEJs/0.jpg`
 
 ## Objetivo
 
