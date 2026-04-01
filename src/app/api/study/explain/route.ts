@@ -14,6 +14,13 @@ type Body = {
 
 type ExplainOptions = Record<QuestionOption, string>;
 
+type ResolvedQuestionFrame = {
+  options: Record<QuestionOption, string>;
+  explanations: ExplainOptions;
+  correctOption: QuestionOption;
+  correctOptions: QuestionOption[];
+};
+
 const EXPLAIN_CACHE_VERSION = 1;
 const EXPLAIN_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -88,6 +95,83 @@ function isCacheValid(cachedAt: Date | null | undefined, cachedVersion: number):
   return Date.now() - cachedAt.getTime() <= EXPLAIN_CACHE_TTL_MS;
 }
 
+function resolveQuestionFrame(question: {
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  optionE: string | null;
+  explanationA: string | null;
+  explanationB: string | null;
+  explanationC: string | null;
+  explanationD: string | null;
+  explanationE: string | null;
+  correctOption: string;
+  correctOptions: unknown;
+  questionOptions: Array<{
+    order: number;
+    content: string;
+    isCorrect: boolean;
+    explanation: string | null;
+  }>;
+}): ResolvedQuestionFrame {
+  const orderedNormalized = [...(question.questionOptions ?? [])].sort((a, b) => a.order - b.order).slice(0, 5);
+  const labels: QuestionOption[] = ["A", "B", "C", "D", "E"];
+
+  if (orderedNormalized.length >= 2) {
+    const options: Record<QuestionOption, string> = {
+      A: orderedNormalized[0]?.content ?? "",
+      B: orderedNormalized[1]?.content ?? "",
+      C: orderedNormalized[2]?.content ?? "",
+      D: orderedNormalized[3]?.content ?? "",
+      E: orderedNormalized[4]?.content ?? "",
+    };
+
+    const explanations: ExplainOptions = {
+      A: orderedNormalized[0]?.explanation ?? "Sem explicacao.",
+      B: orderedNormalized[1]?.explanation ?? "Sem explicacao.",
+      C: orderedNormalized[2]?.explanation ?? "Sem explicacao.",
+      D: orderedNormalized[3]?.explanation ?? "Sem explicacao.",
+      E: orderedNormalized[4]?.explanation ?? "Nao aplicavel.",
+    };
+
+    const correctOptions = orderedNormalized
+      .map((option, index) => ({ option, label: labels[index] }))
+      .filter((entry) => Boolean(entry.label))
+      .filter((entry) => entry.option.isCorrect)
+      .map((entry) => entry.label as QuestionOption);
+
+    return {
+      options,
+      explanations,
+      correctOption: correctOptions[0] ?? "A",
+      correctOptions: correctOptions.length > 0 ? correctOptions : ["A"],
+    };
+  }
+
+  const fallbackCorrectOption = isOptionKey(question.correctOption) ? question.correctOption : "A";
+  const fallbackCorrectOptions = normalizeOptionArray((question as { correctOptions?: unknown }).correctOptions);
+
+  return {
+    options: {
+      A: question.optionA,
+      B: question.optionB,
+      C: question.optionC,
+      D: question.optionD,
+      E: question.optionE ?? "",
+    },
+    explanations: {
+      A: question.explanationA ?? "Sem explicacao.",
+      B: question.explanationB ?? "Sem explicacao.",
+      C: question.explanationC ?? "Sem explicacao.",
+      D: question.explanationD ?? "Sem explicacao.",
+      E: question.explanationE ?? "Nao aplicavel.",
+    },
+    correctOption: fallbackCorrectOption,
+    correctOptions: fallbackCorrectOptions.length > 0 ? fallbackCorrectOptions : [fallbackCorrectOption],
+  };
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
@@ -106,6 +190,17 @@ export async function POST(request: NextRequest) {
     include: {
       certificationPreset: { select: { code: true, name: true } },
       awsService: { select: { code: true, name: true } },
+      questionOptions: {
+        select: {
+          order: true,
+          content: true,
+          isCorrect: true,
+          explanation: true,
+        },
+        orderBy: {
+          order: "asc",
+        },
+      },
     },
   });
 
@@ -113,18 +208,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Questao nao encontrada." }, { status: 404 });
   }
 
-  const fallbackOriginalOptions: ExplainOptions = {
-    A: question.explanationA ?? "Sem explicacao.",
-    B: question.explanationB ?? "Sem explicacao.",
-    C: question.explanationC ?? "Sem explicacao.",
-    D: question.explanationD ?? "Sem explicacao.",
-    E: question.explanationE ?? "Nao aplicavel.",
-  };
+  const resolvedFrame = resolveQuestionFrame(question);
+  const fallbackOriginalOptions: ExplainOptions = resolvedFrame.explanations;
 
   const questionType = normalizeQuestionType((question as { questionType?: unknown }).questionType);
-  const originalCorrectOption = isOptionKey(question.correctOption) ? question.correctOption : "A";
-  const rawCorrectOptions = normalizeOptionArray((question as { correctOptions?: unknown }).correctOptions);
-  const originalCorrectOptions = rawCorrectOptions.length > 0 ? rawCorrectOptions : [originalCorrectOption];
+  const originalCorrectOption = resolvedFrame.correctOption;
+  const originalCorrectOptions = resolvedFrame.correctOptions;
   const originalSelectedOptions =
     selectedOptionsInput.length > 0
       ? selectedOptionsInput.map((option) => toOriginalOptionFrame(option, body.optionMapping))
@@ -170,11 +259,11 @@ Contexto:
 - Alternativas corretas oficiais: ${originalCorrectOptions.join(", ")}
 
 Alternativas:
-A) ${question.optionA}
-B) ${question.optionB}
-C) ${question.optionC}
-D) ${question.optionD}
-E) ${question.optionE ?? "(não aplicável)"}
+A) ${resolvedFrame.options.A}
+B) ${resolvedFrame.options.B}
+C) ${resolvedFrame.options.C}
+D) ${resolvedFrame.options.D}
+E) ${resolvedFrame.options.E || "(não aplicável)"}
 
 Regras:
 - Retorne APENAS JSON válido (sem markdown).
@@ -211,23 +300,45 @@ Regras:
       options: normalizeExplainOptions(parsed.options, fallbackOriginalOptions),
     };
 
-    await prisma.studyQuestion.update({
-      where: { id: question.id },
-      data: {
-        explanationA: normalizedOriginal.options.A,
-        explanationB: normalizedOriginal.options.B,
-        explanationC: normalizedOriginal.options.C,
-        explanationD: normalizedOriginal.options.D,
-        explanationE: normalizedOriginal.options.E,
-        cachedExplainSummary: normalizedOriginal.summary,
-        cachedExplainA: normalizedOriginal.options.A,
-        cachedExplainB: normalizedOriginal.options.B,
-        cachedExplainC: normalizedOriginal.options.C,
-        cachedExplainD: normalizedOriginal.options.D,
-        cachedExplainE: normalizedOriginal.options.E,
-        cachedExplainAt: new Date(),
-        cachedExplainVersion: EXPLAIN_CACHE_VERSION,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.studyQuestion.update({
+        where: { id: question.id },
+        data: {
+          explanationA: normalizedOriginal.options.A,
+          explanationB: normalizedOriginal.options.B,
+          explanationC: normalizedOriginal.options.C,
+          explanationD: normalizedOriginal.options.D,
+          explanationE: normalizedOriginal.options.E,
+          cachedExplainSummary: normalizedOriginal.summary,
+          cachedExplainA: normalizedOriginal.options.A,
+          cachedExplainB: normalizedOriginal.options.B,
+          cachedExplainC: normalizedOriginal.options.C,
+          cachedExplainD: normalizedOriginal.options.D,
+          cachedExplainE: normalizedOriginal.options.E,
+          cachedExplainAt: new Date(),
+          cachedExplainVersion: EXPLAIN_CACHE_VERSION,
+        },
+      });
+
+      const explanationByOrder = [
+        normalizedOriginal.options.A,
+        normalizedOriginal.options.B,
+        normalizedOriginal.options.C,
+        normalizedOriginal.options.D,
+        normalizedOriginal.options.E,
+      ];
+
+      for (let order = 0; order < explanationByOrder.length; order += 1) {
+        await tx.questionOption.updateMany({
+          where: {
+            questionId: question.id,
+            order,
+          },
+          data: {
+            explanation: explanationByOrder[order],
+          },
+        });
+      }
     });
 
     return NextResponse.json({

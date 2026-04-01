@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureQuestionPool } from "@/lib/study-question-generation";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
 
 const VALID_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
@@ -113,21 +112,6 @@ export async function POST(request: NextRequest) {
     return buildGuideErrorResponse();
   }
 
-  const selectedDifficulties = difficulties.length > 0 ? difficulties : (["easy", "medium", "hard"] as const);
-
-  for (const difficulty of selectedDifficulties) {
-    await ensureQuestionPool({
-      certification: {
-        id: profile.certificationPresetId,
-        code: profile.certificationPreset.code,
-        name: profile.certificationPreset.name,
-      },
-      usage: "SIMULADO",
-      difficulty,
-      desiredCount: Math.ceil(desiredCount / selectedDifficulties.length) + 8,
-    });
-  }
-
   const pool = await prisma.studyQuestion.findMany({
     where: {
       active: true,
@@ -138,6 +122,25 @@ export async function POST(request: NextRequest) {
     include: {
       certificationPreset: { select: { code: true } },
       awsService: { select: { code: true, name: true } },
+      questionOptions: {
+        select: {
+          order: true,
+          content: true,
+          isCorrect: true,
+          explanation: true,
+        },
+        orderBy: { order: "asc" },
+      },
+      questionAwsServices: {
+        select: {
+          service: {
+            select: {
+              code: true,
+              name: true,
+            },
+          },
+        },
+      },
     },
     take: 400,
   });

@@ -91,6 +91,15 @@ export async function POST(request: NextRequest) {
             id: true,
             topic: true,
             difficulty: true,
+            questionAwsServices: {
+              select: {
+                service: {
+                  select: {
+                    code: true,
+                  },
+                },
+              },
+            },
           },
         }),
         listXpWeightsByActivity(body.sessionType),
@@ -113,7 +122,8 @@ export async function POST(request: NextRequest) {
 
         const question = questionMap.get(answer.questionId);
         const difficulty = toTaskDifficulty(question?.difficulty);
-        const topic = question?.topic ?? "*";
+        const normalizedTopic = question?.questionAwsServices?.[0]?.service?.code;
+        const topic = normalizedTopic ?? question?.topic ?? "*";
 
         const basePerCorrect = Math.max(20, Math.round(getTaskXpByDifficulty(difficulty) / 4));
         const resolvedWeight = resolveXpWeight(weights, {

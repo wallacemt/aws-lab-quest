@@ -76,6 +76,16 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       topic: true,
+      questionAwsServices: {
+        select: {
+          service: {
+            select: {
+              code: true,
+              name: true,
+            },
+          },
+        },
+      },
       awsService: {
         select: {
           code: true,
@@ -97,9 +107,10 @@ export async function GET(request: NextRequest) {
 
       const question = byQuestionId.get(answer.questionId);
       const topic = question?.topic?.trim() || "OUTROS";
-      const serviceCode = question?.awsService?.code ?? topic;
-      const serviceName = question?.awsService?.name ?? topic;
-      const key = topic.toUpperCase();
+      const normalizedService = question?.questionAwsServices?.[0]?.service;
+      const serviceCode = normalizedService?.code ?? question?.awsService?.code ?? topic;
+      const serviceName = normalizedService?.name ?? question?.awsService?.name ?? topic;
+      const key = serviceCode.toUpperCase();
 
       const current =
         aggregate.get(key) ??

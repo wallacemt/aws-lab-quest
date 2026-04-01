@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureQuestionPool } from "@/lib/study-question-generation";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
 
 const VALID_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
@@ -13,8 +13,6 @@ type Body = {
 };
 
 const MAX_KC_TOPICS = 3;
-const MAX_GENERATION_ATTEMPTS = 3;
-
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
@@ -47,45 +45,48 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const baseWhere = {
+  const baseWhere: Prisma.StudyQuestionWhereInput = {
     active: true,
     certificationPresetId: profile.certificationPresetId,
     usage: { in: ["KC", "BOTH"] as Array<"KC" | "BOTH"> },
-    ...(topics.length > 0 ? { awsService: { code: { in: topics } } } : {}),
+    ...(topics.length > 0
+      ? {
+          OR: [
+            { awsService: { code: { in: topics } } },
+            { questionAwsServices: { some: { service: { code: { in: topics } } } } },
+          ],
+        }
+      : {}),
     difficulty,
   };
 
-  let questions = await prisma.studyQuestion.findMany({
+  const questions = await prisma.studyQuestion.findMany({
     where: baseWhere,
     include: {
       certificationPreset: { select: { code: true } },
       awsService: { select: { code: true, name: true } },
+      questionOptions: {
+        select: {
+          order: true,
+          content: true,
+          isCorrect: true,
+          explanation: true,
+        },
+        orderBy: { order: "asc" },
+      },
+      questionAwsServices: {
+        select: {
+          service: {
+            select: {
+              code: true,
+              name: true,
+            },
+          },
+        },
+      },
     },
     take: 200,
   });
-
-  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && questions.length < count; attempt += 1) {
-    await ensureQuestionPool({
-      certification: {
-        id: profile.certificationPreset.id,
-        code: profile.certificationPreset.code,
-        name: profile.certificationPreset.name,
-      },
-      usage: "KC",
-      difficulty,
-      desiredCount: count,
-      selectedServiceCodes: topics,
-    });
-
-    questions = await prisma.studyQuestion.findMany({
-      where: baseWhere,
-      include: {
-        certificationPreset: { select: { code: true } },
-        awsService: { select: { code: true, name: true } },
-      },
-      take: 200,
-    });
-  }
 
   if (questions.length === 0) {
     return NextResponse.json({ error: "Nenhuma questao encontrada para os filtros selecionados." }, { status: 404 });
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
   if (questions.length < count) {
     return NextResponse.json(
       {
-        error: `Nao foi possivel completar ${count} questoes para os servicos selecionados. Disponivel apos geracao: ${questions.length}.`,
+        error: `Banco de questoes insuficiente para os filtros selecionados. Disponivel: ${questions.length}, necessario: ${count}.`,
       },
       { status: 422 },
     );
