@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  cleanupAdminQuestions,
+
   deleteAdminQuestion,
   listAdminQuestions,
   updateAdminQuestion,
@@ -134,8 +134,7 @@ export function AdminQuestionsScreen() {
   const [editMode, setEditMode] = useState(false);
   const [savingQuestion, setSavingQuestion] = useState(false);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
-  const [cleanupRunning, setCleanupRunning] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
+ 
   const [modalError, setModalError] = useState<string | null>(null);
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [allAwsServices, setAllAwsServices] = useState<AwsServiceOption[]>([]);
@@ -417,29 +416,6 @@ export function AdminQuestionsScreen() {
     }
   }
 
-  async function handleCleanupIrregularQuestions() {
-    const confirmed = window.confirm(
-      "Essa acao remove automaticamente questoes irregulares/incompletas. Deseja continuar?",
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setCleanupRunning(true);
-    setCleanupResult(null);
-
-    try {
-      const payload = await cleanupAdminQuestions({ dryRun: false, limit: 7000 });
-      setCleanupResult(
-        `Escaneadas: ${payload.scanned} | Irregulares: ${payload.irregularCount} | Removidas: ${payload.removedCount}`,
-      );
-      setRefreshKey((previous) => previous + 1);
-    } catch (err) {
-      setCleanupResult(err instanceof Error ? err.message : "Falha ao tratar dados irregulares.");
-    } finally {
-      setCleanupRunning(false);
-    }
-  }
 
   useEffect(() => {
     async function loadFilterOptions() {
@@ -533,15 +509,7 @@ export function AdminQuestionsScreen() {
         >
           Atualizar dados
         </button>
-        <button
-          type="button"
-          disabled={cleanupRunning}
-          onClick={() => void handleCleanupIrregularQuestions()}
-          className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-xs uppercase text-red-200 disabled:opacity-60"
-        >
-          {cleanupRunning ? "Tratando dados..." : "Tratar dados irregulares"}
-        </button>
-        {cleanupResult && <p className="text-xs text-[#fbbf24]">{cleanupResult}</p>}
+        
       </header>
 
       <section className="border border-[#1e293b] bg-[#111827] p-4">

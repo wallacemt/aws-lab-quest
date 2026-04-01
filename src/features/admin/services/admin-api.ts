@@ -279,28 +279,7 @@ export async function deleteAdminQuestion(questionId: string): Promise<void> {
   }
 }
 
-export async function cleanupAdminQuestions(input?: {
-  dryRun?: boolean;
-  limit?: number;
-}): Promise<AdminQuestionsCleanupPayload> {
-  const response = await fetch("/api/admin/questions/cleanup", {
-    method: "POST",
-    cache: "no-store",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      dryRun: input?.dryRun ?? false,
-      limit: input?.limit ?? 4000,
-    }),
-  });
 
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
-    throw new Error(payload.error ?? "Nao foi possivel tratar dados de questoes.");
-  }
-
-  return (await response.json()) as AdminQuestionsCleanupPayload;
-}
 
 export async function getAdminMetrics(days = 30): Promise<AdminMetricsPayload> {
   const response = await fetch(`/api/admin/metrics?days=${days}`, {
