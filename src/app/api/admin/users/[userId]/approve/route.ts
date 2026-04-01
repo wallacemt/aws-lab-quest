@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import {
+  buildTemplateVariables,
+  ensureSystemTemplates,
+  renderTemplateWithVariables,
+} from "@/lib/admin-email-templates";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
-import { renderFreeAcessTemplate } from "@/features/admin/email/templates";
 
 type RouteContext = {
   params: Promise<{ userId: string }>;
@@ -35,11 +39,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
   });
 
   try {
-    const content = renderFreeAcessTemplate({ name: updated.name });
+    let template = await prisma.adminEmailTemplate.findUnique({ where: { code: "free-access" } });
+
+    if (!template) {
+      await ensureSystemTemplates();
+      template = await prisma.adminEmailTemplate.findUnique({ where: { code: "free-access" } });
+    }
+
+    if (!template || !template.active) {
+      throw new Error("Template de acesso liberado nao encontrado ou inativo no banco de dados.");
+    }
+
+    const variables = buildTemplateVariables({ name: updated.name });
+    const subject = renderTemplateWithVariables(template.subject, variables);
+    const html = renderTemplateWithVariables(template.html, variables);
+
     await sendEmail({
       to: updated.email,
-      subject: content.subject,
-      html: content.html,
+      subject,
+      html,
     });
   } catch (error) {
     devAuditLog("admin.users.approve.email-warning", {
