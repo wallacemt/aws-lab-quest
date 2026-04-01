@@ -15,12 +15,6 @@ export function getAiModel() {
   return client.getGenerativeModel({ model: preferredModel });
 }
 
-export function getOcrAiModel() {
-  const client = getAiClient();
-  const preferredModel = process.env.GEMINI_OCR_MODEL ?? process.env.GEMINI_MODEL ?? "gemma-3-4b-it";
-  return client.getGenerativeModel({ model: preferredModel });
-}
-
 export function extractJsonObject(text: string): string | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
