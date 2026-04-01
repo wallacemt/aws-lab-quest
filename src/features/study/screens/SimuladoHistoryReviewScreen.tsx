@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SimuladoScoreGauge } from "@/features/study/components/SimuladoScoreGauge";
 import { fetchStudyHistoryItemById, StudyHistoryItem } from "@/features/study/services";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
@@ -126,6 +127,11 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
 
   const wrongCount = snapshotsWithResult.filter((item) => !item.correct).length;
   const correctCount = snapshotsWithResult.filter((item) => item.correct).length;
+  const scorePoints = session
+    ? session.totalQuestions > 0
+      ? Math.round((session.correctAnswers / session.totalQuestions) * 1000)
+      : Math.round((session.scorePercent / 100) * 1000)
+    : 0;
 
   return (
     <AppLayout>
@@ -168,6 +174,8 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
                   </span>
                 )}
               </div>
+
+              <SimuladoScoreGauge points={scorePoints} maxPoints={1000} minimumCertificationPoints={700} />
             </div>
           )}
         </PixelCard>

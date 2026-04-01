@@ -75,7 +75,6 @@ export function HistoryScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  const totalXp = history.reduce((sum, item) => sum + item.xp, 0);
   const normalizedSearch = search.trim().toLowerCase();
 
   const filteredLabs = useMemo(() => {
@@ -103,7 +102,6 @@ export function HistoryScreen() {
     });
   }, [normalizedSearch, studyHistory]);
 
-  const filteredLabsXp = filteredLabs.reduce((sum, item) => sum + item.xp, 0);
   const hasAnyResult = filteredLabs.length > 0 || filteredStudyHistory.length > 0;
 
   return (
@@ -251,6 +249,9 @@ export function HistoryScreen() {
                         </div>
                         <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
                           {item.scorePercent}%
+                        </span>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                          +{item.gainedXp} XP
                         </span>
                       </div>
 
@@ -401,6 +402,9 @@ export function HistoryScreen() {
               <div className="flex flex-wrap gap-2 text-xs">
                 <span className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1">
                   Score {selectedStudyItem.scorePercent}%
+                </span>
+                <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                  +{selectedStudyItem.gainedXp} XP
                 </span>
                 <span className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1">
                   {selectedStudyItem.correctAnswers}/{selectedStudyItem.totalQuestions} corretas

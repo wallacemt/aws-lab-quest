@@ -61,6 +61,7 @@ export type StudyHistoryItem = {
   scorePercent: number;
   correctAnswers: number;
   totalQuestions: number;
+  gainedXp: number;
   durationSeconds?: number | null;
   completedAt: string;
   answersSnapshot: StudyAnswerSnapshotPayload[];

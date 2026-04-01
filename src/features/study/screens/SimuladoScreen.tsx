@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
+import { SimuladoScoreGauge } from "@/features/study/components/SimuladoScoreGauge";
 import {
   createSimuladoQuestions,
   createStudyExplanation,
@@ -245,22 +246,6 @@ export function SimuladoScreen() {
   }, [historicalWeakServices, weakServicesCurrentExam]);
   const allQuestionsAnswered = answeredCount === questions.length && questions.length > 0;
   const activeOverview = showScoreOverview ? (mockScoreOverview ?? scoreOverview) : null;
-  const activeOverviewProgress = activeOverview
-    ? Math.min(1, Math.max(0, activeOverview.points / activeOverview.maxPoints))
-    : 0;
-  const activeOverviewThresholdProgress = activeOverview
-    ? Math.min(1, Math.max(0, activeOverview.minimumCertificationPoints / activeOverview.maxPoints))
-    : 0;
-  const gaugeCenterX = 160;
-  const gaugeCenterY = 160;
-  const gaugeRadius = 120;
-  const gaugeNeedleRadius = 96;
-  const activeOverviewNeedleRadians = Math.PI * (1 - activeOverviewProgress);
-  const activeOverviewThresholdRadians = Math.PI * (1 - activeOverviewThresholdProgress);
-  const activeOverviewNeedleX = gaugeCenterX + Math.cos(activeOverviewNeedleRadians) * gaugeNeedleRadius;
-  const activeOverviewNeedleY = gaugeCenterY - Math.sin(activeOverviewNeedleRadians) * gaugeNeedleRadius;
-  const activeOverviewThresholdX = gaugeCenterX + Math.cos(activeOverviewThresholdRadians) * gaugeRadius;
-  const activeOverviewThresholdY = gaugeCenterY - Math.sin(activeOverviewThresholdRadians) * gaugeRadius;
 
   function toTopicCode(topic: string): string {
     const cleaned = topic
@@ -647,96 +632,11 @@ export function SimuladoScreen() {
               )}
             </div>
 
-            <div className="border border-[var(--pixel-border)] bg-[repeating-linear-gradient(45deg,rgba(148,163,184,0.07),rgba(148,163,184,0.07)_8px,rgba(15,23,42,0.22)_8px,rgba(15,23,42,0.22)_16px)] p-3 sm:p-4">
-              <div className="mx-auto w-full max-w-[34rem] overflow-hidden">
-                <div className="relative">
-                  <svg viewBox="0 0 320 210" className="w-full h-auto" role="img" aria-label="Velocimetro de pontuacao">
-                    <defs>
-                      <linearGradient id="retroGaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#b91c1c" />
-                        <stop offset="40%" stopColor="#f59e0b" />
-                        <stop offset="72%" stopColor="#84cc16" />
-                        <stop offset="100%" stopColor="#22c55e" />
-                      </linearGradient>
-                    </defs>
-
-                    <path
-                      d="M 40 160 A 120 120 0 0 1 280 160"
-                      stroke="rgba(148,163,184,0.2)"
-                      strokeWidth="26"
-                      fill="none"
-                    />
-                    <path
-                      d="M 40 160 A 120 120 0 0 1 280 160"
-                      stroke="url(#retroGaugeGradient)"
-                      strokeWidth="20"
-                      fill="none"
-                    />
-
-                    <line
-                      x1={gaugeCenterX}
-                      y1={gaugeCenterY}
-                      x2={activeOverviewThresholdX}
-                      y2={activeOverviewThresholdY}
-                      stroke="#fca5a5"
-                      strokeWidth="2"
-                      strokeDasharray="4 4"
-                    />
-
-                    <line
-                      x1={gaugeCenterX}
-                      y1={gaugeCenterY}
-                      x2={activeOverviewNeedleX}
-                      y2={activeOverviewNeedleY}
-                      stroke="#f8fafc"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                    />
-                    <circle cx={gaugeCenterX} cy={gaugeCenterY} r="8" fill="#e2e8f0" stroke="#0f172a" strokeWidth="2" />
-
-                    <text
-                      x="40"
-                      y="184"
-                      textAnchor="middle"
-                      className="fill-[var(--pixel-subtext)] text-[10px] font-mono"
-                    >
-                      0
-                    </text>
-                    <text
-                      x="280"
-                      y="184"
-                      textAnchor="middle"
-                      className="fill-[var(--pixel-subtext)] text-[10px] font-mono"
-                    >
-                      {activeOverview.maxPoints}
-                    </text>
-                    <text
-                      x={activeOverviewThresholdX}
-                      y={activeOverviewThresholdY - 8}
-                      textAnchor="middle"
-                      className="fill-red-300 text-[10px] font-mono"
-                    >
-                      {activeOverview.minimumCertificationPoints}
-                    </text>
-                  </svg>
-
-                  <div className="pointer-events-none absolute inset-x-0 bottom-1 text-center">
-                    <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Pontuacao</p>
-                    <p className="font-mono text-xl sm:text-2xl text-[var(--pixel-text)]">
-                      {activeOverview.points}
-                      <span className="text-xs sm:text-sm text-[var(--pixel-subtext)]">
-                        {" "}
-                        / {activeOverview.maxPoints}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-center font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                Corte de certificacao marcado em vermelho: {activeOverview.minimumCertificationPoints} pontos.
-              </p>
-            </div>
+            <SimuladoScoreGauge
+              points={activeOverview.points}
+              maxPoints={activeOverview.maxPoints}
+              minimumCertificationPoints={activeOverview.minimumCertificationPoints}
+            />
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="border border-[#14532d] bg-green-900/20 p-3">

@@ -7,6 +7,18 @@ type OptionKey = "A" | "B" | "C" | "D" | "E";
 type DbQuestionWithRelations = DbStudyQuestion & {
   certificationPreset?: { code: string } | null;
   awsService?: { code: string; name: string } | null;
+  questionOptions?: Array<{
+    order: number;
+    content: string;
+    isCorrect: boolean;
+    explanation: string | null;
+  }>;
+  questionAwsServices?: Array<{
+    service: {
+      code: string;
+      name: string;
+    };
+  }>;
 };
 
 function toOptionKey(value: string): OptionKey {
@@ -44,15 +56,53 @@ function shuffleArray<T>(items: T[]): T[] {
   return cloned;
 }
 
-export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations): StudyQuestion {
-  const rawQuestionType = (question as DbStudyQuestion & { questionType?: unknown }).questionType;
-  const questionType = toQuestionType(rawQuestionType);
+function buildRawOptionsFrame(question: DbQuestionWithRelations): {
+  rawOptions: Array<{ key: OptionKey; text: string; explanation: string }>;
+  originalCorrect: OptionKey;
+  originalCorrectOptions: OptionKey[];
+} {
+  const orderedNormalized = Array.isArray(question.questionOptions)
+    ? [...question.questionOptions].sort((a, b) => a.order - b.order).slice(0, 5)
+    : [];
+
+  if (orderedNormalized.length >= 2) {
+    const targetKeys: OptionKey[] = ["A", "B", "C", "D", "E"];
+    const rawOptions = orderedNormalized
+      .map((option, index) => {
+        const key = targetKeys[index];
+        if (!key) {
+          return null;
+        }
+
+        return {
+          key,
+          text: normalizeOptionText(option.content),
+          explanation: option.explanation ?? "",
+        };
+      })
+      .filter((option): option is { key: OptionKey; text: string; explanation: string } => option !== null);
+
+    const originalCorrectOptions = orderedNormalized
+      .map((option, index) => ({ option, key: targetKeys[index] }))
+      .filter((item) => Boolean(item.key))
+      .filter((item) => item.option.isCorrect)
+      .map((item) => item.key as OptionKey);
+
+    const originalCorrect = originalCorrectOptions[0] ?? "A";
+    return {
+      rawOptions,
+      originalCorrect,
+      originalCorrectOptions,
+    };
+  }
+
   const originalCorrect = toOptionKey(question.correctOption);
   const rawCorrectOptions = (question as DbStudyQuestion & { correctOptions?: unknown }).correctOptions;
   const originalCorrectOptions = toOptionKeys(rawCorrectOptions);
   if (originalCorrectOptions.length === 0) {
     originalCorrectOptions.push(originalCorrect);
   }
+
   const rawOptions: Array<{ key: OptionKey; text: string; explanation: string }> = [
     { key: "A", text: normalizeOptionText(question.optionA), explanation: question.explanationA ?? "" },
     { key: "B", text: normalizeOptionText(question.optionB), explanation: question.explanationB ?? "" },
@@ -60,6 +110,21 @@ export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations):
     { key: "D", text: normalizeOptionText(question.optionD), explanation: question.explanationD ?? "" },
     { key: "E", text: normalizeOptionText(question.optionE), explanation: question.explanationE ?? "" },
   ];
+
+  return {
+    rawOptions,
+    originalCorrect,
+    originalCorrectOptions,
+  };
+}
+
+export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations): StudyQuestion {
+  const rawQuestionType = (question as DbStudyQuestion & { questionType?: unknown }).questionType;
+  const questionType = toQuestionType(rawQuestionType);
+  const normalizedFrame = buildRawOptionsFrame(question);
+  const originalCorrect = normalizedFrame.originalCorrect;
+  const originalCorrectOptions = normalizedFrame.originalCorrectOptions;
+  const rawOptions = normalizedFrame.rawOptions;
   const originalOptions = rawOptions.filter((option) => hasRenderableOptionText(option.text));
 
   const shuffled = shuffleArray(originalOptions);
@@ -106,7 +171,7 @@ export function mapDbQuestionToStudyQuestion(question: DbQuestionWithRelations):
     id: question.id,
     statement: question.statement,
     certificationCode: question.certificationPreset?.code ?? "",
-    topic: question.awsService?.name ?? question.topic,
+    topic: question.questionAwsServices?.[0]?.service.name ?? question.awsService?.name ?? question.topic,
     difficulty: question.difficulty,
     questionType,
     options: nextOptions,
