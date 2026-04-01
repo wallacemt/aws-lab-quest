@@ -1,23 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import {
+  buildSha256,
   createIngestionJob,
-  deleteAdminUploadedFileById,
+  createUploadedFileRecord,
   ensureIngestionJobNotCancelled,
   updateIngestionJob,
+  uploadAdminFileToSupabase,
 } from "@/lib/admin-ingestion";
+import { ingestQuestions } from "@/lib/question-ingestion-pipeline";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
-import { ingestQuestionsFromPdf } from "@/lib/study-question-generation";
 
-type IngestPayload = {
-  certificationCode?: string;
-  extractedText?: string;
-  desiredCount?: number;
-  ingestMode?: "generate-new" | "extract-existing";
-  jobId?: string;
-  uploadedFileId?: string;
-};
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+function isSupportedFile(file: File): boolean {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".pdf") || lower.endsWith(".md")) {
+    return true;
+  }
+
+  return file.type === "application/pdf" || file.type === "text/markdown" || file.type === "text/plain";
+}
 
 export async function POST(request: NextRequest) {
   const adminCheck = await requireAdmin(request);
@@ -25,131 +29,134 @@ export async function POST(request: NextRequest) {
     return adminCheck.response;
   }
 
-  let body: IngestPayload;
-  try {
-    body = (await request.json()) as IngestPayload;
-  } catch {
-    return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
-  }
-
-  const certificationCode = body.certificationCode?.trim();
-  const extractedText = body.extractedText?.trim();
+  const formData = await request.formData();
+  const certificationCode = String(formData.get("certificationCode") ?? "").trim();
+  const files = formData.getAll("files").filter((item): item is File => item instanceof File && item.size > 0);
 
   if (!certificationCode) {
     return NextResponse.json({ error: "Certificacao obrigatoria." }, { status: 400 });
   }
 
-  if (!extractedText || extractedText.length < 80) {
-    return NextResponse.json({ error: "Texto extraido insuficiente para ingestao." }, { status: 400 });
+  if (files.length === 0) {
+    return NextResponse.json({ error: "Envie ao menos um arquivo PDF ou MD." }, { status: 400 });
   }
 
-  const desiredCount =
-    typeof body.desiredCount === "number" && Number.isFinite(body.desiredCount)
-      ? Math.max(5, Math.min(50, Math.round(body.desiredCount)))
-      : 20;
-  const ingestMode = body.ingestMode === "extract-existing" ? "extract-existing" : "generate-new";
-
-  devAuditLog("admin.pdf.ingest.request", {
-    adminUserId: adminCheck.userId,
-    certificationCode,
-    ingestMode,
-    desiredCount,
-    extractedLength: extractedText.length,
-    hasUploadedFileId: Boolean(body.uploadedFileId),
-  });
-
-  let jobId = body.jobId?.trim() || null;
-
-  try {
-    if (!jobId) {
-      const certification = await prisma.certificationPreset.findUnique({
-        where: { code: certificationCode },
-        select: { id: true },
-      });
-
-      const job = await createIngestionJob({
-        uploadType: "SIMULADO_GENERATION",
-        createdByUserId: adminCheck.userId,
-        certificationPresetId: certification?.id,
-        desiredCount,
-        fileName: "simulado-ingest",
-        status: ingestMode === "extract-existing" ? "EXTRACTING" : "GENERATING",
-        progressPercent: 55,
-        message:
-          ingestMode === "extract-existing"
-            ? "Iniciando extracao de questoes existentes do PDF."
-            : "Iniciando geracao de questoes.",
-      });
-
-      jobId = job.id;
-    } else {
-      await updateIngestionJob(jobId, {
-        status: ingestMode === "extract-existing" ? "EXTRACTING" : "GENERATING",
-        progressPercent: 55,
-        message:
-          ingestMode === "extract-existing"
-            ? "Iniciando extracao de questoes existentes do PDF."
-            : "Iniciando geracao de questoes.",
-        uploadedFileId: body.uploadedFileId?.trim() || undefined,
-      });
+  for (const file of files) {
+    if (!isSupportedFile(file)) {
+      return NextResponse.json({ error: `Arquivo nao suportado: ${file.name}.` }, { status: 400 });
     }
 
-    await ensureIngestionJobNotCancelled(jobId);
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: `Arquivo excede 20MB: ${file.name}.` }, { status: 413 });
+    }
+  }
 
-    const result = await ingestQuestionsFromPdf({
+  const certification = await prisma.certificationPreset.findUnique({
+    where: { code: certificationCode },
+    select: { id: true, code: true },
+  });
+
+  if (!certification) {
+    return NextResponse.json({ error: "Certificacao invalida." }, { status: 400 });
+  }
+
+  const job = await createIngestionJob({
+    uploadType: "SIMULADO_GENERATION",
+    createdByUserId: adminCheck.userId,
+    certificationPresetId: certification.id,
+    status: "UPLOADING",
+    progressPercent: 10,
+    fileName: files.length === 1 ? files[0].name : `${files.length}-files`,
+    message: "Preparando upload dos arquivos para ingestao.",
+  });
+
+  const uploadedFileIdsByName: Record<string, string> = {};
+
+  try {
+    for (const file of files) {
+      await ensureIngestionJobNotCancelled(job.id);
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const storage = await uploadAdminFileToSupabase({
+        fileName: file.name,
+        certificationCode,
+        uploadType: "SIMULADO_PDF",
+        buffer,
+        mimeType: file.type || "application/octet-stream",
+      });
+
+      const uploaded = await createUploadedFileRecord({
+        uploadType: "SIMULADO_PDF",
+        certificationPresetId: certification.id,
+        uploadedByUserId: adminCheck.userId,
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        fileSizeBytes: file.size,
+        storageBucket: storage.bucket,
+        storagePath: storage.path,
+        sha256: buildSha256(buffer),
+        metadata: {
+          pipeline: "question-ingestion-v2",
+        },
+      });
+
+      uploadedFileIdsByName[file.name] = uploaded.id;
+    }
+
+    await updateIngestionJob(job.id, {
+      status: "EXTRACTING",
+      progressPercent: 25,
+      message: "Iniciando pipeline deterministico de ingestao.",
+    });
+
+    const result = await ingestQuestions(files, {
       certificationCode,
-      extractedText,
-      desiredCount,
-      mode: ingestMode,
-      sourceUploadedFileId: body.uploadedFileId?.trim() || undefined,
+      sourceUploadedFileIdsByName: uploadedFileIdsByName,
       onProgress: async (progress) => {
-        if (!jobId) {
-          return;
-        }
-
-        await ensureIngestionJobNotCancelled(jobId);
-
-        await updateIngestionJob(jobId, {
+        await ensureIngestionJobNotCancelled(job.id);
+        await updateIngestionJob(job.id, {
           status: progress.status,
           progressPercent: progress.progressPercent,
           message: progress.message,
           generatedCount: progress.generatedCount,
           savedCount: progress.savedCount,
-          uploadedFileId: body.uploadedFileId?.trim() || undefined,
           finished: progress.status === "COMPLETED",
         });
       },
     });
 
+    await updateIngestionJob(job.id, {
+      status: "COMPLETED",
+      progressPercent: 100,
+      message: "Ingestao concluida.",
+      generatedCount: result.generatedCount,
+      savedCount: result.savedCount,
+      finished: true,
+    });
+
     return NextResponse.json({
-      jobId,
+      jobId: job.id,
       ...result,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao gerar e salvar questoes.";
+    const message = error instanceof Error ? error.message : "Falha na ingestao de questoes.";
     const cancelledByAdmin = message.includes("cancelado manualmente");
 
-    if (body.uploadedFileId?.trim() && !cancelledByAdmin) {
-      await deleteAdminUploadedFileById(body.uploadedFileId.trim()).catch(() => undefined);
-    }
-
-    if (jobId) {
-      await updateIngestionJob(jobId, {
-        status: "FAILED",
-        progressPercent: 100,
-        message: cancelledByAdmin ? "Ingestao cancelada manualmente." : "Falha na ingestao de questoes.",
-        errorMessage: cancelledByAdmin ? "CANCELLED_BY_ADMIN" : message,
-        finished: true,
-      }).catch(() => undefined);
-    }
+    await updateIngestionJob(job.id, {
+      status: "FAILED",
+      progressPercent: 100,
+      message: cancelledByAdmin ? "Ingestao cancelada manualmente." : "Falha na ingestao de questoes.",
+      errorMessage: cancelledByAdmin ? "CANCELLED_BY_ADMIN" : message,
+      finished: true,
+    }).catch(() => undefined);
 
     devAuditLog("admin.pdf.ingest.failed", {
       adminUserId: adminCheck.userId,
       certificationCode,
-      ingestMode,
-      jobId,
+      jobId: job.id,
       error: message,
     });
+
     return NextResponse.json({ error: message }, { status: cancelledByAdmin ? 409 : 422 });
   }
 }

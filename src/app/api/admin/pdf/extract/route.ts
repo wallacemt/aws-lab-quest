@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { extractPdfTextWithGeminiOcr } from "@/features/admin/services/pdf-extraction";
 import {
   buildSha256,
   createIngestionJob,
@@ -10,17 +9,19 @@ import {
   updateIngestionJob,
   uploadAdminFileToSupabase,
 } from "@/lib/admin-ingestion";
+import { normalizeText, extractTextFromFile } from "@/lib/question-ingestion-pipeline";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-function isPdfFile(file: File): boolean {
-  if (file.type === "application/pdf") {
+function isSupportedFile(file: File): boolean {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".pdf") || lower.endsWith(".md")) {
     return true;
   }
 
-  return file.name.toLowerCase().endsWith(".pdf");
+  return file.type === "application/pdf" || file.type === "text/markdown" || file.type === "text/plain";
 }
 
 export async function POST(request: NextRequest) {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
   const certificationCode = formData.get("certificationCode");
 
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Arquivo PDF obrigatorio." }, { status: 400 });
+    return NextResponse.json({ error: "Arquivo obrigatorio." }, { status: 400 });
   }
 
   if (typeof certificationCode !== "string" || !certificationCode.trim()) {
@@ -50,15 +51,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Certificacao invalida." }, { status: 400 });
   }
 
-  if (!isPdfFile(file)) {
-    return NextResponse.json({ error: "Formato invalido. Envie um arquivo PDF." }, { status: 400 });
+  if (!isSupportedFile(file)) {
+    return NextResponse.json({ error: "Formato invalido. Envie PDF ou Markdown." }, { status: 400 });
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "PDF excede o limite de 20MB." }, { status: 413 });
+    return NextResponse.json({ error: "Arquivo excede o limite de 20MB." }, { status: 413 });
   }
 
-  devAuditLog("admin.pdf.extract.request", {
+  devAuditLog("admin.file.extract.request", {
     adminUserId: adminCheck.userId,
     certificationCode: certification.code,
     fileName: file.name,
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       certificationCode: certification.code,
       uploadType: "SIMULADO_PDF",
       buffer,
-      mimeType: file.type || "application/pdf",
+      mimeType: file.type || "application/octet-stream",
     });
 
     const uploadedFile = await createUploadedFileRecord({
@@ -94,42 +95,35 @@ export async function POST(request: NextRequest) {
       certificationPresetId: certification.id,
       uploadedByUserId: adminCheck.userId,
       fileName: file.name,
-      mimeType: file.type || "application/pdf",
+      mimeType: file.type || "application/octet-stream",
       fileSizeBytes: file.size,
       storageBucket: storage.bucket,
       storagePath: storage.path,
       sha256: buildSha256(buffer),
       metadata: {
         stage: "extract",
+        parser: "pdf-parse|markdown",
       },
     });
     uploadedFileId = uploadedFile.id;
 
     await updateIngestionJob(ingestJob.id, {
       status: "EXTRACTING",
-      progressPercent: 35,
-      message: "Executando OCR com IA no PDF...",
+      progressPercent: 50,
+      message: "Extraindo texto estruturado...",
       uploadedFileId,
     });
 
     await ensureIngestionJobNotCancelled(ingestJob.id);
 
-    const extractedText = await extractPdfTextWithGeminiOcr(buffer, file.type || "application/pdf");
+    const extractedText = normalizeText(await extractTextFromFile(file));
 
     await ensureIngestionJobNotCancelled(ingestJob.id);
-
-    devAuditLog("admin.pdf.extract.completed", {
-      adminUserId: adminCheck.userId,
-      certificationCode: certification.code,
-      fileName: file.name,
-      characters: extractedText.length,
-      jobId: ingestJob.id,
-    });
 
     await updateIngestionJob(ingestJob.id, {
       status: "COMPLETED",
       progressPercent: 100,
-      message: "Texto extraido com OCR com sucesso.",
+      message: "Texto extraido com sucesso.",
       finished: true,
     });
 
@@ -152,18 +146,11 @@ export async function POST(request: NextRequest) {
         status: "FAILED",
         progressPercent: 100,
         message: "Falha na extracao.",
-        errorMessage: e instanceof Error ? e.message : "Falha ao processar PDF.",
+        errorMessage: e instanceof Error ? e.message : "Falha ao processar arquivo.",
         finished: true,
       }).catch(() => undefined);
     }
 
-    devAuditLog("admin.pdf.extract.failed", {
-      adminUserId: adminCheck.userId,
-      certificationCode: certification.code,
-      fileName: file.name,
-      jobId,
-      error: e instanceof Error ? e.message : String(e),
-    });
-    return NextResponse.json({ error: "Falha ao processar PDF." }, { status: 422 });
+    return NextResponse.json({ error: "Falha ao processar arquivo." }, { status: 422 });
   }
 }

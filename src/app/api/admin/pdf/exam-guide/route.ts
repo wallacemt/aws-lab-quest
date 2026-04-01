@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import {
-  extractPdfText,
-  extractPdfTextWithGeminiOcr,
-  toExamGuideMarkdown,
-} from "@/features/admin/services/pdf-extraction";
+import { extractPdfText, toExamGuideMarkdown } from "@/features/admin/services/pdf-extraction";
 import { buildSha256, createUploadedFileRecord, uploadAdminFileToSupabase } from "@/lib/admin-ingestion";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
@@ -82,7 +78,7 @@ export async function POST(request: NextRequest) {
     let markdownGuide = "";
     let fileName = "manual-input";
     let uploadedFileId: string | null = null;
-    let extractionEngine: "manual" | "pdf2json" | "gemini-ocr" = hasManualText ? "manual" : "pdf2json";
+    let extractionEngine: "manual" | "pdf-parse" = hasManualText ? "manual" : "pdf-parse";
 
     if (hasPdfFile) {
       if (!isPdfFile(file)) {
@@ -94,13 +90,8 @@ export async function POST(request: NextRequest) {
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
-      try {
-        extractedText = await extractPdfText(buffer);
-        extractionEngine = "pdf2json";
-      } catch {
-        extractedText = await extractPdfTextWithGeminiOcr(buffer, file.type || "application/pdf");
-        extractionEngine = "gemini-ocr";
-      }
+      extractedText = await extractPdfText(buffer);
+      extractionEngine = "pdf-parse";
       fileName = file.name;
 
       const storage = await uploadAdminFileToSupabase({

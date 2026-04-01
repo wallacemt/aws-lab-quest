@@ -166,6 +166,16 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           topic: true,
+          questionAwsServices: {
+            select: {
+              service: {
+                select: {
+                  code: true,
+                  name: true,
+                },
+              },
+            },
+          },
           awsService: {
             select: {
               code: true,
@@ -187,8 +197,9 @@ export async function GET(request: NextRequest) {
       }
 
       const question = questionById.get(answer.questionId);
-      const serviceCode = question?.awsService?.code ?? question?.topic ?? "OUTROS";
-      const serviceName = question?.awsService?.name ?? question?.topic ?? "OUTROS";
+      const normalizedService = question?.questionAwsServices?.[0]?.service;
+      const serviceCode = normalizedService?.code ?? question?.awsService?.code ?? question?.topic ?? "OUTROS";
+      const serviceName = normalizedService?.name ?? question?.awsService?.name ?? question?.topic ?? "OUTROS";
       const current =
         weakAggregate.get(serviceCode) ?? ({ serviceCode, serviceName, attempts: 0, errors: 0 } as WeakAggregate);
 

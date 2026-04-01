@@ -75,15 +75,60 @@ export async function GET(request: NextRequest, context: RouteContext) {
         usage: true,
         correctOption: true,
         correctOptions: true,
+        questionOptions: {
+          select: {
+            order: true,
+            isCorrect: true,
+          },
+          orderBy: {
+            order: "asc",
+          },
+        },
         createdAt: true,
       },
     }),
     prisma.studyQuestion.count({ where }),
   ]);
 
+  const labels = ["A", "B", "C", "D", "E"] as const;
+  const normalizedItems = items.map((item) => {
+    const normalizedCorrectOptions = [...(item.questionOptions ?? [])]
+      .slice(0, 5)
+      .map((option, index) => ({ option, label: labels[index] }))
+      .filter((entry): entry is { option: { order: number; isCorrect: boolean }; label: "A" | "B" | "C" | "D" | "E" } =>
+        Boolean(entry.label),
+      )
+      .filter((entry) => entry.option.isCorrect)
+      .map((entry) => entry.label);
+
+    const legacyCorrectOptions = Array.isArray(item.correctOptions)
+      ? item.correctOptions.filter((value): value is string => typeof value === "string")
+      : [];
+
+    const correctOptions =
+      normalizedCorrectOptions.length > 0
+        ? normalizedCorrectOptions
+        : legacyCorrectOptions.length > 0
+          ? legacyCorrectOptions
+          : [item.correctOption];
+
+    return {
+      id: item.id,
+      externalId: item.externalId,
+      statement: item.statement,
+      topic: item.topic,
+      difficulty: item.difficulty,
+      questionType: item.questionType,
+      usage: item.usage,
+      createdAt: item.createdAt,
+      correctOption: correctOptions[0] ?? item.correctOption,
+      correctOptions,
+    };
+  });
+
   return NextResponse.json({
     uploadedFile,
-    items,
+    items: normalizedItems,
     page,
     pageSize,
     total,
