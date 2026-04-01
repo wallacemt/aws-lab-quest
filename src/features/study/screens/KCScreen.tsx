@@ -395,7 +395,7 @@ export function KCScreen() {
           </p>
         </PixelCard>
 
-        {!inProgress && (
+        {!inProgress && !kcSummary &&(
           <PixelCard className="space-y-4">
             <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Configurar KC</h2>
 
