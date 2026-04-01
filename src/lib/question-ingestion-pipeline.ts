@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 const MIN_OPTION_LENGTH = 3;
 const INGESTION_VERSION = 2;
 const OPTION_REGEX = /^\s*(?:[A-Ea-e]|[1-5])\s*[\)\.\-:]\s+(.+)$/;
+const CHECKBOX_OPTION_REGEX = /^\s*[-*]\s*\[(x|X|\s)\]\s+(.+)$/;
 
 type PdfParseResult = {
   text?: string;
@@ -166,7 +167,7 @@ function buildUsageHash(question: ParsedQuestion): string {
 }
 
 function looksLikeQuestionStart(line: string): boolean {
-  const normalized = line.trim();
+  const normalized = line.trim().replace(/^#{1,6}\s+/, "");
   if (!normalized) {
     return false;
   }
@@ -179,8 +180,53 @@ function looksLikeQuestionStart(line: string): boolean {
 
 function hasMinimumOptionLines(text: string): boolean {
   const lines = text.split("\n");
-  const optionLines = lines.filter((line) => OPTION_REGEX.test(line));
+  const optionLines = lines.filter((line) => OPTION_REGEX.test(line) || CHECKBOX_OPTION_REGEX.test(line));
   return optionLines.length >= 2;
+}
+
+function parseMarkdownChecklistQuestion(blockText: string): ParsedQuestion | null {
+  const lines = blockText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return null;
+  }
+
+  const firstLine = lines[0]
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^\d{1,3}\s*[\)\.\-:]\s+/, "")
+    .trim();
+
+  if (firstLine.length < 12) {
+    return null;
+  }
+
+  const options = lines
+    .map((line) => line.match(CHECKBOX_OPTION_REGEX))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .map((match) => ({
+      content: normalizeOptionText(match[2] ?? ""),
+      isCorrect: (match[1] ?? "").toLowerCase() === "x",
+    }))
+    .filter((option) => option.content.length >= MIN_OPTION_LENGTH);
+
+  if (options.length < 2) {
+    return null;
+  }
+
+  if (!options.some((item) => item.isCorrect)) {
+    options[0].isCorrect = true;
+  }
+
+  return {
+    statement: firstLine,
+    options,
+    explanation: null,
+    awsServices: [],
+    topics: [],
+  };
 }
 
 export async function extractTextFromFile(file: File): Promise<string> {
@@ -331,6 +377,11 @@ function parseLlmJson(text: string): ParsedQuestion | null {
 }
 
 export async function parseQuestionWithLLM(block: DetectedQuestionBlock): Promise<ParsedQuestion | null> {
+  const markdownParsed = parseMarkdownChecklistQuestion(block.rawText);
+  if (markdownParsed) {
+    return markdownParsed;
+  }
+
   const model = getAiModel();
 
   const prompt = [
