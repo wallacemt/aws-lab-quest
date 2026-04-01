@@ -59,8 +59,57 @@ const DEFAULT_COLUMNS: ColumnKey[] = [
   "service",
 ];
 
+const UNASSIGNED_SERVICE_FILTER = "__UNASSIGNED__";
+
 function formatDate(value: string): string {
   return new Date(value).toLocaleString("pt-BR");
+}
+
+function normalizeForSearch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function resolveQuestionOptions(question: AdminQuestionListItem) {
+  const labels = ["A", "B", "C", "D", "E"] as const;
+  const legacyCorrect = question.correctOptions ?? [question.correctOption];
+
+  return labels.map((label) => {
+    const fromPayload = question.options?.find((item) => item.label === label);
+    const content =
+      fromPayload?.content ??
+      (label === "A"
+        ? question.optionA
+        : label === "B"
+          ? question.optionB
+          : label === "C"
+            ? question.optionC
+            : label === "D"
+              ? question.optionD
+              : question.optionE);
+
+    const explanation =
+      fromPayload?.explanation ??
+      (label === "A"
+        ? question.explanationA
+        : label === "B"
+          ? question.explanationB
+          : label === "C"
+            ? question.explanationC
+            : label === "D"
+              ? question.explanationD
+              : question.explanationE);
+
+    return {
+      label,
+      content,
+      explanation,
+      isCorrect: fromPayload?.isCorrect ?? legacyCorrect.includes(label),
+    };
+  });
 }
 
 export function AdminQuestionsScreen() {
@@ -89,8 +138,8 @@ export function AdminQuestionsScreen() {
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
-  const [awsServices, setAwsServices] = useState<AwsServiceOption[]>([]);
-
+  const [allAwsServices, setAllAwsServices] = useState<AwsServiceOption[]>([]);
+  const [serviceSearch, setServiceSearch] = useState("");
   const [editForm, setEditForm] = useState<{
     statement: string;
     topic: string;
@@ -110,6 +159,7 @@ export function AdminQuestionsScreen() {
     explanationC: string;
     explanationD: string;
     explanationE: string;
+    serviceCodes: string[];
   }>({
     statement: "",
     topic: "",
@@ -129,16 +179,65 @@ export function AdminQuestionsScreen() {
     explanationC: "",
     explanationD: "",
     explanationE: "",
+    serviceCodes: [],
   });
 
   const selectedColumns = useMemo(() => {
     return COLUMN_OPTIONS.filter((column) => visibleColumns.includes(column.key));
   }, [visibleColumns]);
 
+  const selectedQuestionOptions = useMemo(() => {
+    if (!selectedQuestion) {
+      return [] as ReturnType<typeof resolveQuestionOptions>;
+    }
+
+    return resolveQuestionOptions(selectedQuestion);
+  }, [selectedQuestion]);
+
+  const filteredAwsServices = useMemo(() => {
+    const normalizedSearch = normalizeForSearch(serviceSearch);
+
+    if (!normalizedSearch) {
+      return allAwsServices;
+    }
+
+    return allAwsServices
+      .filter((service) => normalizeForSearch(`${service.code} ${service.name}`).includes(normalizedSearch))
+      .sort((a, b) => {
+        const aCodeStarts = normalizeForSearch(a.code).startsWith(normalizedSearch) ? 1 : 0;
+        const bCodeStarts = normalizeForSearch(b.code).startsWith(normalizedSearch) ? 1 : 0;
+        if (aCodeStarts !== bCodeStarts) {
+          return bCodeStarts - aCodeStarts;
+        }
+
+        const aNameStarts = normalizeForSearch(a.name).startsWith(normalizedSearch) ? 1 : 0;
+        const bNameStarts = normalizeForSearch(b.name).startsWith(normalizedSearch) ? 1 : 0;
+        if (aNameStarts !== bNameStarts) {
+          return bNameStarts - aNameStarts;
+        }
+
+        return a.code.localeCompare(b.code, "pt-BR");
+      });
+  }, [allAwsServices, serviceSearch]);
+
   function openQuestionModal(question: AdminQuestionListItem) {
+    const resolvedOptions = resolveQuestionOptions(question);
+    const optionByLabel = Object.fromEntries(resolvedOptions.map((item) => [item.label, item])) as Record<
+      "A" | "B" | "C" | "D" | "E",
+      { label: "A" | "B" | "C" | "D" | "E"; content: string | null; explanation: string | null; isCorrect: boolean }
+    >;
+    const computedCorrectOptions = resolvedOptions.filter((item) => item.isCorrect).map((item) => item.label);
+    const serviceCodes = Array.from(
+      new Set([
+        ...(question.awsServices?.map((service) => service.code) ?? []),
+        ...(question.awsService?.code ? [question.awsService.code] : []),
+      ]),
+    );
+
     setSelectedQuestion(question);
     setEditMode(false);
     setModalError(null);
+    setServiceSearch("");
     setEditForm({
       statement: question.statement,
       topic: question.topic,
@@ -146,18 +245,35 @@ export function AdminQuestionsScreen() {
       questionType: question.questionType,
       usage: question.usage,
       active: question.active,
-      optionA: question.optionA,
-      optionB: question.optionB,
-      optionC: question.optionC,
-      optionD: question.optionD,
-      optionE: question.optionE ?? "",
-      correctOption: question.correctOption,
-      correctOptions: (question.correctOptions ?? [question.correctOption]).join(","),
-      explanationA: question.explanationA ?? "",
-      explanationB: question.explanationB ?? "",
-      explanationC: question.explanationC ?? "",
-      explanationD: question.explanationD ?? "",
-      explanationE: question.explanationE ?? "",
+      optionA: optionByLabel.A.content ?? "",
+      optionB: optionByLabel.B.content ?? "",
+      optionC: optionByLabel.C.content ?? "",
+      optionD: optionByLabel.D.content ?? "",
+      optionE: optionByLabel.E.content ?? "",
+      correctOption: computedCorrectOptions[0] ?? question.correctOption,
+      correctOptions: (computedCorrectOptions.length > 0 ? computedCorrectOptions : [question.correctOption]).join(","),
+      explanationA: optionByLabel.A.explanation ?? "",
+      explanationB: optionByLabel.B.explanation ?? "",
+      explanationC: optionByLabel.C.explanation ?? "",
+      explanationD: optionByLabel.D.explanation ?? "",
+      explanationE: optionByLabel.E.explanation ?? "",
+      serviceCodes,
+    });
+  }
+
+  function toggleServiceCode(serviceCode: string) {
+    setEditForm((previous) => {
+      if (previous.serviceCodes.includes(serviceCode)) {
+        return {
+          ...previous,
+          serviceCodes: previous.serviceCodes.filter((code) => code !== serviceCode),
+        };
+      }
+
+      return {
+        ...previous,
+        serviceCodes: [...previous.serviceCodes, serviceCode],
+      };
     });
   }
 
@@ -165,6 +281,7 @@ export function AdminQuestionsScreen() {
     setSelectedQuestion(null);
     setEditMode(false);
     setModalError(null);
+    setServiceSearch("");
   }
 
   function toggleColumn(column: ColumnKey) {
@@ -209,6 +326,39 @@ export function AdminQuestionsScreen() {
         ),
       );
 
+      const normalizedOptionRows: AdminQuestionUpdatePayload["options"] = [
+        {
+          label: "A",
+          content: editForm.optionA,
+          explanation: editForm.explanationA || null,
+          isCorrect: parsedCorrectOptions.includes("A"),
+        },
+        {
+          label: "B",
+          content: editForm.optionB,
+          explanation: editForm.explanationB || null,
+          isCorrect: parsedCorrectOptions.includes("B"),
+        },
+        {
+          label: "C",
+          content: editForm.optionC,
+          explanation: editForm.explanationC || null,
+          isCorrect: parsedCorrectOptions.includes("C"),
+        },
+        {
+          label: "D",
+          content: editForm.optionD,
+          explanation: editForm.explanationD || null,
+          isCorrect: parsedCorrectOptions.includes("D"),
+        },
+        {
+          label: "E",
+          content: editForm.optionE || null,
+          explanation: editForm.explanationE || null,
+          isCorrect: parsedCorrectOptions.includes("E"),
+        },
+      ];
+
       const payload: AdminQuestionUpdatePayload = {
         statement: editForm.statement,
         topic: editForm.topic,
@@ -228,6 +378,8 @@ export function AdminQuestionsScreen() {
         explanationC: editForm.explanationC || null,
         explanationD: editForm.explanationD || null,
         explanationE: editForm.explanationE || null,
+        options: normalizedOptionRows,
+        serviceCodes: editForm.serviceCodes,
       };
 
       const updated = await updateAdminQuestion(selectedQuestion.id, payload);
@@ -316,7 +468,7 @@ export function AdminQuestionsScreen() {
           const servicesPayload = (await servicesResponse.json()) as {
             services?: AwsServiceOption[];
           };
-          setAwsServices(servicesPayload.services ?? []);
+          setAllAwsServices(servicesPayload.services ?? []);
         }
       } catch {
         // Keep table usable if filter options fail to load.
@@ -483,7 +635,8 @@ export function AdminQuestionsScreen() {
             className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
           >
             <option value="">Todos os servicos AWS</option>
-            {awsServices.map((service) => (
+            <option value={UNASSIGNED_SERVICE_FILTER}>Sem servico vinculado</option>
+            {allAwsServices.map((service) => (
               <option key={service.id} value={service.code}>
                 {service.code} - {service.name}
               </option>
@@ -643,9 +796,15 @@ export function AdminQuestionsScreen() {
                       }
 
                       if (column.key === "service") {
+                        const serviceCodes = Array.from(
+                          new Set([
+                            ...(item.awsServices?.map((service) => service.code) ?? []),
+                            ...(item.awsService?.code ? [item.awsService.code] : []),
+                          ]),
+                        );
                         return (
                           <td key={`${item.id}-${column.key}`} className="px-3 py-2">
-                            {item.awsService?.code ?? "-"}
+                            {serviceCodes.length > 0 ? serviceCodes.join(", ") : "-"}
                           </td>
                         );
                       }
@@ -768,30 +927,48 @@ export function AdminQuestionsScreen() {
                     {selectedQuestion.active ? "ATIVA" : "INATIVA"}
                   </p>
                   <p>
-                    <strong>Servico:</strong> {selectedQuestion.awsService?.code ?? "-"} |{" "}
-                    <strong>Certificacao:</strong> {selectedQuestion.certificationPreset?.code ?? "-"}
+                    <strong>Servicos:</strong>{" "}
+                    {(() => {
+                      const serviceCodes = Array.from(
+                        new Set([
+                          ...(selectedQuestion.awsServices?.map((service) => service.code) ?? []),
+                          ...(selectedQuestion.awsService?.code ? [selectedQuestion.awsService.code] : []),
+                        ]),
+                      );
+
+                      return serviceCodes.length > 0 ? serviceCodes.join(", ") : "-";
+                    })()}{" "}
+                    | <strong>Certificacao:</strong> {selectedQuestion.certificationPreset?.code ?? "-"}
                   </p>
                 </div>
 
                 <div className="grid gap-2 text-sm">
                   <p className="font-mono text-xs uppercase text-[#94a3b8]">Alternativas</p>
-                  <p>A) {selectedQuestion.optionA}</p>
-                  <p>B) {selectedQuestion.optionB}</p>
-                  <p>C) {selectedQuestion.optionC}</p>
-                  <p>D) {selectedQuestion.optionD}</p>
-                  {selectedQuestion.optionE && <p>E) {selectedQuestion.optionE}</p>}
+                  {selectedQuestionOptions
+                    .filter((option, index) => index < 4 || Boolean(option.content))
+                    .map((option) => (
+                      <p key={`view-option-${option.label}`}>
+                        {option.label}) {option.content ?? "-"}
+                      </p>
+                    ))}
                   <p className="mt-1 font-mono text-xs uppercase text-[#22c55e]">
-                    Gabarito: {(selectedQuestion.correctOptions ?? [selectedQuestion.correctOption]).join(", ")}
+                    Gabarito:{" "}
+                    {selectedQuestionOptions
+                      .filter((option) => option.isCorrect)
+                      .map((option) => option.label)
+                      .join(", ") || selectedQuestion.correctOption}
                   </p>
                 </div>
 
                 <div className="grid gap-2 text-sm">
                   <p className="font-mono text-xs uppercase text-[#94a3b8]">Explicacoes</p>
-                  <p>A) {selectedQuestion.explanationA ?? "-"}</p>
-                  <p>B) {selectedQuestion.explanationB ?? "-"}</p>
-                  <p>C) {selectedQuestion.explanationC ?? "-"}</p>
-                  <p>D) {selectedQuestion.explanationD ?? "-"}</p>
-                  {selectedQuestion.optionE && <p>E) {selectedQuestion.explanationE ?? "-"}</p>}
+                  {selectedQuestionOptions
+                    .filter((option, index) => index < 4 || Boolean(option.content) || Boolean(option.explanation))
+                    .map((option) => (
+                      <p key={`view-explanation-${option.label}`}>
+                        {option.label}) {option.explanation ?? "-"}
+                      </p>
+                    ))}
                 </div>
               </>
             ) : (
@@ -872,6 +1049,52 @@ export function AdminQuestionsScreen() {
                   />
                   <span className="text-xs uppercase text-[#94a3b8]">Questao ativa</span>
                 </label>
+
+                <div className="space-y-2 md:col-span-2">
+                  <p className="text-xs uppercase text-[#94a3b8]">Servicos AWS vinculados</p>
+                  <div className="flex items-center gap-2 p-2">
+                    <label htmlFor="search_services">Pesquisar servico:</label>
+                    <input
+                      type="text"
+                      id="search_services"
+                      value={serviceSearch}
+                      placeholder="Nome ou codigo"
+                      className="w-full border border-[#334155] bg-[#0b1220] px-3 py-1 text-sm text-[#e2e8f0] outline-none"
+                      onChange={(event) => setServiceSearch(event.target.value)}
+                    />
+                    {serviceSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setServiceSearch("")}
+                        className="border border-[#334155] px-2 py-1 text-[10px] uppercase"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-40 overflow-auto rounded border border-[#334155] bg-[#0b1220] p-2">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {filteredAwsServices.map((service) => (
+                        <label key={`service-${service.code}`} className="inline-flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={editForm.serviceCodes.includes(service.code)}
+                            onChange={() => toggleServiceCode(service.code)}
+                          />
+                          <span>
+                            {service.code} - {service.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    {filteredAwsServices.length === 0 && (
+                      <p className="p-2 text-xs text-[#94a3b8]">Nenhum servico encontrado para essa busca.</p>
+                    )}
+                  </div>
+                  <p className="text-[10px] uppercase text-[#94a3b8]">
+                    Selecione um ou mais servicos. {filteredAwsServices.length} resultado(s).
+                  </p>
+                </div>
 
                 {(["A", "B", "C", "D", "E"] as const).map((letter) => (
                   <label key={letter} className="space-y-1 md:col-span-2">

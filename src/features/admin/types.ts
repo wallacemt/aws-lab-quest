@@ -105,6 +105,12 @@ export type AdminQuestionListItem = {
   explanationC: string | null;
   explanationD: string | null;
   explanationE: string | null;
+  options?: Array<{
+    label: "A" | "B" | "C" | "D" | "E";
+    content: string | null;
+    explanation: string | null;
+    isCorrect: boolean;
+  }>;
   createdAt: string;
   certificationPreset: {
     code: string;
@@ -114,6 +120,10 @@ export type AdminQuestionListItem = {
     code: string;
     name: string;
   } | null;
+  awsServices?: Array<{
+    code: string;
+    name: string;
+  }>;
 };
 
 export type AdminQuestionUpdatePayload = {
@@ -135,6 +145,13 @@ export type AdminQuestionUpdatePayload = {
   explanationC?: string | null;
   explanationD?: string | null;
   explanationE?: string | null;
+  options?: Array<{
+    label?: "A" | "B" | "C" | "D" | "E";
+    content?: string | null;
+    explanation?: string | null;
+    isCorrect?: boolean;
+  }>;
+  serviceCodes?: string[] | null;
 };
 
 export type AdminQuestionsCleanupPayload = {
@@ -371,8 +388,28 @@ export type IngestResponse = {
   certificationCode: string;
   generatedCount: number;
   savedCount: number;
+  duplicateCount?: number;
   rejectedCount?: number;
   rejectionReasons?: Record<string, number>;
+  extractedQuestions?: Array<{
+    id: string;
+    usageHash: string;
+    rawText: string;
+    statement: string;
+    options: Array<{
+      content: string;
+      isCorrect: boolean;
+    }>;
+    explanation: string | null;
+    awsServices: string[];
+    topics: string[];
+  }>;
+  rejects?: Array<{
+    fileName: string;
+    blockId?: number;
+    reason: string;
+    detail: string;
+  }>;
 };
 
 export type ExamGuideResponse = {
