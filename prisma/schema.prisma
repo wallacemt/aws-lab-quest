@@ -126,14 +126,15 @@ model CertificationPreset {
 }
 
 model AwsService {
-  id          String          @id @default(cuid())
-  code        String          @unique
-  name        String
-  description String?
-  active      Boolean         @default(true)
-  questions   StudyQuestion[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id                  String               @id @default(cuid())
+  code                String               @unique
+  name                String
+  description         String?
+  active              Boolean              @default(true)
+  questions           StudyQuestion[]
+  questionAwsServices QuestionAwsService[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 }
 
 enum StudyQuestionUsage {
@@ -202,6 +203,9 @@ model StudyQuestion {
   cachedExplainE        String?
   cachedExplainAt       DateTime?
   cachedExplainVersion  Int                     @default(1)
+  rawText               String?
+  ingestionVersion      Int                     @default(1)
+  usageHash             String?                 @unique
   active                Boolean                 @default(true)
   certificationPresetId String?
   certificationPreset   CertificationPreset?    @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
@@ -209,6 +213,9 @@ model StudyQuestion {
   awsService            AwsService?             @relation(fields: [awsServiceId], references: [id], onDelete: SetNull)
   sourceUploadedFileId  String?
   sourceUploadedFile    AdminUploadedFile?      @relation(fields: [sourceUploadedFileId], references: [id], onDelete: SetNull)
+  questionOptions       QuestionOption[]
+  questionAwsServices   QuestionAwsService[]
+  questionTopics        QuestionTopic[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 
@@ -219,6 +226,52 @@ model StudyQuestion {
   @@index([awsServiceId])
   @@index([sourceUploadedFileId])
   @@index([cachedExplainAt])
+  @@index([usageHash])
+}
+
+model QuestionOption {
+  id          String        @id @default(cuid())
+  questionId  String
+  question    StudyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  content     String
+  isCorrect   Boolean       @default(false)
+  order       Int
+  explanation String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([questionId, order])
+  @@index([questionId, isCorrect])
+}
+
+model Topic {
+  id             String          @id @default(cuid())
+  name           String          @unique
+  questionTopics QuestionTopic[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model QuestionAwsService {
+  questionId String
+  serviceId  String
+  question   StudyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  service    AwsService    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+
+  @@id([questionId, serviceId])
+  @@index([serviceId])
+}
+
+model QuestionTopic {
+  questionId String
+  topicId    String
+  question   StudyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  topic      Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+
+  @@id([questionId, topicId])
+  @@index([topicId])
 }
 
 model StudySessionHistory {
