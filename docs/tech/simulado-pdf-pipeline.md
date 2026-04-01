@@ -1,190 +1,168 @@
-# Pipeline tecnico de PDF de Simulado
+# Pipeline tecnico de ingestao de questoes (PDF e Markdown)
 
-Este documento descreve como funciona o fluxo de ingestao de PDFs de simulados na plataforma, desde o upload no painel admin ate o uso das questoes no endpoint que alimenta o modo Simulado.
+Este documento descreve o pipeline deterministico de ingestao de questoes usado no painel admin.
 
-## Objetivo do pipeline
+Status atual:
 
-- Permitir que o admin envie PDFs de simulados.
-- Extrair texto do PDF com seguranca e validacoes.
-- Gerar questoes estruturadas com IA.
-- Salvar as questoes no banco para reutilizacao.
-- Reaproveitar esse banco no endpoint de Simulado dos usuarios.
+- OCR removido do fluxo de ingestao.
+- Parsing por chunks cegos removido.
+- Extracao em bloco completo por questao antes de qualquer chamada de IA.
+- Deduplicacao por hash de uso (usageHash).
+- Persistencia com estrutura normalizada (QuestionOption, QuestionAwsService, QuestionTopic).
 
-## Visao geral da arquitetura
+## Objetivo
 
-Fluxo em alto nivel:
+- Ingerir questoes de arquivos PDF e Markdown com previsibilidade.
+- Garantir integridade do bloco completo da questao (enunciado + alternativas + metadados).
+- Persistir questoes com deduplicacao consistente e rastreabilidade.
+- Exibir preview das questoes extraidas no frontend admin em fluxo de pagina unica.
 
-1. Admin envia PDF no painel [src/features/admin/screens/AdminPdfUploadScreen.tsx](../../src/features/admin/screens/AdminPdfUploadScreen.tsx).
-2. API extrai texto via [src/app/api/admin/pdf/extract/route.ts](../../src/app/api/admin/pdf/extract/route.ts).
-3. Admin confirma ingestao via [src/app/api/admin/pdf/ingest/route.ts](../../src/app/api/admin/pdf/ingest/route.ts).
-4. Servico gera/sanitiza/salva questoes em [src/lib/study-question-generation.ts](../../src/lib/study-question-generation.ts).
-5. Endpoint de Simulado busca questoes no banco em [src/app/api/study/simulado/questions/route.ts](../../src/app/api/study/simulado/questions/route.ts).
+## Arquitetura atual
 
-## Pré-condicoes importantes
+Fluxo principal:
 
-Antes de ingerir PDF de simulado, o sistema exige que a certificacao tenha um Exam Guide valido salvo no banco.
+1. Admin abre a tela de upload unica.
+2. Admin seleciona certificacao e envia um ou mais arquivos (PDF/MD).
+3. Endpoint de ingestao processa o arquivo no pipeline deterministico.
+4. Cada bloco de questao e validado e enviado para IA individualmente.
+5. Saida da IA e validada por schema e regras de negocio.
+6. Dados validos sao persistidos em transacao com deduplicacao por usageHash.
+7. API retorna resumo e preview para a interface.
 
-- O Exam Guide e salvo por [src/app/api/admin/pdf/exam-guide/route.ts](../../src/app/api/admin/pdf/exam-guide/route.ts).
-- A ingestao de simulado falha se o Exam Guide estiver ausente/curto (regra em [src/lib/study-question-generation.ts](../../src/lib/study-question-generation.ts)).
-- O endpoint de Simulado tambem bloqueia execucao sem Exam Guide da certificacao do usuario (regra em [src/app/api/study/simulado/questions/route.ts](../../src/app/api/study/simulado/questions/route.ts)).
+Arquivos principais:
 
-## Etapa 1: Upload e extracao do PDF
+- src/features/admin/screens/AdminPdfUploadScreen.tsx
+- src/features/admin/hooks/useAdminPdfUpload.ts
+- src/app/api/admin/pdf/ingest/route.ts
+- src/lib/question-ingestion-pipeline.ts
+- prisma/schema.prisma
 
-Entrada:
+## Regras mandatorias implementadas
 
-- `multipart/form-data` com:
-  - `file` (PDF)
-  - `certificationCode`
+### Extracao
 
-Endpoint:
+- PDF: uso de pdf-parse (sem OCR).
+- Markdown: leitura nativa do arquivo.
+- Texto normalizado antes de detectar questoes.
 
-- [src/app/api/admin/pdf/extract/route.ts](../../src/app/api/admin/pdf/extract/route.ts)
+### Deteccao de blocos
 
-Validacoes principais:
+- Deteccao por regex e heuristicas de inicio de questao.
+- Nao existe chunking cego para enviar texto parcial ao modelo.
+- Bloco so e considerado valido se tiver enunciado e no minimo duas linhas de alternativa.
 
-- Usuario precisa ser admin (`requireAdmin`).
-- Arquivo precisa ser PDF.
-- Limite de tamanho: 20 MB.
-- Certificacao precisa existir em `CertificationPreset`.
+### Uso de IA
 
-Extracao de texto:
+- Uma chamada de IA por bloco de questao.
+- Prompt exige JSON estrito.
+- Se o JSON vier incompleto/invalido, o bloco e rejeitado.
 
-- Implementada em [src/features/admin/services/pdf-extraction.ts](../../src/features/admin/services/pdf-extraction.ts).
-- Usa `pdf2json` para extrair texto.
-- Normaliza whitespace e corta tamanho maximo (`MAX_TEXT_LENGTH`).
-- Se o texto vier vazio (PDF escaneado), retorna erro orientando OCR/fallback manual.
+### Validacao
 
-Saida do endpoint de extracao:
+A questao e rejeitada quando:
 
-- `fileName`
-- `characters`
-- `preview`
-- `extractedText`
-- `certification` (code e name)
+- enunciado ausente ou muito curto;
+- menos de 2 alternativas;
+- nenhuma alternativa correta;
+- alternativas duplicadas;
+- alternativas curtas demais.
 
-## Etapa 2: Ingestao das questoes
+### Deduplicacao
 
-Depois da extracao, o admin aciona "Gerar e salvar questoes" no frontend.
+- usageHash calculado sobre conteudo canonico da questao.
+- Se usageHash ja existe, a questao nao e duplicada no banco.
 
-Endpoint:
+## Estrutura de persistencia
 
-- [src/app/api/admin/pdf/ingest/route.ts](../../src/app/api/admin/pdf/ingest/route.ts)
+Campos e tabelas usados pelo pipeline:
 
-Payload esperado:
+- StudyQuestion:
+  - statement
+  - difficulty
+  - questionType
+  - active
+  - rawText
+  - ingestionVersion
+  - usageHash
+  - relacionamentos de certificacao/upload
 
-- `certificationCode`
-- `extractedText`
-- `desiredCount` (opcional; limitado entre 5 e 50)
+- QuestionOption:
+  - questionId
+  - content
+  - isCorrect
+  - order
+  - explanation
 
-Validacoes:
+- QuestionAwsService:
+  - questionId
+  - serviceId
 
-- Admin autenticado.
-- Payload JSON valido.
-- Texto extraido minimo (>= 80 chars).
-
-Servico chamado:
-
-- `ingestQuestionsFromPdf` em [src/lib/study-question-generation.ts](../../src/lib/study-question-generation.ts).
-
-## Etapa 3: Geracao com IA e sanitizacao
-
-No `ingestQuestionsFromPdf`:
-
-1. Carrega certificacao por `certificationCode`.
-2. Verifica se existe `examGuide` suficiente.
-3. Busca servicos AWS ativos (`AwsService`) para limitar dominios validos.
-4. Chama `generateQuestionsWithAi` com:
-   - `usage: "BOTH"` (questoes podem servir para KC e Simulado)
-   - `difficulty: "mixed"`
-   - `sourceText: extractedText` (texto do PDF)
-   - contexto do exam guide + lista de servicos permitidos
-5. Sanitiza as questoes com `sanitizeGeneratedQuestion`:
-   - normaliza dificuldade
-   - normaliza alternativa correta
-   - corrige serviceCode invalido para fallback
-   - garante strings minimas e consistencia
-6. Persiste com `saveGeneratedQuestions` em `StudyQuestion`.
-
-Retorno final da ingestao:
-
-- `certificationCode`
-- `generatedCount`
-- `savedCount`
-
-## Estrutura de dados no banco
-
-Tabelas centrais (Prisma):
-
-- `CertificationPreset`:
-  - contem metadados da certificacao e `examGuide`.
-- `AwsService`:
-  - catalogo de servicos permitidos para classificar questoes.
-- `StudyQuestion`:
-  - banco principal de questoes para KC e Simulado.
-  - campos relevantes: `usage`, `difficulty`, `topic`, `optionA..E`, `correctOption`, `explanationA..E`, `active`, FKs para certificacao/servico.
-
-Modelo completo: [prisma/schema.prisma](../../prisma/schema.prisma).
-
-## Como o Simulado consome esse banco
-
-Endpoint de prova:
-
-- [src/app/api/study/simulado/questions/route.ts](../../src/app/api/study/simulado/questions/route.ts)
-
-Fluxo:
-
-1. Autentica usuario.
-2. Carrega certificacao alvo do perfil (`UserProfile`).
-3. Bloqueia se nao houver exam guide.
-4. Para cada dificuldade selecionada, chama `ensureQuestionPool(...)`.
-   - Esse metodo preenche faltas do pool com IA quando necessario.
-5. Consulta `StudyQuestion` com filtros:
-   - `active = true`
-   - `certificationPresetId` do usuario
-   - `usage in ["SIMULADO", "BOTH"]`
-   - dificuldade opcional
-6. Sorteia perguntas aleatorias e mapeia para DTO de resposta (`mapDbQuestionToStudyQuestion`).
-7. Retorna para frontend:
-   - `questions`
-   - `certificationCode`
-   - `examMinutes`
+- Topic
+- QuestionTopic
 
 Observacao:
 
-- Mesmo sem novo PDF, o endpoint continua funcionando com o banco acumulado.
-- O PDF melhora e expande a base de questoes para aquela certificacao.
+- O schema ainda contem campos legados para compatibilidade operacional de telas/endpoints antigos em outras areas, mas o novo pipeline grava tambem no modelo normalizado e usa usageHash como chave de dedupe.
 
-## Relacao com KC
+## Contrato da API de ingestao
 
-O mesmo banco `StudyQuestion` e reutilizado no KC.
+Endpoint:
 
-- Endpoint KC: [src/app/api/study/kc/questions/route.ts](../../src/app/api/study/kc/questions/route.ts)
-- Filtro de uso para KC: `usage in ["KC", "BOTH"]`.
-- Isso permite compartilhar parte do conhecimento gerado por PDF entre os dois modos.
+- POST /api/admin/pdf/ingest
 
-## Tratamento de falhas e mensagens
+Entrada:
 
-Falhas comuns e resposta esperada:
+- multipart/form-data
+  - certificationCode
+  - files[] (PDF/MD)
 
-- PDF invalido ou maior que 20 MB: erro de validacao.
-- PDF escaneado sem texto: erro orientando OCR/fallback manual.
-- Certificacao invalida: erro 400.
-- Sem Exam Guide: bloqueio da ingestao e do simulado.
-- IA sem retorno JSON util: ingestao falha com mensagem de negocio.
+Saida:
 
-## Checklist operacional (admin)
+- jobId
+- certificationCode
+- generatedCount
+- savedCount
+- duplicateCount
+- rejectedCount
+- extractedQuestions (preview)
+- rejects (motivos por bloco)
 
-1. Fazer upload do Exam Guide oficial.
-2. Fazer upload do PDF de Simulado.
-3. Validar preview extraido.
-4. Executar ingestao e confirmar `savedCount` > 0.
-5. Testar Simulado com usuario da mesma certificacao alvo.
+## Fluxo de frontend admin
 
-## Pontos de extensao
+Tela:
 
-Sugestoes para evolucao futura:
+- src/features/admin/screens/AdminPdfUploadScreen.tsx
 
-- Guardar versao/origem do PDF ingerido em tabela dedicada.
-- Evitar duplicadas semanticas de questoes (deduplicacao por embedding/hash).
-- Adicionar score de confianca por questao e curadoria humana.
-- Criar dashboard de cobertura por servico AWS e dificuldade.
+Passos na UI:
+
+1. Selecionar certificacao.
+2. Selecionar arquivos (PDF/MD).
+3. Clicar em Processar.
+4. Ver loading.
+5. Ver resumo final e preview das questoes persistidas.
+
+## Mudancas relevantes em runtime
+
+- Rotas de estudo (KC e Simulado) nao fazem mais geracao automatica de pool durante a requisicao.
+- O banco precisa estar previamente abastecido via ingestao admin.
+- Em caso de pool insuficiente, as rotas retornam erro de disponibilidade.
+
+## Operacao recomendada
+
+1. Validar certificacao alvo no perfil do usuario/admin.
+2. Enviar arquivos fonte no admin upload.
+3. Conferir preview e rejeicoes.
+4. Confirmar crescimento do banco de questoes por certificacao.
+5. Testar KC e Simulado com usuario da mesma certificacao.
+
+## Checklist de observabilidade
+
+- Verificar contadores: generatedCount, savedCount, duplicateCount, rejectedCount.
+- Auditar rejects por motivo para melhorar qualidade da fonte.
+- Auditar uso de usageHash para confirmar deduplicacao.
+
+## Limites e decisoes
+
+- Sem OCR: PDFs escaneados sem texto selecionavel nao sao suportados pela ingestao automatica.
+- Sem chunking cego: blocos incompletos sao descartados.
+- Sem reparo heuristico de JSON: payload invalido da IA e rejeitado.

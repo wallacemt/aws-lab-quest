@@ -46,6 +46,22 @@ Este documento resume as principais entregas da fase de evolucao para preparacao
 - Seed gera imagens por prompt para cada conquista (quando Supabase + Pollinations configurados).
 - Arte e path sao persistidos na tabela Achievement.
 
+## 7. Refactor de ingestao de questoes (pipeline deterministico)
+
+- Novo pipeline unico de ingestao em fluxo de pagina unica no admin.
+- Suporte nativo para PDF e Markdown na entrada.
+- OCR removido do caminho de ingestao.
+- Deteccao de bloco completo antes da IA (sem chunk cego).
+- Uma chamada de IA por bloco, com resposta em JSON estrito.
+- Validacao de integridade de questao antes de persistir.
+- Deduplicacao por usageHash.
+- Persistencia em estrutura normalizada:
+  - QuestionOption
+  - QuestionAwsService
+  - Topic e QuestionTopic
+- Rotas de estudo (KC e Simulado) deixaram de auto-gerar pool em runtime.
+- Operacao passa a depender do abastecimento previo do banco via upload admin.
+
 ## Observacoes operacionais
 
 - Sempre executar npm run db:generate apos alteracoes de schema.

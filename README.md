@@ -14,9 +14,10 @@ Aplicacao web para preparacao de certificacoes AWS em formato gamificado, com mo
   - admin deve enviar primeiro o guia oficial,
   - fallback manual para guias em PDF escaneado.
 - Pipeline admin de PDF:
-  - extracao de texto,
-  - geracao de perguntas com IA,
-  - persistencia no banco.
+  - extracao deterministica (PDF via pdf-parse e MD nativo),
+  - deteccao de bloco completo de questao,
+  - chamada de IA por bloco com JSON estrito,
+  - validacao, deduplicacao por usageHash e persistencia normalizada.
 - Leaderboard em tempo real via Supabase Realtime.
 - Indicador de usuarios online (> 1) no header.
 - Sistema de niveis + badges por nivel.
@@ -143,7 +144,15 @@ npm run db:studio
 3. Depois disso, enviar PDF de simulado para ingestao de questoes.
 4. Sem exam guide, /api/study/simulado/questions retorna bloqueio funcional.
 
-### 2) Conquistas persistidas
+### 2) Ingestao deterministica de questoes
+
+1. Admin envia PDF/Markdown em /admin/upload.
+2. Pipeline detecta blocos completos antes de chamar IA.
+3. Cada bloco processa uma chamada de IA com schema JSON estrito.
+4. Regras invalidam questoes incompletas e deduplicam por usageHash.
+5. Resultado retorna preview e motivos de rejeicao no frontend.
+
+### 3) Conquistas persistidas
 
 1. Catalogo de conquistas existe na tabela Achievement.
 2. Desbloqueios por usuario ficam em UserAchievement.
@@ -156,3 +165,5 @@ npm run db:studio
 - [Showcase: criar lab quest](./docs/showcase/labs/create-lab-quest-v1.md)
 - [Guia de arquitetura e funcionalidades recentes](./docs/platform-upgrade-2026-03.md)
 - [Guia do sistema de conquistas](./docs/achievements-system.md)
+- [Pipeline tecnico de ingestao de questoes](./docs/tech/simulado-pdf-pipeline.md)
+- [Refactor de ingestao v2 (pt-BR)](./docs/tech/question-ingestion-refactor-2026-03.md)
