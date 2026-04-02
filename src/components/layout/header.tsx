@@ -1,6 +1,6 @@
 import { HelpCircle, Settings2, Star } from "lucide-react";
 import Image from "next/image";
-import appLogo from "@/assets/logo.png";
+
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -89,7 +89,7 @@ export const Header = () => {
       <div className="flex items-center gap-3">
         <Link href="/" className="flex min-w-0 items-center gap-3">
           <div className={`pixel-cloud-icon ${theme === "dark" ? "bg-primary" : ""}`} aria-hidden="true">
-            <Image src={appLogo} alt="AWS Quest logo" height={260} width={260} />
+            <Image src={'/logo.png'} alt="AWS Quest logo" height={260} width={260} />
           </div>
           <div className="hidden min-w-0 sm:block">
             <h1 className="font-mono text-lg md:text-xl font-bold tracking-wider text-primary hidden sm:block mt-1">

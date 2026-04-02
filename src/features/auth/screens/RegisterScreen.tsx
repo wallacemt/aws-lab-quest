@@ -8,7 +8,6 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import appLogo from "@/assets/logo.png";
 import { EyeClosed, EyeIcon } from "lucide-react";
 
 export function RegisterScreen() {
@@ -102,7 +101,7 @@ export function RegisterScreen() {
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">
             <Image
-              src={appLogo}
+              src={'/logo.png'}
               alt="AWS Quest logo"
               width={124}
               height={124}

@@ -8,7 +8,6 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import appLogo from "@/assets/logo.png";
 import { EyeClosed, EyeIcon } from "lucide-react";
 
 export function LoginScreen() {
@@ -128,15 +127,15 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">
             <Image
-              src={appLogo}
+              src={'/icon.png'}
               alt="AWS Quest logo"
-              width={124}
-              height={124}
+              width={300}
+              height={300}
               priority
-              className="h-auto w-28 sm:w-32"
+              className="h-auto w-40 retro-shadow rounded-2xl md:w-52 animate-pulse"
             />
           </div>
-          <h1 className="font-mono text-xl text-primary drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">AWS QUEST</h1>
+          {/* <h1 className="font-mono text-xl text-primary drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">AWS QUEST</h1> */}
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Entre para começar sua jornada na nuvem
           </p>
