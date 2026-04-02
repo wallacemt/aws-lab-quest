@@ -171,25 +171,46 @@ export type AdminQuestionsBatchResult = {
 };
 
 export type AdminQuestionsFillMissingPayload = {
+  // Backward compatibility (old UI sent batchSize only).
   batchSize?: number;
+  totalToProcess?: number;
+  chunkSize?: number;
+  delayMs?: number;
   dryRun?: boolean;
 };
 
 export type AdminQuestionsFillMissingResult = {
   ok: boolean;
   batchSize: number;
+  requestedTotal?: number;
   processed: number;
   updated: number;
+  touched?: number;
+  aiRequests?: number;
+  pendingBefore?: number;
+  pendingAfter?: number;
+  delayMs?: number;
   dryRun: boolean;
   message?: string;
   details: Array<{
     id: string;
     externalId: string;
+    attempted?: boolean;
     topicUpdated: boolean;
     servicesUpdated: boolean;
     topic: string;
     serviceCodes: string[];
+    note?: string;
   }>;
+};
+
+export type AdminQuestionsFillMissingStats = {
+  ok: boolean;
+  pending: number;
+  defaultChunkSize: number;
+  maxChunkSize: number;
+  defaultDelayMs: number;
+  maxTotalPerRun: number;
 };
 
 export type AdminQuestionsCleanupPayload = {

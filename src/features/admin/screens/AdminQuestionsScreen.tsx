@@ -5,10 +5,16 @@ import {
   batchAdminQuestions,
   deleteAdminQuestion,
   fillAdminQuestionsMissingWithAI,
+  getAdminQuestionsFillMissingStats,
   listAdminQuestions,
   updateAdminQuestion,
 } from "@/features/admin/services/admin-api";
-import { AdminQuestionListItem, AdminQuestionUpdatePayload, PaginatedResult } from "@/features/admin/types";
+import {
+  AdminQuestionListItem,
+  AdminQuestionsFillMissingStats,
+  AdminQuestionUpdatePayload,
+  PaginatedResult,
+} from "@/features/admin/types";
 
 type CertificationOption = {
   id: string;
@@ -140,6 +146,14 @@ export function AdminQuestionsScreen() {
   const [aiFillRunning, setAiFillRunning] = useState(false);
   const [bulkUsage, setBulkUsage] = useState<"KC" | "SIMULADO" | "BOTH">("BOTH");
   const [bulkResultMessage, setBulkResultMessage] = useState<string | null>(null);
+  const [aiFillModalOpen, setAiFillModalOpen] = useState(false);
+  const [aiFillStatsLoading, setAiFillStatsLoading] = useState(false);
+  const [aiFillStatsError, setAiFillStatsError] = useState<string | null>(null);
+  const [aiFillStats, setAiFillStats] = useState<AdminQuestionsFillMissingStats | null>(null);
+  const [aiFillTotalToProcess, setAiFillTotalToProcess] = useState("10");
+  const [aiFillChunkSize, setAiFillChunkSize] = useState("10");
+  const [aiFillDelayMs, setAiFillDelayMs] = useState("1600");
+  const [aiFillDryRun, setAiFillDryRun] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [allAwsServices, setAllAwsServices] = useState<AwsServiceOption[]>([]);
@@ -460,7 +474,10 @@ export function AdminQuestionsScreen() {
     }
   }
 
-  async function runBulkAction(action: "set-active" | "set-usage" | "delete", input?: { active?: boolean; usage?: "KC" | "SIMULADO" | "BOTH" }) {
+  async function runBulkAction(
+    action: "set-active" | "set-usage" | "delete",
+    input?: { active?: boolean; usage?: "KC" | "SIMULADO" | "BOTH" },
+  ) {
     if (selectedQuestionIds.length === 0) {
       setBulkResultMessage("Selecione ao menos uma questao.");
       return;
@@ -503,26 +520,78 @@ export function AdminQuestionsScreen() {
   }
 
   async function handleFillMissingWithAI() {
+    setAiFillStatsLoading(true);
+    setAiFillStatsError(null);
+    setBulkResultMessage(null);
+
+    try {
+      const stats = await getAdminQuestionsFillMissingStats();
+      setAiFillStats(stats);
+      setAiFillTotalToProcess(String(Math.min(10, Math.max(1, stats.pending))));
+      setAiFillChunkSize(String(stats.defaultChunkSize));
+      setAiFillDelayMs(String(stats.defaultDelayMs));
+      setAiFillDryRun(false);
+      setAiFillModalOpen(true);
+    } catch (error) {
+      setAiFillStatsError(error instanceof Error ? error.message : "Falha ao carregar pendencias para IA.");
+    } finally {
+      setAiFillStatsLoading(false);
+    }
+  }
+
+  async function submitAiFillModal() {
+    const pending = aiFillStats?.pending ?? 0;
+    if (pending <= 0) {
+      setAiFillStatsError("Nao existem questoes pendentes para preencher.");
+      return;
+    }
+
+    const totalRaw = Number(aiFillTotalToProcess);
+    const chunkRaw = Number(aiFillChunkSize);
+    const delayRaw = Number(aiFillDelayMs);
+
+    if (!Number.isFinite(totalRaw) || totalRaw < 1) {
+      setAiFillStatsError("Informe uma quantidade valida para processar.");
+      return;
+    }
+
+    if (!Number.isFinite(chunkRaw) || chunkRaw < 1 || chunkRaw > 10) {
+      setAiFillStatsError("Tamanho do lote por requisicao deve ser entre 1 e 10.");
+      return;
+    }
+
+    if (!Number.isFinite(delayRaw) || delayRaw < 0) {
+      setAiFillStatsError("Delay invalido. Informe 0 ou mais milissegundos.");
+      return;
+    }
+
+    const totalToProcess = Math.min(Math.floor(totalRaw), pending, aiFillStats?.maxTotalPerRun ?? pending);
+    const chunkSize = Math.min(10, Math.floor(chunkRaw));
+    const delayMs = Math.max(0, Math.floor(delayRaw));
+
     setAiFillRunning(true);
+    setAiFillStatsError(null);
     setBulkResultMessage(null);
 
     try {
       const result = await fillAdminQuestionsMissingWithAI({
-        batchSize: 10,
-        dryRun: false,
+        totalToProcess,
+        chunkSize,
+        delayMs,
+        dryRun: aiFillDryRun,
       });
 
       setBulkResultMessage(
-        `IA executada. Processadas: ${result.processed} | Atualizadas: ${result.updated}${result.dryRun ? " | dry-run" : ""}`,
+        `IA executada. Solicitadas: ${result.requestedTotal ?? totalToProcess} | Processadas: ${result.processed} | Atualizadas: ${result.updated} | Sem alteracao: ${result.touched ?? 0} | Requisicoes IA: ${result.aiRequests ?? 0}${result.dryRun ? " | dry-run" : ""}`,
       );
+      setAiFillModalOpen(false);
       setRefreshKey((previous) => previous + 1);
     } catch (error) {
-      setBulkResultMessage(error instanceof Error ? error.message : "Falha ao preencher questoes faltantes com IA.");
+      setAiFillStatsError(error instanceof Error ? error.message : "Falha ao preencher questoes faltantes com IA.");
     } finally {
       setAiFillRunning(false);
     }
   }
-
 
   useEffect(() => {
     async function loadFilterOptions() {
@@ -673,13 +742,18 @@ export function AdminQuestionsScreen() {
             onClick={() => void handleFillMissingWithAI()}
             className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#fbbf24] disabled:opacity-60"
           >
-            {aiFillRunning ? "IA em execucao..." : "Preencher faltantes com IA (10)"}
+            {aiFillStatsLoading
+              ? "Carregando pendencias..."
+              : aiFillRunning
+                ? "IA em execucao..."
+                : "Preencher faltantes com IA"}
           </button>
         </div>
         <p className="text-xs text-[#94a3b8]">
           Selecionadas: {selectedQuestionIds.length} (na pagina: {selectedOnPageCount})
         </p>
         {bulkResultMessage && <p className="text-xs text-[#fbbf24]">{bulkResultMessage}</p>}
+        {aiFillStatsError && <p className="text-xs text-[#fca5a5]">{aiFillStatsError}</p>}
       </header>
 
       <section className="border border-[#1e293b] bg-[#111827] p-4">
@@ -1354,6 +1428,89 @@ export function AdminQuestionsScreen() {
                 className="border border-[#7f1d1d] bg-red-900/20 px-3 py-2 text-xs uppercase text-red-200 disabled:opacity-60"
               >
                 {deletingQuestion ? "Removendo..." : "Remover questao"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {aiFillModalOpen && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-4">
+          <div className="w-full max-w-lg space-y-4 rounded border border-[#334155] bg-[#111827] p-4 text-[#e2e8f0]">
+            <div className="space-y-1">
+              <p className="font-mono text-xs uppercase text-[#fbbf24]">Preencher faltantes com IA</p>
+              <p className="text-sm text-[#cbd5e1]">
+                Pendentes atuais: <strong>{aiFillStats?.pending ?? 0}</strong>
+              </p>
+              <p className="text-xs text-[#94a3b8]">
+                Maximo por requisicao IA: {aiFillStats?.maxChunkSize ?? 10} | Maximo por execucao:{" "}
+                {aiFillStats?.maxTotalPerRun ?? 200}
+              </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-xs uppercase text-[#94a3b8]">Quantidade para processar</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, aiFillStats?.pending ?? 1)}
+                  value={aiFillTotalToProcess}
+                  onChange={(event) => setAiFillTotalToProcess(event.target.value)}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-xs uppercase text-[#94a3b8]">Lote por requisicao IA (1-10)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={aiFillChunkSize}
+                  onChange={(event) => setAiFillChunkSize(event.target.value)}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="space-y-1 md:col-span-2">
+                <span className="text-xs uppercase text-[#94a3b8]">Delay entre requisicoes IA (ms)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={aiFillDelayMs}
+                  onChange={(event) => setAiFillDelayMs(event.target.value)}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="inline-flex items-center gap-2 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={aiFillDryRun}
+                  onChange={(event) => setAiFillDryRun(event.target.checked)}
+                />
+                <span className="text-xs uppercase text-[#94a3b8]">Dry-run (nao persistir alteracoes)</span>
+              </label>
+            </div>
+
+            {aiFillStatsError && <p className="text-xs text-[#fca5a5]">{aiFillStatsError}</p>}
+
+            <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-3">
+              <button
+                type="button"
+                onClick={() => setAiFillModalOpen(false)}
+                className="border border-[#334155] px-3 py-2 text-xs uppercase"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={aiFillRunning || (aiFillStats?.pending ?? 0) === 0}
+                onClick={() => void submitAiFillModal()}
+                className="border border-[#14532d] bg-green-900/20 px-3 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
+              >
+                {aiFillRunning ? "Processando..." : "Iniciar processamento"}
               </button>
             </div>
           </div>

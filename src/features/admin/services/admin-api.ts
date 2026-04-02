@@ -7,6 +7,7 @@ import {
   AdminQuestionsBatchResult,
   AdminQuestionsFillMissingPayload,
   AdminQuestionsFillMissingResult,
+  AdminQuestionsFillMissingStats,
   AdminQuestionUpdatePayload,
   AdminUploadSignedUrlPayload,
   AdminUploadQuestionsPayload,
@@ -316,6 +317,21 @@ export async function fillAdminQuestionsMissingWithAI(
   }
 
   return (await response.json()) as AdminQuestionsFillMissingResult;
+}
+
+export async function getAdminQuestionsFillMissingStats(): Promise<AdminQuestionsFillMissingStats> {
+  const response = await fetch("/api/admin/questions/fill-missing", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(errorPayload.error ?? "Nao foi possivel carregar resumo de pendencias para IA.");
+  }
+
+  return (await response.json()) as AdminQuestionsFillMissingStats;
 }
 
 export async function getAdminMetrics(days = 30): Promise<AdminMetricsPayload> {
