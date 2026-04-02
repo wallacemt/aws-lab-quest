@@ -154,6 +154,44 @@ export type AdminQuestionUpdatePayload = {
   serviceCodes?: string[] | null;
 };
 
+export type AdminQuestionsBatchAction = "set-active" | "set-usage" | "delete";
+
+export type AdminQuestionsBatchPayload = {
+  ids: string[];
+  action: AdminQuestionsBatchAction;
+  active?: boolean;
+  usage?: "KC" | "SIMULADO" | "BOTH";
+};
+
+export type AdminQuestionsBatchResult = {
+  ok: boolean;
+  action: AdminQuestionsBatchAction;
+  requested: number;
+  affected: number;
+};
+
+export type AdminQuestionsFillMissingPayload = {
+  batchSize?: number;
+  dryRun?: boolean;
+};
+
+export type AdminQuestionsFillMissingResult = {
+  ok: boolean;
+  batchSize: number;
+  processed: number;
+  updated: number;
+  dryRun: boolean;
+  message?: string;
+  details: Array<{
+    id: string;
+    externalId: string;
+    topicUpdated: boolean;
+    servicesUpdated: boolean;
+    topic: string;
+    serviceCodes: string[];
+  }>;
+};
+
 export type AdminQuestionsCleanupPayload = {
   scanned: number;
   irregularCount: number;

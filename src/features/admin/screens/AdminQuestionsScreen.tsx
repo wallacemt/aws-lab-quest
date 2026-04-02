@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-
+  batchAdminQuestions,
   deleteAdminQuestion,
+  fillAdminQuestionsMissingWithAI,
   listAdminQuestions,
   updateAdminQuestion,
 } from "@/features/admin/services/admin-api";
@@ -131,10 +132,14 @@ export function AdminQuestionsScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [result, setResult] = useState<PaginatedResult<AdminQuestionListItem> | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState<AdminQuestionListItem | null>(null);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [savingQuestion, setSavingQuestion] = useState(false);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
- 
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [aiFillRunning, setAiFillRunning] = useState(false);
+  const [bulkUsage, setBulkUsage] = useState<"KC" | "SIMULADO" | "BOTH">("BOTH");
+  const [bulkResultMessage, setBulkResultMessage] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [allAwsServices, setAllAwsServices] = useState<AwsServiceOption[]>([]);
@@ -218,6 +223,44 @@ export function AdminQuestionsScreen() {
         return a.code.localeCompare(b.code, "pt-BR");
       });
   }, [allAwsServices, serviceSearch]);
+
+  const currentPageIds = useMemo(() => result?.items.map((item) => item.id) ?? [], [result]);
+  const selectedOnPageCount = useMemo(
+    () => currentPageIds.filter((id) => selectedQuestionIds.includes(id)).length,
+    [currentPageIds, selectedQuestionIds],
+  );
+  const allSelectedOnPage = currentPageIds.length > 0 && selectedOnPageCount === currentPageIds.length;
+
+  function toggleSelectQuestion(questionId: string) {
+    setSelectedQuestionIds((previous) => {
+      if (previous.includes(questionId)) {
+        return previous.filter((id) => id !== questionId);
+      }
+
+      return [...previous, questionId];
+    });
+  }
+
+  function toggleSelectAllOnPage() {
+    setSelectedQuestionIds((previous) => {
+      if (currentPageIds.length === 0) {
+        return previous;
+      }
+
+      const selectedSet = new Set(previous);
+      const allSelected = currentPageIds.every((id) => selectedSet.has(id));
+
+      if (allSelected) {
+        return previous.filter((id) => !currentPageIds.includes(id));
+      }
+
+      for (const id of currentPageIds) {
+        selectedSet.add(id);
+      }
+
+      return Array.from(selectedSet);
+    });
+  }
 
   function openQuestionModal(question: AdminQuestionListItem) {
     const resolvedOptions = resolveQuestionOptions(question);
@@ -407,12 +450,76 @@ export function AdminQuestionsScreen() {
 
     try {
       await deleteAdminQuestion(selectedQuestion.id);
+      setSelectedQuestionIds((previous) => previous.filter((id) => id !== selectedQuestion.id));
       closeQuestionModal();
       setRefreshKey((previous) => previous + 1);
     } catch (err) {
       setModalError(err instanceof Error ? err.message : "Falha ao remover questao.");
     } finally {
       setDeletingQuestion(false);
+    }
+  }
+
+  async function runBulkAction(action: "set-active" | "set-usage" | "delete", input?: { active?: boolean; usage?: "KC" | "SIMULADO" | "BOTH" }) {
+    if (selectedQuestionIds.length === 0) {
+      setBulkResultMessage("Selecione ao menos uma questao.");
+      return;
+    }
+
+    setBulkRunning(true);
+    setBulkResultMessage(null);
+
+    try {
+      const payload = {
+        ids: selectedQuestionIds,
+        action,
+        ...(input?.active !== undefined ? { active: input.active } : {}),
+        ...(input?.usage ? { usage: input.usage } : {}),
+      };
+
+      const result = await batchAdminQuestions(payload);
+      setBulkResultMessage(`Acao em lote concluida. Solicitadas: ${result.requested} | Afetadas: ${result.affected}`);
+      setSelectedQuestionIds([]);
+      setRefreshKey((previous) => previous + 1);
+    } catch (error) {
+      setBulkResultMessage(error instanceof Error ? error.message : "Falha na acao em lote.");
+    } finally {
+      setBulkRunning(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedQuestionIds.length === 0) {
+      setBulkResultMessage("Selecione ao menos uma questao.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Remover ${selectedQuestionIds.length} questoes selecionadas?`);
+    if (!confirmed) {
+      return;
+    }
+
+    await runBulkAction("delete");
+  }
+
+  async function handleFillMissingWithAI() {
+    setAiFillRunning(true);
+    setBulkResultMessage(null);
+
+    try {
+      const result = await fillAdminQuestionsMissingWithAI({
+        batchSize: 10,
+        dryRun: false,
+      });
+
+      setBulkResultMessage(
+        `IA executada. Processadas: ${result.processed} | Atualizadas: ${result.updated}${result.dryRun ? " | dry-run" : ""}`,
+      );
+      setRefreshKey((previous) => previous + 1);
+    } catch (error) {
+      setBulkResultMessage(error instanceof Error ? error.message : "Falha ao preencher questoes faltantes com IA.");
+    } finally {
+      setAiFillRunning(false);
     }
   }
 
@@ -497,19 +604,82 @@ export function AdminQuestionsScreen() {
     refreshKey,
   ]);
 
+  useEffect(() => {
+    if (!result) {
+      return;
+    }
+
+    const pageIds = new Set(result.items.map((item) => item.id));
+    setSelectedQuestionIds((previous) => previous.filter((id) => pageIds.has(id) || !currentPageIds.includes(id)));
+  }, [currentPageIds, result]);
+
   return (
     <main className="space-y-5">
       <header className="space-y-2">
         <p className="font-mono text-xs uppercase text-[#f97316]">Questoes</p>
         <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Banco de questoes paginavel</h1>
-        <button
-          type="button"
-          onClick={() => setRefreshKey((prev) => prev + 1)}
-          className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
-        >
-          Atualizar dados
-        </button>
-        
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setRefreshKey((prev) => prev + 1)}
+            className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
+          >
+            Atualizar dados
+          </button>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void runBulkAction("set-active", { active: true })}
+            className="border border-[#14532d] bg-green-900/20 px-3 py-1 text-xs uppercase text-green-200 disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Ativar selecionadas"}
+          </button>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void runBulkAction("set-active", { active: false })}
+            className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-xs uppercase text-red-200 disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Inativar selecionadas"}
+          </button>
+          <select
+            value={bulkUsage}
+            onChange={(event) => setBulkUsage(event.target.value as "KC" | "SIMULADO" | "BOTH")}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] outline-none"
+          >
+            <option value="KC">Uso: KC</option>
+            <option value="SIMULADO">Uso: SIMULADO</option>
+            <option value="BOTH">Uso: BOTH</option>
+          </select>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void runBulkAction("set-usage", { usage: bulkUsage })}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Aplicar uso selecionado"}
+          </button>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void handleBulkDelete()}
+            className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-xs uppercase text-red-200 disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Remover selecionadas"}
+          </button>
+          <button
+            type="button"
+            disabled={aiFillRunning || bulkRunning}
+            onClick={() => void handleFillMissingWithAI()}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#fbbf24] disabled:opacity-60"
+          >
+            {aiFillRunning ? "IA em execucao..." : "Preencher faltantes com IA (10)"}
+          </button>
+        </div>
+        <p className="text-xs text-[#94a3b8]">
+          Selecionadas: {selectedQuestionIds.length} (na pagina: {selectedOnPageCount})
+        </p>
+        {bulkResultMessage && <p className="text-xs text-[#fbbf24]">{bulkResultMessage}</p>}
       </header>
 
       <section className="border border-[#1e293b] bg-[#111827] p-4">
@@ -687,6 +857,9 @@ export function AdminQuestionsScreen() {
             <table className="w-full min-w-[1000px] text-left text-sm">
               <thead className="border-b border-[#1e293b] bg-[#0f172a] text-xs uppercase text-[#94a3b8]">
                 <tr>
+                  <th className="px-3 py-2">
+                    <input type="checkbox" checked={allSelectedOnPage} onChange={toggleSelectAllOnPage} />
+                  </th>
                   {selectedColumns.map((column) => (
                     <th key={column.key} className="px-3 py-2">
                       {column.label}
@@ -698,6 +871,13 @@ export function AdminQuestionsScreen() {
               <tbody>
                 {result.items.map((item) => (
                   <tr key={item.id} className="border-b border-[#1e293b] text-[#e2e8f0] hover:bg-[#0b1220]">
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="checkbox"
+                        checked={selectedQuestionIds.includes(item.id)}
+                        onChange={() => toggleSelectQuestion(item.id)}
+                      />
+                    </td>
                     {selectedColumns.map((column) => {
                       if (column.key === "externalId") {
                         return (

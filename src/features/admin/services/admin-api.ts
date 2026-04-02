@@ -3,7 +3,10 @@ import {
   AdminMetricsPayload,
   AdminQuestionsListParams,
   AdminQuestionListItem,
-  AdminQuestionsCleanupPayload,
+  AdminQuestionsBatchPayload,
+  AdminQuestionsBatchResult,
+  AdminQuestionsFillMissingPayload,
+  AdminQuestionsFillMissingResult,
   AdminQuestionUpdatePayload,
   AdminUploadSignedUrlPayload,
   AdminUploadQuestionsPayload,
@@ -279,7 +282,41 @@ export async function deleteAdminQuestion(questionId: string): Promise<void> {
   }
 }
 
+export async function batchAdminQuestions(payload: AdminQuestionsBatchPayload): Promise<AdminQuestionsBatchResult> {
+  const response = await fetch("/api/admin/questions/batch", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(errorPayload.error ?? "Nao foi possivel executar acao em lote.");
+  }
+
+  return (await response.json()) as AdminQuestionsBatchResult;
+}
+
+export async function fillAdminQuestionsMissingWithAI(
+  payload: AdminQuestionsFillMissingPayload = {},
+): Promise<AdminQuestionsFillMissingResult> {
+  const response = await fetch("/api/admin/questions/fill-missing", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(errorPayload.error ?? "Nao foi possivel preencher dados faltantes com IA.");
+  }
+
+  return (await response.json()) as AdminQuestionsFillMissingResult;
+}
 
 export async function getAdminMetrics(days = 30): Promise<AdminMetricsPayload> {
   const response = await fetch(`/api/admin/metrics?days=${days}`, {
