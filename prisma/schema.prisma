@@ -33,15 +33,17 @@ model User {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
-  sessions      Session[]
-  accounts      Account[]
-  profile       UserProfile?
-  questHistory  QuestHistory[]
-  studyHistory  StudySessionHistory[]
-  userBadges    UserBadge[]
-  achievements  UserAchievement[]
-  uploadedFiles AdminUploadedFile[]
-  ingestionJobs AdminIngestionJob[]
+  sessions                Session[]
+  accounts                Account[]
+  profile                 UserProfile?
+  questHistory            QuestHistory[]
+  studyHistory            StudySessionHistory[]
+  userBadges              UserBadge[]
+  achievements            UserAchievement[]
+  uploadedFiles           AdminUploadedFile[]
+  ingestionJobs           AdminIngestionJob[]
+  questionReports         QuestionReport[]      @relation("QuestionReportAuthor")
+  reviewedQuestionReports QuestionReport[]      @relation("QuestionReportReviewer")
 
   @@index([accessStatus, active])
   @@map("user")
@@ -159,6 +161,23 @@ enum StudySessionType {
   SIMULADO
 }
 
+enum QuestionReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum QuestionReportReason {
+  INCORRECT_ANSWER
+  UNCLEAR_STATEMENT
+  MISSING_CONTEXT
+  GRAMMAR_TYPO
+  DUPLICATE
+  QUALITY_ISSUE
+  OTHER
+}
+
 enum AdminUploadType {
   EXAM_GUIDE
   SIMULADO_PDF
@@ -213,9 +232,12 @@ model StudyQuestion {
   awsService            AwsService?             @relation(fields: [awsServiceId], references: [id], onDelete: SetNull)
   sourceUploadedFileId  String?
   sourceUploadedFile    AdminUploadedFile?      @relation(fields: [sourceUploadedFileId], references: [id], onDelete: SetNull)
+  flaggedAt             DateTime?
+  flaggedReason         String?
   questionOptions       QuestionOption[]
   questionAwsServices   QuestionAwsService[]
   questionTopics        QuestionTopic[]
+  questionReports       QuestionReport[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 
@@ -227,6 +249,7 @@ model StudyQuestion {
   @@index([sourceUploadedFileId])
   @@index([cachedExplainAt])
   @@index([usageHash])
+  @@index([flaggedAt])
 }
 
 model QuestionOption {
@@ -292,6 +315,29 @@ model StudySessionHistory {
 
   @@index([userId, completedAt])
   @@index([sessionType])
+}
+
+model QuestionReport {
+  id               String               @id @default(cuid())
+  questionId       String
+  question         StudyQuestion        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User                 @relation("QuestionReportAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  reason           QuestionReportReason
+  description      String?              @db.Text
+  status           QuestionReportStatus @default(OPEN)
+  reviewedByUserId String?
+  reviewedBy       User?                @relation("QuestionReportReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewNotes      String?              @db.Text
+  reportedAt       DateTime             @default(now())
+  reviewedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([questionId, status])
+  @@index([userId, reportedAt])
+  @@index([status, reportedAt])
+  @@map("question_report")
 }
 
 model QuestHistory {
