@@ -7,6 +7,9 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { fetchWeakServices, WeakServiceItem } from "@/features/study/services";
 
+const REVIEW_GAP_TOP_N = 20;
+const REVIEW_ACTION_TOPICS = 5;
+
 function toTopicCode(topic: string): string {
   const cleaned = topic
     .toUpperCase()
@@ -44,7 +47,7 @@ export function ReviewScreen() {
       setError(null);
 
       try {
-        const items = await fetchWeakServices({ take: 8, sample: 40 });
+        const items = await fetchWeakServices({ take: REVIEW_GAP_TOP_N, sample: 40 });
         if (!cancelled) {
           setWeakServices(items);
         }
@@ -72,7 +75,7 @@ export function ReviewScreen() {
       weakServices
         .map((item) => item.serviceCode || item.topic)
         .filter(Boolean)
-        .slice(0, 3),
+        .slice(0, REVIEW_ACTION_TOPICS),
     [weakServices],
   );
 

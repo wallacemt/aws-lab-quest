@@ -8,6 +8,8 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { STUDY_DIFFICULTIES, STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
+import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
+import { ReportQuestionModal } from "@/features/study/components/ReportQuestionModal";
 import {
   createKcQuestions,
   createStudyExplanation,
@@ -15,13 +17,13 @@ import {
   listStudyServices,
   normalizeAnswerValue,
   normalizeCorrectOptions,
+  reportStudyQuestion,
   saveStudyHistory,
   StudyServiceItem,
 } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const DIFFICULTIES: TaskDifficulty[] = STUDY_DIFFICULTIES;
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
@@ -67,6 +69,9 @@ export function KCScreen() {
     gainedXp: number;
     historySaved: boolean;
   } | null>(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportMessage, setReportMessage] = useState<string | null>(null);
 
   useEffect(() => {
     listStudyServices()
@@ -158,6 +163,30 @@ export function KCScreen() {
   );
 
   const currentExplanation = currentQuestion ? explanationByQuestion[currentQuestion.id] : undefined;
+  const currentReviewOptions = useMemo(() => {
+    if (!currentQuestion) {
+      return [];
+    }
+
+    const selectedOptions = normalizeAnswerValue(answers[currentQuestion.id]);
+    const correctOptions = normalizeCorrectOptions(currentQuestion);
+
+    return OPTIONS.map((option) => {
+      const text = normalizeOptionText(currentQuestion.options[option]);
+      if (!text) {
+        return null;
+      }
+
+      return {
+        option,
+        text,
+        explanation:
+          currentExplanation?.options[option] ?? currentQuestion.explanations[option] ?? "Sem explicacao adicional.",
+        isCorrect: correctOptions.includes(option),
+        isSelected: selectedOptions.includes(option),
+      };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [answers, currentExplanation, currentQuestion]);
 
   function toggleTopic(code: string) {
     setSelectedTopics((prev) => {
@@ -273,6 +302,7 @@ export function KCScreen() {
     setExplanationByQuestion({});
     setSubmittedCurrent(false);
     setFlowError(null);
+    setReportMessage(null);
   }
 
   async function rerollKC() {
@@ -306,7 +336,7 @@ export function KCScreen() {
 
     let historySaved = false;
     try {
-      historySaved = await saveStudyHistory({
+      const saveResult = await saveStudyHistory({
         sessionType: "KC",
         title: sessionTitle,
         certificationCode: questions[0]?.certificationCode ?? null,
@@ -333,10 +363,13 @@ export function KCScreen() {
             correctOptions: normalizeCorrectOptions(question),
             options: question.options,
             optionMapping: question.optionMapping,
+            explanationSummary: explanationByQuestion[question.id]?.summary,
             explanations: mergedExplanations,
           };
         }),
       });
+
+      historySaved = saveResult.ok;
 
       if (historySaved) {
         await refreshTotalXp();
@@ -362,6 +395,37 @@ export function KCScreen() {
     });
 
     restartKC();
+  }
+
+  async function submitQuestionReport(input: {
+    reason:
+      | "INCORRECT_ANSWER"
+      | "UNCLEAR_STATEMENT"
+      | "MISSING_CONTEXT"
+      | "GRAMMAR_TYPO"
+      | "DUPLICATE"
+      | "QUALITY_ISSUE"
+      | "OTHER";
+    description: string;
+  }) {
+    if (!currentQuestion) {
+      return;
+    }
+
+    setReportSubmitting(true);
+    setReportMessage(null);
+
+    try {
+      await reportStudyQuestion({
+        questionId: currentQuestion.id,
+        reason: input.reason,
+        description: input.description,
+      });
+      setReportMessage("Denuncia enviada com sucesso. Obrigado pelo feedback.");
+      setTimeout(() => setReportMessage(null), 4500);
+    } finally {
+      setReportSubmitting(false);
+    }
   }
 
   return (
@@ -395,7 +459,7 @@ export function KCScreen() {
           </p>
         </PixelCard>
 
-        {!inProgress && !kcSummary &&(
+        {!inProgress && !kcSummary && (
           <PixelCard className="space-y-4">
             <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Configurar KC</h2>
 
@@ -617,65 +681,28 @@ export function KCScreen() {
                 <PixelCard className="border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
                   <p className="inline-flex items-center gap-2 font-[var(--font-body)] text-sm">
                     <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
-                    Gerando explicacao da IA...
+                    Gerando explição da Questão...
                   </p>
                 </PixelCard>
               )}
 
               {submittedCurrent && (
-                <PixelCard
-                  className={isCurrentCorrect ? "border-[#2ecc71] bg-green-900/25" : "border-[#e74c3c] bg-red-900/25"}
-                >
-                  <p className="font-mono text-[10px] uppercase">
-                    {isCurrentCorrect ? "✓ Resposta correta" : "✗ Resposta incorreta"}
-                  </p>
-
-                  {loadingExplanation && (
-                    <p className="mt-2 font-sans text-xs text-[var(--pixel-subtext)]">
-                      Gerando auditoria detalhada com IA...
-                    </p>
-                  )}
-
-                  <p className="mt-2 font-sans text-sm text-[var(--pixel-subtext)]">
-                    {currentExplanation?.summary ?? "Analise das alternativas para reforcar o aprendizado."}
-                  </p>
-
-                  <div className="mt-2 space-y-2">
-                    {OPTIONS.map((option) => {
-                      const text = normalizeOptionText(currentQuestion.options[option]);
-                      if (!text) return null;
-
-                      const isCorrectOption = normalizeCorrectOptions(currentQuestion).includes(option);
-                      const isSelected = normalizeAnswerValue(answers[currentQuestion.id]).includes(option);
-
-                      return (
-                        <div
-                          key={`${currentQuestion.id}-audit-${option}`}
-                          className={cn(
-                            "border border-pixel-border bg-pixel-card px-3 py-2",
-                            isSelected && " border-2 ",
-                            isCorrectOption ? "border-green-400" : "border-red-400",
-                          )}
-                        >
-                          <p className={cn("font-mono text-[9px] uppercase text-[var(--pixel-subtext)]")}>
-                            {option} {isCorrectOption ? "correta" : "incorreta"}
-                            <span className="text-primary font-bold">{isSelected ? " · sua resposta" : ""}</span>
-                          </p>
-                          <p className="mt-1 font-sans text-sm">
-                            {currentExplanation?.options[option] ??
-                              currentQuestion.explanations[option] ??
-                              "Sem explicacao adicional."}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </PixelCard>
+                <QuestionReviewPanel
+                  isCorrect={isCurrentCorrect}
+                  summary={currentExplanation?.summary ?? "Analise das alternativas para reforcar o aprendizado."}
+                  loading={loadingExplanation}
+                  loadingText="Gerando auditoria detalhada com IA..."
+                  options={currentReviewOptions}
+                />
               )}
 
               {flowError && <p className="font-sans text-sm text-red-300">{flowError}</p>}
+              {reportMessage && <p className="font-sans text-sm text-[var(--pixel-accent)]">{reportMessage}</p>}
 
               <div className="flex flex-wrap justify-end gap-2">
+                <PixelButton variant="ghost" onClick={() => setReportModalOpen(true)}>
+                  Denunciar questao
+                </PixelButton>
                 {!submittedCurrent ? (
                   <PixelButton onClick={submitCurrentAnswer} disabled={loadingExplanation || submittingAnswer}>
                     {submittingAnswer ? "Gerando feedback..." : "Enviar resposta"}
@@ -688,6 +715,16 @@ export function KCScreen() {
               </div>
             </PixelCard>
           </>
+        )}
+
+        {currentQuestion && (
+          <ReportQuestionModal
+            open={reportModalOpen}
+            questionStatement={currentQuestion.statement}
+            submitting={reportSubmitting}
+            onClose={() => setReportModalOpen(false)}
+            onSubmit={submitQuestionReport}
+          />
         )}
       </main>
     </AppLayout>

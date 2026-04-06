@@ -8,6 +8,8 @@ import remarkGfm from "remark-gfm";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
+import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
+import { ReportQuestionModal } from "@/features/study/components/ReportQuestionModal";
 import { SimuladoScoreGauge } from "@/features/study/components/SimuladoScoreGauge";
 import {
   createSimuladoQuestions,
@@ -17,7 +19,9 @@ import {
   isAnswerCorrect,
   normalizeAnswerValue,
   normalizeCorrectOptions,
+  reportStudyQuestion,
   saveStudyHistory,
+  saveStudyHistoryExplanation,
 } from "@/features/study/services";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
@@ -28,6 +32,7 @@ import { STORAGE_KEYS } from "@/lib/storage";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
+const GAP_TOP_N = 10;
 
 function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): QuestionOption[] {
   if (current.includes(option)) {
@@ -171,6 +176,10 @@ export function SimuladoScreen() {
   const [scoreOverview, setScoreOverview] = useState<ScoreOverviewData | null>(null);
   const [showScoreOverview, setShowScoreOverview] = useState(false);
   const [mockScoreOverview, setMockScoreOverview] = useState<ScoreOverviewData | null>(null);
+  const [savedHistoryId, setSavedHistoryId] = useState<string | null>(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportMessage, setReportMessage] = useState<string | null>(null);
 
   const inExamFlow = isActive && questions.length > 0 && !submitted;
   const inReviewFlow = submitted && questions.length > 0;
@@ -246,6 +255,30 @@ export function SimuladoScreen() {
   }, [historicalWeakServices, weakServicesCurrentExam]);
   const allQuestionsAnswered = answeredCount === questions.length && questions.length > 0;
   const activeOverview = showScoreOverview ? (mockScoreOverview ?? scoreOverview) : null;
+  const currentReviewOptions = useMemo(() => {
+    if (!currentQuestion) {
+      return [];
+    }
+
+    const selectedOptions = normalizeAnswerValue(answers[currentQuestion.id]);
+    const correctOptions = normalizeCorrectOptions(currentQuestion);
+
+    return OPTIONS.map((option) => {
+      const text = normalizeOptionText(currentQuestion.options[option]);
+      if (!text) {
+        return null;
+      }
+
+      return {
+        option,
+        text,
+        explanation:
+          currentReview?.options[option] ?? currentQuestion.explanations[option] ?? "Sem explicacao adicional.",
+        isCorrect: correctOptions.includes(option),
+        isSelected: selectedOptions.includes(option),
+      };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [answers, currentQuestion, currentReview]);
 
   function toTopicCode(topic: string): string {
     const cleaned = topic
@@ -351,6 +384,7 @@ export function SimuladoScreen() {
       setAnswers({});
       setCurrentIndex(0);
       setSubmitted(false);
+      setSavedHistoryId(null);
       setReviewByQuestion({});
       setLoadingReviewByQuestion({});
       setExamGuideInfo(data.examGuide ?? null);
@@ -382,7 +416,11 @@ export function SimuladoScreen() {
     await handleStart();
   }
 
-  async function fetchReviewForQuestion(question: StudyQuestion, answer: StudyAnswerMap[string]) {
+  async function fetchReviewForQuestion(
+    question: StudyQuestion,
+    answer: StudyAnswerMap[string],
+    historyId?: string | null,
+  ) {
     if (reviewByQuestion[question.id] || loadingReviewByQuestion[question.id]) {
       return;
     }
@@ -399,23 +437,82 @@ export function SimuladoScreen() {
         optionMapping: question.optionMapping,
       });
 
+      const nextReview: StudyExplanationResult = {
+        summary: explanation.summary,
+        options: explanation.options,
+      };
       setReviewByQuestion((prev) => ({
         ...prev,
-        [question.id]: {
-          summary: explanation.summary,
-          options: explanation.options,
-        },
+        [question.id]: nextReview,
       }));
+
+      if (historyId) {
+        try {
+          await saveStudyHistoryExplanation({
+            historyId,
+            questionId: question.id,
+            explanationSummary: nextReview.summary,
+            explanations: nextReview.options,
+          });
+        } catch {
+          // Best effort to persist review in session history.
+        }
+      }
     } catch {
+      const nextReview: StudyExplanationResult = {
+        summary: "Revisao local baseada no gabarito da questao.",
+        options: question.explanations,
+      };
+
       setReviewByQuestion((prev) => ({
         ...prev,
-        [question.id]: {
-          summary: "Revisao local baseada no gabarito da questao.",
-          options: question.explanations,
-        },
+        [question.id]: nextReview,
       }));
+
+      if (historyId) {
+        try {
+          await saveStudyHistoryExplanation({
+            historyId,
+            questionId: question.id,
+            explanationSummary: nextReview.summary,
+            explanations: nextReview.options,
+          });
+        } catch {
+          // Best effort to persist review in session history.
+        }
+      }
     } finally {
       setLoadingReviewByQuestion((prev) => ({ ...prev, [question.id]: false }));
+    }
+  }
+
+  async function submitQuestionReport(input: {
+    reason:
+      | "INCORRECT_ANSWER"
+      | "UNCLEAR_STATEMENT"
+      | "MISSING_CONTEXT"
+      | "GRAMMAR_TYPO"
+      | "DUPLICATE"
+      | "QUALITY_ISSUE"
+      | "OTHER";
+    description: string;
+  }) {
+    if (!currentQuestion) {
+      return;
+    }
+
+    setReportMessage(null);
+    setReportSubmitting(true);
+
+    try {
+      await reportStudyQuestion({
+        questionId: currentQuestion.id,
+        reason: input.reason,
+        description: input.description,
+      });
+      setReportMessage("Denuncia enviada com sucesso. Obrigado por ajudar a melhorar o banco de questoes.");
+    } finally {
+      setReportSubmitting(false);
     }
   }
 
@@ -452,8 +549,9 @@ export function SimuladoScreen() {
     clearSession();
 
     let historySaved = false;
+    let savedHistoryIdValue: string | null = null;
     try {
-      historySaved = await saveStudyHistory({
+      const saveResult = await saveStudyHistory({
         sessionType: "SIMULADO",
         title: `Simulado ${session.certificationCode}`,
         certificationCode: session.certificationCode,
@@ -472,21 +570,28 @@ export function SimuladoScreen() {
           correctOptions: normalizeCorrectOptions(question),
           options: question.options,
           optionMapping: question.optionMapping,
+          explanationSummary: reviewByQuestion[question.id]?.summary,
           explanations: {
-            A: question.explanations.A ?? "Sem explicacao.",
-            B: question.explanations.B ?? "Sem explicacao.",
-            C: question.explanations.C ?? "Sem explicacao.",
-            D: question.explanations.D ?? "Sem explicacao.",
-            E: question.explanations.E ?? "Nao aplicavel.",
+            A: reviewByQuestion[question.id]?.options.A ?? question.explanations.A ?? "Sem explicacao.",
+            B: reviewByQuestion[question.id]?.options.B ?? question.explanations.B ?? "Sem explicacao.",
+            C: reviewByQuestion[question.id]?.options.C ?? question.explanations.C ?? "Sem explicacao.",
+            D: reviewByQuestion[question.id]?.options.D ?? question.explanations.D ?? "Sem explicacao.",
+            E: reviewByQuestion[question.id]?.options.E ?? question.explanations.E ?? "Nao aplicavel.",
           },
         })),
       });
+
+      historySaved = saveResult.ok;
+      savedHistoryIdValue = saveResult.itemId ?? null;
+      setSavedHistoryId(savedHistoryIdValue);
 
       if (historySaved) {
         await refreshTotalXp();
       }
     } catch {
       historySaved = false;
+      savedHistoryIdValue = null;
+      setSavedHistoryId(null);
     }
 
     setSubmitted(true);
@@ -497,7 +602,7 @@ export function SimuladoScreen() {
 
     setLoadingWeakServices(true);
     try {
-      const weakServices = await fetchWeakServices({ take: 5, sample: 35 });
+      const weakServices = await fetchWeakServices({ take: GAP_TOP_N, sample: 35 });
       setHistoricalWeakServices(
         weakServices.map((item) => ({
           topic: item.serviceCode || item.topic,
@@ -514,7 +619,11 @@ export function SimuladoScreen() {
     }
 
     if (questions[0]) {
-      await fetchReviewForQuestion(questions[0], answers[questions[0].id] ?? questions[0].correctOption);
+      await fetchReviewForQuestion(
+        questions[0],
+        answers[questions[0].id] ?? questions[0].correctOption,
+        savedHistoryIdValue,
+      );
     }
   }
 
@@ -531,6 +640,7 @@ export function SimuladoScreen() {
     setAnswers({});
     setCurrentIndex(0);
     setSubmitted(false);
+    setSavedHistoryId(null);
     setReviewByQuestion({});
     setLoadingReviewByQuestion({});
     setExamGuideInfo(null);
@@ -548,7 +658,7 @@ export function SimuladoScreen() {
     if (submitted) {
       const target = questions[clamped];
       if (target) {
-        await fetchReviewForQuestion(target, answers[target.id] ?? target.correctOption);
+        await fetchReviewForQuestion(target, answers[target.id] ?? target.correctOption, savedHistoryId);
       }
     }
   }
@@ -971,72 +1081,29 @@ export function SimuladoScreen() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <PixelCard
-                      className={
-                        isAnswerCorrect({
-                          questionType: currentQuestion.questionType,
-                          answer: answers[currentQuestion.id],
-                          correctOption: currentQuestion.correctOption,
-                          correctOptions: currentQuestion.correctOptions,
-                        })
-                          ? "border-[#2ecc71] bg-green-900/25"
-                          : "border-[#e74c3c] bg-red-900/25"
+                    <QuestionReviewPanel
+                      isCorrect={isAnswerCorrect({
+                        questionType: currentQuestion.questionType,
+                        answer: answers[currentQuestion.id],
+                        correctOption: currentQuestion.correctOption,
+                        correctOptions: currentQuestion.correctOptions,
+                      })}
+                      summary={currentReview?.summary}
+                      loading={Boolean(loadingReviewByQuestion[currentQuestion.id])}
+                      loadingText="Gerando revisao com IA..."
+                      options={currentReviewOptions}
+                      questionStatement={currentQuestion.statement}
+                      questionTypeLabel={
+                        currentQuestion.questionType === "multi" ? "Tipo multipla escolha" : "Tipo escolha unica"
                       }
-                    >
-                      <p className="font-mono text-[10px] uppercase">
-                        {isAnswerCorrect({
-                          questionType: currentQuestion.questionType,
-                          answer: answers[currentQuestion.id],
-                          correctOption: currentQuestion.correctOption,
-                          correctOptions: currentQuestion.correctOptions,
-                        })
-                          ? "✓ Resposta correta"
-                          : "✗ Resposta incorreta"}
-                      </p>
-
-                      {loadingReviewByQuestion[currentQuestion.id] && (
-                        <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                          <span className="inline-flex items-center gap-2">
-                            <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
-                            Gerando revisao com IA...
-                          </span>
-                        </p>
-                      )}
-
-                      {currentReview && (
-                        <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                          {currentReview.summary}
-                        </p>
-                      )}
-
-                      <div className="mt-2 space-y-2">
-                        {OPTIONS.map((option) => {
-                          const text = normalizeOptionText(currentQuestion.options[option]);
-                          if (!text) return null;
-
-                          const isCorrectOption = normalizeCorrectOptions(currentQuestion).includes(option);
-                          const isSelected = normalizeAnswerValue(answers[currentQuestion.id]).includes(option);
-
-                          return (
-                            <div
-                              key={`${currentQuestion.id}-review-${option}`}
-                              className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
-                            >
-                              <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
-                                {option}) {isCorrectOption ? "correta" : "incorreta"}
-                                {isSelected ? " · sua resposta" : ""}
-                              </p>
-                              <p className="mt-1 font-[var(--font-body)] text-sm">
-                                {currentReview?.options[option] ??
-                                  currentQuestion.explanations[option] ??
-                                  "Sem explicacao adicional."}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </PixelCard>
+                      questionIndex={currentIndex + 1}
+                      questionCount={questions.length}
+                    />
                   </motion.div>
+                )}
+
+                {reportMessage && (
+                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-accent)]">{reportMessage}</p>
                 )}
 
                 <div className="flex flex-wrap justify-between gap-2">
@@ -1045,6 +1112,9 @@ export function SimuladoScreen() {
                       Anterior
                     </PixelButton>
                     <PixelButton onClick={() => void goToQuestion(currentIndex + 1)}>Proxima</PixelButton>
+                    <PixelButton variant="ghost" onClick={() => setReportModalOpen(true)}>
+                      Denunciar questao
+                    </PixelButton>
                   </div>
 
                   <div className="flex gap-2">
@@ -1141,7 +1211,7 @@ export function SimuladoScreen() {
 
                 {!loadingWeakServices && historicalWeakServices.length === 0 && weakServicesCurrentExam.length > 0 && (
                   <div className="space-y-2">
-                    {weakServicesCurrentExam.slice(0, 5).map((item) => (
+                    {weakServicesCurrentExam.slice(0, GAP_TOP_N).map((item) => (
                       <p
                         key={`fallback-${item.topic}`}
                         className="font-[var(--font-body)] text-xs text-[var(--pixel-text)]"
@@ -1192,6 +1262,16 @@ export function SimuladoScreen() {
             O tempo do simulado terminou ou a sessao foi encerrada. Envie ou reinicie para continuar.
           </p>
         </PixelCard>
+      )}
+
+      {currentQuestion && (
+        <ReportQuestionModal
+          open={reportModalOpen}
+          questionStatement={currentQuestion.statement}
+          submitting={reportSubmitting}
+          onClose={() => setReportModalOpen(false)}
+          onSubmit={submitQuestionReport}
+        />
       )}
     </main>
   );

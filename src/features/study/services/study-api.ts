@@ -25,6 +25,7 @@ export type StudyAnswerSnapshotPayload = {
   correctOptions?: string[];
   options: Record<string, string>;
   explanations: Record<string, string>;
+  explanationSummary?: string;
   optionMapping?: QuestionOptionMapping;
 };
 
@@ -89,6 +90,26 @@ type StudyExplainPayload = {
   selectedOption?: QuestionOption;
   selectedOptions?: QuestionOption[];
   optionMapping?: QuestionOptionMapping;
+};
+
+export type SaveStudyHistoryResult = {
+  ok: boolean;
+  itemId?: string;
+};
+
+export type ReportQuestionReason =
+  | "INCORRECT_ANSWER"
+  | "UNCLEAR_STATEMENT"
+  | "MISSING_CONTEXT"
+  | "GRAMMAR_TYPO"
+  | "DUPLICATE"
+  | "QUALITY_ISSUE"
+  | "OTHER";
+
+export type ReportStudyQuestionPayload = {
+  questionId: string;
+  reason: ReportQuestionReason;
+  description?: string;
 };
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -203,14 +224,58 @@ export async function createStudyExplanation(payload: StudyExplainPayload): Prom
   };
 }
 
-export async function saveStudyHistory(payload: SaveStudyHistoryPayload): Promise<boolean> {
+export async function saveStudyHistory(payload: SaveStudyHistoryPayload): Promise<SaveStudyHistoryResult> {
   const response = await fetch("/api/study/history", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
-  return response.ok;
+  if (!response.ok) {
+    return { ok: false };
+  }
+
+  const data = await parseJson<{ item?: { id?: string } }>(response).catch(() => ({}) as { item?: { id?: string } });
+
+  return {
+    ok: true,
+    itemId: typeof data.item?.id === "string" ? data.item.id : undefined,
+  };
+}
+
+export async function saveStudyHistoryExplanation(input: {
+  historyId: string;
+  questionId: string;
+  explanationSummary?: string;
+  explanations: Partial<Record<QuestionOption, string>>;
+}): Promise<void> {
+  const response = await fetch(`/api/study/history/${encodeURIComponent(input.historyId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      questionId: input.questionId,
+      explanationSummary: input.explanationSummary,
+      explanations: input.explanations,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await parseJson<{ error?: string }>(response).catch(() => ({ error: undefined }));
+    throw new Error(data.error ?? "Nao foi possivel salvar explicacao no historico.");
+  }
+}
+
+export async function reportStudyQuestion(payload: ReportStudyQuestionPayload): Promise<void> {
+  const response = await fetch("/api/study/reports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const data = await parseJson<{ error?: string }>(response).catch(() => ({ error: undefined }));
+    throw new Error(data.error ?? "Nao foi possivel enviar denuncia da questao.");
+  }
 }
 
 export async function fetchQuestHistory(): Promise<QuestHistoryItem[]> {
