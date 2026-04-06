@@ -3,6 +3,10 @@ import {
   AdminMetricsPayload,
   AdminQuestionsListParams,
   AdminQuestionListItem,
+  AdminQuestionReportListItem,
+  AdminQuestionReportListParams,
+  AdminQuestionReportUpdatePayload,
+  AdminQuestionReportUpdateResult,
   AdminQuestionsBatchPayload,
   AdminQuestionsBatchResult,
   AdminQuestionsFillMissingPayload,
@@ -268,6 +272,46 @@ export async function updateAdminQuestion(
 
   const data = (await response.json()) as { question: AdminQuestionListItem };
   return data.question;
+}
+
+export async function listAdminQuestionReports(
+  questionId: string,
+  input: AdminQuestionReportListParams,
+): Promise<PaginatedResult<AdminQuestionReportListItem>> {
+  const qs = toQueryString(input);
+  const response = await fetch(`/api/admin/questions/${questionId}/reports?${qs}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(errorPayload.error ?? "Nao foi possivel carregar denuncias da questao.");
+  }
+
+  return (await response.json()) as PaginatedResult<AdminQuestionReportListItem>;
+}
+
+export async function updateAdminQuestionReportStatus(
+  questionId: string,
+  reportId: string,
+  payload: AdminQuestionReportUpdatePayload,
+): Promise<AdminQuestionReportUpdateResult> {
+  const response = await fetch(`/api/admin/questions/${questionId}/reports/${reportId}`, {
+    method: "PATCH",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(errorPayload.error ?? "Nao foi possivel atualizar status da denuncia.");
+  }
+
+  return (await response.json()) as AdminQuestionReportUpdateResult;
 }
 
 export async function deleteAdminQuestion(questionId: string): Promise<void> {

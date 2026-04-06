@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   batchAdminQuestions,
   deleteAdminQuestion,
   fillAdminQuestionsMissingWithAI,
   getAdminQuestionsFillMissingStats,
+  listAdminQuestionReports,
   listAdminQuestions,
+  updateAdminQuestionReportStatus,
   updateAdminQuestion,
 } from "@/features/admin/services/admin-api";
 import {
   AdminQuestionListItem,
+  AdminQuestionReportListItem,
   AdminQuestionsFillMissingStats,
   AdminQuestionUpdatePayload,
   PaginatedResult,
@@ -80,6 +84,55 @@ function normalizeForSearch(value: string): string {
     .trim();
 }
 
+function formatReportReason(value: AdminQuestionReportListItem["reason"]): string {
+  switch (value) {
+    case "INCORRECT_ANSWER":
+      return "Resposta incorreta";
+    case "UNCLEAR_STATEMENT":
+      return "Enunciado confuso";
+    case "MISSING_CONTEXT":
+      return "Falta de contexto";
+    case "GRAMMAR_TYPO":
+      return "Gramatica / typo";
+    case "DUPLICATE":
+      return "Questao duplicada";
+    case "QUALITY_ISSUE":
+      return "Problema de qualidade";
+    default:
+      return "Outro";
+  }
+}
+
+function formatReportStatus(value: AdminQuestionReportListItem["status"]): string {
+  switch (value) {
+    case "OPEN":
+      return "Aberta";
+    case "IN_REVIEW":
+      return "Em revisao";
+    case "RESOLVED":
+      return "Resolvida";
+    default:
+      return "Descartada";
+  }
+}
+
+function toInitials(name: string): string {
+  const parts = name
+    .split(" ")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return "U";
+  }
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
 function resolveQuestionOptions(question: AdminQuestionListItem) {
   const labels = ["A", "B", "C", "D", "E"] as const;
   const legacyCorrect = question.correctOptions ?? [question.correctOption];
@@ -127,6 +180,9 @@ export function AdminQuestionsScreen() {
   const [active, setActive] = useState<"" | "true" | "false">("");
   const [certificationCode, setCertificationCode] = useState("");
   const [awsServiceCode, setAwsServiceCode] = useState("");
+  const [reportStatus, setReportStatus] = useState<"" | "REPORTED" | "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED">(
+    "",
+  );
   const [sortBy, setSortBy] = useState<SortByOption>("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
@@ -158,6 +214,14 @@ export function AdminQuestionsScreen() {
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [allAwsServices, setAllAwsServices] = useState<AwsServiceOption[]>([]);
   const [serviceSearch, setServiceSearch] = useState("");
+  const [reportsPanelOpen, setReportsPanelOpen] = useState(false);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [reportsPage, setReportsPage] = useState(1);
+  const [reportsPageSize] = useState(5);
+  const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
+  const [reportActionRunningId, setReportActionRunningId] = useState<string | null>(null);
+  const [reportsResult, setReportsResult] = useState<PaginatedResult<AdminQuestionReportListItem> | null>(null);
   const [editForm, setEditForm] = useState<{
     statement: string;
     topic: string;
@@ -294,6 +358,13 @@ export function AdminQuestionsScreen() {
     setEditMode(false);
     setModalError(null);
     setServiceSearch("");
+    setReportsPanelOpen(false);
+    setReportsLoading(false);
+    setReportsError(null);
+    setReportsPage(1);
+    setReportsRefreshKey(0);
+    setReportActionRunningId(null);
+    setReportsResult(null);
     setEditForm({
       statement: question.statement,
       topic: question.topic,
@@ -338,6 +409,24 @@ export function AdminQuestionsScreen() {
     setEditMode(false);
     setModalError(null);
     setServiceSearch("");
+    setReportsPanelOpen(false);
+    setReportsLoading(false);
+    setReportsError(null);
+    setReportsPage(1);
+    setReportsRefreshKey(0);
+    setReportActionRunningId(null);
+    setReportsResult(null);
+  }
+
+  function toggleReportsPanel() {
+    setReportsPanelOpen((previous) => {
+      const next = !previous;
+      if (next) {
+        setReportsPage(1);
+      }
+
+      return next;
+    });
   }
 
   function toggleColumn(column: ColumnKey) {
@@ -362,6 +451,69 @@ export function AdminQuestionsScreen() {
         items: previous.items.map((item) => (item.id === updated.id ? updated : item)),
       };
     });
+  }
+
+  function updateQuestionReportCounters(input: { reportCount: number; openReportCount: number }) {
+    setSelectedQuestion((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        reportCount: input.reportCount,
+        openReportCount: input.openReportCount,
+      };
+    });
+
+    setResult((previous) => {
+      if (!previous || !selectedQuestion) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        items: previous.items.map((item) => {
+          if (item.id !== selectedQuestion.id) {
+            return item;
+          }
+
+          return {
+            ...item,
+            reportCount: input.reportCount,
+            openReportCount: input.openReportCount,
+          };
+        }),
+      };
+    });
+  }
+
+  async function moderateReportStatus(reportId: string, status: "RESOLVED" | "DISMISSED") {
+    if (!selectedQuestion) {
+      return;
+    }
+
+    const actionLabel = status === "RESOLVED" ? "marcar como resolvida" : "descartar";
+    const confirmed = window.confirm(`Deseja ${actionLabel} esta denuncia?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setReportActionRunningId(reportId);
+    setReportsError(null);
+
+    try {
+      const updated = await updateAdminQuestionReportStatus(selectedQuestion.id, reportId, { status });
+      updateQuestionReportCounters({
+        reportCount: updated.question.reportCount,
+        openReportCount: updated.question.openReportCount,
+      });
+      setReportsRefreshKey((previous) => previous + 1);
+    } catch (error) {
+      setReportsError(error instanceof Error ? error.message : "Falha ao atualizar status da denuncia.");
+    } finally {
+      setReportActionRunningId(null);
+    }
   }
 
   async function handleSaveQuestion() {
@@ -646,6 +798,7 @@ export function AdminQuestionsScreen() {
           active: active || undefined,
           certificationCode,
           awsServiceCode,
+          reportStatus: reportStatus || undefined,
           sortBy,
           sortOrder,
         });
@@ -668,6 +821,7 @@ export function AdminQuestionsScreen() {
     active,
     certificationCode,
     awsServiceCode,
+    reportStatus,
     sortBy,
     sortOrder,
     refreshKey,
@@ -681,6 +835,47 @@ export function AdminQuestionsScreen() {
     const pageIds = new Set(result.items.map((item) => item.id));
     setSelectedQuestionIds((previous) => previous.filter((id) => pageIds.has(id) || !currentPageIds.includes(id)));
   }, [currentPageIds, result]);
+
+  useEffect(() => {
+    if (!selectedQuestion || !reportsPanelOpen) {
+      return;
+    }
+
+    const selectedQuestionId = selectedQuestion.id;
+
+    let cancelled = false;
+
+    async function loadQuestionReports() {
+      setReportsLoading(true);
+      setReportsError(null);
+
+      try {
+        const data = await listAdminQuestionReports(selectedQuestionId, {
+          page: reportsPage,
+          pageSize: reportsPageSize,
+        });
+
+        if (!cancelled) {
+          setReportsResult(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setReportsError(err instanceof Error ? err.message : "Falha ao carregar denuncias.");
+          setReportsResult(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setReportsLoading(false);
+        }
+      }
+    }
+
+    void loadQuestionReports();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reportsPage, reportsPageSize, reportsPanelOpen, reportsRefreshKey, selectedQuestion]);
 
   return (
     <main className="space-y-5">
@@ -855,6 +1050,22 @@ export function AdminQuestionsScreen() {
             ))}
           </select>
 
+          <select
+            value={reportStatus}
+            onChange={(event) => {
+              setPage(1);
+              setReportStatus(event.target.value as "" | "REPORTED" | "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Denuncias: todas</option>
+            <option value="REPORTED">Com denuncia</option>
+            <option value="OPEN">Denuncia aberta</option>
+            <option value="IN_REVIEW">Em revisao</option>
+            <option value="RESOLVED">Resolvida</option>
+            <option value="DISMISSED">Descartada</option>
+          </select>
+
           <div className="grid grid-cols-2 gap-2 xl:col-span-2">
             <select
               value={sortBy}
@@ -1004,7 +1215,15 @@ export function AdminQuestionsScreen() {
                       if (column.key === "active") {
                         return (
                           <td key={`${item.id}-${column.key}`} className="px-3 py-2 uppercase">
-                            {item.active ? "ATIVA" : "INATIVA"}
+                            <div className="space-y-1">
+                              <p>{item.active ? "ATIVA" : "INATIVA"}</p>
+                              {(item.reportCount ?? 0) > 0 && (
+                                <p className="text-[10px] text-[#fbbf24]">
+                                  Denuncias: {item.reportCount}
+                                  {(item.openReportCount ?? 0) > 0 ? ` (abertas: ${item.openReportCount})` : ""}
+                                </p>
+                              )}
+                            </div>
                           </td>
                         );
                       }
@@ -1114,6 +1333,14 @@ export function AdminQuestionsScreen() {
               <div className="flex gap-2">
                 <button
                   type="button"
+                  onClick={toggleReportsPanel}
+                  className="border border-[#854d0e] bg-amber-900/20 px-3 py-1 text-xs uppercase text-amber-200"
+                >
+                  {reportsPanelOpen ? "Ocultar denuncias" : "Mostrar denuncias"}
+                  {typeof selectedQuestion.reportCount === "number" ? ` (${selectedQuestion.reportCount})` : ""}
+                </button>
+                <button
+                  type="button"
                   onClick={() => setEditMode((previous) => !previous)}
                   className="border border-[#334155] px-3 py-1 text-xs uppercase"
                 >
@@ -1130,6 +1357,115 @@ export function AdminQuestionsScreen() {
             </div>
 
             {modalError && <p className="text-sm text-[#fca5a5]">{modalError}</p>}
+
+            {reportsPanelOpen && (
+              <section className="space-y-3 rounded border border-[#7c2d12]/50 bg-[#0b1220] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-mono text-xs uppercase text-amber-300">Denuncias recebidas</p>
+                  {reportsResult && (
+                    <p className="text-xs text-[#cbd5e1]">
+                      Pagina {reportsResult.page} de {reportsResult.totalPages} · Total {reportsResult.total}
+                    </p>
+                  )}
+                </div>
+
+                {reportsLoading && <p className="text-sm text-[#cbd5e1]">Carregando denuncias...</p>}
+                {reportsError && <p className="text-sm text-[#fca5a5]">{reportsError}</p>}
+
+                {!reportsLoading && !reportsError && reportsResult && (
+                  <>
+                    {reportsResult.items.length === 0 ? (
+                      <p className="text-sm text-[#94a3b8]">Nenhuma denuncia encontrada para esta questao.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {reportsResult.items.map((report) => {
+                          const reporterName = report.reporter.name?.trim() || report.reporter.username || "Usuario";
+                          return (
+                            <article
+                              key={report.id}
+                              className="space-y-2 rounded border border-[#334155] bg-[#111827] p-3"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-start gap-2">
+                                  <Avatar size="sm" className="mt-0.5 border border-[#334155]">
+                                    {report.reporter.imageUrl ? (
+                                      <AvatarImage src={report.reporter.imageUrl} alt={reporterName} />
+                                    ) : null}
+                                    <AvatarFallback>{toInitials(reporterName)}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="text-sm text-[#e2e8f0]">{reporterName}</p>
+                                    <p className="text-xs text-[#94a3b8]">
+                                      {report.reporter.username ? `@${report.reporter.username} · ` : ""}
+                                      {formatDate(report.reportedAt)}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="border border-[#f59e0b]/60 px-2 py-0.5 text-[10px] uppercase text-amber-300">
+                                    {formatReportReason(report.reason)}
+                                  </span>
+                                  <span className="border border-[#334155] px-2 py-0.5 text-[10px] uppercase text-[#cbd5e1]">
+                                    {formatReportStatus(report.status)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <p className="text-sm text-[#cbd5e1]">
+                                {report.description?.trim() || "Sem descricao informada."}
+                              </p>
+
+                              {(report.status === "OPEN" || report.status === "IN_REVIEW") && (
+                                <div className="flex flex-wrap justify-end gap-2 border-t border-[#1e293b] pt-2">
+                                  <button
+                                    type="button"
+                                    disabled={Boolean(reportActionRunningId)}
+                                    onClick={() => void moderateReportStatus(report.id, "RESOLVED")}
+                                    className="border border-[#14532d] bg-green-900/20 px-2 py-1 text-[10px] uppercase text-green-200 disabled:opacity-60"
+                                  >
+                                    {reportActionRunningId === report.id ? "Atualizando..." : "Marcar resolvida"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={Boolean(reportActionRunningId)}
+                                    onClick={() => void moderateReportStatus(report.id, "DISMISSED")}
+                                    className="border border-[#7c2d12] bg-amber-900/20 px-2 py-1 text-[10px] uppercase text-amber-200 disabled:opacity-60"
+                                  >
+                                    {reportActionRunningId === report.id ? "Atualizando..." : "Marcar descartada"}
+                                  </button>
+                                </div>
+                              )}
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {reportsResult.totalPages > 1 && (
+                      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#1e293b] pt-2">
+                        <button
+                          type="button"
+                          disabled={reportsResult.page <= 1}
+                          onClick={() => setReportsPage((previous) => Math.max(1, previous - 1))}
+                          className="border border-[#334155] px-3 py-1 text-xs uppercase disabled:opacity-40"
+                        >
+                          Anterior
+                        </button>
+                        <button
+                          type="button"
+                          disabled={reportsResult.page >= reportsResult.totalPages}
+                          onClick={() => setReportsPage((previous) => Math.min(reportsResult.totalPages, previous + 1))}
+                          className="border border-[#334155] px-3 py-1 text-xs uppercase disabled:opacity-40"
+                        >
+                          Proxima
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+            )}
 
             {!editMode ? (
               <>

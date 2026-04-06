@@ -80,6 +80,7 @@ export type AdminQuestionsListParams = {
   active?: "true" | "false";
   certificationCode?: string;
   awsServiceCode?: string;
+  reportStatus?: "REPORTED" | "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED";
   sortBy?: "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active" | "questionType";
   sortOrder?: AdminListSortOrder;
 };
@@ -124,6 +125,8 @@ export type AdminQuestionListItem = {
     code: string;
     name: string;
   }>;
+  reportCount?: number;
+  openReportCount?: number;
 };
 
 export type AdminQuestionUpdatePayload = {
@@ -152,6 +155,53 @@ export type AdminQuestionUpdatePayload = {
     isCorrect?: boolean;
   }>;
   serviceCodes?: string[] | null;
+};
+
+export type AdminQuestionReportListParams = {
+  page: number;
+  pageSize: number;
+  status?: "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED";
+};
+
+export type AdminQuestionReportListItem = {
+  id: string;
+  reason:
+    | "INCORRECT_ANSWER"
+    | "UNCLEAR_STATEMENT"
+    | "MISSING_CONTEXT"
+    | "GRAMMAR_TYPO"
+    | "DUPLICATE"
+    | "QUALITY_ISSUE"
+    | "OTHER";
+  status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED";
+  description: string | null;
+  reportedAt: string;
+  reviewedAt: string | null;
+  reporter: {
+    id: string;
+    name: string;
+    username: string | null;
+    imageUrl: string | null;
+  };
+};
+
+export type AdminQuestionReportUpdatePayload = {
+  status: "RESOLVED" | "DISMISSED";
+  reviewNotes?: string;
+};
+
+export type AdminQuestionReportUpdateResult = {
+  report: {
+    id: string;
+    status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED";
+    reviewedAt: string | null;
+    reviewNotes: string | null;
+  };
+  question: {
+    id: string;
+    reportCount: number;
+    openReportCount: number;
+  };
 };
 
 export type AdminQuestionsBatchAction = "set-active" | "set-usage" | "delete";
