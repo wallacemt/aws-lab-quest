@@ -47,6 +47,9 @@ type AdminQuestionListDbItem = {
       name: string;
     };
   }>;
+  questionReports: Array<{
+    status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED";
+  }>;
 };
 
 const UNASSIGNED_SERVICE_FILTER = "__UNASSIGNED__";
@@ -115,6 +118,8 @@ function toAdminQuestionView(item: AdminQuestionListDbItem) {
     (service, index, array) => array.findIndex((candidate) => candidate.code === service.code) === index,
   );
   const primaryService = allServices[0] ?? null;
+  const reportCount = item.questionReports.length;
+  const openReportCount = item.questionReports.filter((report) => report.status === "OPEN").length;
 
   return {
     id: item.id,
@@ -142,6 +147,8 @@ function toAdminQuestionView(item: AdminQuestionListDbItem) {
     certificationPreset: item.certificationPreset,
     awsService: primaryService,
     awsServices: allServices,
+    reportCount,
+    openReportCount,
   };
 }
 
@@ -190,6 +197,7 @@ export async function GET(request: NextRequest) {
   const activeParam = request.nextUrl.searchParams.get("active")?.trim() ?? "";
   const certificationCode = request.nextUrl.searchParams.get("certificationCode")?.trim() ?? "";
   const awsServiceCode = request.nextUrl.searchParams.get("awsServiceCode")?.trim() ?? "";
+  const reportStatus = request.nextUrl.searchParams.get("reportStatus")?.trim().toUpperCase() ?? "";
   const sortBy = parseSortBy(request.nextUrl.searchParams.get("sortBy"));
   const sortOrder = parseSortOrder(request.nextUrl.searchParams.get("sortOrder"));
 
@@ -241,6 +249,29 @@ export async function GET(request: NextRequest) {
         ],
       });
     }
+  }
+
+  if (reportStatus === "REPORTED") {
+    andFilters.push({
+      questionReports: {
+        some: {},
+      },
+    });
+  }
+
+  if (
+    reportStatus === "OPEN" ||
+    reportStatus === "IN_REVIEW" ||
+    reportStatus === "RESOLVED" ||
+    reportStatus === "DISMISSED"
+  ) {
+    andFilters.push({
+      questionReports: {
+        some: {
+          status: reportStatus,
+        },
+      },
+    });
   }
 
   if (andFilters.length > 0) {
@@ -308,6 +339,11 @@ export async function GET(request: NextRequest) {
                 name: true,
               },
             },
+          },
+        },
+        questionReports: {
+          select: {
+            status: true,
           },
         },
       },

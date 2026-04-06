@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const take = Math.max(1, Math.min(10, Number(searchParams.get("take") ?? 5)));
+  const take = Math.max(1, Math.min(20, Number(searchParams.get("take") ?? 10)));
   const sampleSessions = Math.max(5, Math.min(80, Number(searchParams.get("sample") ?? 35)));
 
   const history = await prisma.studySessionHistory.findMany({
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
       const normalizedService = question?.questionAwsServices?.[0]?.service;
       const serviceCode = normalizedService?.code ?? question?.awsService?.code ?? topic;
       const serviceName = normalizedService?.name ?? question?.awsService?.name ?? topic;
-      const key = serviceCode.toUpperCase();
+      const key = `${serviceCode.toUpperCase()}::${topic.toUpperCase()}`;
 
       const current =
         aggregate.get(key) ??
