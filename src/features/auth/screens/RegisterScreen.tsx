@@ -101,7 +101,7 @@ export function RegisterScreen() {
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">
             <Image
-              src={'/logo.png'}
+              src={"/logo.png"}
               alt="AWS Quest logo"
               width={124}
               height={124}
@@ -186,6 +186,7 @@ export function RegisterScreen() {
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute right-1 top-1/2 -translate-y-1/2  px-2 py-1 font-mono text-[8px] uppercase "
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  title={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeClosed /> : <EyeIcon />}
                 </button>
@@ -208,6 +209,7 @@ export function RegisterScreen() {
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
                   className="absolute right-1 top-1/2 -translate-y-1/2   px-2 py-1 font-mono text-[8px] uppercase "
                   aria-label={showConfirmPassword ? "Ocultar confirmacao de senha" : "Mostrar confirmacao de senha"}
+                  title={showConfirmPassword ? "Ocultar confirmacao de senha" : "Mostrar confirmacao de senha"}
                 >
                   {showConfirmPassword ? <EyeClosed /> : <EyeIcon />}
                 </button>

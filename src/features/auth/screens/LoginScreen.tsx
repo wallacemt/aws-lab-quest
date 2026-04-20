@@ -68,7 +68,7 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
       setLoading(false);
       return;
     }
-    
+
     const access = await checkUserAccessStatus();
     if (!access || !access.active) {
       await authClient.signOut();
@@ -127,7 +127,7 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">
             <Image
-              src={'/icon.png'}
+              src={"/icon.png"}
               alt="AWS Quest logo"
               width={300}
               height={300}
@@ -178,11 +178,23 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute right-1 top-1/2 -translate-y-1/2   px-2 py-1 font-mono text-[8px] uppercase ]"
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  title={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeClosed /> : <EyeIcon />}
                 </button>
               </div>
             </label>
+
+            {mode !== "admin" && (
+              <div className="text-right">
+                <Link
+                  href="/forgot-password"
+                  className="font-mono text-[10px] uppercase text-[var(--pixel-primary)] underline"
+                >
+                  Esqueci minha senha
+                </Link>
+              </div>
+            )}
 
             {error && (
               <PixelCard className="border-red-500 bg-red-900/30 py-2">
