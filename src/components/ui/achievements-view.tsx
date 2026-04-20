@@ -29,7 +29,7 @@ function rarityClass(rarity: AchievementItem["rarity"]): string {
 
 export function AchievementsView({
   items,
-  title = "Conquistas",
+  title,
   handleCopyShareLink,
   shareMsg,
   isPublic,
@@ -38,9 +38,11 @@ export function AchievementsView({
 
   return (
     <div className="space-y-3">
-      <h3 className="font-mono text-xs uppercase text-primary">
-        {title} ({unlockedCount}/{items.length})
-      </h3>
+      {title && (
+        <h3 className="font-mono text-xs uppercase text-primary">
+          {title} ({unlockedCount}/{items.length})
+        </h3>
+      )}
 
       <div className="grid gap-2 sm:grid-cols-2">
         {items

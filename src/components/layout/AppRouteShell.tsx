@@ -10,6 +10,7 @@ import { getAdminStatus } from "@/features/admin/services/admin-api";
 import BottomNav from "../ui/bottom-nav";
 import RetroLoading from "../ui/retro-loading";
 import { Header } from "@/components/layout/header";
+import { PixelButton } from "@/components/ui/pixel-button";
 
 type AppRouteShellProps = {
   children: ReactNode;
@@ -19,7 +20,16 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { hydrated, isProfileComplete, profile } = useUserProfile();
-  const { hydrated: simHydrated, isActive: simulatedExamActive } = useSimulatedExam();
+  const {
+    hydrated: simHydrated,
+    isActive: simulatedExamActive,
+    restoredFromStorage,
+    clearSession,
+    acknowledgeRestoredSession,
+  } = useSimulatedExam();
+  const recoveredExamDialogOpen = Boolean(
+    simHydrated && simulatedExamActive && restoredFromStorage && pathname !== "/simulado",
+  );
   const onboardingStep = getOnboardingStep();
   const guardReady =
     hydrated &&
@@ -46,14 +56,20 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
       return;
     }
 
+    if (pathname === "/simulado") {
+      return;
+    }
+
     if (!simulatedExamActive) {
       return;
     }
 
-    if (pathname !== "/simulado") {
-      router.replace("/simulado");
+    if (restoredFromStorage) {
+      return;
     }
-  }, [pathname, router, simHydrated, simulatedExamActive, profile.role]);
+
+    router.replace("/simulado");
+  }, [pathname, restoredFromStorage, router, simHydrated, simulatedExamActive, profile.role]);
 
   useEffect(() => {
     if (!pathname || !hydrated) {
@@ -102,6 +118,15 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
     );
   }
 
+  function handleResumeRecoveredExam() {
+    acknowledgeRestoredSession();
+    router.replace("/simulado");
+  }
+
+  function handleClearRecoveredExam() {
+    clearSession();
+  }
+
   return (
     <>
       <div className="min-h-screen pb-28">
@@ -113,6 +138,25 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
         )}
         {children}
       </div>
+
+      {recoveredExamDialogOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md space-y-4 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] p-4 shadow-[6px_6px_0_0_var(--pixel-shadow)]">
+            <p className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Simulado pendente detectado</p>
+            <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+              Encontramos uma sessao de simulado anterior. Voce pode retomar agora ou limpar a sessao para seguir
+              navegando no app.
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <PixelButton variant="ghost" onClick={handleClearRecoveredExam}>
+                Limpar sessao
+              </PixelButton>
+              <PixelButton onClick={handleResumeRecoveredExam}>Retomar simulado</PixelButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </>
   );

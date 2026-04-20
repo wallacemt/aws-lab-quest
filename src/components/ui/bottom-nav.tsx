@@ -2,6 +2,7 @@ import { Home, Trophy, History, BarChart2, ChevronDown, ChevronUp } from "lucide
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home, active: false },
@@ -26,13 +27,19 @@ export default function BottomNav() {
         }`}
       >
         {/* Toggle Button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="absolute -top-12 right-1 bg-pixel-card retro-border border-2 p-1.5 md:p-2 rounded-full text-pixel-subtext hover:text-pixel-text transition-colors retro-shadow-sm active:translate-y-0.5 active:shadow-none backdrop-blur-2xl"
-          aria-label={isOpen ? "Ocultar menu" : "Mostrar menu"}
-        >
-          {isOpen ? <ChevronDown className="w-5 h-5 " /> : <ChevronUp className="w-5 h-5" />}
-        </button>
+        <Tooltip>
+          <TooltipTrigger>
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="absolute -top-12 right-1 bg-pixel-card retro-border border-2 p-1.5 md:p-2 rounded-full text-pixel-subtext hover:text-pixel-text transition-colors retro-shadow-sm active:translate-y-0.5 active:shadow-none backdrop-blur-2xl"
+              aria-label={isOpen ? "Ocultar menu" : "Mostrar menu"}
+              title={isOpen ? "Ocultar menu" : "Mostrar menu"}
+            >
+              {isOpen ? <ChevronDown className="w-5 h-5 " /> : <ChevronUp className="w-5 h-5" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{isOpen ? "Fechar Navegação" : "Abrir Navegação"}</TooltipContent>
+        </Tooltip>
 
         <nav className="bg-pixel-card retro-border border-b-0 border-l-0 border-r-0 rounded-none pb-safe md:rounded-2xl md:border-4 md:px-2 md:pb-0 md:retro-shadow w-full backdrop-blur-lg">
           <ul className="flex items-center justify-around px-2 py-2 md:gap-4">
@@ -40,22 +47,29 @@ export default function BottomNav() {
               const Icon = item.icon;
               return (
                 <li key={item.label} className="flex-1 md:flex-none">
-                  <Link
-                    href={item.href}
-                    className={`flex flex-col items-center justify-center gap-1 p-2 md:p-3 md:px-4 rounded-xl transition-all active:scale-95 ${
-                      item.active ? "text-primary" : "text-pixel-subtext hover:text-pixel-text hover:bg-pixel-muted"
-                    }`}
-                  >
-                    <div className={`relative ${item.active ? "animate-bounce-slight" : ""}`}>
-                      <Icon className={`w-6 h-6 md:w-8 md:h-8 ${item.active ? "fill-primary/20" : ""}`} />
-                      {item.active && (
-                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 md:w-1.5 md:h-1.5 md:-bottom-1.5 bg-primary rounded-full" />
-                      )}
-                    </div>
-                    <span className="hidden md:text-[0.5rem] md:block font-bold uppercase tracking-wider font-mono mt-1">
-                      {item.label}
-                    </span>
-                  </Link>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Link
+                        href={item.href}
+                        aria-label={item.label}
+                        title={item.label}
+                        className={`flex flex-col items-center justify-center gap-1 p-2 md:p-3 md:px-4 rounded-xl transition-all active:scale-95 ${
+                          item.active ? "text-primary" : "text-pixel-subtext hover:text-pixel-text hover:bg-pixel-muted"
+                        }`}
+                      >
+                        <div className={`relative ${item.active ? "animate-bounce-slight" : ""}`}>
+                          <Icon className={`w-6 h-6 md:w-8 md:h-8 ${item.active ? "fill-primary/20" : ""}`} />
+                          {item.active && (
+                            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 md:w-1.5 md:h-1.5 md:-bottom-1.5 bg-primary rounded-full" />
+                          )}
+                        </div>
+                        <span className="hidden md:text-[0.5rem] md:block font-bold uppercase tracking-wider font-mono mt-1">
+                          {item.label}
+                        </span>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>{item.label}</TooltipContent>
+                  </Tooltip>
                 </li>
               );
             })}
