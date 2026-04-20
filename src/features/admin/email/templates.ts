@@ -6,6 +6,7 @@ type BaseEmailParams = {
 
 type InviteParams = BaseEmailParams;
 type FreeAccessParams = BaseEmailParams;
+type PasswordResetParams = BaseEmailParams;
 
 export type SystemTemplateDraft = {
   code: string;
@@ -112,9 +113,36 @@ export function renderFreeAcessTemplate(params: FreeAccessParams) {
   };
 }
 
+export function renderPasswordResetTemplate(params: PasswordResetParams) {
+  const logoUrl = getLogoUrl(params);
+
+  const subject = "Redefinicao de senha AWS Lab Quest";
+  const html = renderBrandedEmail({
+    title: `Ola, ${params.name}!`,
+    subtitle: "Recebemos um pedido para redefinir sua senha.",
+    intro: "Se voce fez essa solicitacao, use o botao abaixo para criar uma nova senha com seguranca.",
+    highlights: [
+      "O link expira automaticamente em 1 hora",
+      "Apos redefinir a senha, sessoes antigas serao encerradas",
+      "Se nao foi voce, ignore este email sem riscos",
+    ],
+    ctaLabel: "Redefinir senha",
+    ctaHref: "{{reset_url}}",
+    footer: "Dica de seguranca: nunca compartilhe este link com outras pessoas.",
+    logoUrl,
+  });
+
+  return {
+    subject,
+    html,
+    text: `Ola, ${params.name}! Use este link para redefinir sua senha: {{reset_url}}. Se voce nao solicitou, ignore este email.`,
+  };
+}
+
 export function getSystemEmailTemplates(params: BaseEmailParams = { name: "Aluno" }): SystemTemplateDraft[] {
   const daily = renderDailyPraticeInviteTemplate(params);
   const freeAccess = renderFreeAcessTemplate(params);
+  const passwordReset = renderPasswordResetTemplate(params);
 
   return [
     {
@@ -132,6 +160,14 @@ export function getSystemEmailTemplates(params: BaseEmailParams = { name: "Aluno
       subject: freeAccess.subject,
       html: freeAccess.html,
       text: freeAccess.text,
+    },
+    {
+      code: "password-reset",
+      name: "Redefinicao de senha",
+      description: "Fluxo de recuperacao de conta para usuarios que esqueceram a senha.",
+      subject: passwordReset.subject,
+      html: passwordReset.html,
+      text: passwordReset.text,
     },
   ];
 }

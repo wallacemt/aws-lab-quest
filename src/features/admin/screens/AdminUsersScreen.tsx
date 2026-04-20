@@ -319,7 +319,11 @@ export function AdminUsersScreen() {
                           asChild
                           className="flex items-center justify-center hover:border-[var(--pixel-primary)]"
                         >
-                          <div className="h-12 w-12 overflow-hidden border-4 border-[var(--pixel-border)] shadow-[4px_4px_0_0_var(--pixel-shadow)] rounded-full">
+                          <div
+                            className="h-12 w-12 overflow-hidden border-4 border-[var(--pixel-border)] shadow-[4px_4px_0_0_var(--pixel-shadow)] rounded-full"
+                            aria-label="Acoes do usuario"
+                            title="Acoes do usuario"
+                          >
                             <EditIcon />
                           </div>
                         </DropdownMenuTrigger>
