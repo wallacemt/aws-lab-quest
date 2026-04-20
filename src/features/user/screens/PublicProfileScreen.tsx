@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { AchievementsView } from "@/components/ui/achievements-view";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { BadgesView } from "@/components/ui/badges-view";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { AchievementItem } from "@/lib/achievements";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
@@ -70,6 +73,9 @@ export function PublicProfileScreen() {
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [achievementsOpen, setAchievementsOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [studyHistoryOpen, setStudyHistoryOpen] = useState(true);
 
   useEffect(() => {
     if (!userId) return;
@@ -105,9 +111,7 @@ export function PublicProfileScreen() {
     return (
       <AppLayout>
         <main className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-6 px-4 py-8">
-          <p className="font-mono text-sm uppercase text-[var(--pixel-primary)]">
-            Jogador não encontrado
-          </p>
+          <p className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Jogador não encontrado</p>
           <PixelButton onClick={() => router.back()}>← Voltar</PixelButton>
         </main>
       </AppLayout>
@@ -170,9 +174,7 @@ export function PublicProfileScreen() {
                   transition={{ duration: 0.8, ease: "easeOut" }}
                 />
               </div>
-              <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
-                {currentLevel.next}
-              </p>
+              <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">{currentLevel.next}</p>
 
               {/* Meta info */}
               <div className="flex flex-wrap justify-center gap-3 pt-1 sm:justify-start">
@@ -247,7 +249,28 @@ export function PublicProfileScreen() {
             transition={{ delay: 0.2, duration: 0.4 }}
           >
             <PixelCard>
-              <AchievementsView items={achievements.items} title="Conquistas" isPublic />
+              <Collapsible open={achievementsOpen} onOpenChange={setAchievementsOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left"
+                  >
+                    <span className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                      Conquistas ({achievements.unlockedCount}/{achievements.total})
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${achievementsOpen ? "rotate-180" : "rotate-0"}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="pt-3">
+                  <ScrollArea className="h-[460px] pr-3">
+                    <AchievementsView items={achievements.items}  isPublic />
+                  </ScrollArea>
+                </CollapsibleContent>
+              </Collapsible>
             </PixelCard>
           </motion.div>
         )}
@@ -260,31 +283,49 @@ export function PublicProfileScreen() {
             transition={{ delay: 0.25, duration: 0.4 }}
           >
             <PixelCard className="space-y-3">
-              <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">
-                Últimos Labs ({history.length})
-              </h3>
-              <div className="space-y-2">
-                {history.map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 + i * 0.04, duration: 0.25 }}
-                    className="flex items-center justify-between border border-[var(--pixel-border)] bg-[var(--pixel-muted)]/40 px-3 py-2"
+              <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
-                      <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
-                        {item.theme} · {item.tasksCount} task{item.tasksCount !== 1 ? "s" : ""} ·{" "}
-                        {new Date(item.completedAt).toLocaleDateString("pt-BR")}
-                      </p>
-                    </div>
-                    <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
-                      +{item.xp} XP
+                    <span className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                      Ultimos Labs ({history.length})
                     </span>
-                  </motion.div>
-                ))}
-              </div>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${historyOpen ? "rotate-180" : "rotate-0"}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="pt-3">
+                  <ScrollArea className="h-[360px] pr-3">
+                    <div className="space-y-2">
+                      {history.map((item, i) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.3 + i * 0.04, duration: 0.25 }}
+                          className="flex items-center justify-between border border-[var(--pixel-border)] bg-[var(--pixel-muted)]/40 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
+                            <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
+                              {item.theme} · {item.tasksCount} task{item.tasksCount !== 1 ? "s" : ""} ·{" "}
+                              {new Date(item.completedAt).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                          <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
+                            +{item.xp} XP
+                          </span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CollapsibleContent>
+              </Collapsible>
             </PixelCard>
           </motion.div>
         )}
@@ -296,31 +337,49 @@ export function PublicProfileScreen() {
             transition={{ delay: 0.35, duration: 0.4 }}
           >
             <PixelCard className="space-y-3">
-              <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">
-                KC e Simulados ({studyHistory.length})
-              </h3>
-              <div className="space-y-2">
-                {studyHistory.map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + i * 0.04, duration: 0.25 }}
-                    className="flex items-center justify-between border border-[var(--pixel-border)] bg-[var(--pixel-muted)]/40 px-3 py-2"
+              <Collapsible open={studyHistoryOpen} onOpenChange={setStudyHistoryOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
-                      <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
-                        {item.sessionType} · {item.scorePercent}% · {item.correctAnswers}/{item.totalQuestions} ·{" "}
-                        {new Date(item.completedAt).toLocaleDateString("pt-BR")}
-                      </p>
-                    </div>
-                    <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
-                      +{item.gainedXp} XP
+                    <span className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                      KC e Simulados ({studyHistory.length})
                     </span>
-                  </motion.div>
-                ))}
-              </div>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${studyHistoryOpen ? "rotate-180" : "rotate-0"}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="pt-3">
+                  <ScrollArea className="h-[360px] pr-3">
+                    <div className="space-y-2">
+                      {studyHistory.map((item, i) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.4 + i * 0.04, duration: 0.25 }}
+                          className="flex items-center justify-between border border-[var(--pixel-border)] bg-[var(--pixel-muted)]/40 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
+                            <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
+                              {item.sessionType} · {item.scorePercent}% · {item.correctAnswers}/{item.totalQuestions} ·{" "}
+                              {new Date(item.completedAt).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                          <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
+                            +{item.gainedXp} XP
+                          </span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CollapsibleContent>
+              </Collapsible>
             </PixelCard>
           </motion.div>
         )}

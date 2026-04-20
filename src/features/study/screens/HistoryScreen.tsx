@@ -185,7 +185,7 @@ export function HistoryScreen() {
         {!loading && filteredLabs.length > 0 && (
           <div className="space-y-3">
             <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Labs</h2>
-            <ScrollArea className="h-72 w-full rounded-md  border border-pixel-border">
+            <ScrollArea className="h-92 w-full rounded-md  border border-pixel-border">
               <div className="flex flex-col p-4 gap-3 ">
                 {filteredLabs.map((item) => (
                   <button key={item.id} type="button" onClick={() => setSelectedItem(item)} className="text-left">
@@ -223,7 +223,7 @@ export function HistoryScreen() {
         {!loading && filteredStudyHistory.length > 0 && (
           <div className="space-y-3">
             <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">KC e Simulados</h2>
-            <ScrollArea className="h-72 w-full rounded-md  border border-pixel-border">
+            <ScrollArea className="h-92 w-full rounded-md  border border-pixel-border">
               <div className="grid gap-3 grid-cols-1 p-4 sm:grid-cols-2">
                 {filteredStudyHistory.map((item) => (
                   <button
