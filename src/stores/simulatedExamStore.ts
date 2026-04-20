@@ -7,12 +7,14 @@ import { SimulatedExamSession } from "@/lib/types";
 type SimulatedExamState = {
   session: SimulatedExamSession | null;
   hydrated: boolean;
+  restoredFromStorage: boolean;
   nowMs: number;
   hydrate: () => void;
   setNowMs: (value: number) => void;
   startSession: (certificationCode: string, minutes?: number) => void;
   submitSession: () => void;
   clearSession: () => void;
+  acknowledgeRestoredSession: () => void;
 };
 
 function persistSession(next: SimulatedExamSession | null) {
@@ -25,6 +27,7 @@ function persistSession(next: SimulatedExamSession | null) {
 export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
   session: null,
   hydrated: false,
+  restoredFromStorage: false,
   nowMs: 0,
   hydrate: () => {
     if (get().hydrated || typeof window === "undefined") {
@@ -32,14 +35,32 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
     }
 
     let parsed: SimulatedExamSession | null = null;
+    let restoredFromStorage = false;
+
     try {
       const raw = window.localStorage.getItem(STORAGE_KEYS.activeSimulatedExam);
       parsed = raw ? (JSON.parse(raw) as SimulatedExamSession | null) : null;
+
+      if (parsed) {
+        const endsAtMs = new Date(parsed.endsAt).getTime();
+        const startedAtMs = new Date(parsed.startedAt).getTime();
+        const hasValidDates = Number.isFinite(endsAtMs) && Number.isFinite(startedAtMs);
+        const isExpired = !hasValidDates || endsAtMs <= Date.now();
+        const isSubmitted = Boolean(parsed.submittedAt);
+
+        if (isExpired || isSubmitted) {
+          parsed = null;
+          window.localStorage.removeItem(STORAGE_KEYS.activeSimulatedExam);
+        } else {
+          restoredFromStorage = true;
+        }
+      }
     } catch {
       parsed = null;
+      window.localStorage.removeItem(STORAGE_KEYS.activeSimulatedExam);
     }
 
-    set({ session: parsed, hydrated: true, nowMs: Date.now() });
+    set({ session: parsed, hydrated: true, restoredFromStorage, nowMs: Date.now() });
   },
   setNowMs: (value) => set({ nowMs: value }),
   startSession: (certificationCode, minutes = 90) => {
@@ -55,14 +76,21 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
     };
 
     persistSession(nextSession);
-    set({ session: nextSession, nowMs: Date.now() });
+    set({ session: nextSession, restoredFromStorage: false, nowMs: Date.now() });
   },
   submitSession: () => {
     persistSession(null);
-    set({ session: null, nowMs: 0 });
+    set({ session: null, restoredFromStorage: false, nowMs: 0 });
   },
   clearSession: () => {
     persistSession(null);
-    set({ session: null, nowMs: 0 });
+    set({ session: null, restoredFromStorage: false, nowMs: 0 });
+  },
+  acknowledgeRestoredSession: () => {
+    if (!get().restoredFromStorage) {
+      return;
+    }
+
+    set({ restoredFromStorage: false });
   },
 }));

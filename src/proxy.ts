@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const AUTH_PAGES = ["/login", "/register", "/admin/login"];
+const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/reset-password", "/admin/login"];
 const PUBLIC_PREFIXES = [
   "/api/auth",
   "/api/health",
@@ -53,7 +53,7 @@ export function proxy(request: NextRequest) {
     const target = pathname.startsWith("/admin") ? "/admin" : "/";
     return NextResponse.redirect(new URL(target, request.url));
   }
-  
+
   return NextResponse.next();
 }
 

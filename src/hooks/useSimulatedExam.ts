@@ -7,8 +7,18 @@ let tickerId: number | null = null;
 let tickerSubscribers = 0;
 
 export function useSimulatedExam() {
-  const { hydrated, session, nowMs, hydrate, setNowMs, startSession, submitSession, clearSession } =
-    useSimulatedExamStore();
+  const {
+    hydrated,
+    session,
+    restoredFromStorage,
+    nowMs,
+    hydrate,
+    setNowMs,
+    startSession,
+    submitSession,
+    clearSession,
+    acknowledgeRestoredSession,
+  } = useSimulatedExamStore();
 
   useEffect(() => {
     if (!hydrated) {
@@ -52,10 +62,12 @@ export function useSimulatedExam() {
   return {
     hydrated,
     session,
+    restoredFromStorage,
     isActive,
     remainingSeconds,
     startSession,
     submitSession,
     clearSession,
+    acknowledgeRestoredSession,
   };
 }

@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { getSystemEmailTemplates } from "@/features/admin/email/templates";
 
-const ALLOWED_VARIABLES = ["name", "app_url", "logo_url"] as const;
+const ALLOWED_VARIABLES = ["name", "app_url", "logo_url", "reset_url"] as const;
 
 type TemplateVariables = {
   name: string;
   app_url: string;
   logo_url: string;
+  reset_url: string;
 };
 
 function getBaseAppUrl(): string {
@@ -55,11 +56,12 @@ export async function ensureSystemTemplates(): Promise<void> {
   }
 }
 
-export function buildTemplateVariables(input: { name: string }): TemplateVariables {
+export function buildTemplateVariables(input: { name: string; resetUrl?: string }): TemplateVariables {
   const appUrl = getBaseAppUrl();
   return {
     name: input.name,
     app_url: appUrl,
     logo_url: `${appUrl}/android-chrome-192x192.png`,
+    reset_url: input.resetUrl ?? `${appUrl}/login`,
   };
 }
