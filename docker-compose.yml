@@ -15,6 +15,65 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  worker:
+    build:
+      context: ./aws-worker
+      dockerfile: Dockerfile
+    container_name: awlq-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_POOL_MAX: "3"
+      REDIS_URL: ${REDIS_URL}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      NODE_ENV: production
+      LOG_LEVEL: info
+      WEAK_AREA_THRESHOLD: "0.60"
+      WEAK_AREA_WINDOW_DAYS: "30"
+  app:
+    build:
+      context: ./awlq-app
+      dockerfile: Dockerfile
+    container_name: awlq-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      GEMINI_SAFE_TOKENS_PER_MINUTE: 9_000
+      GEMINI_MIN_CALL_INTERVAL_MS: 2_500
+      GEMINI_OCR_MODEL: ${GEMINI_OCR_MODEL}
+      DATABASE_URL: ${DATABASE_URL}
+
+      EMAIL_FROM: ${EMAIL_FROM}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+
+      # DATABASE_URL="postgresql://postgres.djitwkagdqgbhanenonk:MQxgePEqvKMsWzal@aws-0-us-west-2.pooler.supabase.com:5432/awlq"
+
+      # Better Auth
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL:  ${BETTER_AUTH_URL}
+      APP_URL:  ${APP_URL}
+
+      # Supabase (storage for avatars + badges)
+      SUPABASE_URL:  ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY:  ${SUPABASE_SERVICE_ROLE_KEY}
+
+      SUPABASE_ANON_KEY:  ${SUPABASE_ANON_KEY}
+      POLLINATIONS_API_KEY:  ${POLLINATIONS_API_KEY}
+
+      # Initial admin seed (optional)
+      ADMIN_EMAIL:  ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_NAME:  ${ADMIN_NAME}
 
 volumes:
   postgres_data:
