@@ -1,0 +1,1857 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  batchAdminQuestions,
+  deleteAdminQuestion,
+  fillAdminQuestionsMissingWithAI,
+  getAdminQuestionsFillMissingStats,
+  listAdminQuestionReports,
+  listAdminQuestions,
+  updateAdminQuestionReportStatus,
+  updateAdminQuestion,
+} from "@/features/admin/services/admin-api";
+import {
+  AdminQuestionListItem,
+  AdminQuestionReportListItem,
+  AdminQuestionsFillMissingStats,
+  AdminQuestionUpdatePayload,
+  PaginatedResult,
+} from "@/features/admin/types";
+
+type CertificationOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type AwsServiceOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type SortByOption = "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active" | "questionType";
+
+type ColumnKey =
+  | "externalId"
+  | "statement"
+  | "topic"
+  | "difficulty"
+  | "questionType"
+  | "usage"
+  | "active"
+  | "certification"
+  | "service"
+  | "createdAt";
+
+const COLUMN_OPTIONS: Array<{ key: ColumnKey; label: string }> = [
+  { key: "externalId", label: "External ID" },
+  { key: "statement", label: "Enunciado" },
+  { key: "topic", label: "Topico" },
+  { key: "difficulty", label: "Dificuldade" },
+  { key: "questionType", label: "Tipo" },
+  { key: "usage", label: "Uso" },
+  { key: "active", label: "Status" },
+  { key: "certification", label: "Certificacao" },
+  { key: "service", label: "Servico" },
+  { key: "createdAt", label: "Criada em" },
+];
+
+const DEFAULT_COLUMNS: ColumnKey[] = [
+  "statement",
+  "topic",
+  "difficulty",
+  "questionType",
+  "usage",
+  "active",
+  "certification",
+  "service",
+];
+
+const UNASSIGNED_SERVICE_FILTER = "__UNASSIGNED__";
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleString("pt-BR");
+}
+
+function normalizeForSearch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function formatReportReason(value: AdminQuestionReportListItem["reason"]): string {
+  switch (value) {
+    case "INCORRECT_ANSWER":
+      return "Resposta incorreta";
+    case "UNCLEAR_STATEMENT":
+      return "Enunciado confuso";
+    case "MISSING_CONTEXT":
+      return "Falta de contexto";
+    case "GRAMMAR_TYPO":
+      return "Gramatica / typo";
+    case "DUPLICATE":
+      return "Questao duplicada";
+    case "QUALITY_ISSUE":
+      return "Problema de qualidade";
+    default:
+      return "Outro";
+  }
+}
+
+function formatReportStatus(value: AdminQuestionReportListItem["status"]): string {
+  switch (value) {
+    case "OPEN":
+      return "Aberta";
+    case "IN_REVIEW":
+      return "Em revisao";
+    case "RESOLVED":
+      return "Resolvida";
+    default:
+      return "Descartada";
+  }
+}
+
+function toInitials(name: string): string {
+  const parts = name
+    .split(" ")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return "U";
+  }
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
+function resolveQuestionOptions(question: AdminQuestionListItem) {
+  const labels = ["A", "B", "C", "D", "E"] as const;
+  const legacyCorrect = question.correctOptions ?? [question.correctOption];
+
+  return labels.map((label) => {
+    const fromPayload = question.options?.find((item) => item.label === label);
+    const content =
+      fromPayload?.content ??
+      (label === "A"
+        ? question.optionA
+        : label === "B"
+          ? question.optionB
+          : label === "C"
+            ? question.optionC
+            : label === "D"
+              ? question.optionD
+              : question.optionE);
+
+    const explanation =
+      fromPayload?.explanation ??
+      (label === "A"
+        ? question.explanationA
+        : label === "B"
+          ? question.explanationB
+          : label === "C"
+            ? question.explanationC
+            : label === "D"
+              ? question.explanationD
+              : question.explanationE);
+
+    return {
+      label,
+      content,
+      explanation,
+      isCorrect: fromPayload?.isCorrect ?? legacyCorrect.includes(label),
+    };
+  });
+}
+
+export function AdminQuestionsScreen() {
+  const [search, setSearch] = useState("");
+  const [difficulty, setDifficulty] = useState<"" | "easy" | "medium" | "hard">("");
+  const [questionType, setQuestionType] = useState<"" | "single" | "multi">("");
+  const [usage, setUsage] = useState<"" | "KC" | "SIMULADO" | "BOTH">("");
+  const [active, setActive] = useState<"" | "true" | "false">("");
+  const [certificationCode, setCertificationCode] = useState("");
+  const [awsServiceCode, setAwsServiceCode] = useState("");
+  const [reportStatus, setReportStatus] = useState<"" | "REPORTED" | "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED">(
+    "",
+  );
+  const [sortBy, setSortBy] = useState<SortByOption>("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
+  const [jumpPage, setJumpPage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [result, setResult] = useState<PaginatedResult<AdminQuestionListItem> | null>(null);
+  const [selectedQuestion, setSelectedQuestion] = useState<AdminQuestionListItem | null>(null);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const [editMode, setEditMode] = useState(false);
+  const [savingQuestion, setSavingQuestion] = useState(false);
+  const [deletingQuestion, setDeletingQuestion] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [aiFillRunning, setAiFillRunning] = useState(false);
+  const [bulkUsage, setBulkUsage] = useState<"KC" | "SIMULADO" | "BOTH">("BOTH");
+  const [bulkResultMessage, setBulkResultMessage] = useState<string | null>(null);
+  const [aiFillModalOpen, setAiFillModalOpen] = useState(false);
+  const [aiFillStatsLoading, setAiFillStatsLoading] = useState(false);
+  const [aiFillStatsError, setAiFillStatsError] = useState<string | null>(null);
+  const [aiFillStats, setAiFillStats] = useState<AdminQuestionsFillMissingStats | null>(null);
+  const [aiFillTotalToProcess, setAiFillTotalToProcess] = useState("10");
+  const [aiFillChunkSize, setAiFillChunkSize] = useState("10");
+  const [aiFillDelayMs, setAiFillDelayMs] = useState("1600");
+  const [aiFillDryRun, setAiFillDryRun] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [certifications, setCertifications] = useState<CertificationOption[]>([]);
+  const [allAwsServices, setAllAwsServices] = useState<AwsServiceOption[]>([]);
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [reportsPanelOpen, setReportsPanelOpen] = useState(false);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [reportsPage, setReportsPage] = useState(1);
+  const [reportsPageSize] = useState(5);
+  const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
+  const [reportActionRunningId, setReportActionRunningId] = useState<string | null>(null);
+  const [reportsResult, setReportsResult] = useState<PaginatedResult<AdminQuestionReportListItem> | null>(null);
+  const [editForm, setEditForm] = useState<{
+    statement: string;
+    topic: string;
+    difficulty: "easy" | "medium" | "hard";
+    questionType: "single" | "multi";
+    usage: "KC" | "SIMULADO" | "BOTH";
+    active: boolean;
+    optionA: string;
+    optionB: string;
+    optionC: string;
+    optionD: string;
+    optionE: string;
+    correctOption: string;
+    correctOptions: string;
+    explanationA: string;
+    explanationB: string;
+    explanationC: string;
+    explanationD: string;
+    explanationE: string;
+    serviceCodes: string[];
+  }>({
+    statement: "",
+    topic: "",
+    difficulty: "easy",
+    questionType: "single",
+    usage: "BOTH",
+    active: true,
+    optionA: "",
+    optionB: "",
+    optionC: "",
+    optionD: "",
+    optionE: "",
+    correctOption: "A",
+    correctOptions: "A",
+    explanationA: "",
+    explanationB: "",
+    explanationC: "",
+    explanationD: "",
+    explanationE: "",
+    serviceCodes: [],
+  });
+
+  const selectedColumns = useMemo(() => {
+    return COLUMN_OPTIONS.filter((column) => visibleColumns.includes(column.key));
+  }, [visibleColumns]);
+
+  const selectedQuestionOptions = useMemo(() => {
+    if (!selectedQuestion) {
+      return [] as ReturnType<typeof resolveQuestionOptions>;
+    }
+
+    return resolveQuestionOptions(selectedQuestion);
+  }, [selectedQuestion]);
+
+  const filteredAwsServices = useMemo(() => {
+    const normalizedSearch = normalizeForSearch(serviceSearch);
+
+    if (!normalizedSearch) {
+      return allAwsServices;
+    }
+
+    return allAwsServices
+      .filter((service) => normalizeForSearch(`${service.code} ${service.name}`).includes(normalizedSearch))
+      .sort((a, b) => {
+        const aCodeStarts = normalizeForSearch(a.code).startsWith(normalizedSearch) ? 1 : 0;
+        const bCodeStarts = normalizeForSearch(b.code).startsWith(normalizedSearch) ? 1 : 0;
+        if (aCodeStarts !== bCodeStarts) {
+          return bCodeStarts - aCodeStarts;
+        }
+
+        const aNameStarts = normalizeForSearch(a.name).startsWith(normalizedSearch) ? 1 : 0;
+        const bNameStarts = normalizeForSearch(b.name).startsWith(normalizedSearch) ? 1 : 0;
+        if (aNameStarts !== bNameStarts) {
+          return bNameStarts - aNameStarts;
+        }
+
+        return a.code.localeCompare(b.code, "pt-BR");
+      });
+  }, [allAwsServices, serviceSearch]);
+
+  const currentPageIds = useMemo(() => result?.items.map((item) => item.id) ?? [], [result]);
+  const selectedOnPageCount = useMemo(
+    () => currentPageIds.filter((id) => selectedQuestionIds.includes(id)).length,
+    [currentPageIds, selectedQuestionIds],
+  );
+  const allSelectedOnPage = currentPageIds.length > 0 && selectedOnPageCount === currentPageIds.length;
+
+  function toggleSelectQuestion(questionId: string) {
+    setSelectedQuestionIds((previous) => {
+      if (previous.includes(questionId)) {
+        return previous.filter((id) => id !== questionId);
+      }
+
+      return [...previous, questionId];
+    });
+  }
+
+  function toggleSelectAllOnPage() {
+    setSelectedQuestionIds((previous) => {
+      if (currentPageIds.length === 0) {
+        return previous;
+      }
+
+      const selectedSet = new Set(previous);
+      const allSelected = currentPageIds.every((id) => selectedSet.has(id));
+
+      if (allSelected) {
+        return previous.filter((id) => !currentPageIds.includes(id));
+      }
+
+      for (const id of currentPageIds) {
+        selectedSet.add(id);
+      }
+
+      return Array.from(selectedSet);
+    });
+  }
+
+  function openQuestionModal(question: AdminQuestionListItem) {
+    const resolvedOptions = resolveQuestionOptions(question);
+    const optionByLabel = Object.fromEntries(resolvedOptions.map((item) => [item.label, item])) as Record<
+      "A" | "B" | "C" | "D" | "E",
+      { label: "A" | "B" | "C" | "D" | "E"; content: string | null; explanation: string | null; isCorrect: boolean }
+    >;
+    const computedCorrectOptions = resolvedOptions.filter((item) => item.isCorrect).map((item) => item.label);
+    const serviceCodes = Array.from(
+      new Set([
+        ...(question.awsServices?.map((service) => service.code) ?? []),
+        ...(question.awsService?.code ? [question.awsService.code] : []),
+      ]),
+    );
+
+    setSelectedQuestion(question);
+    setEditMode(false);
+    setModalError(null);
+    setServiceSearch("");
+    setReportsPanelOpen(false);
+    setReportsLoading(false);
+    setReportsError(null);
+    setReportsPage(1);
+    setReportsRefreshKey(0);
+    setReportActionRunningId(null);
+    setReportsResult(null);
+    setEditForm({
+      statement: question.statement,
+      topic: question.topic,
+      difficulty: question.difficulty,
+      questionType: question.questionType,
+      usage: question.usage,
+      active: question.active,
+      optionA: optionByLabel.A.content ?? "",
+      optionB: optionByLabel.B.content ?? "",
+      optionC: optionByLabel.C.content ?? "",
+      optionD: optionByLabel.D.content ?? "",
+      optionE: optionByLabel.E.content ?? "",
+      correctOption: computedCorrectOptions[0] ?? question.correctOption,
+      correctOptions: (computedCorrectOptions.length > 0 ? computedCorrectOptions : [question.correctOption]).join(","),
+      explanationA: optionByLabel.A.explanation ?? "",
+      explanationB: optionByLabel.B.explanation ?? "",
+      explanationC: optionByLabel.C.explanation ?? "",
+      explanationD: optionByLabel.D.explanation ?? "",
+      explanationE: optionByLabel.E.explanation ?? "",
+      serviceCodes,
+    });
+  }
+
+  function toggleServiceCode(serviceCode: string) {
+    setEditForm((previous) => {
+      if (previous.serviceCodes.includes(serviceCode)) {
+        return {
+          ...previous,
+          serviceCodes: previous.serviceCodes.filter((code) => code !== serviceCode),
+        };
+      }
+
+      return {
+        ...previous,
+        serviceCodes: [...previous.serviceCodes, serviceCode],
+      };
+    });
+  }
+
+  function closeQuestionModal() {
+    setSelectedQuestion(null);
+    setEditMode(false);
+    setModalError(null);
+    setServiceSearch("");
+    setReportsPanelOpen(false);
+    setReportsLoading(false);
+    setReportsError(null);
+    setReportsPage(1);
+    setReportsRefreshKey(0);
+    setReportActionRunningId(null);
+    setReportsResult(null);
+  }
+
+  function toggleReportsPanel() {
+    setReportsPanelOpen((previous) => {
+      const next = !previous;
+      if (next) {
+        setReportsPage(1);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleColumn(column: ColumnKey) {
+    setVisibleColumns((previous) => {
+      if (previous.includes(column)) {
+        const next = previous.filter((item) => item !== column);
+        return next.length > 0 ? next : previous;
+      }
+
+      return [...previous, column];
+    });
+  }
+
+  function updateCurrentResultQuestion(updated: AdminQuestionListItem) {
+    setResult((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        items: previous.items.map((item) => (item.id === updated.id ? updated : item)),
+      };
+    });
+  }
+
+  function updateQuestionReportCounters(input: { reportCount: number; openReportCount: number }) {
+    setSelectedQuestion((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        reportCount: input.reportCount,
+        openReportCount: input.openReportCount,
+      };
+    });
+
+    setResult((previous) => {
+      if (!previous || !selectedQuestion) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        items: previous.items.map((item) => {
+          if (item.id !== selectedQuestion.id) {
+            return item;
+          }
+
+          return {
+            ...item,
+            reportCount: input.reportCount,
+            openReportCount: input.openReportCount,
+          };
+        }),
+      };
+    });
+  }
+
+  async function moderateReportStatus(reportId: string, status: "RESOLVED" | "DISMISSED") {
+    if (!selectedQuestion) {
+      return;
+    }
+
+    const actionLabel = status === "RESOLVED" ? "marcar como resolvida" : "descartar";
+    const confirmed = window.confirm(`Deseja ${actionLabel} esta denuncia?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setReportActionRunningId(reportId);
+    setReportsError(null);
+
+    try {
+      const updated = await updateAdminQuestionReportStatus(selectedQuestion.id, reportId, { status });
+      updateQuestionReportCounters({
+        reportCount: updated.question.reportCount,
+        openReportCount: updated.question.openReportCount,
+      });
+      setReportsRefreshKey((previous) => previous + 1);
+    } catch (error) {
+      setReportsError(error instanceof Error ? error.message : "Falha ao atualizar status da denuncia.");
+    } finally {
+      setReportActionRunningId(null);
+    }
+  }
+
+  async function handleSaveQuestion() {
+    if (!selectedQuestion) {
+      return;
+    }
+
+    setSavingQuestion(true);
+    setModalError(null);
+
+    try {
+      const parsedCorrectOptions = Array.from(
+        new Set(
+          editForm.correctOptions
+            .split(",")
+            .map((item) => item.trim().toUpperCase())
+            .filter(Boolean),
+        ),
+      );
+
+      const normalizedOptionRows: AdminQuestionUpdatePayload["options"] = [
+        {
+          label: "A",
+          content: editForm.optionA,
+          explanation: editForm.explanationA || null,
+          isCorrect: parsedCorrectOptions.includes("A"),
+        },
+        {
+          label: "B",
+          content: editForm.optionB,
+          explanation: editForm.explanationB || null,
+          isCorrect: parsedCorrectOptions.includes("B"),
+        },
+        {
+          label: "C",
+          content: editForm.optionC,
+          explanation: editForm.explanationC || null,
+          isCorrect: parsedCorrectOptions.includes("C"),
+        },
+        {
+          label: "D",
+          content: editForm.optionD,
+          explanation: editForm.explanationD || null,
+          isCorrect: parsedCorrectOptions.includes("D"),
+        },
+        {
+          label: "E",
+          content: editForm.optionE || null,
+          explanation: editForm.explanationE || null,
+          isCorrect: parsedCorrectOptions.includes("E"),
+        },
+      ];
+
+      const payload: AdminQuestionUpdatePayload = {
+        statement: editForm.statement,
+        topic: editForm.topic,
+        difficulty: editForm.difficulty,
+        questionType: editForm.questionType,
+        usage: editForm.usage,
+        active: editForm.active,
+        optionA: editForm.optionA,
+        optionB: editForm.optionB,
+        optionC: editForm.optionC,
+        optionD: editForm.optionD,
+        optionE: editForm.optionE || null,
+        correctOption: editForm.correctOption,
+        correctOptions: parsedCorrectOptions,
+        explanationA: editForm.explanationA || null,
+        explanationB: editForm.explanationB || null,
+        explanationC: editForm.explanationC || null,
+        explanationD: editForm.explanationD || null,
+        explanationE: editForm.explanationE || null,
+        options: normalizedOptionRows,
+        serviceCodes: editForm.serviceCodes,
+      };
+
+      const updated = await updateAdminQuestion(selectedQuestion.id, payload);
+      setSelectedQuestion(updated);
+      updateCurrentResultQuestion(updated);
+      setEditMode(false);
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Falha ao salvar questao.");
+    } finally {
+      setSavingQuestion(false);
+    }
+  }
+
+  async function handleDeleteQuestion() {
+    if (!selectedQuestion) {
+      return;
+    }
+
+    const shouldDelete = window.confirm("Deseja remover esta questao permanentemente?");
+    if (!shouldDelete) {
+      return;
+    }
+
+    setDeletingQuestion(true);
+    setModalError(null);
+
+    try {
+      await deleteAdminQuestion(selectedQuestion.id);
+      setSelectedQuestionIds((previous) => previous.filter((id) => id !== selectedQuestion.id));
+      closeQuestionModal();
+      setRefreshKey((previous) => previous + 1);
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Falha ao remover questao.");
+    } finally {
+      setDeletingQuestion(false);
+    }
+  }
+
+  async function runBulkAction(
+    action: "set-active" | "set-usage" | "delete",
+    input?: { active?: boolean; usage?: "KC" | "SIMULADO" | "BOTH" },
+  ) {
+    if (selectedQuestionIds.length === 0) {
+      setBulkResultMessage("Selecione ao menos uma questao.");
+      return;
+    }
+
+    setBulkRunning(true);
+    setBulkResultMessage(null);
+
+    try {
+      const payload = {
+        ids: selectedQuestionIds,
+        action,
+        ...(input?.active !== undefined ? { active: input.active } : {}),
+        ...(input?.usage ? { usage: input.usage } : {}),
+      };
+
+      const result = await batchAdminQuestions(payload);
+      setBulkResultMessage(`Acao em lote concluida. Solicitadas: ${result.requested} | Afetadas: ${result.affected}`);
+      setSelectedQuestionIds([]);
+      setRefreshKey((previous) => previous + 1);
+    } catch (error) {
+      setBulkResultMessage(error instanceof Error ? error.message : "Falha na acao em lote.");
+    } finally {
+      setBulkRunning(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedQuestionIds.length === 0) {
+      setBulkResultMessage("Selecione ao menos uma questao.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Remover ${selectedQuestionIds.length} questoes selecionadas?`);
+    if (!confirmed) {
+      return;
+    }
+
+    await runBulkAction("delete");
+  }
+
+  async function handleFillMissingWithAI() {
+    setAiFillStatsLoading(true);
+    setAiFillStatsError(null);
+    setBulkResultMessage(null);
+
+    try {
+      const stats = await getAdminQuestionsFillMissingStats();
+      setAiFillStats(stats);
+      setAiFillTotalToProcess(String(Math.min(10, Math.max(1, stats.pending))));
+      setAiFillChunkSize(String(stats.defaultChunkSize));
+      setAiFillDelayMs(String(stats.defaultDelayMs));
+      setAiFillDryRun(false);
+      setAiFillModalOpen(true);
+    } catch (error) {
+      setAiFillStatsError(error instanceof Error ? error.message : "Falha ao carregar pendencias para IA.");
+    } finally {
+      setAiFillStatsLoading(false);
+    }
+  }
+
+  async function submitAiFillModal() {
+    const pending = aiFillStats?.pending ?? 0;
+    if (pending <= 0) {
+      setAiFillStatsError("Nao existem questoes pendentes para preencher.");
+      return;
+    }
+
+    const totalRaw = Number(aiFillTotalToProcess);
+    const chunkRaw = Number(aiFillChunkSize);
+    const delayRaw = Number(aiFillDelayMs);
+
+    if (!Number.isFinite(totalRaw) || totalRaw < 1) {
+      setAiFillStatsError("Informe uma quantidade valida para processar.");
+      return;
+    }
+
+    if (!Number.isFinite(chunkRaw) || chunkRaw < 1 || chunkRaw > 10) {
+      setAiFillStatsError("Tamanho do lote por requisicao deve ser entre 1 e 10.");
+      return;
+    }
+
+    if (!Number.isFinite(delayRaw) || delayRaw < 0) {
+      setAiFillStatsError("Delay invalido. Informe 0 ou mais milissegundos.");
+      return;
+    }
+
+    const totalToProcess = Math.min(Math.floor(totalRaw), pending, aiFillStats?.maxTotalPerRun ?? pending);
+    const chunkSize = Math.min(10, Math.floor(chunkRaw));
+    const delayMs = Math.max(0, Math.floor(delayRaw));
+
+    setAiFillRunning(true);
+    setAiFillStatsError(null);
+    setBulkResultMessage(null);
+
+    try {
+      const result = await fillAdminQuestionsMissingWithAI({
+        totalToProcess,
+        chunkSize,
+        delayMs,
+        dryRun: aiFillDryRun,
+      });
+
+      setBulkResultMessage(
+        `IA executada. Solicitadas: ${result.requestedTotal ?? totalToProcess} | Processadas: ${result.processed} | Atualizadas: ${result.updated} | Sem alteracao: ${result.touched ?? 0} | Requisicoes IA: ${result.aiRequests ?? 0}${result.dryRun ? " | dry-run" : ""}`,
+      );
+      setAiFillModalOpen(false);
+      setRefreshKey((previous) => previous + 1);
+    } catch (error) {
+      setAiFillStatsError(error instanceof Error ? error.message : "Falha ao preencher questoes faltantes com IA.");
+    } finally {
+      setAiFillRunning(false);
+    }
+  }
+
+  useEffect(() => {
+    async function loadFilterOptions() {
+      try {
+        const [certificationsResponse, servicesResponse] = await Promise.all([
+          fetch("/api/certifications", {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+          }),
+          fetch("/api/study/services", {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+          }),
+        ]);
+
+        if (certificationsResponse.ok) {
+          const certificationsPayload = (await certificationsResponse.json()) as {
+            certifications?: CertificationOption[];
+          };
+          setCertifications(certificationsPayload.certifications ?? []);
+        }
+
+        if (servicesResponse.ok) {
+          const servicesPayload = (await servicesResponse.json()) as {
+            services?: AwsServiceOption[];
+          };
+          setAllAwsServices(servicesPayload.services ?? []);
+        }
+      } catch {
+        // Keep table usable if filter options fail to load.
+      }
+    }
+
+    void loadFilterOptions();
+  }, []);
+
+  useEffect(() => {
+    async function loadQuestions() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const data = await listAdminQuestions({
+          page,
+          pageSize,
+          search,
+          difficulty: difficulty || undefined,
+          questionType: questionType || undefined,
+          usage: usage || undefined,
+          active: active || undefined,
+          certificationCode,
+          awsServiceCode,
+          reportStatus: reportStatus || undefined,
+          sortBy,
+          sortOrder,
+        });
+        setResult(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Falha ao carregar questoes.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadQuestions();
+  }, [
+    page,
+    pageSize,
+    search,
+    difficulty,
+    questionType,
+    usage,
+    active,
+    certificationCode,
+    awsServiceCode,
+    reportStatus,
+    sortBy,
+    sortOrder,
+    refreshKey,
+  ]);
+
+  useEffect(() => {
+    if (!result) {
+      return;
+    }
+
+    const pageIds = new Set(result.items.map((item) => item.id));
+    setSelectedQuestionIds((previous) => previous.filter((id) => pageIds.has(id) || !currentPageIds.includes(id)));
+  }, [currentPageIds, result]);
+
+  useEffect(() => {
+    if (!selectedQuestion || !reportsPanelOpen) {
+      return;
+    }
+
+    const selectedQuestionId = selectedQuestion.id;
+
+    let cancelled = false;
+
+    async function loadQuestionReports() {
+      setReportsLoading(true);
+      setReportsError(null);
+
+      try {
+        const data = await listAdminQuestionReports(selectedQuestionId, {
+          page: reportsPage,
+          pageSize: reportsPageSize,
+        });
+
+        if (!cancelled) {
+          setReportsResult(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setReportsError(err instanceof Error ? err.message : "Falha ao carregar denuncias.");
+          setReportsResult(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setReportsLoading(false);
+        }
+      }
+    }
+
+    void loadQuestionReports();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reportsPage, reportsPageSize, reportsPanelOpen, reportsRefreshKey, selectedQuestion]);
+
+  return (
+    <main className="space-y-5">
+      <header className="space-y-2">
+        <p className="font-mono text-xs uppercase text-[#f97316]">Questoes</p>
+        <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Banco de questoes paginavel</h1>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setRefreshKey((prev) => prev + 1)}
+            className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
+          >
+            Atualizar dados
+          </button>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void runBulkAction("set-active", { active: true })}
+            className="border border-[#14532d] bg-green-900/20 px-3 py-1 text-xs uppercase text-green-200 disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Ativar selecionadas"}
+          </button>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void runBulkAction("set-active", { active: false })}
+            className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-xs uppercase text-red-200 disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Inativar selecionadas"}
+          </button>
+          <select
+            value={bulkUsage}
+            onChange={(event) => setBulkUsage(event.target.value as "KC" | "SIMULADO" | "BOTH")}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] outline-none"
+          >
+            <option value="KC">Uso: KC</option>
+            <option value="SIMULADO">Uso: SIMULADO</option>
+            <option value="BOTH">Uso: BOTH</option>
+          </select>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void runBulkAction("set-usage", { usage: bulkUsage })}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Aplicar uso selecionado"}
+          </button>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void handleBulkDelete()}
+            className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-xs uppercase text-red-200 disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Remover selecionadas"}
+          </button>
+          <button
+            type="button"
+            disabled={aiFillRunning || bulkRunning}
+            onClick={() => void handleFillMissingWithAI()}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#fbbf24] disabled:opacity-60"
+          >
+            {aiFillStatsLoading
+              ? "Carregando pendencias..."
+              : aiFillRunning
+                ? "IA em execucao..."
+                : "Preencher faltantes com IA"}
+          </button>
+        </div>
+        <p className="text-xs text-[#94a3b8]">
+          Selecionadas: {selectedQuestionIds.length} (na pagina: {selectedOnPageCount})
+        </p>
+        {bulkResultMessage && <p className="text-xs text-[#fbbf24]">{bulkResultMessage}</p>}
+        {aiFillStatsError && <p className="text-xs text-[#fca5a5]">{aiFillStatsError}</p>}
+      </header>
+
+      <section className="border border-[#1e293b] bg-[#111827] p-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <input
+            value={search}
+            onChange={(event) => {
+              setPage(1);
+              setSearch(event.target.value);
+            }}
+            placeholder="Buscar por enunciado, topico ou externalId"
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          />
+
+          <select
+            value={difficulty}
+            onChange={(event) => {
+              setPage(1);
+              setDifficulty(event.target.value as "" | "easy" | "medium" | "hard");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todas as dificuldades</option>
+            <option value="easy">easy</option>
+            <option value="medium">medium</option>
+            <option value="hard">hard</option>
+          </select>
+
+          <select
+            value={questionType}
+            onChange={(event) => {
+              setPage(1);
+              setQuestionType(event.target.value as "" | "single" | "multi");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Tipos (single e multi)</option>
+            <option value="single">single</option>
+            <option value="multi">multi</option>
+          </select>
+
+          <select
+            value={usage}
+            onChange={(event) => {
+              setPage(1);
+              setUsage(event.target.value as "" | "KC" | "SIMULADO" | "BOTH");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todos os usos</option>
+            <option value="KC">KC</option>
+            <option value="SIMULADO">SIMULADO</option>
+            <option value="BOTH">BOTH</option>
+          </select>
+
+          <select
+            value={active}
+            onChange={(event) => {
+              setPage(1);
+              setActive(event.target.value as "" | "true" | "false");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Ativas e inativas</option>
+            <option value="true">Apenas ativas</option>
+            <option value="false">Apenas inativas</option>
+          </select>
+
+          <select
+            value={certificationCode}
+            onChange={(event) => {
+              setPage(1);
+              setCertificationCode(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todas as certificacoes</option>
+            {certifications.map((certification) => (
+              <option key={certification.id} value={certification.code}>
+                {certification.code}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={awsServiceCode}
+            onChange={(event) => {
+              setPage(1);
+              setAwsServiceCode(event.target.value);
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Todos os servicos AWS</option>
+            <option value={UNASSIGNED_SERVICE_FILTER}>Sem servico vinculado</option>
+            {allAwsServices.map((service) => (
+              <option key={service.id} value={service.code}>
+                {service.code} - {service.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={reportStatus}
+            onChange={(event) => {
+              setPage(1);
+              setReportStatus(event.target.value as "" | "REPORTED" | "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED");
+            }}
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">Denuncias: todas</option>
+            <option value="REPORTED">Com denuncia</option>
+            <option value="OPEN">Denuncia aberta</option>
+            <option value="IN_REVIEW">Em revisao</option>
+            <option value="RESOLVED">Resolvida</option>
+            <option value="DISMISSED">Descartada</option>
+          </select>
+
+          <div className="grid grid-cols-2 gap-2 xl:col-span-2">
+            <select
+              value={sortBy}
+              onChange={(event) => {
+                setPage(1);
+                setSortBy(event.target.value as SortByOption);
+              }}
+              className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            >
+              <option value="createdAt">Criacao</option>
+              <option value="difficulty">Dificuldade</option>
+              <option value="usage">Uso</option>
+              <option value="topic">Topico</option>
+              <option value="externalId">External ID</option>
+              <option value="active">Status</option>
+              <option value="questionType">Tipo</option>
+            </select>
+
+            <select
+              value={sortOrder}
+              onChange={(event) => {
+                setPage(1);
+                setSortOrder(event.target.value as "asc" | "desc");
+              }}
+              className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            >
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
+          </div>
+
+          <label className="space-y-1 xl:col-span-1">
+            <span className="font-mono text-[10px] uppercase text-[#94a3b8]">Itens por pagina</span>
+            <select
+              value={pageSize}
+              onChange={(event) => {
+                setPage(1);
+                setPageSize(Number(event.target.value));
+              }}
+              className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            >
+              {[10, 20, 30, 50, 100, 200].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-4 space-y-2 border-t border-[#1e293b] pt-3">
+          <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Dados exibidos na tabela</p>
+          <div className="flex flex-wrap gap-3">
+            {COLUMN_OPTIONS.map((column) => (
+              <label key={column.key} className="inline-flex items-center gap-2 text-xs text-[#cbd5e1]">
+                <input
+                  type="checkbox"
+                  checked={visibleColumns.includes(column.key)}
+                  onChange={() => toggleColumn(column.key)}
+                />
+                <span>{column.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {loading && <p className="text-sm text-[#94a3b8]">Carregando questoes...</p>}
+      {error && <p className="text-sm text-[#fca5a5]">{error}</p>}
+
+      {!loading && result && (
+        <>
+          <section className="overflow-x-auto border border-[#1e293b] bg-[#111827]">
+            <table className="w-full min-w-[1000px] text-left text-sm">
+              <thead className="border-b border-[#1e293b] bg-[#0f172a] text-xs uppercase text-[#94a3b8]">
+                <tr>
+                  <th className="px-3 py-2">
+                    <input type="checkbox" checked={allSelectedOnPage} onChange={toggleSelectAllOnPage} />
+                  </th>
+                  {selectedColumns.map((column) => (
+                    <th key={column.key} className="px-3 py-2">
+                      {column.label}
+                    </th>
+                  ))}
+                  <th className="px-3 py-2">Acoes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.items.map((item) => (
+                  <tr key={item.id} className="border-b border-[#1e293b] text-[#e2e8f0] hover:bg-[#0b1220]">
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="checkbox"
+                        checked={selectedQuestionIds.includes(item.id)}
+                        onChange={() => toggleSelectQuestion(item.id)}
+                      />
+                    </td>
+                    {selectedColumns.map((column) => {
+                      if (column.key === "externalId") {
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2 font-mono text-xs">
+                            {item.externalId}
+                          </td>
+                        );
+                      }
+
+                      if (column.key === "statement") {
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2">
+                            {item.statement.slice(0, 140)}...
+                          </td>
+                        );
+                      }
+
+                      if (column.key === "topic") {
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2">
+                            {item.topic}
+                          </td>
+                        );
+                      }
+
+                      if (column.key === "difficulty") {
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2 uppercase">
+                            {item.difficulty}
+                          </td>
+                        );
+                      }
+
+                      if (column.key === "questionType") {
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2 uppercase">
+                            {item.questionType}
+                          </td>
+                        );
+                      }
+
+                      if (column.key === "usage") {
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2 uppercase">
+                            {item.usage}
+                          </td>
+                        );
+                      }
+
+                      if (column.key === "active") {
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2 uppercase">
+                            <div className="space-y-1">
+                              <p>{item.active ? "ATIVA" : "INATIVA"}</p>
+                              {(item.reportCount ?? 0) > 0 && (
+                                <p className="text-[10px] text-[#fbbf24]">
+                                  Denuncias: {item.reportCount}
+                                  {(item.openReportCount ?? 0) > 0 ? ` (abertas: ${item.openReportCount})` : ""}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      }
+
+                      if (column.key === "certification") {
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2">
+                            {item.certificationPreset?.code ?? "-"}
+                          </td>
+                        );
+                      }
+
+                      if (column.key === "service") {
+                        const serviceCodes = Array.from(
+                          new Set([
+                            ...(item.awsServices?.map((service) => service.code) ?? []),
+                            ...(item.awsService?.code ? [item.awsService.code] : []),
+                          ]),
+                        );
+                        return (
+                          <td key={`${item.id}-${column.key}`} className="px-3 py-2">
+                            {serviceCodes.length > 0 ? serviceCodes.join(", ") : "-"}
+                          </td>
+                        );
+                      }
+
+                      return (
+                        <td key={`${item.id}-${column.key}`} className="px-3 py-2">
+                          {formatDate(item.createdAt)}
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => openQuestionModal(item)}
+                        className="border border-[#334155] px-2 py-1 text-[10px] uppercase"
+                      >
+                        Visualizar / editar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <footer className="flex flex-wrap items-center justify-between gap-3 border border-[#1e293b] bg-[#111827] px-4 py-3 text-sm text-[#cbd5e1]">
+            <span>
+              Pagina {result.page} de {result.totalPages} | Total: {result.total} | Exibindo: {result.pageSize}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                className="border border-[#334155] px-3 py-1 text-xs uppercase disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={page >= result.totalPages}
+                onClick={() => setPage((prev) => Math.min(result.totalPages, prev + 1))}
+                className="border border-[#334155] px-3 py-1 text-xs uppercase disabled:opacity-40"
+              >
+                Proxima
+              </button>
+              <input
+                value={jumpPage}
+                onChange={(event) => setJumpPage(event.target.value.replace(/\D/g, ""))}
+                placeholder="Ir"
+                className="w-16 border border-[#334155] bg-[#0b1220] px-2 py-1 text-xs text-[#e2e8f0] outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!result) {
+                    return;
+                  }
+
+                  const nextPage = Number(jumpPage);
+                  if (!Number.isFinite(nextPage) || nextPage < 1) {
+                    return;
+                  }
+
+                  setPage(Math.min(result.totalPages, nextPage));
+                  setJumpPage("");
+                }}
+                className="border border-[#334155] px-3 py-1 text-xs uppercase"
+              >
+                Ir para pagina
+              </button>
+            </div>
+          </footer>
+        </>
+      )}
+
+      {selectedQuestion && (
+        <div className="fixed inset-0 z-50 grid place-items-center  bg-black/70 p-4">
+          <div className="w-full max-w-4xl space-y-4 rounded border overflow-x-auto max-h-[90%] border-[#334155] bg-[#111827] p-4 text-[#e2e8f0]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-xs uppercase text-[#f97316]">Detalhes da questao</p>
+                <p className="mt-1 text-sm">{selectedQuestion.externalId}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={toggleReportsPanel}
+                  className="border border-[#854d0e] bg-amber-900/20 px-3 py-1 text-xs uppercase text-amber-200"
+                >
+                  {reportsPanelOpen ? "Ocultar denuncias" : "Mostrar denuncias"}
+                  {typeof selectedQuestion.reportCount === "number" ? ` (${selectedQuestion.reportCount})` : ""}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditMode((previous) => !previous)}
+                  className="border border-[#334155] px-3 py-1 text-xs uppercase"
+                >
+                  {editMode ? "Modo leitura" : "Editar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeQuestionModal}
+                  className="border border-[#334155] px-3 py-1 text-xs uppercase"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+
+            {modalError && <p className="text-sm text-[#fca5a5]">{modalError}</p>}
+
+            {reportsPanelOpen && (
+              <section className="space-y-3 rounded border border-[#7c2d12]/50 bg-[#0b1220] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-mono text-xs uppercase text-amber-300">Denuncias recebidas</p>
+                  {reportsResult && (
+                    <p className="text-xs text-[#cbd5e1]">
+                      Pagina {reportsResult.page} de {reportsResult.totalPages} · Total {reportsResult.total}
+                    </p>
+                  )}
+                </div>
+
+                {reportsLoading && <p className="text-sm text-[#cbd5e1]">Carregando denuncias...</p>}
+                {reportsError && <p className="text-sm text-[#fca5a5]">{reportsError}</p>}
+
+                {!reportsLoading && !reportsError && reportsResult && (
+                  <>
+                    {reportsResult.items.length === 0 ? (
+                      <p className="text-sm text-[#94a3b8]">Nenhuma denuncia encontrada para esta questao.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {reportsResult.items.map((report) => {
+                          const reporterName = report.reporter.name?.trim() || report.reporter.username || "Usuario";
+                          return (
+                            <article
+                              key={report.id}
+                              className="space-y-2 rounded border border-[#334155] bg-[#111827] p-3"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-start gap-2">
+                                  <Avatar size="sm" className="mt-0.5 border border-[#334155]">
+                                    {report.reporter.imageUrl ? (
+                                      <AvatarImage src={report.reporter.imageUrl} alt={reporterName} />
+                                    ) : null}
+                                    <AvatarFallback>{toInitials(reporterName)}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="text-sm text-[#e2e8f0]">{reporterName}</p>
+                                    <p className="text-xs text-[#94a3b8]">
+                                      {report.reporter.username ? `@${report.reporter.username} · ` : ""}
+                                      {formatDate(report.reportedAt)}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="border border-[#f59e0b]/60 px-2 py-0.5 text-[10px] uppercase text-amber-300">
+                                    {formatReportReason(report.reason)}
+                                  </span>
+                                  <span className="border border-[#334155] px-2 py-0.5 text-[10px] uppercase text-[#cbd5e1]">
+                                    {formatReportStatus(report.status)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <p className="text-sm text-[#cbd5e1]">
+                                {report.description?.trim() || "Sem descricao informada."}
+                              </p>
+
+                              {(report.status === "OPEN" || report.status === "IN_REVIEW") && (
+                                <div className="flex flex-wrap justify-end gap-2 border-t border-[#1e293b] pt-2">
+                                  <button
+                                    type="button"
+                                    disabled={Boolean(reportActionRunningId)}
+                                    onClick={() => void moderateReportStatus(report.id, "RESOLVED")}
+                                    className="border border-[#14532d] bg-green-900/20 px-2 py-1 text-[10px] uppercase text-green-200 disabled:opacity-60"
+                                  >
+                                    {reportActionRunningId === report.id ? "Atualizando..." : "Marcar resolvida"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={Boolean(reportActionRunningId)}
+                                    onClick={() => void moderateReportStatus(report.id, "DISMISSED")}
+                                    className="border border-[#7c2d12] bg-amber-900/20 px-2 py-1 text-[10px] uppercase text-amber-200 disabled:opacity-60"
+                                  >
+                                    {reportActionRunningId === report.id ? "Atualizando..." : "Marcar descartada"}
+                                  </button>
+                                </div>
+                              )}
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {reportsResult.totalPages > 1 && (
+                      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#1e293b] pt-2">
+                        <button
+                          type="button"
+                          disabled={reportsResult.page <= 1}
+                          onClick={() => setReportsPage((previous) => Math.max(1, previous - 1))}
+                          className="border border-[#334155] px-3 py-1 text-xs uppercase disabled:opacity-40"
+                        >
+                          Anterior
+                        </button>
+                        <button
+                          type="button"
+                          disabled={reportsResult.page >= reportsResult.totalPages}
+                          onClick={() => setReportsPage((previous) => Math.min(reportsResult.totalPages, previous + 1))}
+                          className="border border-[#334155] px-3 py-1 text-xs uppercase disabled:opacity-40"
+                        >
+                          Proxima
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+            )}
+
+            {!editMode ? (
+              <>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    <strong>Enunciado:</strong> {selectedQuestion.statement}
+                  </p>
+                  <p>
+                    <strong>Topico:</strong> {selectedQuestion.topic}
+                  </p>
+                  <p>
+                    <strong>Dificuldade:</strong> {selectedQuestion.difficulty.toUpperCase()} | <strong>Uso:</strong>{" "}
+                    {selectedQuestion.usage}
+                  </p>
+                  <p>
+                    <strong>Tipo:</strong> {selectedQuestion.questionType.toUpperCase()} | <strong>Status:</strong>{" "}
+                    {selectedQuestion.active ? "ATIVA" : "INATIVA"}
+                  </p>
+                  <p>
+                    <strong>Servicos:</strong>{" "}
+                    {(() => {
+                      const serviceCodes = Array.from(
+                        new Set([
+                          ...(selectedQuestion.awsServices?.map((service) => service.code) ?? []),
+                          ...(selectedQuestion.awsService?.code ? [selectedQuestion.awsService.code] : []),
+                        ]),
+                      );
+
+                      return serviceCodes.length > 0 ? serviceCodes.join(", ") : "-";
+                    })()}{" "}
+                    | <strong>Certificacao:</strong> {selectedQuestion.certificationPreset?.code ?? "-"}
+                  </p>
+                </div>
+
+                <div className="grid gap-2 text-sm">
+                  <p className="font-mono text-xs uppercase text-[#94a3b8]">Alternativas</p>
+                  {selectedQuestionOptions
+                    .filter((option, index) => index < 4 || Boolean(option.content))
+                    .map((option) => (
+                      <p key={`view-option-${option.label}`}>
+                        {option.label}) {option.content ?? "-"}
+                      </p>
+                    ))}
+                  <p className="mt-1 font-mono text-xs uppercase text-[#22c55e]">
+                    Gabarito:{" "}
+                    {selectedQuestionOptions
+                      .filter((option) => option.isCorrect)
+                      .map((option) => option.label)
+                      .join(", ") || selectedQuestion.correctOption}
+                  </p>
+                </div>
+
+                <div className="grid gap-2 text-sm">
+                  <p className="font-mono text-xs uppercase text-[#94a3b8]">Explicacoes</p>
+                  {selectedQuestionOptions
+                    .filter((option, index) => index < 4 || Boolean(option.content) || Boolean(option.explanation))
+                    .map((option) => (
+                      <p key={`view-explanation-${option.label}`}>
+                        {option.label}) {option.explanation ?? "-"}
+                      </p>
+                    ))}
+                </div>
+              </>
+            ) : (
+              <div className="grid gap-3 text-sm md:grid-cols-2">
+                <label className="space-y-1 md:col-span-2">
+                  <span className="text-xs uppercase text-[#94a3b8]">Enunciado</span>
+                  <textarea
+                    value={editForm.statement}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, statement: event.target.value }))}
+                    className="min-h-[110px] w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-xs uppercase text-[#94a3b8]">Topico</span>
+                  <input
+                    value={editForm.topic}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, topic: event.target.value }))}
+                    className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-xs uppercase text-[#94a3b8]">Uso</span>
+                  <select
+                    value={editForm.usage}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({ ...prev, usage: event.target.value as "KC" | "SIMULADO" | "BOTH" }))
+                    }
+                    className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                  >
+                    <option value="KC">KC</option>
+                    <option value="SIMULADO">SIMULADO</option>
+                    <option value="BOTH">BOTH</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-xs uppercase text-[#94a3b8]">Dificuldade</span>
+                  <select
+                    value={editForm.difficulty}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        difficulty: event.target.value as "easy" | "medium" | "hard",
+                      }))
+                    }
+                    className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                  >
+                    <option value="easy">easy</option>
+                    <option value="medium">medium</option>
+                    <option value="hard">hard</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-xs uppercase text-[#94a3b8]">Tipo</span>
+                  <select
+                    value={editForm.questionType}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        questionType: event.target.value as "single" | "multi",
+                      }))
+                    }
+                    className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                  >
+                    <option value="single">single</option>
+                    <option value="multi">multi</option>
+                  </select>
+                </label>
+
+                <label className="inline-flex items-center gap-2 md:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={editForm.active}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, active: event.target.checked }))}
+                  />
+                  <span className="text-xs uppercase text-[#94a3b8]">Questao ativa</span>
+                </label>
+
+                <div className="space-y-2 md:col-span-2">
+                  <p className="text-xs uppercase text-[#94a3b8]">Servicos AWS vinculados</p>
+                  <div className="flex items-center gap-2 p-2">
+                    <label htmlFor="search_services">Pesquisar servico:</label>
+                    <input
+                      type="text"
+                      id="search_services"
+                      value={serviceSearch}
+                      placeholder="Nome ou codigo"
+                      className="w-full border border-[#334155] bg-[#0b1220] px-3 py-1 text-sm text-[#e2e8f0] outline-none"
+                      onChange={(event) => setServiceSearch(event.target.value)}
+                    />
+                    {serviceSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setServiceSearch("")}
+                        className="border border-[#334155] px-2 py-1 text-[10px] uppercase"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-40 overflow-auto rounded border border-[#334155] bg-[#0b1220] p-2">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {filteredAwsServices.map((service) => (
+                        <label key={`service-${service.code}`} className="inline-flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={editForm.serviceCodes.includes(service.code)}
+                            onChange={() => toggleServiceCode(service.code)}
+                          />
+                          <span>
+                            {service.code} - {service.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    {filteredAwsServices.length === 0 && (
+                      <p className="p-2 text-xs text-[#94a3b8]">Nenhum servico encontrado para essa busca.</p>
+                    )}
+                  </div>
+                  <p className="text-[10px] uppercase text-[#94a3b8]">
+                    Selecione um ou mais servicos. {filteredAwsServices.length} resultado(s).
+                  </p>
+                </div>
+
+                {(["A", "B", "C", "D", "E"] as const).map((letter) => (
+                  <label key={letter} className="space-y-1 md:col-span-2">
+                    <span className="text-xs uppercase text-[#94a3b8]">Alternativa {letter}</span>
+                    <input
+                      value={
+                        letter === "A"
+                          ? editForm.optionA
+                          : letter === "B"
+                            ? editForm.optionB
+                            : letter === "C"
+                              ? editForm.optionC
+                              : letter === "D"
+                                ? editForm.optionD
+                                : editForm.optionE
+                      }
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setEditForm((prev) => ({
+                          ...prev,
+                          ...(letter === "A"
+                            ? { optionA: value }
+                            : letter === "B"
+                              ? { optionB: value }
+                              : letter === "C"
+                                ? { optionC: value }
+                                : letter === "D"
+                                  ? { optionD: value }
+                                  : { optionE: value }),
+                        }));
+                      }}
+                      className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                    />
+                  </label>
+                ))}
+
+                <label className="space-y-1">
+                  <span className="text-xs uppercase text-[#94a3b8]">Gabarito principal</span>
+                  <input
+                    value={editForm.correctOption}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({ ...prev, correctOption: event.target.value.toUpperCase() }))
+                    }
+                    className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm uppercase"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-xs uppercase text-[#94a3b8]">Respostas corretas (A,B)</span>
+                  <input
+                    value={editForm.correctOptions}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, correctOptions: event.target.value }))}
+                    className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm uppercase"
+                  />
+                </label>
+
+                {(["A", "B", "C", "D", "E"] as const).map((letter) => (
+                  <label key={`explanation-${letter}`} className="space-y-1 md:col-span-2">
+                    <span className="text-xs uppercase text-[#94a3b8]">Explicacao {letter}</span>
+                    <textarea
+                      value={
+                        letter === "A"
+                          ? editForm.explanationA
+                          : letter === "B"
+                            ? editForm.explanationB
+                            : letter === "C"
+                              ? editForm.explanationC
+                              : letter === "D"
+                                ? editForm.explanationD
+                                : editForm.explanationE
+                      }
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setEditForm((prev) => ({
+                          ...prev,
+                          ...(letter === "A"
+                            ? { explanationA: value }
+                            : letter === "B"
+                              ? { explanationB: value }
+                              : letter === "C"
+                                ? { explanationC: value }
+                                : letter === "D"
+                                  ? { explanationD: value }
+                                  : { explanationE: value }),
+                        }));
+                      }}
+                      className="min-h-[80px] w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-[#1e293b] pt-3">
+              {editMode && (
+                <button
+                  type="button"
+                  onClick={() => void handleSaveQuestion()}
+                  disabled={savingQuestion}
+                  className="border border-[#14532d] bg-green-900/20 px-3 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
+                >
+                  {savingQuestion ? "Salvando..." : "Salvar alteracoes"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleDeleteQuestion()}
+                disabled={deletingQuestion}
+                className="border border-[#7f1d1d] bg-red-900/20 px-3 py-2 text-xs uppercase text-red-200 disabled:opacity-60"
+              >
+                {deletingQuestion ? "Removendo..." : "Remover questao"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {aiFillModalOpen && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-4">
+          <div className="w-full max-w-lg space-y-4 rounded border border-[#334155] bg-[#111827] p-4 text-[#e2e8f0]">
+            <div className="space-y-1">
+              <p className="font-mono text-xs uppercase text-[#fbbf24]">Preencher faltantes com IA</p>
+              <p className="text-sm text-[#cbd5e1]">
+                Pendentes atuais: <strong>{aiFillStats?.pending ?? 0}</strong>
+              </p>
+              <p className="text-xs text-[#94a3b8]">
+                Maximo por requisicao IA: {aiFillStats?.maxChunkSize ?? 10} | Maximo por execucao:{" "}
+                {aiFillStats?.maxTotalPerRun ?? 200}
+              </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-xs uppercase text-[#94a3b8]">Quantidade para processar</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, aiFillStats?.pending ?? 1)}
+                  value={aiFillTotalToProcess}
+                  onChange={(event) => setAiFillTotalToProcess(event.target.value)}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-xs uppercase text-[#94a3b8]">Lote por requisicao IA (1-10)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={aiFillChunkSize}
+                  onChange={(event) => setAiFillChunkSize(event.target.value)}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="space-y-1 md:col-span-2">
+                <span className="text-xs uppercase text-[#94a3b8]">Delay entre requisicoes IA (ms)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={aiFillDelayMs}
+                  onChange={(event) => setAiFillDelayMs(event.target.value)}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="inline-flex items-center gap-2 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={aiFillDryRun}
+                  onChange={(event) => setAiFillDryRun(event.target.checked)}
+                />
+                <span className="text-xs uppercase text-[#94a3b8]">Dry-run (nao persistir alteracoes)</span>
+              </label>
+            </div>
+
+            {aiFillStatsError && <p className="text-xs text-[#fca5a5]">{aiFillStatsError}</p>}
+
+            <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-3">
+              <button
+                type="button"
+                onClick={() => setAiFillModalOpen(false)}
+                className="border border-[#334155] px-3 py-2 text-xs uppercase"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={aiFillRunning || (aiFillStats?.pending ?? 0) === 0}
+                onClick={() => void submitAiFillModal()}
+                className="border border-[#14532d] bg-green-900/20 px-3 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
+              >
+                {aiFillRunning ? "Processando..." : "Iniciar processamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
