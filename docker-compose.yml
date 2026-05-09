@@ -2,7 +2,7 @@ services:
     
   rt-awslq-worker:
     build:
-      context: ./aws-worker
+      context: ./awlq-worker
       dockerfile: Dockerfile
     container_name: rt-awslq-worker
     restart: unless-stopped
