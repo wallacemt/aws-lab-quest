@@ -1,5 +1,4 @@
 services:
-    
   rt-awslq-worker:
     build:
       context: ./awlq-worker
