@@ -8,7 +8,10 @@ FROM oven/bun:canary-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Generate Prisma client with Alpine (linux-musl) binary target
+# prisma.config.ts calls env("DATABASE_URL") eagerly even for `generate`,
+# which doesn't connect to the DB. Pass a dummy URL to satisfy the check.
+ARG DATABASE_URL=postgresql://build:build@localhost/build
+ENV DATABASE_URL=$DATABASE_URL
 RUN bunx prisma generate
 # Next.js standalone build
 RUN bun run build
