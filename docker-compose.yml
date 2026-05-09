@@ -1,20 +1,5 @@
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: awlq-postgres
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: awlq
-      POSTGRES_USER: awlq_user
-      POSTGRES_PASSWORD: awlq_pass
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U awlq_user -d awlq"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    
   worker:
     build:
       context: ./aws-worker
@@ -34,16 +19,14 @@ services:
       LOG_LEVEL: info
       WEAK_AREA_THRESHOLD: "0.60"
       WEAK_AREA_WINDOW_DAYS: "30"
+    networks:
+     - rt-network
   app:
     build:
       context: ./awlq-app
       dockerfile: Dockerfile
     container_name: awlq-app
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL}
@@ -74,6 +57,10 @@ services:
       ADMIN_EMAIL:  ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_NAME:  ${ADMIN_NAME}
+    networks:
+     - rt-network
 
-volumes:
-  postgres_data:
+
+networks:
+  rt-network:
+    external: true
