@@ -1,8 +1,8 @@
 import { Queue } from "bullmq";
-import IORedis from "ioredis";
+import { Redis } from "ioredis";
 import { config } from "../config.js";
 
-export const redis = new IORedis(config.redis.url, { maxRetriesPerRequest: null });
+export const redis = new Redis(config.redis.url, { maxRetriesPerRequest: null });
 
 const connection = redis;
 
@@ -54,40 +54,36 @@ export type QualityReviewJobData = {
 
 // ─── Queues ───────────────────────────────────────────────────────────────────
 
-export const sourceFetchQueue = new Queue<SourceFetchJobData>("source-fetch", { connection });
+export const sourceFetchQueue = new Queue<SourceFetchJobData, void, string>("source-fetch", { connection });
 
-export const questionGenerationQueue = new Queue<QuestionGenerationJobData>("question-generation", {
+export const questionGenerationQueue = new Queue<QuestionGenerationJobData, void, string>("question-generation", {
   connection,
   defaultJobOptions: {
     attempts: 2,
     backoff: { type: "fixed", delay: 10_000 },
-    timeout: 180_000,
   },
 });
 
-export const feedbackAnalysisQueue = new Queue<FeedbackAnalysisJobData>("feedback-analysis", {
+export const feedbackAnalysisQueue = new Queue<FeedbackAnalysisJobData, void, string>("feedback-analysis", {
   connection,
   defaultJobOptions: {
     attempts: 2,
     backoff: { type: "fixed", delay: 5_000 },
-    timeout: 60_000,
   },
 });
 
-export const performanceComputeQueue = new Queue<PerformanceComputeJobData>("performance-compute", {
+export const performanceComputeQueue = new Queue<PerformanceComputeJobData, void, string>("performance-compute", {
   connection,
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: "fixed", delay: 2_000 },
-    timeout: 60_000,
   },
 });
 
-export const qualityReviewQueue = new Queue<QualityReviewJobData>("quality-review", {
+export const qualityReviewQueue = new Queue<QualityReviewJobData, void, string>("quality-review", {
   connection,
   defaultJobOptions: {
     attempts: 1,
     backoff: { type: "fixed", delay: 30_000 },
-    timeout: 90_000,
   },
 });

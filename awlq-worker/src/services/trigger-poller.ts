@@ -1,6 +1,6 @@
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
-import { questionGenerationQueue, feedbackAnalysisQueue, sourceFetchQueue, qualityReviewQueue } from "../queues/index.js";
+import { questionGenerationQueue, feedbackAnalysisQueue, sourceFetchQueue } from "../queues/index.js";
 import { config } from "../config.js";
 
 async function processOneTrigger(): Promise<void> {
@@ -16,26 +16,46 @@ async function processOneTrigger(): Promise<void> {
   try {
     switch (trigger.action) {
       case "generate": {
-        const cert = trigger.certificationPresetId
-          ? await prisma.certificationPreset.findUnique({
-              where: { id: trigger.certificationPresetId },
-              select: { id: true, code: true, name: true, blueprintDomains: true },
+        const certs = trigger.certificationPresetId
+          ? await prisma.certificationPreset.findMany({
+              where: { id: trigger.certificationPresetId, active: true },
+              select: {
+                id: true, code: true, name: true,
+                blueprintDomains: {
+                  where: { active: true },
+                  select: { domainName: true, weightPercent: true, subTopics: true },
+                },
+              },
             })
-          : null;
+          : await prisma.certificationPreset.findMany({
+              where: { active: true },
+              select: {
+                id: true, code: true, name: true,
+                blueprintDomains: {
+                  where: { active: true },
+                  select: { domainName: true, weightPercent: true, subTopics: true },
+                },
+              },
+            });
 
-        if (cert) {
+        for (const cert of certs) {
+          const domains =
+            cert.blueprintDomains.length > 0
+              ? cert.blueprintDomains.map((d) => ({
+                  domainName: d.domainName,
+                  weightPercent: d.weightPercent,
+                  subTopics: Array.isArray(d.subTopics) ? (d.subTopics as string[]) : [],
+                }))
+              : [{ domainName: "General AWS", weightPercent: 100, subTopics: [] }];
+
           await questionGenerationQueue.add(
-            "manual-generate",
+            `manual-generate-${cert.code}`,
             {
               certificationPresetId: cert.id,
               certificationCode: cert.code,
               certificationName: cert.name,
               triggerType: "manual",
-              domains: cert.blueprintDomains.map((d) => ({
-                domainName: d.domainName,
-                weightPercent: d.weightPercent,
-                subTopics: Array.isArray(d.subTopics) ? (d.subTopics as string[]) : [],
-              })),
+              domains,
               targetCount: 20,
             },
             { priority: 1 }
