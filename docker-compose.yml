@@ -1,10 +1,10 @@
 services:
     
-  worker:
+  rt-awslq-worker:
     build:
       context: ./aws-worker
       dockerfile: Dockerfile
-    container_name: awlq-worker
+    container_name: rt-awslq-worker
     restart: unless-stopped
     depends_on:
       db:
@@ -21,11 +21,11 @@ services:
       WEAK_AREA_WINDOW_DAYS: "30"
     networks:
      - rt-network
-  app:
+  rt-awslq-app:
     build:
       context: ./awlq-app
       dockerfile: Dockerfile
-    container_name: awlq-app
+    container_name: rt-awslq-app
     restart: unless-stopped
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
@@ -59,6 +59,8 @@ services:
       ADMIN_NAME:  ${ADMIN_NAME}
     networks:
      - rt-network
+    expose:
+     - "3000"
 
 
 networks:
