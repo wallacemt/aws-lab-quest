@@ -18,11 +18,9 @@ const supabaseHostname = getSupabaseHostname();
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
+    // SUPABASE_URL must be an ARG in the Dockerfile builder stage so this
+    // domain is known at build time for Next.js image optimization.
     remotePatterns: supabaseHostname ? [{ protocol: "https", hostname: supabaseHostname }] : [],
-  },
-  env: {
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   },
 };
 

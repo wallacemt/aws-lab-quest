@@ -8,12 +8,19 @@ FROM oven/bun:canary-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# prisma.config.ts calls env("DATABASE_URL") eagerly even for `generate`,
-# which doesn't connect to the DB. Pass a dummy URL to satisfy the check.
+# Modules loaded during `next build` pre-rendering validate these vars at
+# import time. Dummy values satisfy the checks; real values come from
+# docker-compose at runtime and are never baked into the image.
 ARG DATABASE_URL=postgresql://build:build@localhost/build
-ENV DATABASE_URL=$DATABASE_URL
+ARG BETTER_AUTH_SECRET=build-time-placeholder-minimum-32-chars-x
+ARG BETTER_AUTH_URL=http://localhost:3000
+ARG SUPABASE_URL=https://placeholder.supabase.co
+ENV DATABASE_URL=$DATABASE_URL \
+    BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET \
+    BETTER_AUTH_URL=$BETTER_AUTH_URL \
+    SUPABASE_URL=$SUPABASE_URL
+
 RUN bunx prisma generate
-# Next.js standalone build
 RUN bun run build
 
 
