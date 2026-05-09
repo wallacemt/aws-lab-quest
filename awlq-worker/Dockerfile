@@ -1,18 +1,18 @@
-FROM node:24-alpine AS builder
+FROM oven/bun:canary-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
 COPY prisma/ ./prisma/
-RUN npm ci
+RUN bun ci
 
-RUN npx prisma generate
+RUN bunx prisma generate
 
 COPY tsconfig.json ./
 COPY src/ ./src/
-RUN npm run build
+RUN bun run build
 
 # ─── Runner ───────────────────────────────────────────────────────────────────
-FROM node:24-alpine AS runner
+FROM oven/bun:canary-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -22,4 +22,4 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./package.json
 
-CMD ["node", "dist/index.js"]
+CMD ["bun", "dist/index.js"]
