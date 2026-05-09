@@ -6,9 +6,6 @@ services:
       dockerfile: Dockerfile
     container_name: rt-awslq-worker
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
       DATABASE_URL: ${DATABASE_URL}
       DATABASE_POOL_MAX: "3"
