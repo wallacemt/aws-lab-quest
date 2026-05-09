@@ -16,6 +16,7 @@ function getSupabaseHostname(): string | null {
 const supabaseHostname = getSupabaseHostname();
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   images: {
     remotePatterns: supabaseHostname ? [{ protocol: "https", hostname: supabaseHostname }] : [],
   },
@@ -23,7 +24,6 @@ const nextConfig: NextConfig = {
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   },
-  /* config options here */
 };
 
 export default nextConfig;
