@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Nunito_Sans, Press_Start_2P, Inter } from "next/font/google";
-//@ts-expect-error  correct import
 import "./globals.css";
 import { Providers } from "@/stores/providers";
 import { cn } from "@/lib/utils";
