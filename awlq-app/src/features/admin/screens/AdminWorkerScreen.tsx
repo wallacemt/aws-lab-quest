@@ -73,6 +73,13 @@ export function AdminWorkerScreen() {
   const [triggering, setTriggering] = useState(false);
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
 
+  // New source form
+  const [newDisplayName, setNewDisplayName] = useState("");
+  const [newUrl, setNewUrl] = useState("");
+  const [newSourceCert, setNewSourceCert] = useState("");
+  const [addingSource, setAddingSource] = useState(false);
+  const [addSourceMsg, setAddSourceMsg] = useState<string | null>(null);
+
   async function fetchData() {
     setLoading(true);
     setError(null);
@@ -90,6 +97,42 @@ export function AdminWorkerScreen() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  async function handleAddSource() {
+    setAddingSource(true);
+    setAddSourceMsg(null);
+    try {
+      const res = await fetch("/api/admin/ingestion-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: newDisplayName,
+          url: newUrl,
+          certificationPresetId: newSourceCert || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erro ao adicionar fonte");
+      setAddSourceMsg(`Fonte "${json.source.displayName}" criada. Dispare "fetch-sources" para processar.`);
+      setNewDisplayName("");
+      setNewUrl("");
+      setNewSourceCert("");
+      await fetchData();
+    } catch (err) {
+      setAddSourceMsg(err instanceof Error ? err.message : "Erro ao adicionar fonte");
+    } finally {
+      setAddingSource(false);
+    }
+  }
+
+  async function handleToggleSource(id: string, active: boolean) {
+    await fetch("/api/admin/ingestion-sources", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, active }),
+    });
+    await fetchData();
+  }
 
   async function handleTrigger() {
     setTriggering(true);
@@ -159,9 +202,7 @@ export function AdminWorkerScreen() {
       <PixelCard className="space-y-3">
         <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Fontes de Ingestao</p>
         {data.ingestionSources.length === 0 ? (
-          <p className="text-xs text-[var(--pixel-subtext)]">
-            Nenhuma fonte cadastrada. Insira registros em IngestionSource.
-          </p>
+          <p className="text-xs text-[var(--pixel-subtext)]">Nenhuma fonte cadastrada ainda.</p>
         ) : (
           <div className="divide-y divide-[var(--pixel-border)]">
             {data.ingestionSources.map((src) => (
@@ -170,12 +211,23 @@ export function AdminWorkerScreen() {
                   <div className="min-w-0">
                     <p className="truncate font-mono text-[var(--pixel-text)]">{src.displayName}</p>
                     <p className="truncate text-[var(--pixel-subtext)]">{src.certificationPreset?.code ?? "—"}</p>
+                    <p className="truncate text-[var(--pixel-subtext)] opacity-60">{src.url}</p>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="flex shrink-0 flex-col items-end gap-1">
                     <p className={`font-mono uppercase ${STATUS_COLOR[src.status] ?? ""}`}>{src.status}</p>
                     <p className="text-[var(--pixel-subtext)]">
                       {src.parsedDomainCount} dom · {src.generatedQuestionCount} q
                     </p>
+                    <button
+                      onClick={() => handleToggleSource(src.id, !src.active)}
+                      className={`rounded px-2 py-0.5 font-mono text-[9px] uppercase ${
+                        src.active
+                          ? "bg-green-900 text-green-300 hover:bg-red-900 hover:text-red-300"
+                          : "bg-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:bg-green-900 hover:text-green-300"
+                      }`}
+                    >
+                      {src.active ? "Ativo" : "Inativo"}
+                    </button>
                   </div>
                 </div>
                 {src.errorMessage && <p className="mt-1 text-red-400">{src.errorMessage}</p>}
@@ -188,6 +240,46 @@ export function AdminWorkerScreen() {
             ))}
           </div>
         )}
+
+        {/* Add source form */}
+        <div className="border-t border-[var(--pixel-border)] pt-3 space-y-2">
+          <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Adicionar Fonte</p>
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              placeholder="Nome da fonte"
+              value={newDisplayName}
+              onChange={(e) => setNewDisplayName(e.target.value)}
+              className="flex-1 min-w-40 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)] placeholder:text-[var(--pixel-subtext)]"
+            />
+            <input
+              type="url"
+              placeholder="https://..."
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              className="flex-[2] min-w-52 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)] placeholder:text-[var(--pixel-subtext)]"
+            />
+            <select
+              value={newSourceCert}
+              onChange={(e) => setNewSourceCert(e.target.value)}
+              className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
+            >
+              <option value="">Cert (opcional)</option>
+              {data.certifications.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code}
+                </option>
+              ))}
+            </select>
+            <PixelButton
+              onClick={handleAddSource}
+              disabled={addingSource || !newDisplayName.trim() || !newUrl.trim()}
+            >
+              {addingSource ? "Adicionando..." : "Adicionar"}
+            </PixelButton>
+          </div>
+          {addSourceMsg && <p className="text-xs text-[var(--pixel-subtext)]">{addSourceMsg}</p>}
+        </div>
       </PixelCard>
 
       {/* Blueprint Domains */}
