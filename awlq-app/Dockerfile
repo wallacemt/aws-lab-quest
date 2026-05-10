@@ -15,10 +15,12 @@ ARG DATABASE_URL=postgresql://build:build@localhost/build
 ARG BETTER_AUTH_SECRET=build-time-placeholder-minimum-32-chars-x
 ARG BETTER_AUTH_URL=http://localhost:3000
 ARG SUPABASE_URL=https://placeholder.supabase.co
+ARG SUPABASE_SERVICE_ROLE_KEY=build-time-placeholder-supabase-service-key
 ENV DATABASE_URL=$DATABASE_URL \
     BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET \
     BETTER_AUTH_URL=$BETTER_AUTH_URL \
-    SUPABASE_URL=$SUPABASE_URL
+    SUPABASE_URL=$SUPABASE_URL \
+    SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
 
 RUN bunx prisma generate
 RUN bun run build
