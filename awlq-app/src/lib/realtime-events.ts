@@ -1,8 +1,7 @@
+import "server-only";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-
-const LEADERBOARD_CHANNEL_NAME = "leaderboard-updates";
-const LEADERBOARD_EVENT_NAME = "xp-updated";
+import { LEADERBOARD_REALTIME_CHANNEL as LEADERBOARD_CHANNEL_NAME, LEADERBOARD_REALTIME_EVENT as LEADERBOARD_EVENT_NAME } from "@/lib/realtime-constants";
 
 let leaderboardChannel: RealtimeChannel | null = null;
 let subscribePromise: Promise<RealtimeChannel> | null = null;
@@ -68,5 +67,4 @@ export async function publishLeaderboardUpdatedEvent(payload: {
   }
 }
 
-export const LEADERBOARD_REALTIME_CHANNEL = LEADERBOARD_CHANNEL_NAME;
-export const LEADERBOARD_REALTIME_EVENT = LEADERBOARD_EVENT_NAME;
+export { LEADERBOARD_REALTIME_CHANNEL, LEADERBOARD_REALTIME_EVENT } from "@/lib/realtime-constants";

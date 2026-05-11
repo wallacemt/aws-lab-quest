@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { LEADERBOARD_REALTIME_CHANNEL, LEADERBOARD_REALTIME_EVENT } from "@/lib/realtime-events";
+import { LEADERBOARD_REALTIME_CHANNEL, LEADERBOARD_REALTIME_EVENT } from "@/lib/realtime-constants";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export function useRealtimeLeaderboard(onUpdated: () => void) {
