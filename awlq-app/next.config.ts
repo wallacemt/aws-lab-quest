@@ -18,8 +18,10 @@ const supabaseHostname = getSupabaseHostname();
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
-    // SUPABASE_URL must be an ARG in the Dockerfile builder stage so this
-    // domain is known at build time for Next.js image optimization.
+    formats: ["image/webp", "image/avif"],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 31_536_000,
     remotePatterns: supabaseHostname ? [{ protocol: "https", hostname: supabaseHostname }] : [],
   },
 };
