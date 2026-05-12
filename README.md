@@ -1,4 +1,7 @@
 # AWS Lab Quest
+<div align="center">
+
+<img src="./awlq-app/public/logo.png" alt="Critix Vault" width="280" />
 
 > Plataforma de preparação para certificações AWS com gamificação, modos de estudo adaptativos e pipeline de conteúdo via IA.
 
