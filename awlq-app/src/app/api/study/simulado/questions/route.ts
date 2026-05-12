@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { generateAndSaveVariant } from "@/lib/question-variant";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
 
 const VALID_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
@@ -112,6 +113,18 @@ export async function POST(request: NextRequest) {
     return buildGuideErrorResponse();
   }
 
+  const questionInclude = {
+    certificationPreset: { select: { code: true } },
+    awsService: { select: { code: true, name: true } },
+    questionOptions: {
+      select: { order: true, content: true, isCorrect: true, explanation: true },
+      orderBy: { order: "asc" as const },
+    },
+    questionAwsServices: {
+      select: { service: { select: { code: true, name: true } } },
+    },
+  };
+
   const pool = await prisma.studyQuestion.findMany({
     where: {
       active: true,
@@ -119,29 +132,7 @@ export async function POST(request: NextRequest) {
       usage: { in: ["SIMULADO", "BOTH"] },
       ...(difficulties.length > 0 ? { difficulty: { in: difficulties } } : {}),
     },
-    include: {
-      certificationPreset: { select: { code: true } },
-      awsService: { select: { code: true, name: true } },
-      questionOptions: {
-        select: {
-          order: true,
-          content: true,
-          isCorrect: true,
-          explanation: true,
-        },
-        orderBy: { order: "asc" },
-      },
-      questionAwsServices: {
-        select: {
-          service: {
-            select: {
-              code: true,
-              name: true,
-            },
-          },
-        },
-      },
-    },
+    include: questionInclude,
     take: 400,
   });
 
@@ -154,7 +145,78 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const questions = pickRandomItems(pool, desiredCount).map(mapDbQuestionToStudyQuestion);
+  // Buscar IDs de questões já respondidas nos últimos 5 simulados
+  const recentHistory = await prisma.studySessionHistory.findMany({
+    where: { userId: session.user.id, sessionType: "SIMULADO" },
+    select: { answersSnapshot: true },
+    orderBy: { completedAt: "desc" },
+    take: 5,
+  });
+
+  const answeredIds = new Set<string>(
+    recentHistory.flatMap((h) => {
+      const snapshot = h.answersSnapshot;
+      if (!Array.isArray(snapshot)) return [];
+      return (snapshot as Array<{ questionId?: unknown }>)
+        .map((item) => (typeof item.questionId === "string" ? item.questionId : null))
+        .filter((id): id is string => id !== null);
+    }),
+  );
+
+  const freshPool = answeredIds.size > 0 ? pool.filter((q) => !answeredIds.has(q.id)) : pool;
+
+  let selectedPool = freshPool;
+
+  if (freshPool.length < desiredCount) {
+    const needed = desiredCount - freshPool.length;
+    const MAX_VARIANTS = 10;
+    const toGenerate = Math.min(needed, MAX_VARIANTS);
+
+    // Seleciona questões já respondidas para gerar variantes mais difíceis
+    const alreadyAnswered = pool.filter((q) => answeredIds.has(q.id));
+    const sourcesForVariants = pickRandomItems(alreadyAnswered, toGenerate);
+
+    const variantIds = (
+      await Promise.all(
+        sourcesForVariants.map((source) =>
+          generateAndSaveVariant({
+            id: source.id,
+            statement: source.statement,
+            topic: source.topic,
+            difficulty: source.difficulty,
+            optionA: source.optionA,
+            optionB: source.optionB,
+            optionC: source.optionC,
+            optionD: source.optionD,
+            optionE: source.optionE ?? null,
+            correctOption: source.correctOption,
+            certificationPresetId: source.certificationPresetId ?? null,
+            certificationPreset: source.certificationPreset
+              ? { code: source.certificationPreset.code, name: source.certificationPreset.code }
+              : null,
+          }),
+        ),
+      )
+    ).filter((id): id is string => id !== null);
+
+    if (variantIds.length > 0) {
+      const newVariants = await prisma.studyQuestion.findMany({
+        where: { id: { in: variantIds } },
+        include: questionInclude,
+      });
+      selectedPool = [...freshPool, ...newVariants];
+    }
+
+    // Fallback: se ainda não tiver suficiente, usa questões já respondidas para completar
+    if (selectedPool.length < desiredCount) {
+      const remaining = desiredCount - selectedPool.length;
+      const usedIds = new Set(selectedPool.map((q) => q.id));
+      const fallback = pool.filter((q) => !usedIds.has(q.id)).slice(0, remaining);
+      selectedPool = [...selectedPool, ...fallback];
+    }
+  }
+
+  const questions = pickRandomItems(selectedPool, desiredCount).map(mapDbQuestionToStudyQuestion);
 
   return NextResponse.json({
     questions,
