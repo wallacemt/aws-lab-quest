@@ -112,23 +112,23 @@ model UserProfile {
 }
 
 model CertificationPreset {
-  id                   String                @id @default(cuid())
-  code                 String                @unique
-  name                 String
-  description          String
-  examGuide            String?
-  examMinutes          Int                   @default(90)
-  active               Boolean               @default(true)
-  displayOrder         Int                   @default(0)
-  userProfiles         UserProfile[]
-  questions            StudyQuestion[]
-  uploadedFiles        AdminUploadedFile[]
-  ingestionJobs        AdminIngestionJob[]
-  ingestionSources     IngestionSource[]
-  blueprintDomains     ExamBlueprintDomain[]
-  weakAreaReports      WeakAreaReport[]
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id               String                @id @default(cuid())
+  code             String                @unique
+  name             String
+  description      String
+  examGuide        String?
+  examMinutes      Int                   @default(90)
+  active           Boolean               @default(true)
+  displayOrder     Int                   @default(0)
+  userProfiles     UserProfile[]
+  questions        StudyQuestion[]
+  uploadedFiles    AdminUploadedFile[]
+  ingestionJobs    AdminIngestionJob[]
+  ingestionSources IngestionSource[]
+  blueprintDomains ExamBlueprintDomain[]
+  weakAreaReports  WeakAreaReport[]
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 }
 
 model AwsService {
