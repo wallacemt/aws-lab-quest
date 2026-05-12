@@ -7,6 +7,7 @@ import { createQuestionGenerationWorker } from "./workers/question-generation.wo
 import { createFeedbackAnalysisWorker } from "./workers/feedback-analysis.worker.js";
 import { createPerformanceComputeWorker } from "./workers/performance-compute.worker.js";
 import { createQualityReviewWorker } from "./workers/quality-review.worker.js";
+import { createEmailSendWorker } from "./workers/email-send.worker.js";
 import { registerCronJobs, expandCronJob } from "./cron/scheduler.js";
 import { startTriggerPoller } from "./services/trigger-poller.js";
 import { prisma } from "./prisma.js";
@@ -32,6 +33,7 @@ async function main() {
     createFeedbackAnalysisWorker(),
     createPerformanceComputeWorker(),
     createQualityReviewWorker(),
+    createEmailSendWorker(),
   ];
 
   for (const worker of workers) {

@@ -31,21 +31,19 @@ export function createQuestionGenerationWorker(): Worker {
         weakAreaFilter: data.weakAreaFilter,
       });
 
-      // Update generatedQuestionCount on IngestionSource (if triggered from source-fetch)
-      if (data.triggerType === "scheduled") {
+      if (result.savedCount > 0) {
         const sources = await prisma.ingestionSource.findMany({
           where: { certificationPresetId: data.certificationPresetId, status: "COMPLETED" },
           select: { id: true, generatedQuestionCount: true },
-          take: 1,
         });
-        if (sources[0]) {
-          await prisma.ingestionSource.update({
-            where: { id: sources[0].id },
-            data: {
-              generatedQuestionCount: sources[0].generatedQuestionCount + result.savedCount,
-            },
-          });
-        }
+        await Promise.all(
+          sources.map((src) =>
+            prisma.ingestionSource.update({
+              where: { id: src.id },
+              data: { generatedQuestionCount: src.generatedQuestionCount + result.savedCount },
+            })
+          )
+        );
       }
 
       logger.info(

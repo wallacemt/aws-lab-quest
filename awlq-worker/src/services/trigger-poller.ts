@@ -1,6 +1,6 @@
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
-import { questionGenerationQueue, feedbackAnalysisQueue, sourceFetchQueue } from "../queues/index.js";
+import { questionGenerationQueue, feedbackAnalysisQueue, sourceFetchQueue, emailSendQueue } from "../queues/index.js";
 import { config } from "../config.js";
 
 async function processOneTrigger(): Promise<void> {
@@ -118,6 +118,20 @@ async function processOneTrigger(): Promise<void> {
           certificationPresetId: trigger.certificationPresetId ?? undefined,
           forceRecompute: true,
         });
+        break;
+      }
+
+      case "email-send": {
+        const payload = trigger.payload as { templateId?: string; targetMode?: string; userId?: string } | null;
+        if (payload?.templateId) {
+          await emailSendQueue.add("admin-email-send", {
+            templateId: payload.templateId,
+            targetMode: (payload.targetMode ?? "all-users") as "all-users" | "single-user",
+            userId: payload.userId,
+          });
+        } else {
+          logger.warn({ triggerId: trigger.id }, "email-send trigger missing templateId payload");
+        }
         break;
       }
 

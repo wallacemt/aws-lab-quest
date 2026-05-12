@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
       weakAreaReports,
       performanceStats,
       certifications,
+      triggerHistory,
+      triggerStats,
     ] = await Promise.all([
       prisma.ingestionSource.findMany({
         orderBy: { updatedAt: "desc" },
@@ -56,6 +58,22 @@ export async function GET(request: NextRequest) {
         select: { id: true, code: true, name: true },
         orderBy: { displayOrder: "asc" },
       }),
+      prisma.workerTrigger.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: {
+          id: true,
+          action: true,
+          certificationPresetId: true,
+          processed: true,
+          processedAt: true,
+          createdAt: true,
+        },
+      }),
+      prisma.workerTrigger.groupBy({
+        by: ["action", "processed"],
+        _count: { id: true },
+      }),
     ]);
 
     const flagged = performanceStats
@@ -76,12 +94,26 @@ export async function GET(request: NextRequest) {
       totalWeight: row._sum.weightPercent ?? 0,
     }));
 
+    const queueStats = triggerStats.reduce<Record<string, { total: number; pending: number; processed: number }>>(
+      (acc, row) => {
+        const action = row.action;
+        if (!acc[action]) acc[action] = { total: 0, pending: 0, processed: 0 };
+        acc[action].total += row._count.id;
+        if (row.processed) acc[action].processed += row._count.id;
+        else acc[action].pending += row._count.id;
+        return acc;
+      },
+      {}
+    );
+
     return NextResponse.json({
       ingestionSources,
       blueprintStats,
       weakAreaReports,
       performance: { flagged, improved, retired },
       certifications,
+      triggerHistory,
+      queueStats,
     });
   } catch (error) {
     console.error("GET /api/admin/worker error:", error);

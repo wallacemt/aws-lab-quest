@@ -52,6 +52,12 @@ export type QualityReviewJobData = {
   reportCount: number;
 };
 
+export type EmailSendJobData = {
+  templateId: string;
+  targetMode: "all-users" | "single-user";
+  userId?: string;
+};
+
 // ─── Queues ───────────────────────────────────────────────────────────────────
 
 export const sourceFetchQueue = new Queue<SourceFetchJobData, void, string>("source-fetch", { connection });
@@ -85,5 +91,13 @@ export const qualityReviewQueue = new Queue<QualityReviewJobData, void, string>(
   defaultJobOptions: {
     attempts: 1,
     backoff: { type: "fixed", delay: 30_000 },
+  },
+});
+
+export const emailSendQueue = new Queue<EmailSendJobData, void, string>("email-send", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
   },
 });

@@ -58,10 +58,10 @@ function buildPrompt(
   weakAreaFilter?: WeakAreaFilter
 ): string {
   const weakContext = weakAreaFilter
-    ? `CONTEXT: Students currently answer only ${Math.round(weakAreaFilter.targetCorrectRate * 100)}% of questions about ` +
-      `${weakAreaFilter.serviceCode ?? weakAreaFilter.topicName ?? "this topic"} correctly. ` +
-      `Generate questions that progressively build understanding — start with foundational concepts then increase to exam-level scenarios. ` +
-      `Include clear, educational explanations.\n\n`
+    ? `CONTEXTO: Os alunos respondem corretamente apenas ${Math.round(weakAreaFilter.targetCorrectRate * 100)}% das questões sobre ` +
+      `${weakAreaFilter.serviceCode ?? weakAreaFilter.topicName ?? "este tópico"}. ` +
+      `Gere questões que desenvolvam progressivamente o entendimento — comece pelos conceitos fundamentais e aumente até cenários de nível de prova. ` +
+      `Inclua explicações claras e educativas.\n\n`
     : "";
 
   const difficultyInstruction =
@@ -87,7 +87,7 @@ Rules for every question:
 3. ARCHITECTURAL DECISION: Use phrasing like "MOST cost-effective", "BEST meets the requirement", "MOST operationally efficient".
 4. OPTIONS: Exactly 4 options (A–D) for single-select, 5 options (A–E) for multi-select.
 5. EXPLANATIONS: Each option must have an explanation of ≥ 40 characters explaining why it is correct or incorrect.
-6. LANGUAGE: English only.
+6. IDIOMA: Apenas português brasileiro. Escreva enunciados, alternativas e explicações em pt-BR.
 
 Generate exactly ${count} questions.
 

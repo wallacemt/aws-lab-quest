@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { buildTemplateVariables, renderTemplateWithVariables } from "@/lib/admin-email-templates";
 import { devAuditLog } from "@/lib/dev-audit";
-import { sendEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
 type SendBody = {
@@ -25,78 +23,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Template obrigatorio." }, { status: 400 });
   }
 
-  const template = await prisma.adminEmailTemplate.findUnique({ where: { id: templateId } });
+  const template = await prisma.adminEmailTemplate.findUnique({
+    where: { id: templateId },
+    select: { id: true, active: true },
+  });
+
   if (!template || !template.active) {
     return NextResponse.json({ error: "Template nao encontrado ou inativo." }, { status: 404 });
   }
-
-  let recipients: Array<{ id: string; name: string; email: string }> = [];
 
   if (targetMode === "single-user") {
     const userId = body.userId?.trim();
     if (!userId) {
       return NextResponse.json({ error: "Informe o usuario para envio individual." }, { status: 400 });
     }
+  }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, name: true, email: true, role: true, active: true, accessStatus: true },
-    });
-
-    if (!user || user.role !== "user" || !user.active || user.accessStatus !== "approved") {
-      return NextResponse.json({ error: "Usuario alvo nao elegivel para envio." }, { status: 400 });
-    }
-
-    recipients = [{ id: user.id, name: user.name, email: user.email }];
-  } else {
-    const users = await prisma.user.findMany({
-      where: {
-        role: "user",
-        active: true,
-        accessStatus: "approved",
+  await prisma.workerTrigger.create({
+    data: {
+      action: "email-send",
+      payload: {
+        templateId,
+        targetMode,
+        userId: targetMode === "single-user" ? (body.userId?.trim() ?? null) : null,
       },
-      select: { id: true, name: true, email: true },
-      take: 1000,
-    });
+    },
+  });
 
-    recipients = users;
-  }
-
-  devAuditLog("admin.email.send.request", {
+  devAuditLog("admin.email.send.queued", {
     adminUserId: adminCheck.userId,
     templateId,
     targetMode,
-    recipients: recipients.length,
   });
 
-  let sent = 0;
-  let failed = 0;
-
-  for (const recipient of recipients) {
-    try {
-      const variables = buildTemplateVariables({ name: recipient.name });
-      const subject = renderTemplateWithVariables(template.subject, variables);
-      const html = renderTemplateWithVariables(template.html, variables);
-
-      await sendEmail({
-        to: recipient.email,
-        subject,
-        html,
-      });
-
-      sent += 1;
-    } catch {
-      failed += 1;
-    }
-  }
-
-  devAuditLog("admin.email.send.completed", {
-    adminUserId: adminCheck.userId,
-    templateId,
-    targetMode,
-    sent,
-    failed,
-  });
-
-  return NextResponse.json({ sent, failed });
+  return NextResponse.json({ queued: true, sent: 0, failed: 0 });
 }

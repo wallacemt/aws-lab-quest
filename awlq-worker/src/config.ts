@@ -42,4 +42,9 @@ export const config = {
     weakAreaWindowDays: optionalInt("WEAK_AREA_WINDOW_DAYS", 30),
     triggerPollIntervalMs: optionalInt("TRIGGER_POLL_INTERVAL_MS", 30_000),
   },
+  email: {
+    username: optional("MAIL_USERNAME", ""),
+    password: optional("MAIL_PASSWORD", ""),
+    from: optional("EMAIL_FROM", "AWS Quest <noreply@example.com>"),
+  },
 };

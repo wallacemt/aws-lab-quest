@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { getProfileValidationError, sanitizeProfileInput } from "@/lib/input-validation";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
-import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
+import { clearOnboardingStep, getOnboardingStep, setOnboardingStep } from "@/lib/onboarding";
 import { AchievementItem } from "@/lib/achievements";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
 
@@ -28,6 +28,7 @@ export function ProfileScreen() {
     profile,
     setProfile,
     hydrated,
+    isProfileComplete,
     reloadProfile,
     avatarUrl,
     setAvatarUrl,
@@ -49,6 +50,7 @@ export function ProfileScreen() {
   const [achievementsOpen, setAchievementsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
+  const showWelcome = hydrated && !isProfileComplete && !getOnboardingStep();
 
   // Keep onboarding flow forcing profile completion through modal.
   useEffect(() => {
@@ -180,6 +182,53 @@ export function ProfileScreen() {
 
   return (
     <AppLayout>
+      <AnimatePresence>
+        {showWelcome && (
+          <motion.div
+            key="welcome-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4"
+          >
+            <div className="w-full max-w-sm space-y-5 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] p-5 shadow-[6px_6px_0_0_var(--pixel-shadow)]">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">AWS Lab Quest</p>
+              <h2 className="font-mono text-sm uppercase leading-6 text-[var(--pixel-primary)]">
+                Bem-vindo, aventureiro!
+              </h2>
+              <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+                Para desbloquear o app, complete seu perfil. Sao apenas 4 campos rapidos:
+              </p>
+              <ol className="space-y-1 font-mono text-xs text-[var(--pixel-text)]">
+                <li>1. Nome de exibicao</li>
+                <li>2. Username unico</li>
+                <li>3. Certificacao AWS alvo</li>
+                <li>4. Tema favorito (ex: games, musica, esporte)</li>
+              </ol>
+              <div className="flex flex-col gap-2 pt-1">
+                <PixelButton
+                  onClick={() => {
+                    setOnboardingStep("profile");
+                    setEditProfileOpen(true);
+                  }}
+                >
+                  Completar Perfil Agora
+                </PixelButton>
+                <PixelButton
+                  variant="ghost"
+                  onClick={() => {
+                    setOnboardingStep("manual");
+                    router.push("/help");
+                  }}
+                >
+                  Ver Manual Primeiro
+                </PixelButton>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 xl:px-8">
         {/* Player card */}
         <PixelCard className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">

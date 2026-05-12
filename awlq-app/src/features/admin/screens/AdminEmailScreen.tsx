@@ -42,6 +42,9 @@ function renderPreview(template: string, name: string): string {
 }
 
 export function AdminEmailScreen() {
+  const [activeTab, setActiveTab] = useState<"templates" | "send">("templates");
+
+  // Template management state
   const [templates, setTemplates] = useState<AdminEmailTemplateItem[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -50,14 +53,20 @@ export function AdminEmailScreen() {
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState("Aluno AWS");
+
+  // Send tab state
+  const [sending, setSending] = useState(false);
+  const [sendMessage, setSendMessage] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendTemplateId, setSendTemplateId] = useState<string | null>(null);
   const [targetMode, setTargetMode] = useState<"all-users" | "single-user">("all-users");
   const [userSearch, setUserSearch] = useState("");
   const [userOptions, setUserOptions] = useState<AdminUserListItem[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
+
   const selectedTemplateIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -117,9 +126,7 @@ export function AdminEmailScreen() {
     let cancelled = false;
 
     async function loadUsers() {
-      if (targetMode !== "single-user") {
-        return;
-      }
+      if (targetMode !== "single-user") return;
 
       try {
         const data = await listAdminUsers({
@@ -130,27 +137,24 @@ export function AdminEmailScreen() {
           accessStatus: "approved",
           search: userSearch,
         });
-
-        if (!cancelled) {
-          setUserOptions(data.items);
-        }
+        if (!cancelled) setUserOptions(data.items);
       } catch {
-        if (!cancelled) {
-          setUserOptions([]);
-        }
+        if (!cancelled) setUserOptions([]);
       }
     }
 
     void loadUsers();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [targetMode, userSearch]);
 
   const selectedTemplate = useMemo(
     () => templates.find((item) => item.id === selectedTemplateId) ?? null,
     [templates, selectedTemplateId],
+  );
+
+  const sendTemplate = useMemo(
+    () => templates.find((item) => item.id === sendTemplateId) ?? null,
+    [templates, sendTemplateId],
   );
 
   const contentColumnsClass = showTemplatesPanel
@@ -216,13 +220,8 @@ export function AdminEmailScreen() {
   }
 
   async function handleDeleteTemplate() {
-    if (!selectedTemplate) {
-      return;
-    }
-
-    if (!window.confirm("Deseja remover este template?")) {
-      return;
-    }
+    if (!selectedTemplate) return;
+    if (!window.confirm("Deseja remover este template?")) return;
 
     setSaving(true);
     setMessage(null);
@@ -243,30 +242,30 @@ export function AdminEmailScreen() {
   }
 
   async function handleSendTemplate() {
-    if (!selectedTemplate) {
-      setError("Selecione um template para enviar.");
+    if (!sendTemplate) {
+      setSendError("Selecione um template para enviar.");
       return;
     }
 
     if (targetMode === "single-user" && !selectedUserId) {
-      setError("Selecione um usuario para envio individual.");
+      setSendError("Selecione um usuario para envio individual.");
       return;
     }
 
     setSending(true);
-    setMessage(null);
-    setError(null);
+    setSendMessage(null);
+    setSendError(null);
 
     try {
       const result = await sendAdminEmailTemplate({
-        templateId: selectedTemplate.id,
+        templateId: sendTemplate.id,
         targetMode,
         userId: targetMode === "single-user" ? selectedUserId : undefined,
       });
 
-      setMessage(`Envio finalizado: ${result.sent} enviados, ${result.failed} falharam.`);
+      setSendMessage(`Envio enfileirado: ${result.sent} enviados, ${result.failed} falharam.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar template.");
+      setSendError(err instanceof Error ? err.message : "Falha ao enviar template.");
     } finally {
       setSending(false);
     }
@@ -282,257 +281,324 @@ export function AdminEmailScreen() {
         </p>
       </header>
 
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2 border border-[#1e293b] bg-[#111827] p-3">
-          <p className="font-mono text-[11px] uppercase text-[#94a3b8]">Layout</p>
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-[#1e293b]">
+        {(["templates", "send"] as const).map((tab) => (
           <button
+            key={tab}
             type="button"
-            onClick={() => setShowTemplatesPanel((prev) => !prev)}
-            className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#cbd5e1]"
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 font-mono text-[10px] uppercase transition-colors ${
+              activeTab === tab
+                ? "border-b-2 border-[#f97316] text-[#f97316]"
+                : "text-[#94a3b8] hover:text-[#cbd5e1]"
+            }`}
           >
-            {showTemplatesPanel ? "Ocultar menu templates" : "Mostrar menu templates"}
+            {tab === "templates" ? "Templates" : "Envio"}
           </button>
-          <button
-            type="button"
-            onClick={() => setShowPreviewPanel((prev) => !prev)}
-            className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#cbd5e1]"
-          >
-            {showPreviewPanel ? "Ocultar preview" : "Mostrar preview"}
-          </button>
-        </div>
+        ))}
+      </div>
 
-        <div className={contentColumnsClass}>
-          {showTemplatesPanel && (
-            <div className="space-y-3 border border-[#1e293b] bg-[#111827] p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-mono text-xs uppercase text-[#cbd5e1]">Templates</p>
+      {/* Tab: Templates */}
+      {activeTab === "templates" && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 border border-[#1e293b] bg-[#111827] p-3">
+            <p className="font-mono text-[11px] uppercase text-[#94a3b8]">Layout</p>
+            <button
+              type="button"
+              onClick={() => setShowTemplatesPanel((prev) => !prev)}
+              className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#cbd5e1]"
+            >
+              {showTemplatesPanel ? "Ocultar menu templates" : "Mostrar menu templates"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPreviewPanel((prev) => !prev)}
+              className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#cbd5e1]"
+            >
+              {showPreviewPanel ? "Ocultar preview" : "Mostrar preview"}
+            </button>
+          </div>
+
+          <div className={contentColumnsClass}>
+            {showTemplatesPanel && (
+              <div className="space-y-3 border border-[#1e293b] bg-[#111827] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-xs uppercase text-[#cbd5e1]">Templates</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingNew(true);
+                      setSelectedTemplateId(null);
+                      setDraft(EMPTY_DRAFT);
+                      setMessage(null);
+                      setError(null);
+                    }}
+                    className="border border-[#334155] px-2 py-1 text-[10px] uppercase"
+                  >
+                    Novo
+                  </button>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsCreatingNew(true);
-                    setSelectedTemplateId(null);
-                    setDraft(EMPTY_DRAFT);
-                    setMessage(null);
-                    setError(null);
-                  }}
-                  className="border border-[#334155] px-2 py-1 text-[10px] uppercase"
+                  onClick={() => void loadTemplates()}
+                  className="w-full border border-[#334155] px-2 py-2 text-xs uppercase"
                 >
-                  Novo
+                  {loading ? "Atualizando..." : "Atualizar lista"}
                 </button>
+
+                <div className="max-h-[460px] space-y-2 overflow-auto">
+                  {templates.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleSelectTemplate(item)}
+                      className={`w-full border px-2 py-2 text-left ${selectedTemplateId === item.id ? "border-[#f97316] bg-[#0f172a]" : "border-[#334155]"}`}
+                    >
+                      <p className="text-xs uppercase text-[#e2e8f0]">{item.name}</p>
+                      <p className="text-[10px] uppercase text-[#94a3b8]">
+                        {item.code} | {item.isSystem ? "sistema" : "custom"}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className={editorColumnsClass}>
+              <div className="space-y-4 border border-[#1e293b] bg-[#111827] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-mono text-xs uppercase text-[#cbd5e1]">
+                    {isCreatingNew ? "Criar template" : "Editar template"}
+                  </p>
+                  {selectedTemplate && (
+                    <span className="text-[10px] uppercase text-[#94a3b8]">
+                      {selectedTemplate.isSystem ? "Template de sistema" : "Template custom"}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="space-y-1 text-xs uppercase text-[#94a3b8]">
+                    Code
+                    <input
+                      value={draft.code}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}
+                      disabled={Boolean(selectedTemplate?.isSystem) && !isCreatingNew}
+                      className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-xs uppercase text-[#94a3b8]">
+                    Nome
+                    <input
+                      value={draft.name}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
+                      className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-xs uppercase text-[#94a3b8] md:col-span-2">
+                    Descricao
+                    <input
+                      value={draft.description}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
+                      className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-xs uppercase text-[#94a3b8] md:col-span-2">
+                    Subject
+                    <input
+                      value={draft.subject}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))}
+                      className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-xs uppercase text-[#94a3b8] md:col-span-2">
+                    HTML
+                    <textarea
+                      value={draft.html}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, html: event.target.value }))}
+                      className="min-h-[180px] w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-xs text-[#e2e8f0]"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-xs uppercase text-[#94a3b8] md:col-span-2">
+                    Texto alternativo
+                    <textarea
+                      value={draft.text}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, text: event.target.value }))}
+                      className="min-h-[100px] w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-xs text-[#e2e8f0]"
+                    />
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs uppercase text-[#94a3b8]">
+                    <input
+                      type="checkbox"
+                      checked={draft.active}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, active: event.target.checked }))}
+                    />
+                    Ativo
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveTemplate()}
+                    disabled={saving}
+                    className="border border-[#f97316] px-3 py-2 text-xs uppercase text-[#f97316]"
+                  >
+                    {saving ? "Salvando..." : isCreatingNew ? "Criar template" : "Salvar alteracoes"}
+                  </button>
+
+                  {!isCreatingNew && selectedTemplate && !selectedTemplate.isSystem && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteTemplate()}
+                      disabled={saving}
+                      className="border border-[#7f1d1d] px-3 py-2 text-xs uppercase text-[#fca5a5]"
+                    >
+                      Remover template
+                    </button>
+                  )}
+                </div>
+
+                {message && <p className="text-sm text-[#86efac]">{message}</p>}
+                {error && <p className="text-sm text-[#fca5a5]">{error}</p>}
               </div>
 
-              <button
-                type="button"
-                onClick={() => void loadTemplates()}
-                className="w-full border border-[#334155] px-2 py-2 text-xs uppercase"
-              >
-                {loading ? "Atualizando..." : "Atualizar lista"}
-              </button>
+              {showPreviewPanel && (
+                <aside className="space-y-2 border border-[#1e293b] bg-[#111827] p-3 xl:sticky xl:top-4">
+                  <p className="font-mono text-xs uppercase text-[#cbd5e1]">Preview do email</p>
+                  <input
+                    value={previewName}
+                    onChange={(event) => setPreviewName(event.target.value)}
+                    placeholder="Nome para preview"
+                    className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
+                  />
+                  <div className="max-h-[80vh] overflow-auto rounded border border-[#334155] bg-white p-2">
+                    <div
+                      className="min-h-[240px]"
+                      dangerouslySetInnerHTML={{
+                        __html: renderPreview(draft.html || "<p>Sem HTML para preview.</p>", previewName),
+                      }}
+                    />
+                  </div>
+                </aside>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
-              <div className="max-h-[460px] space-y-2 overflow-auto">
+      {/* Tab: Envio */}
+      {activeTab === "send" && (
+        <section className="space-y-5">
+          <p className="text-sm text-[#94a3b8]">
+            Selecione um template, escolha o destino e enfileire o envio via worker.
+          </p>
+
+          {/* Template card grid */}
+          <div>
+            <p className="mb-2 font-mono text-[10px] uppercase text-[#94a3b8]">1. Escolha o template</p>
+            {templates.length === 0 ? (
+              <p className="text-xs text-[#94a3b8]">Nenhum template disponivel.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {templates.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => handleSelectTemplate(item)}
-                    className={`w-full border px-2 py-2 text-left ${selectedTemplateId === item.id ? "border-[#f97316] bg-[#0f172a]" : "border-[#334155]"}`}
+                    onClick={() => { setSendTemplateId(item.id); setSendMessage(null); setSendError(null); }}
+                    className={`border p-3 text-left transition-colors ${
+                      sendTemplateId === item.id
+                        ? "border-[#f97316] bg-[#f9731615]"
+                        : "border-[#334155] bg-[#111827] hover:border-[#475569]"
+                    }`}
                   >
-                    <p className="text-xs uppercase text-[#e2e8f0]">{item.name}</p>
-                    <p className="text-[10px] uppercase text-[#94a3b8]">
-                      {item.code} | {item.isSystem ? "sistema" : "custom"}
+                    <p className="font-mono text-xs uppercase text-[#e2e8f0]">{item.name}</p>
+                    <p className="mt-1 text-[10px] text-[#94a3b8]">{item.subject}</p>
+                    <p className="mt-1 font-mono text-[9px] uppercase text-[#475569]">
+                      {item.code} · {item.isSystem ? "sistema" : "custom"}
                     </p>
                   </button>
                 ))}
               </div>
-            </div>
-          )}
-
-          <div className={editorColumnsClass}>
-            <div className="space-y-4 border border-[#1e293b] bg-[#111827] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-mono text-xs uppercase text-[#cbd5e1]">
-                  {isCreatingNew ? "Criar template" : "Editar template"}
-                </p>
-                {selectedTemplate && (
-                  <span className="text-[10px] uppercase text-[#94a3b8]">
-                    {selectedTemplate.isSystem ? "Template de sistema" : "Template custom"}
-                  </span>
-                )}
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="space-y-1 text-xs uppercase text-[#94a3b8]">
-                  Code
-                  <input
-                    value={draft.code}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}
-                    disabled={Boolean(selectedTemplate?.isSystem) && !isCreatingNew}
-                    className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
-                  />
-                </label>
-
-                <label className="space-y-1 text-xs uppercase text-[#94a3b8]">
-                  Nome
-                  <input
-                    value={draft.name}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
-                    className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
-                  />
-                </label>
-
-                <label className="space-y-1 text-xs uppercase text-[#94a3b8] md:col-span-2">
-                  Descricao
-                  <input
-                    value={draft.description}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
-                    className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
-                  />
-                </label>
-
-                <label className="space-y-1 text-xs uppercase text-[#94a3b8] md:col-span-2">
-                  Subject
-                  <input
-                    value={draft.subject}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))}
-                    className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
-                  />
-                </label>
-
-                <label className="space-y-1 text-xs uppercase text-[#94a3b8] md:col-span-2">
-                  HTML
-                  <textarea
-                    value={draft.html}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, html: event.target.value }))}
-                    className="min-h-[180px] w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-xs text-[#e2e8f0]"
-                  />
-                </label>
-
-                <label className="space-y-1 text-xs uppercase text-[#94a3b8] md:col-span-2">
-                  Texto alternativo
-                  <textarea
-                    value={draft.text}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, text: event.target.value }))}
-                    className="min-h-[100px] w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-xs text-[#e2e8f0]"
-                  />
-                </label>
-
-                <label className="flex items-center gap-2 text-xs uppercase text-[#94a3b8]">
-                  <input
-                    type="checkbox"
-                    checked={draft.active}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, active: event.target.checked }))}
-                  />
-                  Ativo
-                </label>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleSaveTemplate()}
-                  disabled={saving}
-                  className="border border-[#f97316] px-3 py-2 text-xs uppercase text-[#f97316]"
-                >
-                  {saving ? "Salvando..." : isCreatingNew ? "Criar template" : "Salvar alteracoes"}
-                </button>
-
-                {!isCreatingNew && selectedTemplate && !selectedTemplate.isSystem && (
-                  <button
-                    type="button"
-                    onClick={() => void handleDeleteTemplate()}
-                    disabled={saving}
-                    className="border border-[#7f1d1d] px-3 py-2 text-xs uppercase text-[#fca5a5]"
-                  >
-                    Remover template
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-2 border border-[#334155] bg-[#0b1220] p-3">
-                <p className="font-mono text-xs uppercase text-[#cbd5e1]">Enviar template</p>
-
-                <div className="flex flex-wrap gap-3 text-xs uppercase">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={targetMode === "all-users"}
-                      onChange={() => setTargetMode("all-users")}
-                    />
-                    Todos os usuarios aprovados
-                  </label>
-
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={targetMode === "single-user"}
-                      onChange={() => setTargetMode("single-user")}
-                    />
-                    Usuario especifico
-                  </label>
-                </div>
-
-                {targetMode === "single-user" && (
-                  <div className="space-y-2">
-                    <input
-                      value={userSearch}
-                      onChange={(event) => setUserSearch(event.target.value)}
-                      placeholder="Buscar usuario por nome/email"
-                      className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
-                    />
-
-                    <select
-                      value={selectedUserId}
-                      onChange={(event) => setSelectedUserId(event.target.value)}
-                      className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
-                    >
-                      <option value="">Selecione um usuario</option>
-                      {userOptions.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name} ({user.email})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => void handleSendTemplate()}
-                  disabled={sending || isCreatingNew}
-                  className="border border-[#22c55e] px-3 py-2 text-xs uppercase text-[#86efac] disabled:opacity-40"
-                >
-                  {sending ? "Enviando..." : "Enviar template"}
-                </button>
-
-                {isCreatingNew && <p className="text-xs text-[#94a3b8]">Salve o template antes de enviar.</p>}
-              </div>
-
-              {message && <p className="text-sm text-[#86efac]">{message}</p>}
-              {error && <p className="text-sm text-[#fca5a5]">{error}</p>}
-            </div>
-
-            {showPreviewPanel && (
-              <aside className="space-y-2 border border-[#1e293b] bg-[#111827] p-3 xl:sticky xl:top-4">
-                <p className="font-mono text-xs uppercase text-[#cbd5e1]">Preview do email</p>
-                <input
-                  value={previewName}
-                  onChange={(event) => setPreviewName(event.target.value)}
-                  placeholder="Nome para preview"
-                  className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
-                />
-                <div className="max-h-[80vh] overflow-auto rounded border border-[#334155] bg-white p-2">
-                  <div
-                    className="min-h-[240px]"
-                    dangerouslySetInnerHTML={{
-                      __html: renderPreview(draft.html || "<p>Sem HTML para preview.</p>", previewName),
-                    }}
-                  />
-                </div>
-              </aside>
             )}
           </div>
-        </div>
-      </section>
+
+          {/* Send form */}
+          <div className="space-y-4 border border-[#1e293b] bg-[#111827] p-4">
+            <p className="font-mono text-[10px] uppercase text-[#94a3b8]">2. Configurar envio</p>
+
+            {sendTemplate ? (
+              <p className="text-xs text-[#86efac]">
+                Template selecionado: <span className="font-mono uppercase">{sendTemplate.name}</span>
+              </p>
+            ) : (
+              <p className="text-xs text-[#94a3b8]">Nenhum template selecionado acima.</p>
+            )}
+
+            <div className="flex flex-wrap gap-3 text-xs uppercase">
+              <label className="flex items-center gap-2 text-[#cbd5e1]">
+                <input
+                  type="radio"
+                  checked={targetMode === "all-users"}
+                  onChange={() => setTargetMode("all-users")}
+                />
+                Todos os usuarios aprovados
+              </label>
+              <label className="flex items-center gap-2 text-[#cbd5e1]">
+                <input
+                  type="radio"
+                  checked={targetMode === "single-user"}
+                  onChange={() => setTargetMode("single-user")}
+                />
+                Usuario especifico
+              </label>
+            </div>
+
+            {targetMode === "single-user" && (
+              <div className="space-y-2">
+                <input
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.target.value)}
+                  placeholder="Buscar usuario por nome/email"
+                  className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                />
+                <select
+                  value={selectedUserId}
+                  onChange={(event) => setSelectedUserId(event.target.value)}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                >
+                  <option value="">Selecione um usuario</option>
+                  {userOptions.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void handleSendTemplate()}
+              disabled={sending || !sendTemplate}
+              className="border border-[#22c55e] px-4 py-2 text-xs uppercase text-[#86efac] disabled:opacity-40"
+            >
+              {sending ? "Enfileirando..." : "Enfileirar Envio"}
+            </button>
+
+            {sendMessage && <p className="text-sm text-[#86efac]">{sendMessage}</p>}
+            {sendError && <p className="text-sm text-[#fca5a5]">{sendError}</p>}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
