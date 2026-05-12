@@ -157,7 +157,7 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
         </div>
       )}
 
-      <BottomNav />
+      {pathname !== "/simulado" && <BottomNav />}
     </>
   );
 }

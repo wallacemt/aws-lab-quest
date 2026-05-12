@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -74,6 +74,57 @@ function formatTime(seconds: number): string {
     .padStart(2, "0");
   const ss = (clamped % 60).toString().padStart(2, "0");
   return `${mm}:${ss}`;
+}
+
+function playAlarmBeep() {
+  try {
+    const ctx = new AudioContext();
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + i * 0.35);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.35 + 0.3);
+      osc.start(ctx.currentTime + i * 0.35);
+      osc.stop(ctx.currentTime + i * 0.35 + 0.3);
+    }
+  } catch {
+    // Web Audio API não disponível
+  }
+}
+
+function playSuccessSound() {
+  try {
+    const ctx = new AudioContext();
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.25);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.25);
+    });
+  } catch {
+    // Web Audio API não disponível
+  }
+}
+
+async function triggerConfetti() {
+  try {
+    const confetti = (await import("canvas-confetti")).default;
+    confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, zIndex: 9999 });
+    setTimeout(() => confetti({ particleCount: 60, spread: 120, origin: { x: 0.1, y: 0.5 }, zIndex: 9999 }), 300);
+    setTimeout(() => confetti({ particleCount: 60, spread: 120, origin: { x: 0.9, y: 0.5 }, zIndex: 9999 }), 500);
+  } catch {
+    // canvas-confetti não disponível
+  }
 }
 
 function formatGuideLines(text: string): string[] {
@@ -180,6 +231,11 @@ export function SimuladoScreen() {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
+  const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
+  const [showPreSubmitSummary, setShowPreSubmitSummary] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const confettiFiredRef = useRef(false);
+  const prevRemainingRef = useRef(remainingSeconds);
 
   const inExamFlow = isActive && questions.length > 0 && !submitted;
   const inReviewFlow = submitted && questions.length > 0;
@@ -353,6 +409,20 @@ export function SimuladoScreen() {
       cancelled = true;
     };
   }, [hydrated, inExamFlow, inReviewFlow, consentScope]);
+
+  useEffect(() => {
+    if (prevRemainingRef.current > 0 && remainingSeconds <= 0 && inExamFlow) {
+      playAlarmBeep();
+      void handleSubmitExam();
+    }
+    prevRemainingRef.current = remainingSeconds;
+  });
+
+  useEffect(() => {
+    if (!reportMessage) return;
+    const timer = setTimeout(() => setReportMessage(null), 5000);
+    return () => clearTimeout(timer);
+  }, [reportMessage]);
 
   function hasValidRulesConsent(scope: string): boolean {
     const raw = rulesConsent.value[scope];
@@ -595,10 +665,18 @@ export function SimuladoScreen() {
     }
 
     setSubmitted(true);
+    setShowPreSubmitSummary(false);
     setCurrentIndex(0);
     const performance = buildTopicPerformance(questions, answers);
-    setScoreOverview(buildScoreOverview(correctAnswers, totalQuestions, performance));
+    const overview = buildScoreOverview(correctAnswers, totalQuestions, performance);
+    setScoreOverview(overview);
     setShowScoreOverview(true);
+
+    if (!confettiFiredRef.current && overview.points >= overview.minimumCertificationPoints) {
+      confettiFiredRef.current = true;
+      playSuccessSound();
+      void triggerConfetti();
+    }
 
     setLoadingWeakServices(true);
     try {
@@ -649,6 +727,22 @@ export function SimuladoScreen() {
     setScoreOverview(null);
     setShowScoreOverview(false);
     setError(null);
+    setMarkedForReview(new Set());
+    setShowPreSubmitSummary(false);
+    setFocusMode(false);
+    confettiFiredRef.current = false;
+  }
+
+  function toggleMarkForReview(questionId: string) {
+    setMarkedForReview((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) {
+        next.delete(questionId);
+      } else {
+        next.add(questionId);
+      }
+      return next;
+    });
   }
 
   async function goToQuestion(index: number) {
@@ -1001,14 +1095,34 @@ export function SimuladoScreen() {
       )}
 
       {(inExamFlow || inReviewFlow) && currentQuestion && (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className={`grid gap-4 ${focusMode ? "" : "xl:grid-cols-[minmax(0,1fr)_340px]"}`}>
           <section className="space-y-4">
             {inExamFlow && (
               <PixelCard className="flex flex-wrap items-center justify-between gap-2 border-red-500 bg-red-900/10">
                 <p className="font-mono text-[10px] uppercase text-red-300">
                   Prova em andamento · Certificacao {session?.certificationCode}
                 </p>
-                <div className="border-2 border-red-400 px-3 py-1 font-mono text-sm text-red-300">{timerLabel}</div>
+                <div className="flex items-center gap-2">
+                  {!focusMode && (
+                    <div className="border-2 border-red-400 px-3 py-1 font-mono text-sm text-red-300">{timerLabel}</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setFocusMode((prev) => !prev)}
+                    title={focusMode ? "Sair do Modo Foco" : "Ativar Modo Foco"}
+                    className={`flex items-center gap-1 border px-2 py-1 font-mono text-[10px] uppercase transition-colors ${
+                      focusMode
+                        ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/20 text-[var(--pixel-primary)]"
+                        : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]"
+                    }`}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M17.66 6.34l-2.12 2.12M6.34 17.66l-2.12 2.12" />
+                    </svg>
+                    Foco
+                  </button>
+                </div>
               </PixelCard>
             )}
 
@@ -1019,10 +1133,44 @@ export function SimuladoScreen() {
               transition={{ duration: 0.22, ease: "easeOut" }}
             >
               <PixelCard className="space-y-4">
-                <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                  Questao {currentIndex + 1} de {questions.length}
-                </p>
-                <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+                    Questao {currentIndex + 1} de {questions.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {inExamFlow && (
+                      <button
+                        type="button"
+                        onClick={() => toggleMarkForReview(currentQuestion.id)}
+                        title={markedForReview.has(currentQuestion.id) ? "Remover marcacao de revisao" : "Marcar para revisao"}
+                        className={`flex items-center gap-1 border px-2 py-0.5 font-mono text-[10px] uppercase transition-colors ${
+                          markedForReview.has(currentQuestion.id)
+                            ? "border-yellow-400 bg-yellow-900/30 text-yellow-300"
+                            : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-yellow-500 hover:text-yellow-400"
+                        }`}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill={markedForReview.has(currentQuestion.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                        Revisar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setReportModalOpen(true)}
+                      title="Denunciar questao"
+                      className="border border-[var(--pixel-border)] p-1 text-[var(--pixel-subtext)] transition-colors hover:border-yellow-500 hover:text-yellow-400"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <p className={`font-[var(--font-body)] ${focusMode ? "text-lg" : "text-base"}`}>{currentQuestion.statement}</p>
                 {currentQuestion.questionType === "multi" && (
                   <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
                     Questao multipla: selecione todas as alternativas corretas.
@@ -1067,7 +1215,7 @@ export function SimuladoScreen() {
                           }}
                           disabled={submitted}
                         />
-                        <span className="font-[var(--font-body)] text-sm">
+                        <span className={`font-[var(--font-body)] ${focusMode ? "text-base" : "text-sm"}`}>
                           {option}) {text}
                         </span>
                       </label>
@@ -1102,59 +1250,108 @@ export function SimuladoScreen() {
                   </motion.div>
                 )}
 
-                {reportMessage && (
-                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-accent)]">{reportMessage}</p>
-                )}
+                <AnimatePresence>
+                  {reportMessage && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="font-[var(--font-body)] text-xs text-[var(--pixel-accent)]"
+                    >
+                      {reportMessage}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
 
-                <div className="flex flex-wrap justify-between gap-2">
-                  <div className="flex gap-2">
-                    <PixelButton variant="ghost" onClick={() => void goToQuestion(currentIndex - 1)}>
-                      Anterior
+                {/* Barra de navegação dinâmica */}
+                <div className="space-y-2 border-t border-[var(--pixel-border)] pt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <PixelButton
+                      variant="ghost"
+                      onClick={() => void goToQuestion(currentIndex - 1)}
+                      disabled={currentIndex === 0}
+                    >
+                      ← Anterior
                     </PixelButton>
-                    <PixelButton onClick={() => void goToQuestion(currentIndex + 1)}>Proxima</PixelButton>
-                    <PixelButton variant="ghost" onClick={() => setReportModalOpen(true)}>
-                      Denunciar questao
+
+                    <span className="font-mono text-[11px] text-[var(--pixel-subtext)]">
+                      {currentIndex + 1} / {questions.length}
+                    </span>
+
+                    <PixelButton
+                      onClick={() => void goToQuestion(currentIndex + 1)}
+                      disabled={currentIndex === questions.length - 1}
+                    >
+                      Proxima →
                     </PixelButton>
                   </div>
 
-                  <div className="flex gap-2">
-                    {inExamFlow ? (
-                      <>
-                        <PixelButton variant="ghost" onClick={handleForceExit}>
-                          Encerrar
-                        </PixelButton>
-                        {allQuestionsAnswered ? (
-                          <PixelButton onClick={handleSubmitExam}>Enviar Simulado</PixelButton>
-                        ) : (
-                          <p className="self-center font-[var(--font-body)] text-xs text-yellow-300">
-                            Responda todas as {questions.length} questoes para enviar o simulado.
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <PixelButton variant="ghost" onClick={() => router.replace("/")}>
-                          Voltar ao inicio
-                        </PixelButton>
-                        <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
-                      </>
-                    )}
-                  </div>
+                  {inExamFlow && (
+                    <div className="h-1 w-full overflow-hidden rounded bg-[var(--pixel-border)]">
+                      <div
+                        className="h-full bg-[var(--pixel-accent)] transition-all duration-300"
+                        style={{ width: `${questions.length > 0 ? (answeredCount / questions.length) * 100 : 0}%` }}
+                      />
+                    </div>
+                  )}
+
+                  {inReviewFlow && (
+                    <div className="flex justify-end gap-2">
+                      <PixelButton variant="ghost" onClick={() => router.replace("/")}>
+                        Voltar ao inicio
+                      </PixelButton>
+                      <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
+                    </div>
+                  )}
                 </div>
               </PixelCard>
             </motion.div>
           </section>
 
-          <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+          <AnimatePresence>
+            {!focusMode && (
+              <motion.aside
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4 xl:sticky xl:top-24 xl:self-start"
+              >
             <PixelCard className="space-y-3">
               <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Navegacao da prova</p>
-              <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                Respondidas: {answeredCount}/{questions.length}
-              </p>
-              <div className="grid grid-cols-5 gap-2">
+
+              {/* Barra de progresso */}
+              <div className="space-y-1">
+                <div className="flex justify-between font-mono text-[10px] text-[var(--pixel-subtext)]">
+                  <span>Respondidas: {answeredCount}/{questions.length}</span>
+                  {inExamFlow && markedForReview.size > 0 && (
+                    <span className="text-yellow-400">{markedForReview.size} p/ revisao</span>
+                  )}
+                </div>
+                {inExamFlow && (
+                  <div className="h-1 w-full overflow-hidden rounded bg-[var(--pixel-border)]">
+                    <div
+                      className="h-full bg-[var(--pixel-accent)] transition-all duration-300"
+                      style={{ width: `${questions.length > 0 ? (answeredCount / questions.length) * 100 : 0}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Legenda */}
+              {inExamFlow && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] text-[var(--pixel-subtext)]">
+                  <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 border border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/30" />Resp.</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 border border-yellow-400 bg-yellow-900/30" />Revisar</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)]" />Vazia</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-5 gap-1.5">
                 {questions.map((question, index) => {
                   const answered = normalizeAnswerValue(answers[question.id]).length > 0;
                   const isCurrent = index === currentIndex;
+                  const isMarked = inExamFlow && markedForReview.has(question.id);
                   const isCorrectAfterSubmit =
                     submitted &&
                     isAnswerCorrect({
@@ -1168,16 +1365,18 @@ export function SimuladoScreen() {
                       key={question.id}
                       type="button"
                       onClick={() => void goToQuestion(index)}
-                      className={`border px-2 py-2 font-mono text-[10px] uppercase ${
+                      className={`border px-1 py-1.5 font-mono text-[10px] uppercase transition-colors ${
                         isCurrent
                           ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/20"
                           : submitted
                             ? isCorrectAfterSubmit
                               ? "border-[#2ecc71] bg-green-900/15"
                               : "border-[#e74c3c] bg-red-900/20"
-                            : answered
-                              ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15"
-                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                            : isMarked
+                              ? "border-yellow-400 bg-yellow-900/20"
+                              : answered
+                                ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15"
+                                : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
                       }`}
                     >
                       {index + 1}
@@ -1185,6 +1384,22 @@ export function SimuladoScreen() {
                   );
                 })}
               </div>
+
+              {/* Botões de ação do exam centralizados na sidebar */}
+              {inExamFlow && (
+                <div className="flex flex-col gap-2 border-t border-[var(--pixel-border)] pt-3">
+                  <PixelButton
+                    onClick={() => setShowPreSubmitSummary(true)}
+                    disabled={!allQuestionsAnswered}
+                    className="w-full justify-center"
+                  >
+                    Enviar Simulado
+                  </PixelButton>
+                  <PixelButton variant="ghost" onClick={handleForceExit} className="w-full justify-center text-center">
+                    Encerrar
+                  </PixelButton>
+                </div>
+              )}
             </PixelCard>
 
             {inReviewFlow && (
@@ -1252,7 +1467,9 @@ export function SimuladoScreen() {
                 )}
               </PixelCard>
             )}
-          </aside>
+              </motion.aside>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -1262,6 +1479,63 @@ export function SimuladoScreen() {
             O tempo do simulado terminou ou a sessao foi encerrada. Envie ou reinicie para continuar.
           </p>
         </PixelCard>
+      )}
+
+      {/* Modal de resumo pré-envio */}
+      {showPreSubmitSummary && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
+          <PixelCard className="w-full max-w-xl space-y-4">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Resumo antes de enviar</p>
+            <h3 className="font-[var(--font-body)] text-lg">Revise antes de confirmar</h3>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3 text-center">
+                <p className="font-mono text-2xl text-[var(--pixel-primary)]">{answeredCount}</p>
+                <p className="mt-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Respondidas</p>
+              </div>
+              <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3 text-center">
+                <p className="font-mono text-2xl text-yellow-400">{markedForReview.size}</p>
+                <p className="mt-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Marcadas p/ revisao</p>
+              </div>
+            </div>
+
+            {markedForReview.size > 0 && (
+              <div className="space-y-2">
+                <p className="font-mono text-[10px] uppercase text-yellow-400">Questoes marcadas para revisao</p>
+                <div className="flex flex-wrap gap-2">
+                  {questions.map((q, i) =>
+                    markedForReview.has(q.id) ? (
+                      <button
+                        key={q.id}
+                        type="button"
+                        onClick={() => {
+                          setShowPreSubmitSummary(false);
+                          void goToQuestion(i);
+                        }}
+                        className="border border-yellow-400 bg-yellow-900/20 px-2 py-1 font-mono text-[10px] text-yellow-300 hover:bg-yellow-900/40"
+                      >
+                        Q{i + 1}
+                      </button>
+                    ) : null,
+                  )}
+                </div>
+              </div>
+            )}
+
+            {answeredCount < questions.length && (
+              <p className="font-[var(--font-body)] text-xs text-yellow-300">
+                Atencao: {questions.length - answeredCount} questao(oes) sem resposta serao contadas como erradas.
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <PixelButton variant="ghost" onClick={() => setShowPreSubmitSummary(false)}>
+                Voltar para revisar
+              </PixelButton>
+              <PixelButton onClick={() => void handleSubmitExam()}>Confirmar Envio</PixelButton>
+            </div>
+          </PixelCard>
+        </div>
       )}
 
       {currentQuestion && (
