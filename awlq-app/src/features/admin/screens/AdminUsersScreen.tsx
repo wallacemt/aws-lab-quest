@@ -39,6 +39,8 @@ export function AdminUsersScreen() {
   const [globalMessage, setGlobalMessage] = useState<string | null>(null);
   const [result, setResult] = useState<PaginatedResult<AdminUserListItem> | null>(null);
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
+  const [autoApprove, setAutoApprove] = useState<boolean | null>(null);
+  const [autoApproveLoading, setAutoApproveLoading] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -84,8 +86,40 @@ export function AdminUsersScreen() {
       }
     }
 
+    async function loadAutoApprove() {
+      try {
+        const res = await fetch("/api/admin/config", { credentials: "include" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { autoApproveUsers: boolean };
+        setAutoApprove(json.autoApproveUsers);
+      } catch {
+        // Non-fatal
+      }
+    }
+
     void loadCertifications();
+    void loadAutoApprove();
   }, []);
+
+  async function handleToggleAutoApprove() {
+    if (autoApprove === null) return;
+    setAutoApproveLoading(true);
+    const next = !autoApprove;
+    setAutoApprove(next);
+    try {
+      const res = await fetch("/api/admin/config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ autoApproveUsers: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setAutoApprove(!next); // revert on error
+    } finally {
+      setAutoApproveLoading(false);
+    }
+  }
 
   useEffect(() => {
     void loadUsers();
@@ -174,13 +208,32 @@ export function AdminUsersScreen() {
       <header className="space-y-2">
         <p className="font-mono text-xs uppercase text-[#f97316]">Usuarios</p>
         <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Listagem de usuarios</h1>
-        <button
-          type="button"
-          onClick={() => void loadUsers()}
-          className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
-        >
-          Atualizar dados
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void loadUsers()}
+            className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
+          >
+            Atualizar dados
+          </button>
+          {autoApprove !== null && (
+            <button
+              type="button"
+              onClick={() => void handleToggleAutoApprove()}
+              disabled={autoApproveLoading}
+              className={`flex items-center gap-2 rounded px-3 py-1 font-mono text-xs uppercase transition-colors ${
+                autoApprove
+                  ? "bg-green-900/60 text-green-300 hover:bg-red-900/60 hover:text-red-300"
+                  : "bg-[#1e293b] text-[#64748b] hover:bg-green-900/60 hover:text-green-300"
+              }`}
+            >
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${autoApprove ? "bg-green-400" : "bg-[#475569]"}`}
+              />
+              Auto-aprovar novos usuarios: {autoApprove ? "Ativo" : "Inativo"}
+            </button>
+          )}
+        </div>
       </header>
 
       <section className="border border-[#1e293b] bg-[#111827] p-4">

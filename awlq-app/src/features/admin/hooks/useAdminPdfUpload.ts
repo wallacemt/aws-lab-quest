@@ -6,6 +6,7 @@ import { CertificationOption, IngestResponse } from "@/features/admin/types";
 export const useAdminPdfUpload = () => {
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [selectedCertificationCode, setSelectedCertificationCode] = useState("");
+  const [uploadType, setUploadType] = useState<"simulado_generation" | "simulate_pdf" | "exam_guide">("simulado_generation");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IngestResponse | null>(null);
@@ -51,6 +52,7 @@ export const useAdminPdfUpload = () => {
     const formData = new FormData(event.currentTarget);
     formData.delete("certificationCode");
     formData.set("certificationCode", selectedCertificationCode);
+    formData.set("uploadType", uploadType);
 
     const selectedFiles = formData
       .getAll("files")
@@ -88,6 +90,8 @@ export const useAdminPdfUpload = () => {
     certifications,
     selectedCertificationCode,
     setSelectedCertificationCode,
+    uploadType,
+    setUploadType,
     loading,
     error,
     result,

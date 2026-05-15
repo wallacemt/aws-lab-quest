@@ -40,6 +40,7 @@ type Certification = { id: string; code: string; name: string };
 type TriggerHistoryItem = {
   id: string;
   action: string;
+  source: string;
   certificationPresetId: string | null;
   processed: boolean;
   processedAt: string | null;
@@ -55,6 +56,10 @@ type WorkerOverview = {
   performance: PerformanceStats;
   certifications: Certification[];
   triggerHistory: TriggerHistoryItem[];
+  triggerHistoryPage: number;
+  triggerHistoryPageSize: number;
+  triggerHistoryTotal: number;
+  triggerHistoryTotalPages: number;
   queueStats: Record<string, QueueStat>;
 };
 
@@ -88,7 +93,51 @@ export function AdminWorkerScreen() {
   const [data, setData] = useState<WorkerOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"generation" | "worker">("generation");
+  const [activeTab, setActiveTab] = useState<"generation" | "worker" | "questions" | "scheduled">("generation");
+  const [historyPage, setHistoryPage] = useState(1);
+
+  // Questions audit tab state
+  type GeneratedQuestion = {
+    id: string;
+    statement: string;
+    topic: string | null;
+    difficulty: string;
+    questionType: string;
+    createdAt: string;
+    certificationPreset: { code: string; name: string } | null;
+    awsServices: string[];
+  };
+  type QuestionsPage = {
+    items: GeneratedQuestion[];
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  const [questionsData, setQuestionsData] = useState<QuestionsPage | null>(null);
+  const [questionsPage, setQuestionsPage] = useState(1);
+  const [questionsCertId, setQuestionsCertId] = useState("");
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+
+  // Scheduled jobs tab state
+  type ScheduledJob = {
+    id: string;
+    jobId: string;
+    name: string;
+    description: string | null;
+    queue: string;
+    cronPattern: string;
+    active: boolean;
+    updatedAt: string;
+  };
+  const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
+  const [scheduledLoading, setScheduledLoading] = useState(false);
+  const [editingJob, setEditingJob] = useState<ScheduledJob | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPattern, setEditPattern] = useState("");
+  const [editMsg, setEditMsg] = useState<string | null>(null);
+  const [showNewJobForm, setShowNewJobForm] = useState(false);
+  const [newJob, setNewJob] = useState({ jobId: "", name: "", description: "", queue: "question-generation", cronPattern: "" });
 
   // Generation tab state
   const [selectedCert, setSelectedCert] = useState("");
@@ -101,11 +150,11 @@ export function AdminWorkerScreen() {
   const [addingSource, setAddingSource] = useState(false);
   const [addSourceMsg, setAddSourceMsg] = useState<string | null>(null);
 
-  async function fetchData() {
+  async function fetchData(page = historyPage) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/worker");
+      const res = await fetch(`/api/admin/worker?historyPage=${page}&historyPageSize=20`);
       if (!res.ok) throw new Error(await res.text());
       setData(await res.json());
     } catch (err) {
@@ -116,8 +165,92 @@ export function AdminWorkerScreen() {
   }
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(historyPage);
+  }, [historyPage]);
+
+  async function fetchQuestions(page = questionsPage, certId = questionsCertId) {
+    setQuestionsLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+      if (certId) params.set("certificationId", certId);
+      const res = await fetch(`/api/admin/worker/questions?${params}`);
+      if (!res.ok) throw new Error(await res.text());
+      setQuestionsData(await res.json());
+    } catch {
+      // keep previous data on error
+    } finally {
+      setQuestionsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "questions") {
+      fetchQuestions(questionsPage, questionsCertId);
+    }
+  }, [activeTab, questionsPage, questionsCertId]);
+
+  async function fetchScheduledJobs() {
+    setScheduledLoading(true);
+    try {
+      const res = await fetch("/api/admin/scheduled-jobs");
+      if (!res.ok) throw new Error();
+      const json = (await res.json()) as { jobs: ScheduledJob[] };
+      setScheduledJobs(json.jobs);
+    } catch {
+      // keep previous
+    } finally {
+      setScheduledLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "scheduled") {
+      fetchScheduledJobs();
+    }
+  }, [activeTab]);
+
+  async function handleToggleJob(job: ScheduledJob) {
+    await fetch(`/api/admin/scheduled-jobs/${job.jobId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !job.active }),
+    });
+    await fetchScheduledJobs();
+  }
+
+  async function handleSaveEdit() {
+    if (!editingJob) return;
+    setEditMsg(null);
+    const res = await fetch(`/api/admin/scheduled-jobs/${editingJob.jobId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName, cronPattern: editPattern }),
+    });
+    if (!res.ok) {
+      const json = (await res.json()) as { error?: string };
+      setEditMsg(json.error ?? "Erro ao salvar");
+      return;
+    }
+    setEditingJob(null);
+    await fetchScheduledJobs();
+  }
+
+  async function handleCreateJob() {
+    setEditMsg(null);
+    const res = await fetch("/api/admin/scheduled-jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newJob),
+    });
+    const json = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      setEditMsg(json.error ?? "Erro ao criar job");
+      return;
+    }
+    setShowNewJobForm(false);
+    setNewJob({ jobId: "", name: "", description: "", queue: "question-generation", cronPattern: "" });
+    await fetchScheduledJobs();
+  }
 
   async function handleAddSource() {
     setAddingSource(true);
@@ -166,7 +299,7 @@ export function AdminWorkerScreen() {
       });
       if (!res.ok) throw new Error(await res.text());
       setTriggerMsg(`Trigger "${selectedAction}" enfileirado. O worker processara em ate 30s.`);
-      setTimeout(() => fetchData(), 3000);
+      setTimeout(() => fetchData(historyPage), 3000);
     } catch (err) {
       setTriggerMsg(err instanceof Error ? err.message : "Erro ao disparar trigger");
     } finally {
@@ -202,7 +335,7 @@ export function AdminWorkerScreen() {
           Worker / Sistema de Geracao
         </h1>
         <div className="flex items-center gap-3">
-          <PixelButton onClick={fetchData} variant="ghost">
+          <PixelButton onClick={() => fetchData(historyPage)} variant="ghost">
             Atualizar
           </PixelButton>
         </div>
@@ -221,8 +354,8 @@ export function AdminWorkerScreen() {
       </section>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b-2 border-[var(--pixel-border)]">
-        {(["generation", "worker"] as const).map((tab) => (
+      <div className="flex flex-wrap gap-1 border-b-2 border-[var(--pixel-border)]">
+        {(["generation", "worker", "questions", "scheduled"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -232,7 +365,13 @@ export function AdminWorkerScreen() {
                 : "text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]"
             }`}
           >
-            {tab === "generation" ? "Geracao" : "Worker"}
+            {tab === "generation"
+              ? "Geracao"
+              : tab === "worker"
+              ? "Worker"
+              : tab === "questions"
+              ? "Questoes Geradas"
+              : "Jobs Agendados"}
           </button>
         ))}
       </div>
@@ -452,7 +591,14 @@ export function AdminWorkerScreen() {
 
           {/* Trigger History */}
           <PixelCard className="space-y-3">
-            <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Historico de Jobs (ultimos 20)</p>
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+                Historico de Jobs · {data.triggerHistoryTotal} total
+              </p>
+              <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+                Pag. {data.triggerHistoryPage} / {data.triggerHistoryTotalPages}
+              </p>
+            </div>
             {data.triggerHistory.length === 0 ? (
               <p className="text-xs text-[var(--pixel-subtext)]">Nenhum job disparado ainda.</p>
             ) : (
@@ -461,6 +607,7 @@ export function AdminWorkerScreen() {
                   <thead>
                     <tr className="border-b border-[var(--pixel-border)] text-left">
                       <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Acao</th>
+                      <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Origem</th>
                       <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Cert</th>
                       <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Criado</th>
                       <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Status</th>
@@ -471,6 +618,19 @@ export function AdminWorkerScreen() {
                       <tr key={item.id}>
                         <td className="py-2 pr-4 font-mono text-[var(--pixel-text)]">
                           {ACTION_LABEL[item.action] ?? item.action}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span
+                            className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase ${
+                              item.source === "cron"
+                                ? "bg-blue-900/40 text-blue-400"
+                                : item.source === "weak_area"
+                                ? "bg-purple-900/40 text-purple-400"
+                                : "bg-[var(--pixel-border)] text-[var(--pixel-subtext)]"
+                            }`}
+                          >
+                            {item.source === "cron" ? "Cron" : item.source === "weak_area" ? "Area Fraca" : "Manual"}
+                          </span>
                         </td>
                         <td className="py-2 pr-4 text-[var(--pixel-subtext)]">
                           {item.certificationPresetId
@@ -495,6 +655,290 @@ export function AdminWorkerScreen() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {data.triggerHistoryTotalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-[var(--pixel-border)] pt-3">
+                <PixelButton
+                  variant="ghost"
+                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                  disabled={historyPage <= 1}
+                >
+                  Anterior
+                </PixelButton>
+                <span className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+                  {historyPage} / {data.triggerHistoryTotalPages}
+                </span>
+                <PixelButton
+                  variant="ghost"
+                  onClick={() => setHistoryPage((p) => Math.min(data.triggerHistoryTotalPages, p + 1))}
+                  disabled={historyPage >= data.triggerHistoryTotalPages}
+                >
+                  Proxima
+                </PixelButton>
+              </div>
+            )}
+          </PixelCard>
+        </div>
+      )}
+
+      {/* Tab: Questoes Geradas */}
+      {activeTab === "questions" && (
+        <div className="space-y-6">
+          <PixelCard className="space-y-3">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+              Filtros
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase text-[var(--pixel-subtext)]">Certificacao</p>
+                <select
+                  value={questionsCertId}
+                  onChange={(e) => {
+                    setQuestionsCertId(e.target.value);
+                    setQuestionsPage(1);
+                  }}
+                  className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
+                >
+                  <option value="">Todas</option>
+                  {data.certifications.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} — {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <PixelButton onClick={() => fetchQuestions(questionsPage, questionsCertId)} disabled={questionsLoading}>
+                {questionsLoading ? "Carregando..." : "Atualizar"}
+              </PixelButton>
+            </div>
+          </PixelCard>
+
+          <PixelCard className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+                Questoes geradas pelo worker
+                {questionsData ? ` · ${questionsData.total} total` : ""}
+              </p>
+              {questionsData && questionsData.totalPages > 1 && (
+                <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+                  Pag. {questionsData.page} / {questionsData.totalPages}
+                </p>
+              )}
+            </div>
+
+            {!questionsData || questionsData.items.length === 0 ? (
+              <p className="text-xs text-[var(--pixel-subtext)]">
+                {questionsLoading ? "Carregando..." : "Nenhuma questao gerada pelo worker ainda."}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--pixel-border)] text-left">
+                      <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Criado</th>
+                      <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Cert</th>
+                      <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Topico</th>
+                      <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Dific</th>
+                      <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Tipo</th>
+                      <th className="pb-2 pr-4 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Servicos AWS</th>
+                      <th className="pb-2 font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Enunciado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--pixel-border)]">
+                    {questionsData.items.map((q) => (
+                      <tr key={q.id}>
+                        <td className="py-2 pr-4 text-[var(--pixel-subtext)] whitespace-nowrap">
+                          {new Date(q.createdAt).toLocaleString("pt-BR")}
+                        </td>
+                        <td className="py-2 pr-4 font-mono text-[var(--pixel-primary)]">
+                          {q.certificationPreset?.code ?? "—"}
+                        </td>
+                        <td className="py-2 pr-4 text-[var(--pixel-subtext)] max-w-[120px] truncate">
+                          {q.topic ?? "—"}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span
+                            className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase ${
+                              q.difficulty === "hard"
+                                ? "bg-red-900/40 text-red-400"
+                                : q.difficulty === "medium"
+                                ? "bg-yellow-900/40 text-yellow-400"
+                                : "bg-green-900/40 text-green-400"
+                            }`}
+                          >
+                            {q.difficulty === "hard" ? "Dif" : q.difficulty === "medium" ? "Med" : "Fac"}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-4 text-[var(--pixel-subtext)]">
+                          {q.questionType === "multi" ? "Multi" : "Unica"}
+                        </td>
+                        <td className="py-2 pr-4 text-[var(--pixel-subtext)] max-w-[140px] truncate">
+                          {q.awsServices.length > 0 ? q.awsServices.join(", ") : "—"}
+                        </td>
+                        <td className="py-2 text-[var(--pixel-text)] max-w-[260px]">
+                          <p className="line-clamp-2">{q.statement}</p>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {questionsData && questionsData.totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-[var(--pixel-border)] pt-3">
+                <PixelButton
+                  variant="ghost"
+                  onClick={() => setQuestionsPage((p) => Math.max(1, p - 1))}
+                  disabled={questionsPage <= 1 || questionsLoading}
+                >
+                  Anterior
+                </PixelButton>
+                <span className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+                  {questionsPage} / {questionsData.totalPages}
+                </span>
+                <PixelButton
+                  variant="ghost"
+                  onClick={() => setQuestionsPage((p) => Math.min(questionsData.totalPages, p + 1))}
+                  disabled={questionsPage >= questionsData.totalPages || questionsLoading}
+                >
+                  Proxima
+                </PixelButton>
+              </div>
+            )}
+          </PixelCard>
+        </div>
+      )}
+
+      {/* Tab: Jobs Agendados */}
+      {activeTab === "scheduled" && (
+        <div className="space-y-6">
+          <PixelCard className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Jobs Agendados (BullMQ)</p>
+              <div className="flex gap-2">
+                <PixelButton variant="ghost" onClick={fetchScheduledJobs} disabled={scheduledLoading}>
+                  Atualizar
+                </PixelButton>
+                <PixelButton onClick={() => { setShowNewJobForm((v) => !v); setEditMsg(null); }}>
+                  {showNewJobForm ? "Cancelar" : "Novo Job"}
+                </PixelButton>
+              </div>
+            </div>
+            <p className="text-[10px] text-[var(--pixel-subtext)]">
+              Alteracoes sao aplicadas em ate 60s pelo worker automaticamente.
+            </p>
+
+            {showNewJobForm && (
+              <div className="space-y-2 rounded border border-[var(--pixel-border)] p-3">
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Criar novo job</p>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    placeholder="jobId (ex: cron-meu-job)"
+                    value={newJob.jobId}
+                    onChange={(e) => setNewJob((j) => ({ ...j, jobId: e.target.value }))}
+                    className="flex-1 min-w-40 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)] placeholder:text-[var(--pixel-subtext)]"
+                  />
+                  <input
+                    placeholder="Nome"
+                    value={newJob.name}
+                    onChange={(e) => setNewJob((j) => ({ ...j, name: e.target.value }))}
+                    className="flex-1 min-w-40 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)] placeholder:text-[var(--pixel-subtext)]"
+                  />
+                  <select
+                    value={newJob.queue}
+                    onChange={(e) => setNewJob((j) => ({ ...j, queue: e.target.value }))}
+                    className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
+                  >
+                    <option value="question-generation">question-generation</option>
+                    <option value="source-fetch">source-fetch</option>
+                    <option value="feedback-analysis">feedback-analysis</option>
+                    <option value="performance-compute">performance-compute</option>
+                    <option value="email-send">email-send</option>
+                  </select>
+                  <input
+                    placeholder="Cron (ex: 0 8 * * *)"
+                    value={newJob.cronPattern}
+                    onChange={(e) => setNewJob((j) => ({ ...j, cronPattern: e.target.value }))}
+                    className="min-w-36 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)] placeholder:text-[var(--pixel-subtext)]"
+                  />
+                  <PixelButton
+                    onClick={handleCreateJob}
+                    disabled={!newJob.jobId.trim() || !newJob.name.trim() || !newJob.cronPattern.trim()}
+                  >
+                    Criar
+                  </PixelButton>
+                </div>
+                {editMsg && <p className="text-xs text-red-400">{editMsg}</p>}
+              </div>
+            )}
+
+            {scheduledJobs.length === 0 ? (
+              <p className="text-xs text-[var(--pixel-subtext)]">
+                {scheduledLoading ? "Carregando..." : "Nenhum job agendado. Inicie o worker para semear os defaults."}
+              </p>
+            ) : (
+              <div className="divide-y divide-[var(--pixel-border)]">
+                {scheduledJobs.map((job) => (
+                  <div key={job.id} className="py-3 text-xs">
+                    {editingJob?.id === job.id ? (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          <input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="flex-1 min-w-40 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
+                          />
+                          <input
+                            value={editPattern}
+                            onChange={(e) => setEditPattern(e.target.value)}
+                            placeholder="Cron pattern"
+                            className="min-w-36 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
+                          />
+                          <PixelButton onClick={handleSaveEdit}>Salvar</PixelButton>
+                          <PixelButton variant="ghost" onClick={() => { setEditingJob(null); setEditMsg(null); }}>Cancelar</PixelButton>
+                        </div>
+                        {editMsg && <p className="text-xs text-red-400">{editMsg}</p>}
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-mono text-[var(--pixel-text)]">{job.name}</p>
+                          {job.description && <p className="text-[var(--pixel-subtext)]">{job.description}</p>}
+                          <p className="font-mono text-[var(--pixel-subtext)]">
+                            <span className="text-blue-400">{job.queue}</span>
+                            {" · "}
+                            <span className="text-yellow-400">{job.cronPattern}</span>
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingJob(job);
+                              setEditName(job.name);
+                              setEditPattern(job.cronPattern);
+                              setEditMsg(null);
+                            }}
+                            className="rounded border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => void handleToggleJob(job)}
+                            className={`rounded px-2 py-0.5 font-mono text-[9px] uppercase ${
+                              job.active
+                                ? "bg-green-900/60 text-green-300 hover:bg-red-900/60 hover:text-red-300"
+                                : "bg-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:bg-green-900/60 hover:text-green-300"
+                            }`}
+                          >
+                            {job.active ? "Ativo" : "Inativo"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </PixelCard>
