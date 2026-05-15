@@ -253,6 +253,22 @@ export async function listAdminQuestions(
   return (await response.json()) as PaginatedResult<AdminQuestionListItem>;
 }
 
+export async function getAdminQuestion(questionId: string): Promise<AdminQuestionListItem> {
+  const response = await fetch(`/api/admin/questions/${questionId}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(errorPayload.error ?? "Nao foi possivel carregar questao.");
+  }
+
+  const data = (await response.json()) as { question: AdminQuestionListItem };
+  return data.question;
+}
+
 export async function updateAdminQuestion(
   questionId: string,
   payload: AdminQuestionUpdatePayload,

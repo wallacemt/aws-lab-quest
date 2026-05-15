@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { AdminQuestionDetailModal } from "@/features/admin/components/AdminQuestionDetailModal";
+import { ScheduledJobEditModal } from "@/features/admin/components/ScheduledJobEditModal";
+import { parseCronToHuman } from "@/lib/cron-utils";
 
 type IngestionSource = {
   id: string;
@@ -118,6 +121,7 @@ export function AdminWorkerScreen() {
   const [questionsPage, setQuestionsPage] = useState(1);
   const [questionsCertId, setQuestionsCertId] = useState("");
   const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [selectedWorkerQuestionId, setSelectedWorkerQuestionId] = useState<string | null>(null);
 
   // Scheduled jobs tab state
   type ScheduledJob = {
@@ -133,8 +137,6 @@ export function AdminWorkerScreen() {
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
   const [scheduledLoading, setScheduledLoading] = useState(false);
   const [editingJob, setEditingJob] = useState<ScheduledJob | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editPattern, setEditPattern] = useState("");
   const [editMsg, setEditMsg] = useState<string | null>(null);
   const [showNewJobForm, setShowNewJobForm] = useState(false);
   const [newJob, setNewJob] = useState({ jobId: "", name: "", description: "", queue: "question-generation", cronPattern: "" });
@@ -215,23 +217,6 @@ export function AdminWorkerScreen() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !job.active }),
     });
-    await fetchScheduledJobs();
-  }
-
-  async function handleSaveEdit() {
-    if (!editingJob) return;
-    setEditMsg(null);
-    const res = await fetch(`/api/admin/scheduled-jobs/${editingJob.jobId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, cronPattern: editPattern }),
-    });
-    if (!res.ok) {
-      const json = (await res.json()) as { error?: string };
-      setEditMsg(json.error ?? "Erro ao salvar");
-      return;
-    }
-    setEditingJob(null);
     await fetchScheduledJobs();
   }
 
@@ -747,7 +732,11 @@ export function AdminWorkerScreen() {
                   </thead>
                   <tbody className="divide-y divide-[var(--pixel-border)]">
                     {questionsData.items.map((q) => (
-                      <tr key={q.id}>
+                      <tr
+                        key={q.id}
+                        className="cursor-pointer hover:bg-white/5"
+                        onClick={() => setSelectedWorkerQuestionId(q.id)}
+                      >
                         <td className="py-2 pr-4 text-[var(--pixel-subtext)] whitespace-nowrap">
                           {new Date(q.createdAt).toLocaleString("pt-BR")}
                         </td>
@@ -882,61 +871,36 @@ export function AdminWorkerScreen() {
               <div className="divide-y divide-[var(--pixel-border)]">
                 {scheduledJobs.map((job) => (
                   <div key={job.id} className="py-3 text-xs">
-                    {editingJob?.id === job.id ? (
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                          <input
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            className="flex-1 min-w-40 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
-                          />
-                          <input
-                            value={editPattern}
-                            onChange={(e) => setEditPattern(e.target.value)}
-                            placeholder="Cron pattern"
-                            className="min-w-36 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
-                          />
-                          <PixelButton onClick={handleSaveEdit}>Salvar</PixelButton>
-                          <PixelButton variant="ghost" onClick={() => { setEditingJob(null); setEditMsg(null); }}>Cancelar</PixelButton>
-                        </div>
-                        {editMsg && <p className="text-xs text-red-400">{editMsg}</p>}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-mono text-[var(--pixel-text)]">{job.name}</p>
+                        {job.description && <p className="text-[var(--pixel-subtext)]">{job.description}</p>}
+                        <p className="font-mono text-[var(--pixel-subtext)]">
+                          <span className="text-blue-400">{job.queue}</span>
+                          {" · "}
+                          <span className="text-yellow-400">{parseCronToHuman(job.cronPattern)}</span>
+                          <span className="ml-1 text-[#475569]">({job.cronPattern})</span>
+                        </p>
                       </div>
-                    ) : (
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-mono text-[var(--pixel-text)]">{job.name}</p>
-                          {job.description && <p className="text-[var(--pixel-subtext)]">{job.description}</p>}
-                          <p className="font-mono text-[var(--pixel-subtext)]">
-                            <span className="text-blue-400">{job.queue}</span>
-                            {" · "}
-                            <span className="text-yellow-400">{job.cronPattern}</span>
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingJob(job);
-                              setEditName(job.name);
-                              setEditPattern(job.cronPattern);
-                              setEditMsg(null);
-                            }}
-                            className="rounded border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => void handleToggleJob(job)}
-                            className={`rounded px-2 py-0.5 font-mono text-[9px] uppercase ${
-                              job.active
-                                ? "bg-green-900/60 text-green-300 hover:bg-red-900/60 hover:text-red-300"
-                                : "bg-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:bg-green-900/60 hover:text-green-300"
-                            }`}
-                          >
-                            {job.active ? "Ativo" : "Inativo"}
-                          </button>
-                        </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          onClick={() => setEditingJob(job)}
+                          className="rounded border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => void handleToggleJob(job)}
+                          className={`rounded px-2 py-0.5 font-mono text-[9px] uppercase ${
+                            job.active
+                              ? "bg-green-900/60 text-green-300 hover:bg-red-900/60 hover:text-red-300"
+                              : "bg-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:bg-green-900/60 hover:text-green-300"
+                          }`}
+                        >
+                          {job.active ? "Ativo" : "Inativo"}
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -944,6 +908,18 @@ export function AdminWorkerScreen() {
           </PixelCard>
         </div>
       )}
+
+      <ScheduledJobEditModal
+        job={editingJob}
+        onClose={() => setEditingJob(null)}
+        onSaved={() => { setEditingJob(null); void fetchScheduledJobs(); }}
+      />
+
+      <AdminQuestionDetailModal
+        questionId={selectedWorkerQuestionId}
+        onClose={() => setSelectedWorkerQuestionId(null)}
+        onDeleted={() => { setSelectedWorkerQuestionId(null); void fetchQuestions(questionsPage, questionsCertId); }}
+      />
     </main>
   );
 }

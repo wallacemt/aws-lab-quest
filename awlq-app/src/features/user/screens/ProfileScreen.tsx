@@ -19,7 +19,15 @@ import { getProfileValidationError, sanitizeProfileInput } from "@/lib/input-val
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
 import { clearOnboardingStep, getOnboardingStep, setOnboardingStep } from "@/lib/onboarding";
 import { AchievementItem } from "@/lib/achievements";
+import { CertificationAchievementModal } from "@/features/user/components/CertificationAchievementModal";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
+
+type CertBadge = {
+  id: string;
+  badgeUrl: string;
+  earnedAt: string;
+  certificationPreset: { code: string; name: string } | null;
+};
 
 export function ProfileScreen() {
   const router = useRouter();
@@ -48,6 +56,8 @@ export function ProfileScreen() {
   const [achievements, setAchievements] = useState<AchievementItem[]>([]);
   const [shareMsg, setShareMsg] = useState<{ message: string; type: "badge" | "achievement" } | null>(null);
   const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [certBadges, setCertBadges] = useState<CertBadge[]>([]);
+  const [certAchievementOpen, setCertAchievementOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
   const showWelcome = hydrated && !isProfileComplete && !getOnboardingStep();
@@ -78,6 +88,13 @@ export function ProfileScreen() {
       .then((data: { achievements?: { items?: AchievementItem[] } }) => {
         setAchievements(data.achievements?.items ?? []);
       })
+      .catch(() => void 0);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/user/cert-badges", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { badges?: CertBadge[] }) => setCertBadges(data.badges ?? []))
       .catch(() => void 0);
   }, []);
 
@@ -329,6 +346,51 @@ export function ProfileScreen() {
           />
         </PixelCard>
 
+        {/* Cert badges */}
+        <PixelCard className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+              Certificacoes Conquistadas ({certBadges.length})
+            </p>
+            <PixelButton onClick={() => setCertAchievementOpen(true)}>
+              + Adicionar
+            </PixelButton>
+          </div>
+
+          {certBadges.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => setCertAchievementOpen(true)}
+              className="w-full border-2 border-dashed border-[var(--pixel-border)] py-4 text-center font-mono text-xs text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+            >
+              Passou na sua prova? Registre aqui!
+            </button>
+          ) : (
+            <div className="space-y-2">
+              {certBadges.map((badge) => (
+                <div key={badge.id} className="flex items-center justify-between gap-3 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm text-[var(--pixel-primary)]">
+                      {badge.certificationPreset?.name ?? "Certificacao AWS"}
+                    </p>
+                    <p className="text-xs text-[var(--pixel-subtext)]">
+                      {new Date(badge.earnedAt).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <a
+                    href={badge.badgeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 border border-[var(--pixel-border)] px-2 py-1 font-mono text-[9px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]"
+                  >
+                    Ver badge
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </PixelCard>
+
         {achievements.length > 0 && (
           <PixelCard>
             <Collapsible open={achievementsOpen} onOpenChange={setAchievementsOpen}>
@@ -398,7 +460,7 @@ export function ProfileScreen() {
           )}
 
           <div className="flex items-center gap-3">
-            <PixelButton onClick={() => setEditProfileOpen(true)} disabled={saving}>
+            <PixelButton id="edit-profile-btn" onClick={() => setEditProfileOpen(true)} disabled={saving}>
               {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
             </PixelButton>
             <PixelButton
@@ -427,6 +489,13 @@ export function ProfileScreen() {
           currentUsername={profile.username}
           certificationOptions={certificationOptions}
           onSave={handleSave}
+        />
+
+        <CertificationAchievementModal
+          open={certAchievementOpen}
+          onClose={() => setCertAchievementOpen(false)}
+          certificationOptions={certificationOptions}
+          onBadgeAdded={(badge) => setCertBadges((prev) => [badge, ...prev])}
         />
       </main>
     </AppLayout>
