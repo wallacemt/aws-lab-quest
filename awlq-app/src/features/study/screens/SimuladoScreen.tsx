@@ -28,8 +28,8 @@ import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
-import { STORAGE_KEYS } from "@/lib/storage";
-import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
+import { STORAGE_KEYS, safeLocalStorageGet, safeLocalStorageRemove, safeLocalStorageSet } from "@/lib/storage";
+import { QuestionOption, SimuladoDraft, StudyQuestion, TaskDifficulty } from "@/lib/types";
 
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const GAP_TOP_N = 10;
@@ -197,8 +197,18 @@ function buildScoreOverview(correct: number, total: number, topicPerformance: To
 
 export function SimuladoScreen() {
   const router = useRouter();
-  const { hydrated, isActive, remainingSeconds, session, startSession, submitSession, clearSession } =
-    useSimulatedExam();
+  const {
+    hydrated,
+    isActive,
+    isPaused,
+    remainingSeconds,
+    session,
+    startSession,
+    submitSession,
+    clearSession,
+    pauseSession,
+    resumeSession,
+  } = useSimulatedExam();
   const { profile, refreshTotalXp } = useUserProfile();
   const rulesConsent = useLocalStorage<RulesConsentMap>(STORAGE_KEYS.simuladoRulesConsent, {});
 
@@ -234,6 +244,8 @@ export function SimuladoScreen() {
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
   const [showPreSubmitSummary, setShowPreSubmitSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState<SimuladoDraft | null>(null);
   const confettiFiredRef = useRef(false);
   const prevRemainingRef = useRef(remainingSeconds);
 
@@ -362,16 +374,19 @@ export function SimuladoScreen() {
   }
 
   useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
+    if (!hydrated) return;
 
-    // A stale persisted session without restored question state would lock navigation globally.
     if (isActive && questions.length === 0 && !submitted && !loading) {
+      const draft = safeLocalStorageGet<SimuladoDraft | null>(STORAGE_KEYS.simuladoDraft, null);
+      if (draft && session && draft.sessionId === session.id && draft.questions.length > 0) {
+        setResumeDraft(draft);
+        setShowResumeModal(true);
+        return;
+      }
       clearSession();
       setError("Sessao anterior de simulado expirada ou incompleta. Inicie um novo simulado para continuar.");
     }
-  }, [clearSession, hydrated, isActive, loading, questions.length, submitted]);
+  }, [clearSession, hydrated, isActive, loading, questions.length, session, submitted]);
 
   useEffect(() => {
     if (!hydrated || inExamFlow || inReviewFlow) {
@@ -424,6 +439,31 @@ export function SimuladoScreen() {
     return () => clearTimeout(timer);
   }, [reportMessage]);
 
+  // Auto-save draft whenever exam state changes
+  useEffect(() => {
+    if (!inExamFlow || questions.length === 0 || !session) return;
+    const draft: SimuladoDraft = {
+      sessionId: session.id,
+      questions,
+      answers,
+      currentIndex,
+      markedForReview: Array.from(markedForReview),
+    };
+    safeLocalStorageSet(STORAGE_KEYS.simuladoDraft, draft);
+  }, [inExamFlow, questions, answers, currentIndex, markedForReview, session]);
+
+  // Auto-pause when tab goes hidden (crash / browser close recovery)
+  useEffect(() => {
+    if (!inExamFlow) return;
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        pauseSession();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [inExamFlow, pauseSession]);
+
   function hasValidRulesConsent(scope: string): boolean {
     const raw = rulesConsent.value[scope];
     if (!raw) {
@@ -445,6 +485,9 @@ export function SimuladoScreen() {
   async function handleStart() {
     setError(null);
     setHistoricalWeakServices([]);
+    safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
+    setShowResumeModal(false);
+    setResumeDraft(null);
 
     setLoading(true);
 
@@ -615,6 +658,7 @@ export function SimuladoScreen() {
     );
     const usedDurationSeconds = Math.max(0, totalDurationSeconds - remainingSeconds);
 
+    safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
     submitSession();
     clearSession();
 
@@ -706,6 +750,7 @@ export function SimuladoScreen() {
   }
 
   function handleForceExit() {
+    safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
     clearSession();
     setQuestions([]);
     setAnswers({});
@@ -1098,14 +1143,43 @@ export function SimuladoScreen() {
         <div className={`grid gap-4 ${focusMode ? "" : "xl:grid-cols-[minmax(0,1fr)_340px]"}`}>
           <section className="space-y-4">
             {inExamFlow && (
-              <PixelCard className="flex flex-wrap items-center justify-between gap-2 border-red-500 bg-red-900/10">
-                <p className="font-mono text-[10px] uppercase text-red-300">
-                  Prova em andamento · Certificacao {session?.certificationCode}
+              <PixelCard className={`flex flex-wrap items-center justify-between gap-2 ${isPaused ? "border-yellow-500 bg-yellow-900/10" : "border-red-500 bg-red-900/10"}`}>
+                <p className={`font-mono text-[10px] uppercase ${isPaused ? "text-yellow-300" : "text-red-300"}`}>
+                  {isPaused ? "Simulado pausado · " : "Prova em andamento · "}Certificacao {session?.certificationCode}
                 </p>
                 <div className="flex items-center gap-2">
                   {!focusMode && (
-                    <div className="border-2 border-red-400 px-3 py-1 font-mono text-sm text-red-300">{timerLabel}</div>
+                    <div className={`border-2 px-3 py-1 font-mono text-sm ${isPaused ? "border-yellow-400 text-yellow-300" : "border-red-400 text-red-300"}`}>
+                      {timerLabel}
+                    </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => (isPaused ? resumeSession() : pauseSession())}
+                    title={isPaused ? "Retomar simulado" : "Pausar simulado"}
+                    className={`flex items-center gap-1 border px-2 py-1 font-mono text-[10px] uppercase transition-colors ${
+                      isPaused
+                        ? "border-yellow-400 bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/50"
+                        : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-yellow-500 hover:text-yellow-400"
+                    }`}
+                  >
+                    {isPaused ? (
+                      <>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                          <polygon points="5,3 19,12 5,21" />
+                        </svg>
+                        Retomar
+                      </>
+                    ) : (
+                      <>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                          <rect x="6" y="4" width="4" height="16" />
+                          <rect x="14" y="4" width="4" height="16" />
+                        </svg>
+                        Pausar
+                      </>
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setFocusMode((prev) => !prev)}
@@ -1546,6 +1620,76 @@ export function SimuladoScreen() {
           onClose={() => setReportModalOpen(false)}
           onSubmit={submitQuestionReport}
         />
+      )}
+
+      {/* Paused overlay */}
+      {isPaused && inExamFlow && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" role="dialog" aria-modal="true">
+          <PixelCard className="w-full max-w-sm space-y-5 border-yellow-500 bg-yellow-900/20 text-center">
+            <div>
+              <p className="font-mono text-[10px] uppercase text-yellow-300">Simulado Pausado</p>
+              <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                Tempo restante: <span className="font-mono text-yellow-300">{timerLabel}</span>
+              </p>
+              <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                Questao {currentIndex + 1} de {questions.length} · {answeredCount} respondidas
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <PixelButton onClick={resumeSession} className="w-full justify-center">
+                Retomar Simulado
+              </PixelButton>
+              <PixelButton variant="ghost" onClick={handleForceExit} className="w-full justify-center">
+                Encerrar e sair
+              </PixelButton>
+            </div>
+          </PixelCard>
+        </div>
+      )}
+
+      {/* Resume modal (crash / page reload recovery) */}
+      {showResumeModal && resumeDraft && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" role="dialog" aria-modal="true">
+          <PixelCard className="w-full max-w-sm space-y-5 border-[var(--pixel-accent)]">
+            <div>
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Simulado em andamento</p>
+              <h3 className="mt-2 font-[var(--font-body)] text-base">Deseja retomar de onde parou?</h3>
+              <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                Questao {resumeDraft.currentIndex + 1} de {resumeDraft.questions.length} ·{" "}
+                {Object.values(resumeDraft.answers).filter(Boolean).length} respondidas ·{" "}
+                <span className="font-mono text-[var(--pixel-accent)]">{timerLabel}</span> restantes
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <PixelButton
+                onClick={() => {
+                  setQuestions(resumeDraft.questions);
+                  setAnswers(resumeDraft.answers as StudyAnswerMap);
+                  setCurrentIndex(resumeDraft.currentIndex);
+                  setMarkedForReview(new Set(resumeDraft.markedForReview));
+                  if (isPaused) resumeSession();
+                  setShowResumeModal(false);
+                  setResumeDraft(null);
+                }}
+                className="w-full justify-center"
+              >
+                Retomar de onde parei
+              </PixelButton>
+              <PixelButton
+                variant="ghost"
+                onClick={() => {
+                  safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
+                  clearSession();
+                  setShowResumeModal(false);
+                  setResumeDraft(null);
+                }}
+                className="w-full justify-center"
+              >
+                Descartar e iniciar novo
+              </PixelButton>
+            </div>
+          </PixelCard>
+        </div>
       )}
     </main>
   );

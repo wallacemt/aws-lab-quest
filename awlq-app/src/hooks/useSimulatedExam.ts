@@ -17,6 +17,8 @@ export function useSimulatedExam() {
     startSession,
     submitSession,
     clearSession,
+    pauseSession,
+    resumeSession,
     acknowledgeRestoredSession,
   } = useSimulatedExamStore();
 
@@ -46,8 +48,11 @@ export function useSimulatedExam() {
     };
   }, [hydrated, setNowMs]);
 
+  const isPaused = Boolean(session?.pausedAt);
+
   const remainingSeconds = useMemo(() => {
     if (!session) return 0;
+    if (isPaused) return session.pausedRemainingSeconds ?? 0;
     if (nowMs === 0) {
       const startedAtMs = new Date(session.startedAt).getTime();
       const endsAtMs = new Date(session.endsAt).getTime();
@@ -55,7 +60,7 @@ export function useSimulatedExam() {
     }
     const endsAtMs = new Date(session.endsAt).getTime();
     return Math.max(0, Math.floor((endsAtMs - nowMs) / 1000));
-  }, [nowMs, session]);
+  }, [isPaused, nowMs, session]);
 
   const isActive = Boolean(session && !session.submittedAt && remainingSeconds > 0);
 
@@ -64,10 +69,13 @@ export function useSimulatedExam() {
     session,
     restoredFromStorage,
     isActive,
+    isPaused,
     remainingSeconds,
     startSession,
     submitSession,
     clearSession,
+    pauseSession,
+    resumeSession,
     acknowledgeRestoredSession,
   };
 }

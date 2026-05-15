@@ -14,6 +14,8 @@ type SimulatedExamState = {
   startSession: (certificationCode: string, minutes?: number) => void;
   submitSession: () => void;
   clearSession: () => void;
+  pauseSession: () => void;
+  resumeSession: () => void;
   acknowledgeRestoredSession: () => void;
 };
 
@@ -45,7 +47,8 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
         const endsAtMs = new Date(parsed.endsAt).getTime();
         const startedAtMs = new Date(parsed.startedAt).getTime();
         const hasValidDates = Number.isFinite(endsAtMs) && Number.isFinite(startedAtMs);
-        const isExpired = !hasValidDates || endsAtMs <= Date.now();
+        const isPaused = Boolean(parsed.pausedAt) && (parsed.pausedRemainingSeconds ?? 0) > 0;
+        const isExpired = !hasValidDates || (!isPaused && endsAtMs <= Date.now());
         const isSubmitted = Boolean(parsed.submittedAt);
 
         if (isExpired || isSubmitted) {
@@ -85,6 +88,25 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
   clearSession: () => {
     persistSession(null);
     set({ session: null, restoredFromStorage: false, nowMs: 0 });
+  },
+  pauseSession: () => {
+    const { session } = get();
+    if (!session || session.pausedAt || session.submittedAt) return;
+    const endsAtMs = new Date(session.endsAt).getTime();
+    const pausedRemainingSeconds = Math.max(0, Math.floor((endsAtMs - Date.now()) / 1000));
+    const next: SimulatedExamSession = { ...session, pausedAt: new Date().toISOString(), pausedRemainingSeconds };
+    persistSession(next);
+    set({ session: next });
+  },
+  resumeSession: () => {
+    const { session } = get();
+    if (!session || !session.pausedAt) return;
+    const remaining = session.pausedRemainingSeconds ?? 0;
+    const newEndsAt = new Date(Date.now() + remaining * 1000).toISOString();
+    const { pausedAt: _pausedAt, pausedRemainingSeconds: _pausedRemaining, ...rest } = session;
+    const next: SimulatedExamSession = { ...rest, endsAt: newEndsAt };
+    persistSession(next);
+    set({ session: next, nowMs: Date.now() });
   },
   acknowledgeRestoredSession: () => {
     if (!get().restoredFromStorage) {
