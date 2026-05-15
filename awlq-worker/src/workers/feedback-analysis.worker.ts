@@ -77,6 +77,14 @@ export function createFeedbackAnalysisWorker(): Worker {
         data: { generationQueued: true },
       });
 
+      await prisma.workerTrigger.createMany({
+        data: analysis.weakAreas.map(() => ({
+          action: "generate",
+          source: "weak_area",
+          certificationPresetId,
+        })),
+      });
+
       logger.info(
         { certificationCode, weakAreas: analysis.weakAreas.length },
         "feedback-analysis: generation jobs enqueued"

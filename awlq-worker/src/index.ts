@@ -8,7 +8,7 @@ import { createFeedbackAnalysisWorker } from "./workers/feedback-analysis.worker
 import { createPerformanceComputeWorker } from "./workers/performance-compute.worker.js";
 import { createQualityReviewWorker } from "./workers/quality-review.worker.js";
 import { createEmailSendWorker } from "./workers/email-send.worker.js";
-import { registerCronJobs, expandCronJob } from "./cron/scheduler.js";
+import { registerCronJobs, expandCronJob, syncCronJobs } from "./cron/scheduler.js";
 import { startTriggerPoller } from "./services/trigger-poller.js";
 import { prisma } from "./prisma.js";
 
@@ -78,6 +78,13 @@ async function main() {
 
   // Poll WorkerTrigger table for manual triggers from the admin UI
   startTriggerPoller();
+
+  // Poll ScheduledJob DB table every 60s and sync with BullMQ repeatable jobs
+  setInterval(() => {
+    syncCronJobs().catch((err) => {
+      logger.error({ err }, "syncCronJobs error");
+    });
+  }, 60_000);
 
   logger.info("aws-quest-worker ready — all workers and cron jobs active");
 

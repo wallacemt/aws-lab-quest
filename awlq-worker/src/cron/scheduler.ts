@@ -1,3 +1,4 @@
+import { Queue } from "bullmq";
 import {
   sourceFetchQueue,
   questionGenerationQueue,
@@ -34,67 +35,137 @@ async function getActiveSources() {
   });
 }
 
+const DEFAULT_JOBS = [
+  {
+    jobId: "cron-source-fetch-daily",
+    name: "Fetch de Fontes (Diario)",
+    description: "Busca todas as fontes de ingestion ativas",
+    queue: "source-fetch",
+    cronPattern: "0 3 * * *",
+    payload: { ingestionSourceId: "__cron__", url: "__cron__", certificationCode: "__cron__" },
+  },
+  {
+    jobId: "cron-feedback-daily",
+    name: "Analise de Feedback (Diario)",
+    description: "Analisa areas fracas por certificacao",
+    queue: "feedback-analysis",
+    cronPattern: "0 4 * * *",
+    payload: { certificationPresetId: "__cron__", certificationCode: "__cron__" },
+  },
+  {
+    jobId: "cron-generation-scheduled",
+    name: "Geracao de Questoes (Diario)",
+    description: "Gera 15 questoes por certificacao ativa",
+    queue: "question-generation",
+    cronPattern: "0 5 * * *",
+    payload: { certificationPresetId: "__cron__", certificationCode: "__cron__", triggerType: "scheduled", domains: [], targetCount: 0 },
+  },
+  {
+    jobId: "cron-performance-hourly",
+    name: "Calculo de Performance (Horario)",
+    description: "Recomputa metricas de qualidade das questoes",
+    queue: "performance-compute",
+    cronPattern: "0 * * * *",
+    payload: {},
+  },
+  {
+    jobId: "cron-source-fetch-weekly",
+    name: "Fetch de Fontes Forcado (Semanal)",
+    description: "Re-busca todas as fontes ignorando cache SHA256",
+    queue: "source-fetch",
+    cronPattern: "0 2 * * 0",
+    payload: { ingestionSourceId: "__cron__", url: "__cron__", certificationCode: "__cron__", force: true },
+  },
+] as const;
+
+function getQueueByName(queue: string): Queue | null {
+  switch (queue) {
+    case "source-fetch": return sourceFetchQueue;
+    case "question-generation": return questionGenerationQueue;
+    case "feedback-analysis": return feedbackAnalysisQueue;
+    case "performance-compute": return performanceComputeQueue;
+    default: return null;
+  }
+}
+
+function getJobNameForQueue(queue: string, jobId: string): string {
+  switch (queue) {
+    case "source-fetch": return jobId === "cron-source-fetch-weekly" ? "source-fetch-weekly-force" : "source-fetch-daily";
+    case "feedback-analysis": return "feedback-analysis-daily";
+    case "question-generation": return "question-generation-scheduled";
+    case "performance-compute": return "performance-compute-hourly";
+    default: return jobId;
+  }
+}
+
 export async function registerCronJobs(): Promise<void> {
-  logger.info("Registering cron jobs");
+  logger.info("Registering cron jobs from DB");
 
-  // ── 03:00 UTC daily: fetch all active sources ─────────────────────────────
-  await sourceFetchQueue.add(
-    "source-fetch-daily",
-    { ingestionSourceId: "__cron__", url: "__cron__", certificationCode: "__cron__" },
-    {
-      repeat: { pattern: "0 3 * * *" },
-      jobId: "cron-source-fetch-daily",
-    }
-  );
+  // Seed default jobs into DB if they don't exist yet
+  for (const def of DEFAULT_JOBS) {
+    await prisma.scheduledJob.upsert({
+      where: { jobId: def.jobId },
+      create: {
+        jobId: def.jobId,
+        name: def.name,
+        description: def.description,
+        queue: def.queue,
+        cronPattern: def.cronPattern,
+        payload: def.payload as object,
+        active: true,
+      },
+      update: {},  // don't overwrite user edits
+    });
+  }
 
-  // ── 04:00 UTC daily: feedback analysis per cert ───────────────────────────
-  await feedbackAnalysisQueue.add(
-    "feedback-analysis-daily",
-    { certificationPresetId: "__cron__", certificationCode: "__cron__", windowDays: config.worker.weakAreaWindowDays },
-    {
-      repeat: { pattern: "0 4 * * *" },
-      jobId: "cron-feedback-daily",
-    }
-  );
-
-  // ── 05:00 UTC daily: scheduled generation per cert ────────────────────────
-  await questionGenerationQueue.add(
-    "question-generation-scheduled",
-    {
-      certificationPresetId: "__cron__",
-      certificationCode: "__cron__",
-      certificationName: "__cron__",
-      triggerType: "scheduled",
-      domains: [],
-      targetCount: 0,
-    },
-    {
-      repeat: { pattern: "0 5 * * *" },
-      jobId: "cron-generation-scheduled",
-    }
-  );
-
-  // ── every hour: recompute QuestionPerformance ─────────────────────────────
-  await performanceComputeQueue.add(
-    "performance-compute-hourly",
-    {},
-    {
-      repeat: { pattern: "0 * * * *" },
-      jobId: "cron-performance-hourly",
-    }
-  );
-
-  // ── 02:00 UTC Sunday: force re-fetch all sources ──────────────────────────
-  await sourceFetchQueue.add(
-    "source-fetch-weekly-force",
-    { ingestionSourceId: "__cron__", url: "__cron__", certificationCode: "__cron__", force: true },
-    {
-      repeat: { pattern: "0 2 * * 0" },
-      jobId: "cron-source-fetch-weekly",
-    }
-  );
-
+  await syncCronJobs();
   logger.info("Cron jobs registered");
+}
+
+export async function syncCronJobs(): Promise<void> {
+  const dbJobs = await prisma.scheduledJob.findMany();
+
+  for (const job of dbJobs) {
+    const queue = getQueueByName(job.queue);
+    if (!queue) {
+      logger.warn({ jobId: job.jobId, queue: job.queue }, "syncCronJobs: unknown queue, skipping");
+      continue;
+    }
+
+    const repeatables = await queue.getRepeatableJobs();
+    const existing = repeatables.find((r) => r.id === job.jobId || r.name === getJobNameForQueue(job.queue, job.jobId));
+
+    if (!job.active) {
+      if (existing) {
+        await queue.removeRepeatableByKey(existing.key);
+        logger.info({ jobId: job.jobId }, "syncCronJobs: removed inactive job");
+      }
+      continue;
+    }
+
+    if (existing && existing.pattern === job.cronPattern) {
+      continue;  // already registered with correct pattern
+    }
+
+    if (existing) {
+      await queue.removeRepeatableByKey(existing.key);
+    }
+
+    const jobName = getJobNameForQueue(job.queue, job.jobId);
+    const payload = (job.payload as Record<string, unknown>) ?? {};
+
+    // Inject windowDays for feedback-analysis
+    if (job.queue === "feedback-analysis" && !payload.windowDays) {
+      payload.windowDays = config.worker.weakAreaWindowDays;
+    }
+
+    await queue.add(jobName, payload, {
+      repeat: { pattern: job.cronPattern },
+      jobId: job.jobId,
+    });
+
+    logger.info({ jobId: job.jobId, pattern: job.cronPattern }, "syncCronJobs: registered job");
+  }
 }
 
 // The cron jobs above use sentinel data. The actual workers detect __cron__ and
@@ -113,6 +184,15 @@ export async function expandCronJob(
         force,
       });
     }
+    if (sources.length > 0) {
+      await prisma.workerTrigger.createMany({
+        data: sources.map((src) => ({
+          action: "fetch-sources",
+          source: "cron",
+          certificationPresetId: null,
+        })),
+      });
+    }
     logger.info({ count: sources.length, force }, "cron: source-fetch expanded");
   }
 
@@ -123,6 +203,15 @@ export async function expandCronJob(
         certificationPresetId: cert.id,
         certificationCode: cert.code,
         windowDays: config.worker.weakAreaWindowDays,
+      });
+    }
+    if (certs.length > 0) {
+      await prisma.workerTrigger.createMany({
+        data: certs.map((cert) => ({
+          action: "analyze-feedback",
+          source: "cron",
+          certificationPresetId: cert.id,
+        })),
       });
     }
     logger.info({ count: certs.length }, "cron: feedback-analysis expanded");
@@ -150,11 +239,23 @@ export async function expandCronJob(
         difficulty: "mixed",
       });
     }
+    if (certs.length > 0) {
+      await prisma.workerTrigger.createMany({
+        data: certs.map((cert) => ({
+          action: "generate",
+          source: "cron",
+          certificationPresetId: cert.id,
+        })),
+      });
+    }
     logger.info({ count: certs.length }, "cron: question-generation expanded");
   }
 
   if (type === "performance-compute") {
     await performanceComputeQueue.add("hourly-compute", {});
+    await prisma.workerTrigger.create({
+      data: { action: "quality-scan", source: "cron" },
+    });
     logger.info("cron: performance-compute enqueued");
   }
 }
