@@ -72,6 +72,16 @@ export type SimulatedExamSession = {
   certificationCode: string;
   locked: boolean;
   submittedAt?: string;
+  pausedAt?: string;
+  pausedRemainingSeconds?: number;
+};
+
+export type SimuladoDraft = {
+  sessionId: string;
+  questions: StudyQuestion[];
+  answers: Record<string, StudyAnswerValue | undefined>;
+  currentIndex: number;
+  markedForReview: string[];
 };
 
 export type ActiveQuest = {

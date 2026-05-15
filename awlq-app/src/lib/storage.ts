@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   history: "awlq_history",
   draftQuest: "awlq_draft_quest",
   activeSimulatedExam: "awlq_active_simulated_exam",
+  simuladoDraft: "awlq_simulado_draft",
   kcAttempts: "awlq_kc_attempts",
   simuladoRulesConsent: "awlq_simulado_rules_consent",
 } as const;
