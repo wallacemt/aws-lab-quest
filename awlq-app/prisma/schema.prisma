@@ -591,6 +591,7 @@ model WeakAreaReport {
 model WorkerTrigger {
   id                    String    @id @default(cuid())
   action                String
+  source                String    @default("manual") // "manual" | "cron" | "weak_area"
   certificationPresetId String?
   payload               Json?
   processed             Boolean   @default(false)
@@ -598,4 +599,26 @@ model WorkerTrigger {
   createdAt             DateTime  @default(now())
 
   @@index([processed, createdAt])
+  @@index([source, createdAt])
+}
+
+model ScheduledJob {
+  id          String   @id @default(cuid())
+  jobId       String   @unique
+  name        String
+  description String?
+  queue       String
+  cronPattern String
+  payload     Json?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
+}
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
