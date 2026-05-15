@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData();
   const certificationCode = String(formData.get("certificationCode") ?? "").trim();
+  const rawUploadType = String(formData.get("uploadType") ?? "simulado_generation");
+  const uploadTypeMap: Record<string, "EXAM_GUIDE" | "SIMULADO_PDF" | "SIMULADO_GENERATION"> = {
+    exam_guide: "EXAM_GUIDE",
+    simulate_pdf: "SIMULADO_PDF",
+    simulado_generation: "SIMULADO_GENERATION",
+  };
+  const resolvedUploadType = uploadTypeMap[rawUploadType] ?? "SIMULADO_GENERATION";
   const files = formData.getAll("files").filter((item): item is File => item instanceof File && item.size > 0);
 
   if (!certificationCode) {
@@ -61,7 +68,7 @@ export async function POST(request: NextRequest) {
   }
 
   const job = await createIngestionJob({
-    uploadType: "SIMULADO_GENERATION",
+    uploadType: resolvedUploadType,
     createdByUserId: adminCheck.userId,
     certificationPresetId: certification.id,
     status: "UPLOADING",
@@ -80,13 +87,13 @@ export async function POST(request: NextRequest) {
       const storage = await uploadAdminFileToSupabase({
         fileName: file.name,
         certificationCode,
-        uploadType: "SIMULADO_PDF",
+        uploadType: resolvedUploadType,
         buffer,
         mimeType: file.type || "application/octet-stream",
       });
 
       const uploaded = await createUploadedFileRecord({
-        uploadType: "SIMULADO_PDF",
+        uploadType: resolvedUploadType,
         certificationPresetId: certification.id,
         uploadedByUserId: adminCheck.userId,
         fileName: file.name,

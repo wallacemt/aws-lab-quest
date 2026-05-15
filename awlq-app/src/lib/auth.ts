@@ -36,6 +36,27 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          try {
+            const cfg = await prisma.systemConfig.findUnique({
+              where: { key: "auto_approve_users" },
+            });
+            if (cfg?.value === "true") {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { accessStatus: "approved" },
+              });
+            }
+          } catch {
+            // Non-fatal: user was created, auto-approve just failed
+          }
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,

@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
+function parsePageParam(value: string | null, fallback: number): number {
+  const n = parseInt(value ?? "", 10);
+  return isNaN(n) || n < 1 ? fallback : n;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAdmin(request);
     if (!authResult.ok) return authResult.response;
+
+    const historyPage = parsePageParam(request.nextUrl.searchParams.get("historyPage"), 1);
+    const historyPageSize = Math.min(50, parsePageParam(request.nextUrl.searchParams.get("historyPageSize"), 20));
+    const historySkip = (historyPage - 1) * historyPageSize;
 
     const [
       ingestionSources,
@@ -14,6 +23,7 @@ export async function GET(request: NextRequest) {
       performanceStats,
       certifications,
       triggerHistory,
+      triggerHistoryTotal,
       triggerStats,
     ] = await Promise.all([
       prisma.ingestionSource.findMany({
@@ -60,16 +70,19 @@ export async function GET(request: NextRequest) {
       }),
       prisma.workerTrigger.findMany({
         orderBy: { createdAt: "desc" },
-        take: 20,
+        skip: historySkip,
+        take: historyPageSize,
         select: {
           id: true,
           action: true,
+          source: true,
           certificationPresetId: true,
           processed: true,
           processedAt: true,
           createdAt: true,
         },
       }),
+      prisma.workerTrigger.count(),
       prisma.workerTrigger.groupBy({
         by: ["action", "processed"],
         _count: { id: true },
@@ -113,6 +126,10 @@ export async function GET(request: NextRequest) {
       performance: { flagged, improved, retired },
       certifications,
       triggerHistory,
+      triggerHistoryPage: historyPage,
+      triggerHistoryPageSize: historyPageSize,
+      triggerHistoryTotal,
+      triggerHistoryTotalPages: Math.max(1, Math.ceil(triggerHistoryTotal / historyPageSize)),
       queueStats,
     });
   } catch (error) {
