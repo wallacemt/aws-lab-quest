@@ -289,6 +289,55 @@ function isValidOptionLabel(value: string): value is "A" | "B" | "C" | "D" | "E"
   return value === "A" || value === "B" || value === "C" || value === "D" || value === "E";
 }
 
+export async function GET(request: NextRequest, context: RouteContext) {
+  const adminCheck = await requireAdmin(request);
+  if (!adminCheck.ok) return adminCheck.response;
+
+  const { questionId } = await context.params;
+
+  const item = await prisma.studyQuestion.findUnique({
+    where: { id: questionId },
+    select: {
+      id: true,
+      externalId: true,
+      statement: true,
+      topic: true,
+      difficulty: true,
+      questionType: true,
+      usage: true,
+      active: true,
+      correctOption: true,
+      correctOptions: true,
+      optionA: true,
+      optionB: true,
+      optionC: true,
+      optionD: true,
+      optionE: true,
+      explanationA: true,
+      explanationB: true,
+      explanationC: true,
+      explanationD: true,
+      explanationE: true,
+      createdAt: true,
+      certificationPreset: { select: { code: true, name: true } },
+      awsService: { select: { code: true, name: true } },
+      questionOptions: {
+        select: { order: true, content: true, isCorrect: true, explanation: true },
+        orderBy: { order: "asc" },
+      },
+      questionAwsServices: {
+        select: { service: { select: { code: true, name: true } } },
+      },
+    },
+  });
+
+  if (!item) {
+    return NextResponse.json({ error: "Questao nao encontrada." }, { status: 404 });
+  }
+
+  return NextResponse.json({ question: toResponseQuestion(item) });
+}
+
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {

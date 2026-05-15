@@ -119,4 +119,13 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     displayOrder: 12,
     prompt: "pixel-art legendary badge, radiant golden cloud dragon emblem, premium arcade icon, textless, high detail",
   },
+  {
+    code: "first_real_cert",
+    name: "Certificado Real",
+    description: "Registrar sua primeira certificacao AWS aprovada.",
+    rarity: "epic",
+    target: 1,
+    displayOrder: 13,
+    prompt: "pixel-art badge, golden aws certification stamp, diploma scroll with cloud seal, epic glow, textless",
+  },
 ];

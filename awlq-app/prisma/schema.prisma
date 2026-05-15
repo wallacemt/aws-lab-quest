@@ -45,6 +45,7 @@ model User {
   ingestionJobs           AdminIngestionJob[]
   questionReports         QuestionReport[]      @relation("QuestionReportAuthor")
   reviewedQuestionReports QuestionReport[]      @relation("QuestionReportReviewer")
+  certBadges              UserCertBadge[]
 
   @@index([accessStatus, active])
   @@map("user")
@@ -127,6 +128,7 @@ model CertificationPreset {
   ingestionSources IngestionSource[]
   blueprintDomains ExamBlueprintDomain[]
   weakAreaReports  WeakAreaReport[]
+  certBadges       UserCertBadge[]
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
 }
@@ -621,4 +623,17 @@ model SystemConfig {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model UserCertBadge {
+  id                    String               @id @default(cuid())
+  userId                String
+  certificationPresetId String?
+  badgeUrl              String
+  earnedAt              DateTime             @default(now())
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certificationPreset   CertificationPreset? @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
+  createdAt             DateTime             @default(now())
+
+  @@index([userId])
 }

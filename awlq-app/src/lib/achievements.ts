@@ -75,9 +75,10 @@ function getConsecutiveDaysMax(dates: Date[]): number {
   return maxStreak;
 }
 
-function computeMetrics(input: { questHistory: QuestEvent[]; studyHistory: StudyEvent[] }): MetricMap {
+function computeMetrics(input: { questHistory: QuestEvent[]; studyHistory: StudyEvent[]; certBadgesCount: number }): MetricMap {
   const questHistory = input.questHistory;
   const studyHistory = input.studyHistory;
+  const certBadgesCount = input.certBadgesCount;
 
   const kcSessions = studyHistory.filter((item) => item.sessionType === "KC");
   const simuladoSessions = studyHistory.filter((item) => item.sessionType === "SIMULADO");
@@ -109,6 +110,7 @@ function computeMetrics(input: { questHistory: QuestEvent[]; studyHistory: Study
       current: (totalXp >= 5000 ? 1 : 0) + (simuladoPassed.length >= 5 ? 1 : 0),
       unlocked: totalXp >= 5000 && simuladoPassed.length >= 5,
     },
+    first_real_cert: { current: certBadgesCount, unlocked: certBadgesCount >= 1 },
   };
 }
 
@@ -140,7 +142,7 @@ export async function ensureAchievementCatalog() {
 }
 
 async function getUserEvents(userId: string) {
-  const [questHistory, studyHistory] = await Promise.all([
+  const [questHistory, studyHistory, certBadgesCount] = await Promise.all([
     prisma.questHistory.findMany({
       where: { userId },
       select: { completedAt: true, xp: true },
@@ -158,6 +160,7 @@ async function getUserEvents(userId: string) {
       orderBy: { completedAt: "asc" },
       take: 2000,
     }),
+    prisma.userCertBadge.count({ where: { userId } }),
   ]);
 
   return {
@@ -166,6 +169,7 @@ async function getUserEvents(userId: string) {
       ...item,
       sessionType: item.sessionType as "KC" | "SIMULADO",
     })),
+    certBadgesCount,
   };
 }
 
