@@ -33,6 +33,7 @@ export type AdminUserListItem = {
   lastSeen: string;
   profile: {
     certification: string;
+    certificationPresetId: string | null;
     certificationPreset: {
       code: string;
       name: string;
@@ -64,10 +65,12 @@ export type AdminUsersListParams = {
 
 export type AdminUserUpdatePayload = {
   name?: string;
+  username?: string;
   role?: string;
   accessStatus?: "pending" | "approved" | "rejected";
   accessDecisionReason?: string;
   active?: boolean;
+  certificationPresetId?: string | null;
 };
 
 export type AdminQuestionsListParams = {

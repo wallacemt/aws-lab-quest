@@ -1,28 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  approveAdminUser,
-  deactivateAdminUser,
-  listAdminUsers,
-  rejectAdminUser,
-  updateAdminUser,
-} from "@/features/admin/services/admin-api";
-import { AdminUserListItem, PaginatedResult } from "@/features/admin/types";
-import { EditIcon } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-type CertificationOption = {
-  id: string;
-  code: string;
-  name: string;
-};
+import { listAdminUsers } from "@/features/admin/services/admin-api";
+import { AdminUserEditModal } from "@/features/admin/components/AdminUserEditModal";
+import { AdminUserListItem, CertificationOption, PaginatedResult } from "@/features/admin/types";
 
 export function AdminUsersScreen() {
   const [search, setSearch] = useState("");
@@ -35,17 +16,16 @@ export function AdminUsersScreen() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [globalMessage, setGlobalMessage] = useState<string | null>(null);
   const [result, setResult] = useState<PaginatedResult<AdminUserListItem> | null>(null);
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [autoApprove, setAutoApprove] = useState<boolean | null>(null);
   const [autoApproveLoading, setAutoApproveLoading] = useState(false);
+  const [editingUser, setEditingUser] = useState<AdminUserListItem | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
       const data = await listAdminUsers({
         page,
@@ -69,16 +49,8 @@ export function AdminUsersScreen() {
   useEffect(() => {
     async function loadCertifications() {
       try {
-        const response = await fetch("/api/certifications", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
+        const response = await fetch("/api/certifications", { method: "GET", cache: "no-store", credentials: "include" });
+        if (!response.ok) return;
         const payload = (await response.json()) as { certifications?: CertificationOption[] };
         setCertifications(payload.certifications ?? []);
       } catch {
@@ -115,7 +87,7 @@ export function AdminUsersScreen() {
       });
       if (!res.ok) throw new Error();
     } catch {
-      setAutoApprove(!next); // revert on error
+      setAutoApprove(!next);
     } finally {
       setAutoApproveLoading(false);
     }
@@ -125,89 +97,22 @@ export function AdminUsersScreen() {
     void loadUsers();
   }, [loadUsers]);
 
-  async function handleApprove(userId: string) {
-    setBusyUserId(userId);
-    setGlobalMessage(null);
-    try {
-      await approveAdminUser(userId);
-      setGlobalMessage("Usuario aprovado com sucesso.");
-      await loadUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao aprovar usuario.");
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function handleReject(userId: string) {
-    const reason = window.prompt("Motivo da recusa (opcional):", "");
-    setBusyUserId(userId);
-    setGlobalMessage(null);
-    try {
-      await rejectAdminUser(userId, reason ?? undefined);
-      setGlobalMessage("Usuario recusado.");
-      await loadUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao recusar usuario.");
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function handleEdit(item: AdminUserListItem) {
-    const name = window.prompt("Nome do usuario:", item.name);
-    if (!name || !name.trim()) {
-      return;
-    }
-
-    setBusyUserId(item.id);
-    try {
-      await updateAdminUser(item.id, { name: name.trim() });
-      setGlobalMessage("Usuario atualizado.");
-      await loadUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao atualizar usuario.");
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function handleToggleRole(item: AdminUserListItem) {
-    const nextRole = item.role === "admin" ? "user" : "admin";
-    setBusyUserId(item.id);
-    try {
-      await updateAdminUser(item.id, { role: nextRole });
-      setGlobalMessage(`Role atualizada para ${nextRole}.`);
-      await loadUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao atualizar role.");
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function handleDeactivate(userId: string) {
-    if (!window.confirm("Deseja desativar este usuario?")) {
-      return;
-    }
-
-    setBusyUserId(userId);
-    try {
-      await deactivateAdminUser(userId);
-      setGlobalMessage("Usuario desativado.");
-      await loadUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao desativar usuario.");
-    } finally {
-      setBusyUserId(null);
-    }
+  function statusBadge(status: AdminUserListItem["accessStatus"]) {
+    const map = {
+      approved: "border-[#14532d] bg-green-900/20 text-green-300",
+      rejected: "border-[#7f1d1d] bg-red-900/20 text-red-300",
+      pending: "border-yellow-600 bg-yellow-900/20 text-yellow-300",
+    };
+    return (
+      <span className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase ${map[status]}`}>{status}</span>
+    );
   }
 
   return (
     <main className="space-y-5">
       <header className="space-y-2">
         <p className="font-mono text-xs uppercase text-[#f97316]">Usuarios</p>
-        <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Listagem de usuarios</h1>
+        <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Gerenciamento de usuarios</h1>
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -227,46 +132,34 @@ export function AdminUsersScreen() {
                   : "bg-[#1e293b] text-[#64748b] hover:bg-green-900/60 hover:text-green-300"
               }`}
             >
-              <span
-                className={`inline-block h-2 w-2 rounded-full ${autoApprove ? "bg-green-400" : "bg-[#475569]"}`}
-              />
+              <span className={`inline-block h-2 w-2 rounded-full ${autoApprove ? "bg-green-400" : "bg-[#475569]"}`} />
               Auto-aprovar novos usuarios: {autoApprove ? "Ativo" : "Inativo"}
             </button>
           )}
         </div>
       </header>
 
+      {/* Filters */}
       <section className="border border-[#1e293b] bg-[#111827] p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <input
             value={search}
-            onChange={(event) => {
-              setPage(1);
-              setSearch(event.target.value);
-            }}
+            onChange={(e) => { setPage(1); setSearch(e.target.value); }}
             placeholder="Buscar por nome, username ou email"
             className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
           />
-
           <select
             value={role}
-            onChange={(event) => {
-              setPage(1);
-              setRole(event.target.value);
-            }}
+            onChange={(e) => { setPage(1); setRole(e.target.value); }}
             className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
           >
             <option value="">Todas as roles</option>
             <option value="admin">Admin</option>
             <option value="user">User</option>
           </select>
-
           <select
             value={accessStatus}
-            onChange={(event) => {
-              setPage(1);
-              setAccessStatus(event.target.value as "" | "pending" | "approved" | "rejected");
-            }}
+            onChange={(e) => { setPage(1); setAccessStatus(e.target.value as typeof accessStatus); }}
             className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
           >
             <option value="">Todos os status</option>
@@ -274,43 +167,29 @@ export function AdminUsersScreen() {
             <option value="approved">approved</option>
             <option value="rejected">rejected</option>
           </select>
-
           <select
             value={active}
-            onChange={(event) => {
-              setPage(1);
-              setActive(event.target.value as "" | "true" | "false");
-            }}
+            onChange={(e) => { setPage(1); setActive(e.target.value as typeof active); }}
             className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
           >
             <option value="">Ativos e inativos</option>
             <option value="true">Somente ativos</option>
             <option value="false">Somente inativos</option>
           </select>
-
           <select
             value={certificationCode}
-            onChange={(event) => {
-              setPage(1);
-              setCertificationCode(event.target.value);
-            }}
+            onChange={(e) => { setPage(1); setCertificationCode(e.target.value); }}
             className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
           >
             <option value="">Todas as certificacoes</option>
-            {certifications.map((certification) => (
-              <option key={certification.id} value={certification.code}>
-                {certification.code}
-              </option>
+            {certifications.map((c) => (
+              <option key={c.id} value={c.code}>{c.code}</option>
             ))}
           </select>
-
           <div className="grid grid-cols-2 gap-2">
             <select
               value={sortBy}
-              onChange={(event) => {
-                setPage(1);
-                setSortBy(event.target.value as "createdAt" | "lastSeen" | "name" | "email" | "role");
-              }}
+              onChange={(e) => { setPage(1); setSortBy(e.target.value as typeof sortBy); }}
               className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
             >
               <option value="createdAt">Cadastro</option>
@@ -321,10 +200,7 @@ export function AdminUsersScreen() {
             </select>
             <select
               value={sortOrder}
-              onChange={(event) => {
-                setPage(1);
-                setSortOrder(event.target.value as "asc" | "desc");
-              }}
+              onChange={(e) => { setPage(1); setSortOrder(e.target.value as "asc" | "desc"); }}
               className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
             >
               <option value="desc">Desc</option>
@@ -341,7 +217,7 @@ export function AdminUsersScreen() {
       {!loading && result && (
         <>
           <section className="overflow-x-auto border border-[#1e293b] bg-[#111827]">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[800px] text-left text-sm">
               <thead className="border-b border-[#1e293b] bg-[#0f172a] text-xs uppercase text-[#94a3b8]">
                 <tr>
                   <th className="px-3 py-2">Usuario</th>
@@ -357,80 +233,48 @@ export function AdminUsersScreen() {
               </thead>
               <tbody>
                 {result.items.map((item) => (
-                  <tr key={item.id} className="border-b border-[#1e293b] text-[#e2e8f0]">
-                    <td className="px-3 py-2">{item.name}</td>
-                    <td className="px-3 py-2">{item.email}</td>
-                    <td className="px-3 py-2 uppercase">{item.role}</td>
-                    <td className="px-3 py-2 uppercase">{item.accessStatus}</td>
-                    <td className="px-3 py-2 uppercase">{item.active ? "sim" : "nao"}</td>
-                    <td className="px-3 py-2">{item._count.questHistory}</td>
-                    <td className="px-3 py-2">{item._count.studyHistory}</td>
-                    <td className="px-3 py-2">{new Date(item.lastSeen).toLocaleString()}</td>
+                  <tr key={item.id} className="border-b border-[#1e293b] text-[#e2e8f0] hover:bg-white/[0.02]">
                     <td className="px-3 py-2">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          asChild
-                          className="flex items-center justify-center hover:border-[var(--pixel-primary)]"
-                        >
-                          <div
-                            className="h-12 w-12 overflow-hidden border-4 border-[var(--pixel-border)] shadow-[4px_4px_0_0_var(--pixel-shadow)] rounded-full"
-                            aria-label="Acoes do usuario"
-                            title="Acoes do usuario"
-                          >
-                            <EditIcon />
-                          </div>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-45 font-mono flex flex-col items-center justify-center bg-pixel-shadow retro-border border-2 rounded-lg"
-                        >
-                          <DropdownMenuGroup className="space-y-1">
-                            <DropdownMenuItem onClick={() => void handleEdit(item)} disabled={busyUserId === item.id}>
-                              <div className="border border-[#334155] px-2 py-1 text-[10px] uppercase disabled:opacity-40 rounded-md">
-                                Editar
-                              </div>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuGroup className="mt-2 space-y-1">
-                              <DropdownMenuItem
-                                onClick={() => void handleApprove(item.id)}
-                                disabled={busyUserId === item.id || item.accessStatus === "approved"}
-                              >
-                                <div className="border border-[#14532d] px-2 py-1 text-[10px] uppercase disabled:opacity-40 rounded-md">
-                                  Aprovar
-                                </div>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => void handleReject(item.id)}
-                                disabled={busyUserId === item.id}
-                              >
-                                <div className="border border-[#7f1d1d] px-2 py-1 text-[10px] uppercase disabled:opacity-40 rounded-md">
-                                  Recusar
-                                </div>
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-
-                            <DropdownMenuGroup className="mt-2 space-y-1">
-                              <DropdownMenuItem
-                                onClick={() => void handleToggleRole(item)}
-                                disabled={busyUserId === item.id}
-                              >
-                                <div className="border border-[#1d4ed8] px-2 py-1 text-[10px] uppercase disabled:opacity-40 rounded-md">
-                                  Alterar role
-                                </div>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => void handleDeactivate(item.id)}
-                                disabled={busyUserId === item.id || !item.active}
-                              >
-                                <div className="border border-[#9a3412] px-2 py-1 text-[10px] uppercase disabled:opacity-40 rounded-md">
-                                  Desativar
-                                </div>
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                          </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div>
+                        <p className="text-sm">{item.name}</p>
+                        {item.username && (
+                          <p className="text-xs text-[#64748b]">@{item.username}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[#94a3b8]">{item.email}</td>
+                    <td className="px-3 py-2">
+                      <span className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase ${
+                        item.role === "admin"
+                          ? "border-[#1d4ed8] bg-blue-900/20 text-blue-300"
+                          : "border-[#334155] text-[#64748b]"
+                      }`}>
+                        {item.role}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">{statusBadge(item.accessStatus)}</td>
+                    <td className="px-3 py-2">
+                      <span className={`border px-1.5 py-0.5 font-mono text-[10px] ${
+                        item.active
+                          ? "border-[#14532d] bg-green-900/20 text-green-400"
+                          : "border-[#7f1d1d] bg-red-900/20 text-red-400"
+                      }`}>
+                        {item.active ? "sim" : "nao"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center font-mono text-xs">{item._count.questHistory}</td>
+                    <td className="px-3 py-2 text-center font-mono text-xs">{item._count.studyHistory}</td>
+                    <td className="px-3 py-2 text-xs text-[#64748b]">
+                      {new Date(item.lastSeen).toLocaleDateString("pt-BR")}
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => { setGlobalMessage(null); setEditingUser(item); }}
+                        className="border border-[#334155] px-3 py-1 font-mono text-[10px] uppercase text-[#94a3b8] transition-colors hover:border-[#f97316] hover:text-[#f97316]"
+                      >
+                        Gerenciar
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -463,6 +307,16 @@ export function AdminUsersScreen() {
           </footer>
         </>
       )}
+
+      <AdminUserEditModal
+        user={editingUser}
+        certificationOptions={certifications}
+        onClose={() => setEditingUser(null)}
+        onSaved={() => {
+          setGlobalMessage("Usuario atualizado com sucesso.");
+          void loadUsers();
+        }}
+      />
     </main>
   );
 }

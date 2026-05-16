@@ -122,6 +122,21 @@ export async function updateAdminUser(userId: string, payload: AdminUserUpdatePa
   }
 }
 
+export async function setAdminUserPassword(userId: string, password: string): Promise<void> {
+  const response = await fetch(`/api/admin/users/${userId}/set-password`, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error ?? "Nao foi possivel definir a senha.");
+  }
+}
+
 export async function deactivateAdminUser(userId: string): Promise<void> {
   const response = await fetch(`/api/admin/users/${userId}`, {
     method: "DELETE",
