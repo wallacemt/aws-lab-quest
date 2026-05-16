@@ -122,6 +122,7 @@ export async function GET(request: NextRequest) {
         profile: {
           select: {
             certification: true,
+            certificationPresetId: true,
             certificationPreset: {
               select: {
                 code: true,

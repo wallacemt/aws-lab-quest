@@ -9,10 +9,12 @@ type RouteContext = {
 
 type PatchBody = {
   name?: string;
+  username?: string;
   role?: string;
   accessStatus?: "pending" | "approved" | "rejected";
   accessDecisionReason?: string;
   active?: boolean;
+  certificationPresetId?: string | null;
 };
 
 async function ensureNotLastActiveAdmin(userId: string, nextRole?: string, nextActive?: boolean): Promise<boolean> {
@@ -62,6 +64,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   const data: {
     name?: string;
+    username?: string | null;
     role?: string;
     accessStatus?: "pending" | "approved" | "rejected";
     accessDecisionReason?: string;
@@ -71,6 +74,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   if (typeof body.name === "string" && body.name.trim()) {
     data.name = body.name.trim();
+  }
+
+  if (typeof body.username === "string") {
+    data.username = body.username.trim() || null;
   }
 
   if (typeof body.role === "string" && body.role.trim()) {
@@ -88,6 +95,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   await prisma.user.update({ where: { id: userId }, data });
+
+  if ("certificationPresetId" in body) {
+    const presetId = body.certificationPresetId ?? null;
+    await prisma.userProfile.upsert({
+      where: { userId },
+      create: { userId, certificationPresetId: presetId, certification: "" },
+      update: { certificationPresetId: presetId },
+    });
+  }
 
   devAuditLog("admin.users.patch.completed", {
     adminUserId: adminCheck.userId,

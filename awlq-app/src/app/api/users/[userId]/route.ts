@@ -80,6 +80,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const achievements = await getUserAchievementSummary(userId);
 
+  const certBadges = await prisma.userCertBadge.findMany({
+    where: { userId },
+    orderBy: { earnedAt: "asc" },
+    select: {
+      id: true,
+      badgeUrl: true,
+      badgeImageUrl: true,
+      earnedAt: true,
+      certificationPreset: { select: { code: true, name: true } },
+    },
+  });
+
   return NextResponse.json({
     user: {
       id: user.id,
@@ -99,5 +111,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     history,
     studyHistory,
     achievements,
+    certBadges,
   });
 }

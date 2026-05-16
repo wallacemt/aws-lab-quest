@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       badgeUrl: true,
+      badgeImageUrl: true,
       earnedAt: true,
       certificationPreset: { select: { code: true, name: true } },
     },
@@ -25,7 +26,11 @@ export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = (await request.json()) as { badgeUrl?: string; certificationPresetId?: string | null };
+  const body = (await request.json()) as {
+    badgeUrl?: string;
+    certificationPresetId?: string | null;
+    badgeImageUrl?: string | null;
+  };
 
   const badgeUrl = typeof body.badgeUrl === "string" ? body.badgeUrl.trim() : "";
   if (!badgeUrl) {
@@ -38,6 +43,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "badgeUrl invalido." }, { status: 400 });
   }
 
+  const badgeImageUrl = typeof body.badgeImageUrl === "string" && body.badgeImageUrl.trim()
+    ? body.badgeImageUrl.trim()
+    : null;
+
   const userId = session.user.id;
 
   const prevCount = await prisma.userCertBadge.count({ where: { userId } });
@@ -46,11 +55,13 @@ export async function POST(request: NextRequest) {
     data: {
       userId,
       badgeUrl,
+      badgeImageUrl,
       certificationPresetId: body.certificationPresetId ?? null,
     },
     select: {
       id: true,
       badgeUrl: true,
+      badgeImageUrl: true,
       earnedAt: true,
       certificationPreset: { select: { code: true, name: true } },
     },
