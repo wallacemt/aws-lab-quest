@@ -20,11 +20,13 @@ import { getLevel, getLevelProgressPercent } from "@/lib/levels";
 import { clearOnboardingStep, getOnboardingStep, setOnboardingStep } from "@/lib/onboarding";
 import { AchievementItem } from "@/lib/achievements";
 import { CertificationAchievementModal } from "@/features/user/components/CertificationAchievementModal";
+import { CertBadgeEditModal } from "@/features/user/components/CertBadgeEditModal";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
 
 type CertBadge = {
   id: string;
   badgeUrl: string;
+  badgeImageUrl: string | null;
   earnedAt: string;
   certificationPreset: { code: string; name: string } | null;
 };
@@ -58,6 +60,7 @@ export function ProfileScreen() {
   const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [certBadges, setCertBadges] = useState<CertBadge[]>([]);
   const [certAchievementOpen, setCertAchievementOpen] = useState(false);
+  const [editingBadge, setEditingBadge] = useState<CertBadge | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
   const showWelcome = hydrated && !isProfileComplete && !getOnboardingStep();
@@ -291,7 +294,7 @@ export function ProfileScreen() {
             </div>
             <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">{currentLevel.next}</p>
           </div>
-
+              
           {/* Level badge image — animated */}
           <AnimatePresence>
             {currentBadge?.imageUrl && (
@@ -366,25 +369,61 @@ export function ProfileScreen() {
               Passou na sua prova? Registre aqui!
             </button>
           ) : (
-            <div className="space-y-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {certBadges.map((badge) => (
-                <div key={badge.id} className="flex items-center justify-between gap-3 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="font-mono text-sm text-[var(--pixel-primary)]">
+                <div
+                  key={badge.id}
+                  className="group flex items-center gap-3 border border-amber-500/30 bg-amber-900/10 p-3 transition-all hover:border-amber-400/40"
+                >
+                  {/* Badge image */}
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden border border-amber-500/40 bg-amber-900/30">
+                    {badge.badgeImageUrl ? (
+                      <Image
+                        src={badge.badgeImageUrl}
+                        alt={badge.certificationPreset?.name ?? "badge"}
+                        width={56}
+                        height={56}
+                        className="h-full w-full object-contain p-1"
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="text-xl">🎓</span>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-mono text-xs text-amber-300">
                       {badge.certificationPreset?.name ?? "Certificacao AWS"}
                     </p>
-                    <p className="text-xs text-[var(--pixel-subtext)]">
+                    {badge.certificationPreset?.code && (
+                      <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
+                        {badge.certificationPreset.code}
+                      </p>
+                    )}
+                    <p className="font-mono text-[9px] text-[var(--pixel-subtext)]">
                       {new Date(badge.earnedAt).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
-                  <a
-                    href={badge.badgeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 border border-[var(--pixel-border)] px-2 py-1 font-mono text-[9px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]"
-                  >
-                    Ver badge
-                  </a>
+
+                  {/* Actions */}
+                  <div className="flex shrink-0 flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingBadge(badge)}
+                      className="border border-[#334155] px-2 py-1 font-mono text-[9px] uppercase text-[#64748b] transition-colors hover:border-amber-500/50 hover:text-amber-400"
+                    >
+                      Editar
+                    </button>
+                    <a
+                      href={badge.badgeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="border border-[#334155] px-2 py-1 font-mono text-[9px] uppercase text-[#64748b] transition-colors hover:border-[#475569] hover:text-[#94a3b8]"
+                    >
+                      Ver
+                    </a>
+                  </div>
                 </div>
               ))}
             </div>
@@ -496,6 +535,18 @@ export function ProfileScreen() {
           onClose={() => setCertAchievementOpen(false)}
           certificationOptions={certificationOptions}
           onBadgeAdded={(badge) => setCertBadges((prev) => [badge, ...prev])}
+        />
+
+        <CertBadgeEditModal
+          badge={editingBadge}
+          certificationOptions={certificationOptions}
+          onClose={() => setEditingBadge(null)}
+          onSaved={(updated) =>
+            setCertBadges((prev) => prev.map((b) => (b.id === updated.id ? updated : b)))
+          }
+          onDeleted={(id) =>
+            setCertBadges((prev) => prev.filter((b) => b.id !== id))
+          }
         />
       </main>
     </AppLayout>

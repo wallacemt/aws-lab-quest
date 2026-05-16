@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -54,11 +54,124 @@ type StudyEntry = {
   completedAt: string;
 };
 
+type CertBadge = {
+  id: string;
+  badgeUrl: string;
+  badgeImageUrl: string | null;
+  earnedAt: string;
+  certificationPreset: { code: string; name: string } | null;
+};
+
 type PublicAchievements = {
   total: number;
   unlockedCount: number;
   items: AchievementItem[];
 };
+
+function TiltBadgeCard({ badge }: { badge: CertBadge }) {
+  const cardRef = useRef<HTMLAnchorElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [hovered, setHovered] = useState(false);
+  const rafRef = useRef<number | null>(null);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = (e.clientX - cx) / (rect.width / 2);
+    const dy = (e.clientY - cy) / (rect.height / 2);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      setTilt({ x: dy * -12, y: dx * 12 });
+    });
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    setTilt({ x: 0, y: 0 });
+    setHovered(false);
+  }, []);
+
+  return (
+    <motion.a
+      ref={cardRef}
+      href={badge.badgeUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={handleMouseLeave}
+      animate={{ rotateX: tilt.x, rotateY: tilt.y, scale: hovered ? 1.04 : 1 }}
+      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      style={{ transformStyle: "preserve-3d", perspective: 800 }}
+      initial={{ opacity: 0, scale: 0.9 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      className="group relative flex items-center gap-3 overflow-hidden border border-amber-500/30 bg-amber-900/10 p-3 hover:border-amber-400/70"
+    >
+      {/* Sheen layer that follows tilt */}
+      <div
+        className="pointer-events-none absolute inset-0 transition-opacity duration-300"
+        style={{
+          opacity: hovered ? 0.12 : 0,
+          background: `radial-gradient(circle at ${50 + tilt.y * 3}% ${50 + tilt.x * 3}%, rgba(251,191,36,0.9) 0%, transparent 70%)`,
+        }}
+      />
+
+      {/* Badge image or fallback */}
+      <div
+        className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden border border-amber-500/40 bg-amber-900/30"
+        style={{ transform: "translateZ(16px)" }}
+      >
+        {badge.badgeImageUrl ? (
+          <Image
+            src={badge.badgeImageUrl}
+            alt={badge.certificationPreset?.name ?? "badge"}
+            width={56}
+            height={56}
+            className="h-full w-full object-contain p-1 transition-transform duration-500 group-hover:scale-110"
+            unoptimized
+          />
+        ) : (
+          <span className="text-xl transition-transform duration-300 group-hover:scale-110">🎓</span>
+        )}
+        {/* Gloss overlay on the image */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
+      </div>
+
+      {/* Text */}
+      <div className="min-w-0 flex-1" style={{ transform: "translateZ(8px)" }}>
+        <p className="truncate font-mono text-xs text-amber-300">
+          {badge.certificationPreset?.name ?? badge.certificationPreset?.code ?? "Certificacao AWS"}
+        </p>
+        {badge.certificationPreset?.code && (
+          <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
+            {badge.certificationPreset.code}
+          </p>
+        )}
+        <p className="font-mono text-[9px] text-[var(--pixel-subtext)]">
+          {new Date(badge.earnedAt).toLocaleDateString("pt-BR")}
+        </p>
+      </div>
+
+      {/* External link icon */}
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        className="shrink-0 text-amber-500/50 transition-colors group-hover:text-amber-400"
+        style={{ transform: "translateZ(8px)" }}
+      >
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        <polyline points="15 3 21 3 21 9" />
+        <line x1="10" y1="14" x2="21" y2="3" />
+      </svg>
+    </motion.a>
+  );
+}
 
 export function PublicProfileScreen() {
   const params = useParams();
@@ -70,6 +183,7 @@ export function PublicProfileScreen() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [studyHistory, setStudyHistory] = useState<StudyEntry[]>([]);
   const [achievements, setAchievements] = useState<PublicAchievements | null>(null);
+  const [certBadges, setCertBadges] = useState<CertBadge[]>([]);
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -91,6 +205,7 @@ export function PublicProfileScreen() {
         setHistory(userData.history ?? []);
         setStudyHistory(userData.studyHistory ?? []);
         setAchievements(userData.achievements ?? null);
+        setCertBadges((userData.certBadges as CertBadge[]) ?? []);
         setLevelBadges(badgesData.badges ?? []);
       })
       .catch(() => setNotFound(true))
@@ -230,6 +345,36 @@ export function PublicProfileScreen() {
             </AnimatePresence>
           </PixelCard>
         </motion.div>
+
+        {/* Real AWS Certifications */}
+        {certBadges.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.4 }}
+          >
+            <PixelCard className="space-y-4 border-amber-500/50 bg-amber-900/10">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🏆</span>
+                <div>
+                  <p className="font-mono text-[10px] uppercase text-amber-400">Certificacoes Conquistadas</p>
+                  <p className="font-mono text-[9px] text-[var(--pixel-subtext)]">
+                    Certificacoes AWS verificadas por este estudante
+                  </p>
+                </div>
+                <span className="ml-auto border border-amber-500/50 bg-amber-900/20 px-2 py-0.5 font-mono text-[10px] text-amber-400">
+                  {certBadges.length}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {certBadges.map((badge) => (
+                  <TiltBadgeCard key={badge.id} badge={badge} />
+                ))}
+              </div>
+            </PixelCard>
+          </motion.div>
+        )}
 
         {/* Badges collection */}
         <motion.div

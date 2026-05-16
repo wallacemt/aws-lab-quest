@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 type CertificationOption = { id: string; code: string; name: string };
 
 type CertBadge = {
   id: string;
   badgeUrl: string;
+  badgeImageUrl: string | null;
   earnedAt: string;
   certificationPreset: { code: string; name: string } | null;
 };
@@ -55,18 +57,24 @@ export function CertificationAchievementModal({ open, onClose, onBadgeAdded, cer
   const [state, setState] = useState<ModalState>("form");
   const [badgeUrl, setBadgeUrl] = useState("");
   const [certPresetId, setCertPresetId] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastBadge, setLastBadge] = useState<CertBadge | null>(null);
   const [achievementUnlocked, setAchievementUnlocked] = useState(false);
   const confettiFiredRef = useRef(false);
   const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) {
       setState("form");
       setBadgeUrl("");
       setCertPresetId("");
+      setImageFile(null);
+      setImagePreview(null);
       setError(null);
       setLastBadge(null);
       setAchievementUnlocked(false);
@@ -89,15 +97,62 @@ export function CertificationAchievementModal({ open, onClose, onBadgeAdded, cer
 
   if (!open) return null;
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
+
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setError("Imagem deve ser JPEG, PNG ou WebP.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError("Imagem deve ter no maximo 4 MB.");
+      return;
+    }
+
+    setError(null);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function removeImage() {
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   async function handleSubmit() {
     setError(null);
     setSubmitting(true);
     try {
+      let uploadedImageUrl: string | null = null;
+
+      if (imageFile) {
+        setUploadingImage(true);
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        const uploadRes = await fetch("/api/user/badge-image", {
+          method: "POST",
+          credentials: "include",
+          body: fd,
+        });
+        const uploadData = (await uploadRes.json()) as { imageUrl?: string; error?: string };
+        if (!uploadRes.ok) throw new Error(uploadData.error ?? "Falha ao enviar imagem.");
+        uploadedImageUrl = uploadData.imageUrl ?? null;
+        setUploadingImage(false);
+      }
+
       const res = await fetch("/api/user/cert-badges", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ badgeUrl, certificationPresetId: certPresetId || null }),
+        body: JSON.stringify({
+          badgeUrl,
+          certificationPresetId: certPresetId || null,
+          badgeImageUrl: uploadedImageUrl,
+        }),
       });
       const data = (await res.json()) as { badge?: CertBadge; achievementUnlocked?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Falha ao registrar.");
@@ -107,12 +162,16 @@ export function CertificationAchievementModal({ open, onClose, onBadgeAdded, cer
       setState("celebration");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao registrar certificacao.");
+      setUploadingImage(false);
     } finally {
       setSubmitting(false);
     }
   }
 
-  const certName = lastBadge?.certificationPreset?.name ?? certificationOptions.find((c) => c.id === certPresetId)?.name ?? "certificacao";
+  const certName =
+    lastBadge?.certificationPreset?.name ??
+    certificationOptions.find((c) => c.id === certPresetId)?.name ??
+    "certificacao";
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4">
@@ -129,6 +188,57 @@ export function CertificationAchievementModal({ open, onClose, onBadgeAdded, cer
               <button type="button" onClick={onClose} className="border border-[#334155] px-3 py-1 text-xs uppercase">
                 Fechar
               </button>
+            </div>
+
+            {/* Badge image upload */}
+            <div className="space-y-2">
+              <p className="text-xs uppercase text-[#94a3b8]">Imagem do badge (opcional)</p>
+              {imagePreview ? (
+                <div className="relative flex items-center gap-4">
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded border border-amber-500/40 bg-[#0b1220]">
+                    <Image
+                      src={imagePreview}
+                      alt="Preview do badge"
+                      fill
+                      className="object-contain p-1"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-mono text-xs text-[#e2e8f0]">{imageFile?.name}</p>
+                    <p className="font-mono text-[10px] text-[#64748b]">
+                      {imageFile ? `${(imageFile.size / 1024).toFixed(0)} KB` : ""}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="mt-1 border border-[#7f1d1d] px-2 py-0.5 font-mono text-[10px] text-red-400 hover:bg-red-900/20"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full items-center justify-center gap-2 border-2 border-dashed border-[#334155] py-4 text-center font-mono text-xs uppercase text-[#64748b] transition-colors hover:border-amber-500/50 hover:text-amber-400"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                  Anexar imagem do badge
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleFileChange}
+                className="hidden"
+              />
             </div>
 
             <label className="block space-y-1">
@@ -168,7 +278,7 @@ export function CertificationAchievementModal({ open, onClose, onBadgeAdded, cer
                 disabled={submitting || !badgeUrl.trim()}
                 className="border border-[#14532d] bg-green-900/20 px-4 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
               >
-                {submitting ? "Registrando..." : "Registrar conquista"}
+                {uploadingImage ? "Enviando imagem..." : submitting ? "Registrando..." : "Registrar conquista"}
               </button>
             </div>
           </>
@@ -177,7 +287,20 @@ export function CertificationAchievementModal({ open, onClose, onBadgeAdded, cer
         {/* Celebration state */}
         {state === "celebration" && (
           <div className="space-y-5 text-center">
-            <p className="text-4xl">🏆</p>
+            {lastBadge?.badgeImageUrl ? (
+              <div className="mx-auto h-28 w-28 overflow-hidden rounded-full border-2 border-amber-500/60 bg-[#0b1220] p-2 shadow-lg shadow-amber-900/30">
+                <Image
+                  src={lastBadge.badgeImageUrl}
+                  alt={certName}
+                  width={96}
+                  height={96}
+                  className="h-full w-full object-contain"
+                  unoptimized
+                />
+              </div>
+            ) : (
+              <p className="text-4xl">🏆</p>
+            )}
             <div>
               <p className="font-mono text-xs uppercase text-[#f97316]">Incrivel!</p>
               <p className="mt-2 text-lg font-semibold text-[#e2e8f0]">

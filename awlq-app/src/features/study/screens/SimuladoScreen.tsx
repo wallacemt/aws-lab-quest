@@ -244,6 +244,9 @@ export function SimuladoScreen() {
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
   const [showPreSubmitSummary, setShowPreSubmitSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [motivationalMessage, setMotivationalMessage] = useState<string | null>(null);
+  const [loadingMotivationalMessage, setLoadingMotivationalMessage] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeDraft, setResumeDraft] = useState<SimuladoDraft | null>(null);
   const confettiFiredRef = useRef(false);
@@ -634,6 +637,8 @@ export function SimuladoScreen() {
       return;
     }
 
+    setCalculating(true);
+
     const totalQuestions = questions.length;
     const correctAnswers = questions.filter((question) => {
       return isAnswerCorrect({
@@ -715,12 +720,42 @@ export function SimuladoScreen() {
     const overview = buildScoreOverview(correctAnswers, totalQuestions, performance);
     setScoreOverview(overview);
     setShowScoreOverview(true);
+    setCalculating(false);
 
     if (!confettiFiredRef.current && overview.points >= overview.minimumCertificationPoints) {
       confettiFiredRef.current = true;
       playSuccessSound();
       void triggerConfetti();
     }
+
+    const passed = overview.points >= overview.minimumCertificationPoints;
+    setMotivationalMessage(null);
+    setLoadingMotivationalMessage(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/study/simulado-message", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userName: profile.name,
+            certificationCode: session?.certificationCode,
+            scorePercent: scorePercent,
+            passed,
+            correctAnswers: correctAnswers,
+            totalQuestions: totalQuestions,
+            bestArea: overview.bestArea?.topic ?? null,
+            weakestArea: overview.weakestArea?.topic ?? null,
+          }),
+        });
+        const data = (await res.json()) as { message?: string };
+        setMotivationalMessage(data.message ?? null);
+      } catch {
+        // Non-fatal — message stays null
+      } finally {
+        setLoadingMotivationalMessage(false);
+      }
+    })();
 
     setLoadingWeakServices(true);
     try {
@@ -755,6 +790,7 @@ export function SimuladoScreen() {
     setQuestions([]);
     setAnswers({});
     setCurrentIndex(0);
+    setCalculating(false);
     router.replace("/");
   }
 
@@ -775,6 +811,9 @@ export function SimuladoScreen() {
     setMarkedForReview(new Set());
     setShowPreSubmitSummary(false);
     setFocusMode(false);
+    setCalculating(false);
+    setMotivationalMessage(null);
+    setLoadingMotivationalMessage(false);
     confettiFiredRef.current = false;
   }
 
@@ -914,10 +953,79 @@ export function SimuladoScreen() {
                 )}
               </div>
             </div>
+
+            {/* Motivational message */}
+            {(loadingMotivationalMessage || motivationalMessage) && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className={`rounded border px-4 py-3 ${
+                  activeOverview.points >= activeOverview.minimumCertificationPoints
+                    ? "border-[#14532d] bg-green-900/15"
+                    : "border-[#1d4ed8] bg-blue-900/15"
+                }`}
+              >
+                <p className={`font-mono text-[10px] uppercase ${
+                  activeOverview.points >= activeOverview.minimumCertificationPoints
+                    ? "text-green-400"
+                    : "text-blue-400"
+                }`}>
+                  Mensagem do AWSLQ
+                </p>
+                {loadingMotivationalMessage ? (
+                  <p className="mt-2 flex items-center gap-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                    <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
+                    Preparando mensagem personalizada...
+                  </p>
+                ) : (
+                  <p className="mt-2 font-[var(--font-body)] text-sm leading-relaxed text-[var(--pixel-text)]">
+                    {motivationalMessage}
+                  </p>
+                )}
+              </motion.div>
+            )}
           </PixelCard>
         </motion.div>
       )}
-      {!inExamFlow && !inReviewFlow && (
+      {calculating && !submitted && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          <PixelCard className="space-y-6 py-10 text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative flex h-16 w-16 items-center justify-center">
+                <span className="absolute h-full w-full animate-ping rounded-full border-2 border-[var(--pixel-accent)] opacity-30" />
+                <span className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--pixel-accent)] border-r-transparent" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Calculando resultado</p>
+                <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                  Processando suas respostas e calculando a pontuacao final...
+                </p>
+              </div>
+            </div>
+            <div className="mx-auto flex max-w-xs flex-col gap-2">
+              {["Verificando respostas", "Calculando score", "Gerando overview de desempenho"].map((step, i) => (
+                <motion.div
+                  key={step}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.18, duration: 0.25 }}
+                  className="flex items-center gap-2 text-left"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--pixel-accent)]" />
+                  <span className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{step}</span>
+                </motion.div>
+              ))}
+            </div>
+          </PixelCard>
+        </motion.div>
+      )}
+
+      {!inExamFlow && !inReviewFlow && !calculating && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}

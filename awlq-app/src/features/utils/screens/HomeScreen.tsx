@@ -77,7 +77,9 @@ export function HomeScreen() {
                 key={mode.id}
                 {...mode}
                 handleClick={() => {
-                  router.push(`/${mode.id}`);
+                  if(mode.id != "simulado"){
+                    router.push(`/${mode.id}`);
+                  }
                 }}
               />
             ))}
