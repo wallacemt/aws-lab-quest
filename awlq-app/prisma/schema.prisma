@@ -630,6 +630,7 @@ model UserCertBadge {
   userId                String
   certificationPresetId String?
   badgeUrl              String
+  badgeImageUrl         String?
   earnedAt              DateTime             @default(now())
   user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   certificationPreset   CertificationPreset? @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
