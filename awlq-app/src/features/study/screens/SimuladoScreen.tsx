@@ -13,6 +13,7 @@ import { ReportQuestionModal } from "@/features/study/components/ReportQuestionM
 import { SimuladoScoreGauge } from "@/features/study/components/SimuladoScoreGauge";
 import {
   createSimuladoQuestions,
+  createSimuladoQuestionsFromPack,
   createStudyExplanation,
   fetchSimuladoExamGuide,
   fetchWeakServices,
@@ -42,6 +43,23 @@ function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): Q
 }
 
 type RulesConsentMap = Record<string, string>;
+
+type SimuladoPackListItem = {
+  id: string;
+  name: string;
+  questionCount: number;
+  createdAt: string;
+  attempts: number;
+  bestScore: number | null;
+  lastSessionId: string | null;
+  sessions: {
+    id: string;
+    scorePercent: number;
+    correctAnswers: number;
+    totalQuestions: number;
+    completedAt: string;
+  }[];
+};
 
 type WeakServiceMetric = {
   topic: string;
@@ -249,6 +267,18 @@ export function SimuladoScreen() {
   const [loadingMotivationalMessage, setLoadingMotivationalMessage] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeDraft, setResumeDraft] = useState<SimuladoDraft | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"examGuide" | "simulados">("simulados");
+  const [packs, setPacks] = useState<SimuladoPackListItem[]>([]);
+  const [packsLoading, setPacksLoading] = useState(false);
+  const [packsFilter, setPacksFilter] = useState<"all" | "todo" | "done">("all");
+  const [packsRefreshKey, setPacksRefreshKey] = useState(0);
+  const [certInfo, setCertInfo] = useState<{ code: string; name: string } | null>(null);
+  const [pendingPackId, setPendingPackId] = useState<string | null>(null);
+  const [pendingPackName, setPendingPackName] = useState<string | null>(null);
+  const [currentPackId, setCurrentPackId] = useState<string | null>(null);
+  const [expandedPackHistory, setExpandedPackHistory] = useState<string | null>(null);
+
   const confettiFiredRef = useRef(false);
   const prevRemainingRef = useRef(remainingSeconds);
 
@@ -429,6 +459,37 @@ export function SimuladoScreen() {
   }, [hydrated, inExamFlow, inReviewFlow, consentScope]);
 
   useEffect(() => {
+    if (!hydrated || inExamFlow || inReviewFlow) return;
+    let cancelled = false;
+
+    async function loadPacks() {
+      setPacksLoading(true);
+      try {
+        const res = await fetch(`/api/study/simulado-packs?filter=${packsFilter}`);
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as {
+          packs: SimuladoPackListItem[];
+          certificationCode: string | null;
+          certificationName: string | null;
+        };
+        if (!cancelled) {
+          setPacks(json.packs ?? []);
+          if (json.certificationCode) {
+            setCertInfo({ code: json.certificationCode, name: json.certificationName ?? json.certificationCode });
+          }
+        }
+      } catch {
+        // non-fatal
+      } finally {
+        if (!cancelled) setPacksLoading(false);
+      }
+    }
+
+    void loadPacks();
+    return () => { cancelled = true; };
+  }, [hydrated, inExamFlow, inReviewFlow, packsFilter, packsRefreshKey]);
+
+  useEffect(() => {
     if (prevRemainingRef.current > 0 && remainingSeconds <= 0 && inExamFlow) {
       playAlarmBeep();
       void handleSubmitExam();
@@ -512,6 +573,61 @@ export function SimuladoScreen() {
     }
   }
 
+  async function handleStartDevTest() {
+    setError(null);
+    safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
+    setShowResumeModal(false);
+    setResumeDraft(null);
+
+    const devQuestion: StudyQuestion = {
+      id: "dev-test-001",
+      statement:
+        "[MODO DEV] Qual serviço AWS é usado para armazenamento de objetos escalável e durável com 99,999999999% de durabilidade?",
+      certificationCode: "DEV",
+      topic: "S3",
+      difficulty: "easy",
+      questionType: "single",
+      options: {
+        A: "Amazon EC2 (Elastic Compute Cloud)",
+        B: "Amazon S3 (Simple Storage Service)",
+        C: "Amazon RDS (Relational Database Service)",
+        D: "AWS Lambda",
+        E: "",
+      },
+      correctOption: "B",
+      correctOptions: ["B"],
+      explanations: {
+        A: "EC2 é um serviço de computação em nuvem, não armazenamento de objetos.",
+        B: "S3 é o serviço de armazenamento de objetos da AWS, altamente escalável e durável.",
+        C: "RDS é um banco de dados relacional gerenciado.",
+        D: "Lambda é um serviço de computação serverless.",
+        E: "",
+      },
+      optionMapping: {
+        displayToOriginal: { A: "A", B: "B", C: "C", D: "D", E: "E" },
+        originalToDisplay: { A: "A", B: "B", C: "C", D: "D", E: "E" },
+      },
+    };
+
+    setQuestions([devQuestion]);
+    setAnswers({});
+    setCurrentIndex(0);
+    setSubmitted(false);
+    setSavedHistoryId(null);
+    setReviewByQuestion({});
+    setLoadingReviewByQuestion({});
+    setExamGuideInfo(null);
+    setHistoricalWeakServices([]);
+    setScoreOverview(null);
+    setShowScoreOverview(false);
+    setMotivationalMessage(null);
+    setLoadingMotivationalMessage(false);
+    setMarkedForReview(new Set());
+    setShowPreSubmitSummary(false);
+    confettiFiredRef.current = false;
+    startSession("DEV", 4 / 60);
+  }
+
   async function handleStartWithRulesGate() {
     if (hasValidRulesConsent(consentScope)) {
       await handleStart();
@@ -529,7 +645,52 @@ export function SimuladoScreen() {
 
     persistRulesConsent(consentScope);
     setShowRulesModal(false);
-    await handleStart();
+
+    if (pendingPackId) {
+      await handleStartFromPack(pendingPackId);
+      setPendingPackId(null);
+      setPendingPackName(null);
+    } else {
+      await handleStart();
+    }
+  }
+
+  async function handleStartFromPack(packId: string) {
+    setError(null);
+    setHistoricalWeakServices([]);
+    safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
+    setShowResumeModal(false);
+    setResumeDraft(null);
+    setLoading(true);
+
+    try {
+      const data = await createSimuladoQuestionsFromPack(packId);
+      setCurrentPackId(data.packId);
+      setQuestions(data.questions);
+      setAnswers({});
+      setCurrentIndex(0);
+      setSubmitted(false);
+      setSavedHistoryId(null);
+      setReviewByQuestion({});
+      setLoadingReviewByQuestion({});
+      setExamGuideInfo(data.examGuide ?? null);
+      startSession(data.certificationCode, data.examMinutes ?? 90);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Erro ao iniciar simulado.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleOpenPackRulesModal(packId: string, packName: string) {
+    if (hasValidRulesConsent(consentScope)) {
+      void handleStartFromPack(packId);
+      return;
+    }
+    setPendingPackId(packId);
+    setPendingPackName(packName);
+    setRulesAccepted(false);
+    setShowRulesModal(true);
   }
 
   async function fetchReviewForQuestion(
@@ -679,6 +840,7 @@ export function SimuladoScreen() {
         correctAnswers,
         totalQuestions,
         durationSeconds: usedDurationSeconds,
+        packId: currentPackId,
         answersSnapshot: questions.map((question) => ({
           questionId: question.id,
           statement: question.statement,
@@ -749,9 +911,18 @@ export function SimuladoScreen() {
           }),
         });
         const data = (await res.json()) as { message?: string };
-        setMotivationalMessage(data.message ?? null);
+        setMotivationalMessage(
+          data.message ??
+            (passed
+              ? "Excelente trabalho! Sua dedicacao esta valendo a pena. Continue praticando para a certificacao. Nos acreditamos em voce!"
+              : "Nao desanime! Cada simulado te deixa mais preparado. Analise seus pontos fracos e continue praticando. Eu acredito em voce!"),
+        );
       } catch {
-        // Non-fatal — message stays null
+        setMotivationalMessage(
+          passed
+            ? "Excelente trabalho! Sua dedicacao esta valendo a pena. Continue praticando para a certificacao. Nos acreditamos em voce!"
+            : "Nao desanime! Cada simulado te deixa mais preparado. Analise seus pontos fracos e continue praticando. Eu acredito em voce!",
+        );
       } finally {
         setLoadingMotivationalMessage(false);
       }
@@ -814,6 +985,8 @@ export function SimuladoScreen() {
     setCalculating(false);
     setMotivationalMessage(null);
     setLoadingMotivationalMessage(false);
+    setCurrentPackId(null);
+    setExpandedPackHistory(null);
     confettiFiredRef.current = false;
   }
 
@@ -852,7 +1025,14 @@ export function SimuladoScreen() {
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
       {process.env.NODE_ENV !== "production" && !inExamFlow && !inReviewFlow && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => void handleStartDevTest()}
+            className="border border-yellow-700 px-3 py-2 text-xs uppercase text-yellow-300"
+          >
+            Simulado Teste (1q / 4s)
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -879,7 +1059,7 @@ export function SimuladoScreen() {
             }}
             className="border border-[#334155] px-3 py-2 text-xs uppercase text-[#cbd5e1]"
           >
-            Visualizar score mock (dev)
+            Score mock (dev)
           </button>
         </div>
       )}
@@ -1030,182 +1210,299 @@ export function SimuladoScreen() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
+          className="space-y-4"
         >
-          <PixelCard className="space-y-4">
-            <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Configurar Simulado</h2>
-            <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-              O filtro da certificacao e automatico pelo seu perfil. Selecione dificuldade e inicie a prova.
-            </p>
+          {/* Certification header */}
+          {certInfo && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-4 py-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Certificacao alvo</p>
+                <p className="mt-0.5 font-mono text-sm text-[var(--pixel-primary)]">
+                  {certInfo.code} — {certInfo.name}
+                </p>
+              </div>
+              <a
+                href="/profile"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+              >
+                Alterar no perfil ↗
+              </a>
+            </div>
+          )}
 
-            <div className="grid gap-3 md:grid-cols-3">
-              {[
-                {
-                  title: "Formato oficial",
-                  description: "65 questoes com tempo controlado para simular a pressao real da certificacao.",
-                },
-                {
-                  title: "Correcao orientada",
-                  description: "Ao finalizar, voce recebe score, revisao por questao e pontos fracos por topico.",
-                },
-                {
-                  title: "Treino progressivo",
-                  description:
-                    "Seu historico alimenta priorizacao de revisao para melhorar desempenho nas proximas provas.",
-                },
-              ].map((item, index) => (
-                <motion.div
-                  key={item.title}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: 0.06 * index }}
-                  className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3"
+          <PixelCard className="space-y-0 p-0 overflow-hidden">
+            {/* Tabs */}
+            <div className="flex border-b border-[var(--pixel-border)]">
+              {(["simulados", "examGuide"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={[
+                    "flex-1 px-4 py-3 font-mono text-[10px] uppercase transition-colors",
+                    activeTab === tab
+                      ? "border-b-2 border-[var(--pixel-primary)] bg-[var(--pixel-bg)] text-[var(--pixel-primary)]"
+                      : "text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]",
+                  ].join(" ")}
                 >
-                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">{item.title}</p>
-                  <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{item.description}</p>
-                </motion.div>
+                  {tab === "simulados" ? "Simulados" : "Exam Guide"}
+                </button>
               ))}
             </div>
 
-            {loadingExamGuide && (
-              <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Carregando Exam Guide...</p>
-            )}
-
-            {examGuideError && !loadingExamGuide && (
-              <p className="font-[var(--font-body)] text-xs text-yellow-300">{examGuideError}</p>
-            )}
-
-            {examGuideInfo && (
-              <div className="space-y-3 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                    Exame guide ativo da certificacao
-                  </p>
+            {/* Simulados Tab */}
+            {activeTab === "simulados" && (
+              <div className="space-y-4 p-4">
+                {/* Filter bar */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {(["all", "todo", "done"] as const).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setPacksFilter(f)}
+                      className={[
+                        "border px-3 py-1 font-mono text-[10px] uppercase",
+                        packsFilter === f
+                          ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
+                          : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
+                      ].join(" ")}
+                    >
+                      {f === "all" ? "Todos" : f === "todo" ? "Nao realizados" : "Realizados"}
+                    </button>
+                  ))}
                   <button
                     type="button"
-                    onClick={() => setShowExamGuidePanel((prev) => !prev)}
-                    className="border border-[var(--pixel-border)] px-2 py-1 font-mono text-[10px] uppercase"
+                    disabled={packsLoading}
+                    onClick={() => setPacksRefreshKey((k) => k + 1)}
+                    className="ml-auto border border-[var(--pixel-border)] px-3 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50 disabled:opacity-40"
                   >
-                    {showExamGuidePanel ? "Ocultar detalhes" : "Mostrar detalhes"}
+                    {packsLoading ? "..." : "↻ Atualizar"}
                   </button>
                 </div>
 
-                <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                  Este simulado foi alinhado ao guia oficial definido pelo admin ({examGuideInfo.totalChars}{" "}
-                  caracteres).
-                </p>
+                {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
 
-                <AnimatePresence initial={false}>
-                  {showExamGuidePanel && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="space-y-2 overflow-hidden"
-                    >
-                      {examGuideInfo.highlights.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Topicos de foco</p>
-                          {examGuideInfo.highlights.map((item) => (
-                            <ReactMarkdown
-                              key={item}
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                strong: ({ children }) => (
-                                  <h3 className="mb-1 mt-2 text-[0.7rem] uppercase text-[var(--pixel-subtext)]">
-                                    {children}
-                                  </h3>
-                                ),
-                              }}
-                            >
-                              {item}
-                            </ReactMarkdown>
-                          ))}
-                        </div>
-                      )}
+                {packsLoading && (
+                  <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando packs...</p>
+                )}
 
-                      <div className="space-y-1 border border-[var(--pixel-border)] bg-black/10 p-2">
-                        <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Exam guide</p>
-                        {examGuideInfo.markdown.trim().length > 0 ? (
-                          <div className="max-h-[40rem] overflow-auto rounded border border-[var(--pixel-border)] bg-[var(--pixel-card)] p-3">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                h1: ({ children }) => (
-                                  <h1 className="mb-2 font-mono text-sm uppercase text-primary">{children}</h1>
-                                ),
-                                h2: ({ children }) => (
-                                  <h2 className="mb-2 mt-3 font-mono text-xs uppercase text-accent">{children}</h2>
-                                ),
-                                h3: ({ children }) => (
-                                  <h3 className="mb-1 mt-2 font-mono text-[11px] uppercase text-[var(--pixel-subtext)]">
-                                    {children}
-                                  </h3>
-                                ),
-                                p: ({ children }) => (
-                                  <p className="mb-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                                    {children}
-                                  </p>
-                                ),
-                                li: ({ children }) => (
-                                  <li className="mb-1 ml-4 list-disc font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                                    {children}
-                                  </li>
-                                ),
-                                table: ({ children }) => (
-                                  <table className="mb-2 w-full border-collapse text-xs">{children}</table>
-                                ),
-                                th: ({ children }) => (
-                                  <th className="border border-[var(--pixel-border)] px-2 py-1 text-left font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                                    {children}
-                                  </th>
-                                ),
-                                td: ({ children }) => (
-                                  <td className="border border-[var(--pixel-border)] px-2 py-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                                    {children}
-                                  </td>
-                                ),
-                              }}
-                            >
-                              {examGuideInfo.markdown}
-                            </ReactMarkdown>
+                {!packsLoading && packs.length === 0 && (
+                  <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-6 text-center">
+                    <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
+                      {packsFilter === "todo"
+                        ? "Nenhum pack pendente."
+                        : packsFilter === "done"
+                          ? "Nenhum pack realizado ainda."
+                          : "Nenhum pack disponivel para sua certificacao."}
+                    </p>
+                    {packsFilter === "all" && (
+                      <p className="mt-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                        Um administrador precisa gerar packs de simulado para sua certificacao.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  {packs.map((pack) => {
+                    const done = pack.attempts > 0;
+                    const passed = done && pack.bestScore !== null && pack.bestScore >= 70;
+                    const isExpanded = expandedPackHistory === pack.id;
+
+                    return (
+                      <div
+                        key={pack.id}
+                        className={[
+                          "border p-4 space-y-3",
+                          passed
+                            ? "border-green-700/60 bg-green-900/10"
+                            : done
+                              ? "border-yellow-700/60 bg-yellow-900/10"
+                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-mono text-xs text-[var(--pixel-primary)]">{pack.name}</p>
+                            <p className="mt-0.5 font-mono text-[10px] text-[var(--pixel-subtext)]">
+                              {pack.questionCount} questoes
+                            </p>
                           </div>
-                        ) : (
-                          <>
-                            {guidePreviewLines.length > 0 ? (
-                              guidePreviewLines.map((line) => (
-                                <p key={line} className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                                  {line}
-                                </p>
-                              ))
-                            ) : (
-                              <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                                Sem trecho disponivel no momento.
-                              </p>
-                            )}
-                          </>
+                          {done && (
+                            <span
+                              className={[
+                                "border px-2 py-0.5 font-mono text-[10px] uppercase",
+                                passed ? "border-green-700 text-green-400" : "border-yellow-700 text-yellow-400",
+                              ].join(" ")}
+                            >
+                              {passed ? "Aprovado" : "Reprovado"}
+                            </span>
+                          )}
+                        </div>
+
+                        {done && (
+                          <div className="flex items-center gap-4 text-[10px] font-mono text-[var(--pixel-subtext)]">
+                            <span>Melhor: <span className="text-[var(--pixel-text)]">{pack.bestScore}%</span></span>
+                            <span>Tentativas: <span className="text-[var(--pixel-text)]">{pack.attempts}</span></span>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPackRulesModal(pack.id, pack.name)}
+                            disabled={loading}
+                            className="border border-[var(--pixel-primary)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10 disabled:opacity-50"
+                          >
+                            {loading ? "..." : done ? "Refazer" : "Iniciar"}
+                          </button>
+
+                          {done && pack.lastSessionId && (
+                            <a
+                              href={`/study/history/${pack.lastSessionId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+                            >
+                              Revisar ultima ↗
+                            </a>
+                          )}
+
+                          {pack.attempts > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedPackHistory(isExpanded ? null : pack.id)}
+                              className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50"
+                            >
+                              {isExpanded ? "Fechar" : `Historico (${pack.attempts})`}
+                            </button>
+                          )}
+                        </div>
+
+                        {isExpanded && (
+                          <div className="border border-[var(--pixel-border)] divide-y divide-[var(--pixel-border)]">
+                            {pack.sessions.map((s) => (
+                              <div key={s.id} className="flex items-center justify-between px-3 py-2">
+                                <div>
+                                  <p className="font-mono text-[10px] text-[var(--pixel-text)]">{s.scorePercent}% — {s.correctAnswers}/{s.totalQuestions}</p>
+                                  <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+                                    {new Date(s.completedAt).toLocaleDateString("pt-BR")}
+                                  </p>
+                                </div>
+                                <a
+                                  href={`/study/history/${s.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-primary)]"
+                                >
+                                  Revisar ↗
+                                </a>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-            {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
-
-            <div className="flex justify-end">
-              <PixelButton onClick={() => void handleStartWithRulesGate()} disabled={loading}>
-                {loading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-3 w-3 animate-spin rounded-full border border-current border-r-transparent" />
-                    Gerando Simulado...
-                  </span>
-                ) : (
-                  "Iniciar Simulado (65 questoes)"
+            {/* Exam Guide Tab */}
+            {activeTab === "examGuide" && (
+              <div className="space-y-4 p-4">
+                {loadingExamGuide && (
+                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Carregando Exam Guide...</p>
                 )}
-              </PixelButton>
-            </div>
+
+                {examGuideError && !loadingExamGuide && (
+                  <p className="font-[var(--font-body)] text-xs text-yellow-300">{examGuideError}</p>
+                )}
+
+                {examGuideInfo && (
+                  <div className="space-y-3">
+                    <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+                      Exam guide oficial — {examGuideInfo.totalChars} caracteres
+                    </p>
+
+                    {examGuideInfo.highlights.length > 0 && (
+                      <div className="space-y-1 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3">
+                        <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Topicos de foco</p>
+                        {examGuideInfo.highlights.map((item) => (
+                          <ReactMarkdown
+                            key={item}
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              strong: ({ children }) => (
+                                <h3 className="mb-1 mt-2 text-[0.7rem] uppercase text-[var(--pixel-subtext)]">
+                                  {children}
+                                </h3>
+                              ),
+                            }}
+                          >
+                            {item}
+                          </ReactMarkdown>
+                        ))}
+                      </div>
+                    )}
+
+                    {examGuideInfo.markdown.trim().length > 0 && (
+                      <div className="max-h-[40rem] overflow-auto border border-[var(--pixel-border)] bg-[var(--pixel-card)] p-3">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({ children }) => (
+                              <h1 className="mb-2 font-mono text-sm uppercase text-primary">{children}</h1>
+                            ),
+                            h2: ({ children }) => (
+                              <h2 className="mb-2 mt-3 font-mono text-xs uppercase text-accent">{children}</h2>
+                            ),
+                            h3: ({ children }) => (
+                              <h3 className="mb-1 mt-2 font-mono text-[11px] uppercase text-[var(--pixel-subtext)]">
+                                {children}
+                              </h3>
+                            ),
+                            p: ({ children }) => (
+                              <p className="mb-2 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                {children}
+                              </p>
+                            ),
+                            li: ({ children }) => (
+                              <li className="mb-1 ml-4 list-disc font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                {children}
+                              </li>
+                            ),
+                            table: ({ children }) => (
+                              <table className="mb-2 w-full border-collapse text-xs">{children}</table>
+                            ),
+                            th: ({ children }) => (
+                              <th className="border border-[var(--pixel-border)] px-2 py-1 text-left font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children }) => (
+                              <td className="border border-[var(--pixel-border)] px-2 py-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                                {children}
+                              </td>
+                            ),
+                          }}
+                        >
+                          {examGuideInfo.markdown}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!examGuideInfo && !loadingExamGuide && !examGuideError && (
+                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                    Exam guide nao configurado para esta certificacao.
+                  </p>
+                )}
+              </div>
+            )}
           </PixelCard>
         </motion.div>
       )}
@@ -1214,7 +1511,9 @@ export function SimuladoScreen() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
           <PixelCard className="w-full max-w-2xl space-y-4 border-yellow-500 bg-yellow-900/95">
             <p className="font-mono text-[10px] uppercase text-yellow-300">Regras do Simulado</p>
-            <h3 className="font-[var(--font-body)] text-xl">Ambiente de prova real</h3>
+            <h3 className="font-[var(--font-body)] text-xl">
+              {pendingPackName ?? "Ambiente de prova real"}
+            </h3>
 
             <ul className="space-y-2 font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
               <li>1. O simulado possui 65 questoes e cronometro ativo.</li>

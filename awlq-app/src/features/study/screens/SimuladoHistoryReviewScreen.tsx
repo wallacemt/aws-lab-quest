@@ -38,6 +38,7 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
   const [showExplanations, setShowExplanations] = useState(true);
   const [loadingExplanationByQuestion, setLoadingExplanationByQuestion] = useState<Record<string, boolean>>({});
   const [failedExplanationByQuestion, setFailedExplanationByQuestion] = useState<Record<string, boolean>>({});
+  const [removedFromDbByQuestion, setRemovedFromDbByQuestion] = useState<Record<string, boolean>>({});
   const [explanationCacheByQuestion, setExplanationCacheByQuestion] = useState<Record<string, ExplanationCacheItem>>(
     {},
   );
@@ -77,6 +78,7 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
           setLoadingExplanationByQuestion({});
           setFailedExplanationByQuestion({});
           setExplanationCacheByQuestion({});
+          setRemovedFromDbByQuestion({});
         }
       } catch (requestError) {
         if (!cancelled) {
@@ -276,7 +278,15 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
           explanationSummary: generated.summary,
           explanations: generated.options,
         });
-      } catch {
+      } catch (explanationError: unknown) {
+        const isNotFound =
+          explanationError instanceof Error &&
+          (explanationError.message.toLowerCase().includes("nao encontrada") ||
+            explanationError.message.toLowerCase().includes("não encontrada") ||
+            explanationError.message.toLowerCase().includes("not found"));
+        if (isMountedRef.current && isNotFound) {
+          setRemovedFromDbByQuestion((prev) => ({ ...prev, [questionId]: true }));
+        }
         if (isMountedRef.current) {
           setFailedExplanationByQuestion((prev) => ({
             ...prev,
@@ -434,6 +444,16 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
                 </PixelCard>
               )}
 
+              {selectedQuestion && removedFromDbByQuestion[selectedQuestion.questionId] && (
+                <div className="border border-yellow-700 bg-yellow-900/20 px-4 py-3">
+                  <p className="font-mono text-[10px] uppercase text-yellow-400">Questão removida</p>
+                  <p className="mt-1 font-[var(--font-body)] text-sm text-yellow-200">
+                    Esta questão foi removida do banco pelo administrador. Os dados exibidos abaixo vêm do snapshot
+                    salvo no momento da realização do simulado.
+                  </p>
+                </div>
+              )}
+
               {selectedQuestion && (
                 <PixelCard className="space-y-3">
                   <QuestionReviewPanel
@@ -468,17 +488,21 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
                   <div className="grid grid-cols-5 gap-2 p-3">
                     {filteredSnapshots.map((item, index) => {
                       const isCurrent = item.questionId === selectedQuestion?.questionId;
+                      const isRemoved = removedFromDbByQuestion[item.questionId];
                       return (
                         <button
                           key={`${item.questionId}-${index}`}
                           type="button"
                           onClick={() => setSelectedQuestionId(item.questionId)}
+                          title={isRemoved ? "Questão removida do banco" : undefined}
                           className={`border px-2 py-2 font-mono text-[10px] uppercase ${
                             isCurrent
                               ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/20"
-                              : item.correct
-                                ? "border-[#2ecc71] bg-green-900/20"
-                                : "border-[#e74c3c] bg-red-900/20"
+                              : isRemoved
+                                ? "border-yellow-700 bg-yellow-900/20"
+                                : item.correct
+                                  ? "border-[#2ecc71] bg-green-900/20"
+                                  : "border-[#e74c3c] bg-red-900/20"
                           }`}
                         >
                           {index + 1}

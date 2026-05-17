@@ -222,6 +222,23 @@ export function AdminQuestionsScreen() {
   const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
   const [reportActionRunningId, setReportActionRunningId] = useState<string | null>(null);
   const [reportsResult, setReportsResult] = useState<PaginatedResult<AdminQuestionReportListItem> | null>(null);
+  const [jsonImportModalOpen, setJsonImportModalOpen] = useState(false);
+  const [jsonImportText, setJsonImportText] = useState("");
+  const [jsonImportDefaultCert, setJsonImportDefaultCert] = useState("");
+  const [jsonImportGuideOpen, setJsonImportGuideOpen] = useState(false);
+  const [jsonImportLoading, setJsonImportLoading] = useState(false);
+  const [jsonImportError, setJsonImportError] = useState<string | null>(null);
+  const [jsonImportSuccess, setJsonImportSuccess] = useState<string | null>(null);
+  const [jsonImportDryRunResult, setJsonImportDryRunResult] = useState<{
+    count: number;
+    previewItems: Array<{
+      index: number;
+      statement: string;
+      difficulty: string;
+      questionType: string;
+      certificationCode: string | null;
+    }>;
+  } | null>(null);
   const [editForm, setEditForm] = useState<{
     statement: string;
     topic: string;
@@ -745,6 +762,116 @@ export function AdminQuestionsScreen() {
     }
   }
 
+  async function handleJsonImportPreview() {
+    setJsonImportError(null);
+    setJsonImportSuccess(null);
+    setJsonImportDryRunResult(null);
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonImportText.trim());
+    } catch {
+      setJsonImportError("JSON invalido. Verifique a sintaxe.");
+      return;
+    }
+
+    const questions = Array.isArray(parsed)
+      ? parsed
+      : (parsed as Record<string, unknown>)?.questions;
+    if (!Array.isArray(questions)) {
+      setJsonImportError("Esperado array de questoes ou { questions: [...] }");
+      return;
+    }
+
+    setJsonImportLoading(true);
+    try {
+      const res = await fetch("/api/admin/questions/import-json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          questions,
+          defaultCertificationCode: jsonImportDefaultCert || undefined,
+          dryRun: true,
+        }),
+      });
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!res.ok) {
+        const errMsg = Array.isArray(data.errors)
+          ? (data.errors as string[]).slice(0, 5).join(" | ")
+          : String(data.error ?? "Erro desconhecido");
+        setJsonImportError(errMsg);
+      } else {
+        setJsonImportDryRunResult(
+          data as {
+            count: number;
+            previewItems: Array<{
+              index: number;
+              statement: string;
+              difficulty: string;
+              questionType: string;
+              certificationCode: string | null;
+            }>;
+          },
+        );
+      }
+    } catch {
+      setJsonImportError("Falha na requisicao");
+    } finally {
+      setJsonImportLoading(false);
+    }
+  }
+
+  async function handleJsonImportSave() {
+    setJsonImportError(null);
+    setJsonImportSuccess(null);
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonImportText.trim());
+    } catch {
+      setJsonImportError("JSON invalido. Verifique a sintaxe.");
+      return;
+    }
+
+    const questions = Array.isArray(parsed)
+      ? parsed
+      : (parsed as Record<string, unknown>)?.questions;
+    if (!Array.isArray(questions)) {
+      setJsonImportError("Esperado array de questoes ou { questions: [...] }");
+      return;
+    }
+
+    setJsonImportLoading(true);
+    try {
+      const res = await fetch("/api/admin/questions/import-json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          questions,
+          defaultCertificationCode: jsonImportDefaultCert || undefined,
+        }),
+      });
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!res.ok) {
+        const errMsg = Array.isArray(data.errors)
+          ? (data.errors as string[]).slice(0, 5).join(" | ")
+          : String(data.error ?? "Erro desconhecido");
+        setJsonImportError(errMsg);
+      } else {
+        setJsonImportSuccess(`${String(data.created)} questoes importadas com sucesso.`);
+        setJsonImportText("");
+        setJsonImportDryRunResult(null);
+        setRefreshKey((prev) => prev + 1);
+      }
+    } catch {
+      setJsonImportError("Falha na requisicao");
+    } finally {
+      setJsonImportLoading(false);
+    }
+  }
+
   useEffect(() => {
     async function loadFilterOptions() {
       try {
@@ -942,6 +1069,18 @@ export function AdminQuestionsScreen() {
               : aiFillRunning
                 ? "IA em execucao..."
                 : "Preencher faltantes com IA"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setJsonImportModalOpen(true);
+              setJsonImportError(null);
+              setJsonImportSuccess(null);
+              setJsonImportDryRunResult(null);
+            }}
+            className="border border-[#1e3a5f] bg-blue-900/20 px-3 py-1 text-xs uppercase text-[#38bdf8]"
+          >
+            Importar JSON
           </button>
         </div>
         <p className="text-xs text-[#94a3b8]">
@@ -1764,6 +1903,159 @@ export function AdminQuestionsScreen() {
                 className="border border-[#7f1d1d] bg-red-900/20 px-3 py-2 text-xs uppercase text-red-200 disabled:opacity-60"
               >
                 {deletingQuestion ? "Removendo..." : "Remover questao"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {jsonImportModalOpen && (
+        <div className="fixed inset-0 z-40 grid place-items-start justify-center overflow-y-auto bg-black/70 p-4 pt-10">
+          <div className="w-full max-w-2xl space-y-4 rounded border border-[#334155] bg-[#111827] p-5 text-[#e2e8f0]">
+            <div className="space-y-1">
+              <p className="font-mono text-xs uppercase text-[#38bdf8]">Importar questoes via JSON</p>
+              <p className="text-xs text-[#94a3b8]">
+                Cole o JSON abaixo. Maximo de 200 questoes por importacao.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block space-y-1">
+                <span className="text-xs uppercase text-[#94a3b8]">Certificacao padrao (opcional)</span>
+                <select
+                  value={jsonImportDefaultCert}
+                  onChange={(e) => setJsonImportDefaultCert(e.target.value)}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+                >
+                  <option value="">-- sem padrao (use certificationCode em cada questao) --</option>
+                  {certifications.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} — {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-xs uppercase text-[#94a3b8]">JSON das questoes</span>
+                <textarea
+                  rows={10}
+                  value={jsonImportText}
+                  onChange={(e) => {
+                    setJsonImportText(e.target.value);
+                    setJsonImportDryRunResult(null);
+                    setJsonImportError(null);
+                    setJsonImportSuccess(null);
+                  }}
+                  placeholder={'[{ "statement": "...", "options": { "A": "...", "B": "..." }, "correctOption": "A", "difficulty": "medium" }]'}
+                  className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 font-mono text-xs text-[#e2e8f0] outline-none"
+                />
+              </label>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setJsonImportGuideOpen((v) => !v)}
+                className="flex items-center gap-1 text-xs uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
+              >
+                <span>{jsonImportGuideOpen ? "▾" : "▸"}</span> Guia de formato
+              </button>
+              {jsonImportGuideOpen && (
+                <div className="mt-2 space-y-2 border border-[#1e293b] bg-[#0b1220] p-3 font-mono text-xs text-[#94a3b8]">
+                  <p className="text-[#38bdf8]">Formato esperado:</p>
+                  <pre className="overflow-x-auto whitespace-pre-wrap text-[11px]">{`[
+  {
+    "statement": "Qual servico AWS e usado para...",   // obrigatorio
+    "options": {                                        // obrigatorio, min 2
+      "A": "Amazon S3",
+      "B": "Amazon EC2",
+      "C": "AWS Lambda",
+      "D": "Amazon RDS"
+    },
+    "correctOption": "A",                              // single choice
+    // OU correctOptions: ["A", "C"],                  // multi choice
+    "difficulty": "medium",                            // easy | medium | hard
+    "questionType": "single",                          // single | multi
+    "topic": "Storage",                                // padrao: OUTROS
+    "certificationCode": "SAA-C03",                    // sobreescreve padrao
+    "explanations": {                                  // opcional
+      "A": "S3 e usado para...",
+      "B": "EC2 nao e..."
+    }
+  }
+]`}</pre>
+                </div>
+              )}
+            </div>
+
+            {jsonImportError && (
+              <p className="rounded border border-red-900/40 bg-red-900/20 px-3 py-2 text-xs text-[#fca5a5]">
+                {jsonImportError}
+              </p>
+            )}
+
+            {jsonImportSuccess && (
+              <p className="rounded border border-green-900/40 bg-green-900/20 px-3 py-2 text-xs text-green-200">
+                {jsonImportSuccess}
+              </p>
+            )}
+
+            {jsonImportDryRunResult && (
+              <div className="space-y-2 border border-[#1e3a5f] bg-blue-900/10 p-3">
+                <p className="text-xs font-semibold text-[#38bdf8]">
+                  Preview: {jsonImportDryRunResult.count} questoes validas
+                </p>
+                <div className="space-y-1">
+                  {jsonImportDryRunResult.previewItems.map((item) => (
+                    <div key={item.index} className="flex gap-3 text-xs text-[#94a3b8]">
+                      <span className="w-5 shrink-0 text-right text-[#64748b]">{item.index}.</span>
+                      <span className="flex-1 truncate">{item.statement}</span>
+                      <span className="shrink-0 text-[#fbbf24]">{item.difficulty}</span>
+                      <span className="shrink-0 text-[#a78bfa]">{item.questionType}</span>
+                      {item.certificationCode && (
+                        <span className="shrink-0 text-[#34d399]">{item.certificationCode}</span>
+                      )}
+                    </div>
+                  ))}
+                  {jsonImportDryRunResult.count > jsonImportDryRunResult.previewItems.length && (
+                    <p className="text-xs text-[#64748b]">
+                      ... e mais {jsonImportDryRunResult.count - jsonImportDryRunResult.previewItems.length} questoes
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-[#1e293b] pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setJsonImportModalOpen(false);
+                  setJsonImportText("");
+                  setJsonImportDryRunResult(null);
+                  setJsonImportError(null);
+                  setJsonImportSuccess(null);
+                }}
+                className="border border-[#334155] px-3 py-2 text-xs uppercase"
+              >
+                Fechar
+              </button>
+              <button
+                type="button"
+                disabled={jsonImportLoading || !jsonImportText.trim()}
+                onClick={() => void handleJsonImportPreview()}
+                className="border border-[#1e3a5f] bg-blue-900/20 px-3 py-2 text-xs uppercase text-[#38bdf8] disabled:opacity-60"
+              >
+                {jsonImportLoading && !jsonImportDryRunResult ? "Validando..." : "Validar / Preview"}
+              </button>
+              <button
+                type="button"
+                disabled={jsonImportLoading || !jsonImportText.trim()}
+                onClick={() => void handleJsonImportSave()}
+                className="border border-[#14532d] bg-green-900/20 px-3 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
+              >
+                {jsonImportLoading && jsonImportDryRunResult ? "Importando..." : "Importar questoes"}
               </button>
             </div>
           </div>

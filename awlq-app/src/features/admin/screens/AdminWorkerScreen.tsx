@@ -96,7 +96,7 @@ export function AdminWorkerScreen() {
   const [data, setData] = useState<WorkerOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"generation" | "worker" | "questions" | "scheduled">("generation");
+  const [activeTab, setActiveTab] = useState<"generation" | "worker" | "questions" | "scheduled" | "manual">("generation");
   const [historyPage, setHistoryPage] = useState(1);
 
   // Questions audit tab state
@@ -120,6 +120,8 @@ export function AdminWorkerScreen() {
   const [questionsData, setQuestionsData] = useState<QuestionsPage | null>(null);
   const [questionsPage, setQuestionsPage] = useState(1);
   const [questionsCertId, setQuestionsCertId] = useState("");
+  const [questionsDateFrom, setQuestionsDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [questionsDateTo, setQuestionsDateTo] = useState("");
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [selectedWorkerQuestionId, setSelectedWorkerQuestionId] = useState<string | null>(null);
 
@@ -170,11 +172,18 @@ export function AdminWorkerScreen() {
     fetchData(historyPage);
   }, [historyPage]);
 
-  async function fetchQuestions(page = questionsPage, certId = questionsCertId) {
+  async function fetchQuestions(
+    page = questionsPage,
+    certId = questionsCertId,
+    dateFrom = questionsDateFrom,
+    dateTo = questionsDateTo,
+  ) {
     setQuestionsLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: "20" });
       if (certId) params.set("certificationId", certId);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
       const res = await fetch(`/api/admin/worker/questions?${params}`);
       if (!res.ok) throw new Error(await res.text());
       setQuestionsData(await res.json());
@@ -187,9 +196,9 @@ export function AdminWorkerScreen() {
 
   useEffect(() => {
     if (activeTab === "questions") {
-      fetchQuestions(questionsPage, questionsCertId);
+      fetchQuestions(questionsPage, questionsCertId, questionsDateFrom, questionsDateTo);
     }
-  }, [activeTab, questionsPage, questionsCertId]);
+  }, [activeTab, questionsPage, questionsCertId, questionsDateFrom, questionsDateTo]);
 
   async function fetchScheduledJobs() {
     setScheduledLoading(true);
@@ -340,7 +349,7 @@ export function AdminWorkerScreen() {
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 border-b-2 border-[var(--pixel-border)]">
-        {(["generation", "worker", "questions", "scheduled"] as const).map((tab) => (
+        {(["generation", "worker", "questions", "scheduled", "manual"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -356,7 +365,9 @@ export function AdminWorkerScreen() {
               ? "Worker"
               : tab === "questions"
               ? "Questoes Geradas"
-              : "Jobs Agendados"}
+              : tab === "scheduled"
+              ? "Jobs Agendados"
+              : "Manual"}
           </button>
         ))}
       </div>
@@ -693,7 +704,28 @@ export function AdminWorkerScreen() {
                   ))}
                 </select>
               </div>
-              <PixelButton onClick={() => fetchQuestions(questionsPage, questionsCertId)} disabled={questionsLoading}>
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase text-[var(--pixel-subtext)]">De</p>
+                <input
+                  type="date"
+                  value={questionsDateFrom}
+                  onChange={(e) => { setQuestionsDateFrom(e.target.value); setQuestionsPage(1); }}
+                  className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase text-[var(--pixel-subtext)]">Ate</p>
+                <input
+                  type="date"
+                  value={questionsDateTo}
+                  onChange={(e) => { setQuestionsDateTo(e.target.value); setQuestionsPage(1); }}
+                  className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 text-xs text-[var(--pixel-text)]"
+                />
+              </div>
+              <PixelButton
+                onClick={() => fetchQuestions(questionsPage, questionsCertId, questionsDateFrom, questionsDateTo)}
+                disabled={questionsLoading}
+              >
                 {questionsLoading ? "Carregando..." : "Atualizar"}
               </PixelButton>
             </div>
@@ -906,6 +938,82 @@ export function AdminWorkerScreen() {
               </div>
             )}
           </PixelCard>
+        </div>
+      )}
+
+      {activeTab === "manual" && (
+        <div className="space-y-4">
+          <PixelCard className="space-y-2">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Referencia dos Workers e Jobs</p>
+            <p className="text-xs text-[var(--pixel-subtext)]">
+              Descricao de cada worker/job disponivel no sistema, o que faz, quando roda e quais dados processa.
+            </p>
+          </PixelCard>
+
+          {[
+            {
+              id: "question-generation",
+              title: "question-generation",
+              what: "Gera novas questoes de simulado e KC para uma certificacao especifica, usando o blueprint de dominios como guia de peso por topico.",
+              when: "Acionado manualmente via painel (aba Geracao) ou via job agendado.",
+              inputs: "CertificationPresetId, IngestionSource (URL de blueprint), topico alvo.",
+              outputs: "Novas StudyQuestion gravadas no banco, vinculadas a certificacao e servico AWS.",
+            },
+            {
+              id: "source-fetch",
+              title: "source-fetch",
+              what: "Busca fontes externas (URLs de blueprints de exame) e parseia os dominios e pesos do ExamBlueprint.",
+              when: "Acionado manualmente ou por job agendado apos cadastro de nova IngestionSource.",
+              inputs: "IngestionSource.url (PDF ou pagina web com blueprint).",
+              outputs: "ExamBlueprintDomain atualizado, contagem de dominios e pesos por certificacao.",
+            },
+            {
+              id: "feedback-analysis",
+              title: "feedback-analysis",
+              what: "Analisa sessoes de estudo dos usuarios nos ultimos N dias e identifica areas com maior taxa de erro (WeakAreaReport).",
+              when: "Rodado periodicamente (job agendado) ou manualmente. Default: diario.",
+              inputs: "StudySessionHistory dos ultimos windowDays dias por certificacao.",
+              outputs: "WeakAreaReport salvo por certificacao, com lista de areas fracas e metrica de erro por topico.",
+            },
+            {
+              id: "performance-compute",
+              title: "performance-compute",
+              what: "Calcula metricas de desempenho por questao (taxa de acerto, taxa de erro, numero de tentativas) e atualiza QuestionPerformance.",
+              when: "Rodado apos cada lote de sessoes ou agendado periodicamente.",
+              inputs: "StudySessionHistory.answersSnapshot de todas as sessoes.",
+              outputs: "QuestionPerformance atualizado por questionId, com flagged/improved/retired conforme threshold.",
+            },
+            {
+              id: "email-send",
+              title: "email-send",
+              what: "Processa a fila de emails pendentes e envia mensagens usando o template configurado (aprovacao, rejeicao, etc.).",
+              when: "Automaticamente quando um email e enfileirado (aprovacao/rejeicao de usuario, convite de engajamento).",
+              inputs: "Fila de emails no banco com template e destinatario.",
+              outputs: "Email enviado via provedor configurado; status atualizado para sent/failed.",
+            },
+          ].map((job) => (
+            <PixelCard key={job.id} className="space-y-2">
+              <p className="font-mono text-xs uppercase text-[var(--pixel-primary)]">{job.title}</p>
+              <div className="grid gap-2 text-xs md:grid-cols-2">
+                <div>
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">O que faz</p>
+                  <p className="mt-0.5 text-[var(--pixel-text)]">{job.what}</p>
+                </div>
+                <div>
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Quando roda</p>
+                  <p className="mt-0.5 text-[var(--pixel-text)]">{job.when}</p>
+                </div>
+                <div>
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Inputs</p>
+                  <p className="mt-0.5 text-[var(--pixel-subtext)]">{job.inputs}</p>
+                </div>
+                <div>
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Outputs</p>
+                  <p className="mt-0.5 text-[var(--pixel-subtext)]">{job.outputs}</p>
+                </div>
+              </div>
+            </PixelCard>
+          ))}
         </div>
       )}
 

@@ -5,12 +5,19 @@ import { listAdminUsers } from "@/features/admin/services/admin-api";
 import { AdminUserEditModal } from "@/features/admin/components/AdminUserEditModal";
 import { AdminUserListItem, CertificationOption, PaginatedResult } from "@/features/admin/types";
 
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+function isOnline(lastSeen: string): boolean {
+  return Date.now() - new Date(lastSeen).getTime() < ONLINE_WINDOW_MS;
+}
+
 export function AdminUsersScreen() {
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   const [accessStatus, setAccessStatus] = useState<"" | "pending" | "approved" | "rejected">("");
   const [active, setActive] = useState<"" | "true" | "false">("");
   const [certificationCode, setCertificationCode] = useState("");
+  const [onlineOnly, setOnlineOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"createdAt" | "lastSeen" | "name" | "email" | "role">("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
@@ -121,6 +128,18 @@ export function AdminUsersScreen() {
           >
             Atualizar dados
           </button>
+          {result && (() => {
+            const onlineCount = result.items.filter((u) => isOnline(u.lastSeen)).length;
+            return onlineCount > 0 ? (
+              <span className="flex items-center gap-1.5 border border-green-700 bg-green-900/20 px-2 py-1 font-mono text-[10px] uppercase text-green-300">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+                </span>
+                {onlineCount} online agora
+              </span>
+            ) : null;
+          })()}
           {autoApprove !== null && (
             <button
               type="button"
@@ -207,6 +226,15 @@ export function AdminUsersScreen() {
               <option value="asc">Asc</option>
             </select>
           </div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-[#94a3b8]">
+            <input
+              type="checkbox"
+              checked={onlineOnly}
+              onChange={(e) => { setPage(1); setOnlineOnly(e.target.checked); }}
+              className="accent-green-400"
+            />
+            Apenas online (5 min)
+          </label>
         </div>
       </section>
 
@@ -225,6 +253,7 @@ export function AdminUsersScreen() {
                   <th className="px-3 py-2">Role</th>
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Ativo</th>
+                  <th className="px-3 py-2 text-center">Online</th>
                   <th className="px-3 py-2">Labs</th>
                   <th className="px-3 py-2">Estudos</th>
                   <th className="px-3 py-2">Ultimo acesso</th>
@@ -232,7 +261,7 @@ export function AdminUsersScreen() {
                 </tr>
               </thead>
               <tbody>
-                {result.items.map((item) => (
+                {result.items.filter((u) => !onlineOnly || isOnline(u.lastSeen)).map((item) => (
                   <tr key={item.id} className="border-b border-[#1e293b] text-[#e2e8f0] hover:bg-white/[0.02]">
                     <td className="px-3 py-2">
                       <div>
@@ -261,6 +290,16 @@ export function AdminUsersScreen() {
                       }`}>
                         {item.active ? "sim" : "nao"}
                       </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {isOnline(item.lastSeen) ? (
+                        <span className="relative flex h-2.5 w-2.5 mx-auto">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-400" />
+                        </span>
+                      ) : (
+                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#334155]" />
+                      )}
                     </td>
                     <td className="px-3 py-2 text-center font-mono text-xs">{item._count.questHistory}</td>
                     <td className="px-3 py-2 text-center font-mono text-xs">{item._count.studyHistory}</td>

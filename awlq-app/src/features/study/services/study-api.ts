@@ -39,6 +39,7 @@ export type SaveStudyHistoryPayload = {
   totalQuestions: number;
   durationSeconds?: number;
   answersSnapshot: StudyAnswerSnapshotPayload[];
+  packId?: string | null;
 };
 
 export type QuestHistoryItem = {
@@ -169,6 +170,40 @@ export async function createSimuladoQuestions(params: { count: number; difficult
   }
 
   return {
+    questions: data.questions,
+    certificationCode: data.certificationCode,
+    examMinutes: data.examMinutes,
+    examGuide: data.examGuide,
+  };
+}
+
+export async function createSimuladoQuestionsFromPack(packId: string): Promise<{
+  packId: string;
+  packName: string;
+  questions: StudyQuestion[];
+  certificationCode: string;
+  examMinutes?: number;
+  examGuide?: SimuladoExamGuidePayload;
+}> {
+  const response = await fetch(`/api/study/simulado/pack-questions?packId=${encodeURIComponent(packId)}`);
+
+  const data = await parseJson<{
+    packId?: string;
+    packName?: string;
+    questions?: StudyQuestion[];
+    certificationCode?: string;
+    examMinutes?: number;
+    examGuide?: SimuladoExamGuidePayload;
+    error?: string;
+  }>(response);
+
+  if (!response.ok || !data.questions || !data.certificationCode) {
+    throw new Error(data.error ?? "Nao foi possivel carregar as questoes do pack.");
+  }
+
+  return {
+    packId: data.packId ?? packId,
+    packName: data.packName ?? "",
     questions: data.questions,
     certificationCode: data.certificationCode,
     examMinutes: data.examMinutes,

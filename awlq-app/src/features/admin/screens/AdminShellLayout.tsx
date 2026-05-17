@@ -13,7 +13,9 @@ const ADMIN_MENU = [
   { href: "/admin/users", label: "Usuarios" },
   { href: "/admin/email", label: "Email" },
   { href: "/admin/questions", label: "Banco de Questoes" },
+  { href: "/admin/simulados", label: "Simulados" },
   { href: "/admin/worker", label: "Worker / Geracao" },
+  { href: "/admin/config-ia", label: "Config de IA" },
 ];
 
 export function AdminShellLayout({ children }: { children: React.ReactNode }) {
