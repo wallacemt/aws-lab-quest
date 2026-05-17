@@ -46,6 +46,7 @@ model User {
   questionReports         QuestionReport[]      @relation("QuestionReportAuthor")
   reviewedQuestionReports QuestionReport[]      @relation("QuestionReportReviewer")
   certBadges              UserCertBadge[]
+  simuladoPacks           SimuladoPack[]
 
   @@index([accessStatus, active])
   @@map("user")
@@ -129,6 +130,7 @@ model CertificationPreset {
   blueprintDomains ExamBlueprintDomain[]
   weakAreaReports  WeakAreaReport[]
   certBadges       UserCertBadge[]
+  simuladoPacks    SimuladoPack[]
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
 }
@@ -245,6 +247,7 @@ model StudyQuestion {
   questionTopics        QuestionTopic[]
   questionReports       QuestionReport[]
   performance           QuestionPerformance?
+  packQuestions         SimuladoPackQuestion[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 
@@ -305,23 +308,26 @@ model QuestionTopic {
 }
 
 model StudySessionHistory {
-  id                String           @id @default(cuid())
+  id                String        @id @default(cuid())
   userId            String
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionType       StudySessionType
   title             String
   certificationCode String?
-  gainedXp          Int              @default(0)
+  gainedXp          Int           @default(0)
   scorePercent      Int
   correctAnswers    Int
   totalQuestions    Int
   durationSeconds   Int?
   answersSnapshot   Json
   completedAt       DateTime
-  createdAt         DateTime         @default(now())
+  createdAt         DateTime      @default(now())
+  packId            String?
+  pack              SimuladoPack? @relation(fields: [packId], references: [id], onDelete: SetNull)
 
   @@index([userId, completedAt])
   @@index([sessionType])
+  @@index([packId])
 }
 
 model QuestionReport {
@@ -637,4 +643,39 @@ model UserCertBadge {
   createdAt             DateTime             @default(now())
 
   @@index([userId])
+}
+
+// ─── Simulado Pack models ─────────────────────────────────────────────────────
+
+model SimuladoPack {
+  id                    String                 @id @default(cuid())
+  name                  String
+  certificationPresetId String?
+  certificationPreset   CertificationPreset?   @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
+  createdByUserId       String?
+  createdBy             User?                  @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  questionCount         Int                    @default(65)
+  active                Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  questions             SimuladoPackQuestion[]
+  sessions              StudySessionHistory[]
+
+  @@index([certificationPresetId, active])
+  @@index([createdByUserId])
+  @@index([active, createdAt])
+}
+
+model SimuladoPackQuestion {
+  id         String        @id @default(cuid())
+  packId     String
+  pack       SimuladoPack  @relation(fields: [packId], references: [id], onDelete: Cascade)
+  questionId String
+  question   StudyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  position   Int
+
+  @@unique([packId, questionId])
+  @@unique([packId, position])
+  @@index([questionId])
 }
