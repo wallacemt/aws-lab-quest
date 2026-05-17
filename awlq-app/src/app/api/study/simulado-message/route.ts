@@ -15,9 +15,9 @@ type Body = {
 
 function fallbackMessage(passed: boolean, firstName: string): string {
   if (passed) {
-    return `Excelente desempenho, ${firstName}! Voce provou que esta pronto para a certificacao. O awslq acredita em voce!`;
+    return `Excelente desempenho, ${firstName}! Voce provou que esta pronto para a certificacao. Eu acredito em voce!`;
   }
-  return `Nao desanime, ${firstName}! Cada tentativa e um passo a mais na sua jornada. Continue praticando — o awslq acredita em voce!`;
+  return `Nao desanime, ${firstName}! Cada tentativa e um passo a mais na sua jornada. Continue praticando — acreditamos em voce!`;
 }
 
 function firstName(name: string): string {
@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
     .join("\n");
 
   const systemPrompt = passed
-    ? `Voce e o tutor motivacional do AWS Lab Quest, um app gamificado de estudos para certificacoes AWS. Escreva uma mensagem curta (3-4 frases) em portugues, calorosa e pessoal, parabenizando o estudante por ter atingido a pontuacao minima no simulado. Mencione o esforco e dedicacao, nao apenas o resultado. Se houver uma area de destaque, elogie especificamente. Termine SEMPRE com a frase exata: "O awslq acredita em voce!". Escreva apenas o texto da mensagem, sem aspas, sem prefixo.`
-    : `Voce e o tutor motivacional do AWS Lab Quest, um app gamificado de estudos para certificacoes AWS. Escreva uma mensagem curta (3-4 frases) em portugues, acolhedora e encorajadora, para um estudante que nao atingiu a pontuacao minima no simulado. Mostre empatia real, normalize o erro como parte da jornada, e aponte um caminho concreto de melhora (se houver area fraca, mencione-a). Termine SEMPRE com a frase exata: "O awslq acredita em voce!". Escreva apenas o texto da mensagem, sem aspas, sem prefixo.`;
+    ? `Voce e o tutor motivacional do AWS Lab Quest, um app gamificado de estudos para certificacoes AWS. Escreva uma mensagem curta (3-4 frases) em portugues, calorosa e pessoal, parabenizando o estudante por ter atingido a pontuacao minima no simulado. Mencione o esforco e dedicacao, nao apenas o resultado. Se houver uma area de destaque, elogie especificamente. Termine SEMPRE com a frase exata: "Eu acredito em voce!". Escreva apenas o texto da mensagem, sem aspas, sem prefixo.`
+    : `Voce e o tutor motivacional do AWS Lab Quest, um app gamificado de estudos para certificacoes AWS. Escreva uma mensagem curta (3-4 frases) em portugues, acolhedora e encorajadora, para um estudante que nao atingiu a pontuacao minima no simulado. Mostre empatia real, normalize o erro como parte da jornada, e aponte um caminho concreto de melhora (se houver area fraca, mencione-a). Termine SEMPRE com a frase exata: "Nos acreditamos em voce!". Escreva apenas o texto da mensagem, sem aspas, sem prefixo.`;
 
   const userPrompt = `Dados do simulado:\n${context}\n\nEscreva a mensagem personalizada para ${first}:`;
 

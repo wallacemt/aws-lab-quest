@@ -31,6 +31,7 @@ type Body = {
   totalQuestions?: number;
   durationSeconds?: number;
   answersSnapshot?: StudyHistoryItem[];
+  packId?: string;
 };
 
 function toTaskDifficulty(value: string | undefined): "easy" | "medium" | "hard" {
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
       totalQuestions: Math.max(1, Math.round(body.totalQuestions)),
       durationSeconds: body.durationSeconds == null ? null : Math.max(0, Math.round(body.durationSeconds)),
       answersSnapshot: snapshot,
+      packId: typeof body.packId === "string" && body.packId.length > 0 ? body.packId : null,
       completedAt: new Date(),
     },
   });
