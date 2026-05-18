@@ -16,6 +16,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       name: true,
       active: true,
       questionCount: true,
+      artworkUrl: true,
       createdAt: true,
       certificationPreset: { select: { id: true, code: true, name: true } },
       questions: {
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     name: pack.name,
     active: pack.active,
     questionCount: pack.questionCount,
+    artworkUrl: pack.artworkUrl ?? null,
     createdAt: pack.createdAt,
     certificationPreset: pack.certificationPreset,
     questions: pack.questions.map((pq) => ({
@@ -62,6 +64,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const body = (await request.json().catch(() => ({}))) as {
     active?: boolean;
     name?: string;
+    artworkUrl?: string | null;
     addQuestionIds?: string[];
     removeQuestionIds?: string[];
   };
@@ -72,9 +75,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   });
   if (!pack) return NextResponse.json({ error: "Pack nao encontrado" }, { status: 404 });
 
-  const updateData: { active?: boolean; name?: string; questionCount?: number } = {};
+  const updateData: { active?: boolean; name?: string; artworkUrl?: string | null; questionCount?: number } = {};
   if (body.active !== undefined) updateData.active = body.active;
   if (body.name !== undefined) updateData.name = body.name.trim();
+  if ("artworkUrl" in body) updateData.artworkUrl = body.artworkUrl ?? null;
 
   let newCount = pack.questionCount;
 

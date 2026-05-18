@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     certificationName: p.certificationPreset?.name ?? null,
     questionCount: p.questionCount,
     active: p.active,
+    artworkUrl: p.artworkUrl ?? null,
     createdAt: p.createdAt.toISOString(),
     createdByName: p.createdBy?.name ?? null,
     sessionCount: p._count.sessions,
@@ -54,6 +55,7 @@ type CreateBody = {
   name: string;
   certificationCode: string;
   questionIds: string[];
+  artworkUrl?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -87,11 +89,12 @@ export async function POST(request: NextRequest) {
       createdByUserId: adminResult.userId,
       questionCount: questionIds.length,
       active: true,
+      artworkUrl: body.artworkUrl ?? null,
       questions: {
         create: questionIds.map((questionId, position) => ({ questionId, position })),
       },
     },
-    select: { id: true, name: true, questionCount: true },
+    select: { id: true, name: true, questionCount: true, artworkUrl: true },
   });
 
   return NextResponse.json(pack, { status: 201 });
