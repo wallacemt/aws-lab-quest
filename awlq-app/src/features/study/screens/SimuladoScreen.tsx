@@ -65,6 +65,7 @@ type SimuladoPackListItem = {
   id: string;
   name: string;
   questionCount: number;
+  artworkUrl: string | null;
   createdAt: string;
   attempts: number;
   bestScore: number | null;
@@ -1390,17 +1391,49 @@ export function SimuladoScreen() {
                               : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]",
                         ].join(" ")}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-mono text-xs text-[var(--pixel-primary)]">{pack.name}</p>
-                            <p className="mt-0.5 font-mono text-[10px] text-[var(--pixel-subtext)]">
-                              {pack.questionCount} questoes · {timeAgo(pack.createdAt)}
-                            </p>
+                        {/* Artwork header */}
+                        {pack.artworkUrl ? (
+                          <div className="relative -mx-4 -mt-4 mb-1 overflow-hidden">
+                            <img
+                              src={pack.artworkUrl}
+                              alt={pack.name}
+                              className="h-28 w-full object-cover"
+                            />
+                            {done && (
+                              <span
+                                className={[
+                                  "absolute right-2 top-2 border px-2 py-0.5 font-mono text-[10px] uppercase backdrop-blur-sm",
+                                  passed
+                                    ? "border-green-700 bg-green-900/80 text-green-300"
+                                    : "border-yellow-700 bg-yellow-900/80 text-yellow-300",
+                                ].join(" ")}
+                              >
+                                {passed ? "Aprovado" : "Reprovado"}
+                              </span>
+                            )}
                           </div>
-                          {done && (
+                        ) : null}
+
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            {!pack.artworkUrl && (
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--pixel-border)] bg-[var(--pixel-primary)]/10">
+                                <span className="font-mono text-lg font-bold text-[var(--pixel-primary)]">
+                                  {pack.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-mono text-xs text-[var(--pixel-primary)]">{pack.name}</p>
+                              <p className="mt-0.5 font-mono text-[10px] text-[var(--pixel-subtext)]">
+                                {pack.questionCount} questoes · {timeAgo(pack.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          {done && !pack.artworkUrl && (
                             <span
                               className={[
-                                "border px-2 py-0.5 font-mono text-[10px] uppercase",
+                                "shrink-0 border px-2 py-0.5 font-mono text-[10px] uppercase",
                                 passed ? "border-green-700 text-green-400" : "border-yellow-700 text-yellow-400",
                               ].join(" ")}
                             >

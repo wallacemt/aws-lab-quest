@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
+import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
 import { CertificationOption } from "@/features/admin/types";
 
 type PackQuestion = {
@@ -20,6 +21,7 @@ type PackDetail = {
   name: string;
   active: boolean;
   questionCount: number;
+  artworkUrl: string | null;
   certificationPreset: { id: string; code: string; name: string } | null;
   questions: PackQuestion[];
 };
@@ -82,6 +84,8 @@ export function AdminSimuladosScreen() {
   const [editPack, setEditPack] = useState<PackDetail | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editName, setEditName] = useState("");
+  const [editArtworkUrl, setEditArtworkUrl] = useState<string | null>(null);
+  const [editArtworkChanged, setEditArtworkChanged] = useState(false);
   const [editRemovedIds, setEditRemovedIds] = useState<Set<string>>(new Set());
   const [editAddedIds, setEditAddedIds] = useState<Set<string>>(new Set());
   const [editAddedQuestions, setEditAddedQuestions] = useState<AvailableQuestion[]>([]);
@@ -239,6 +243,8 @@ export function AdminSimuladosScreen() {
       const data = (await res.json()) as PackDetail;
       setEditPack(data);
       setEditName(data.name);
+      setEditArtworkUrl(data.artworkUrl);
+      setEditArtworkChanged(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro");
     } finally {
@@ -285,6 +291,7 @@ export function AdminSimuladosScreen() {
     try {
       const body: Record<string, unknown> = {};
       if (editName.trim() !== editPack.name) body.name = editName.trim();
+      if (editArtworkChanged) body.artworkUrl = editArtworkUrl;
       if (editRemovedIds.size > 0) body.removeQuestionIds = Array.from(editRemovedIds);
       if (editAddedIds.size > 0) body.addQuestionIds = Array.from(editAddedIds);
 
@@ -613,6 +620,12 @@ export function AdminSimuladosScreen() {
                 className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
               />
             </label>
+
+            <ArtworkUploadField
+              value={editArtworkUrl}
+              onChange={(url) => { setEditArtworkUrl(url); setEditArtworkChanged(true); }}
+              label="Arte do pack"
+            />
 
             {/* Current questions */}
             <div className="space-y-2">

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
+import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
 import { CertificationOption } from "@/features/admin/types";
 
 type AvailableQuestion = {
@@ -28,6 +29,7 @@ export function AdminSimuladoMakerScreen() {
   // Step 1
   const [name, setName] = useState("");
   const [certificationCode, setCertificationCode] = useState("");
+  const [artworkUrl, setArtworkUrl] = useState<string | null>(null);
 
   // Step 2 — question picker
   const [search, setSearch] = useState("");
@@ -134,6 +136,7 @@ export function AdminSimuladoMakerScreen() {
           name,
           certificationCode,
           questionIds: Array.from(selectedIds),
+          artworkUrl: artworkUrl ?? undefined,
         }),
       });
       const json = (await res.json()) as { id?: string; name?: string; error?: string };
@@ -170,7 +173,8 @@ export function AdminSimuladoMakerScreen() {
             </Link>
             <button
               onClick={() => {
-                setName(""); setCertificationCode(""); setSelectedIds(new Set()); setSelectedQuestions([]);
+                setName(""); setCertificationCode(""); setArtworkUrl(null);
+                setSelectedIds(new Set()); setSelectedQuestions([]);
                 setStep(1); setCreatedPack(null); setSubmitError(null);
               }}
               className="border border-[#f97316] px-4 py-2 font-mono text-xs uppercase text-[#f97316] hover:bg-[#f97316]/10"
@@ -232,6 +236,8 @@ export function AdminSimuladoMakerScreen() {
               ))}
             </select>
           </div>
+
+          <ArtworkUploadField value={artworkUrl} onChange={setArtworkUrl} />
 
           <button
             onClick={() => setStep(2)}
