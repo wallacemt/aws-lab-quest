@@ -656,6 +656,7 @@ model SimuladoPack {
   createdBy             User?                  @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   questionCount         Int                    @default(65)
   active                Boolean                @default(true)
+  artworkUrl            String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
