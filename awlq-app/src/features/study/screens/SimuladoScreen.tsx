@@ -1473,7 +1473,7 @@ export function SimuladoScreen() {
                                 </button>
                                 {done && pack.lastSessionId && (
                                   <a
-                                    href={`/study/history/${pack.lastSessionId}`}
+                                    href={`/simulado/historico/${pack.lastSessionId}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="border border-[var(--pixel-border)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
@@ -1548,7 +1548,7 @@ export function SimuladoScreen() {
 
                                 {done && pack.lastSessionId && (
                                   <a
-                                    href={`/study/history/${pack.lastSessionId}`}
+                                    href={`/simulado/historico/${pack.lastSessionId}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="border border-white/30 bg-black/40 px-3 py-1.5 font-mono text-[10px] uppercase text-white/70 backdrop-blur-sm hover:text-white"
@@ -1623,7 +1623,7 @@ export function SimuladoScreen() {
 
                               {done && pack.lastSessionId && (
                                 <a
-                                  href={`/study/history/${pack.lastSessionId}`}
+                                  href={`/simulado/historico/${pack.lastSessionId}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
@@ -1658,7 +1658,7 @@ export function SimuladoScreen() {
                                   </p>
                                 </div>
                                 <a
-                                  href={`/study/history/${s.id}`}
+                                  href={`/simulado/historico/${s.id}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-primary)]"
