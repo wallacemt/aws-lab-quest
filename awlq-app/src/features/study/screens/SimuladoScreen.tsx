@@ -42,6 +42,23 @@ function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): Q
   return [...current, option].sort();
 }
 
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "agora";
+  if (mins < 60) return `há ${mins}min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `há ${days} dia${days > 1 ? "s" : ""}`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `há ${weeks} semana${weeks > 1 ? "s" : ""}`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `há ${months} ${months === 1 ? "mês" : "meses"}`;
+  const years = Math.floor(days / 365);
+  return `há ${years} ano${years > 1 ? "s" : ""}`;
+}
+
 type RulesConsentMap = Record<string, string>;
 
 type SimuladoPackListItem = {
@@ -273,6 +290,8 @@ export function SimuladoScreen() {
   const [packsLoading, setPacksLoading] = useState(false);
   const [packsFilter, setPacksFilter] = useState<"all" | "todo" | "done">("all");
   const [packsRefreshKey, setPacksRefreshKey] = useState(0);
+  const [packsSearch, setPacksSearch] = useState("");
+  const [packsSort, setPacksSort] = useState<"newest" | "oldest" | "name_az" | "score_desc">("newest");
   const [certInfo, setCertInfo] = useState<{ code: string; name: string } | null>(null);
   const [pendingPackId, setPendingPackId] = useState<string | null>(null);
   const [pendingPackName, setPendingPackName] = useState<string | null>(null);
@@ -1256,30 +1275,59 @@ export function SimuladoScreen() {
             {activeTab === "simulados" && (
               <div className="space-y-4 p-4">
                 {/* Filter bar */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {(["all", "todo", "done"] as const).map((f) => (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(["all", "todo", "done"] as const).map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setPacksFilter(f)}
+                        className={[
+                          "border px-3 py-1 font-mono text-[10px] uppercase",
+                          packsFilter === f
+                            ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
+                            : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
+                        ].join(" ")}
+                      >
+                        {f === "all" ? "Todos" : f === "todo" ? "Nao realizados" : "Realizados"}
+                      </button>
+                    ))}
                     <button
-                      key={f}
                       type="button"
-                      onClick={() => setPacksFilter(f)}
-                      className={[
-                        "border px-3 py-1 font-mono text-[10px] uppercase",
-                        packsFilter === f
-                          ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
-                          : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
-                      ].join(" ")}
+                      disabled={packsLoading}
+                      onClick={() => setPacksRefreshKey((k) => k + 1)}
+                      className="ml-auto border border-[var(--pixel-border)] px-3 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50 disabled:opacity-40"
                     >
-                      {f === "all" ? "Todos" : f === "todo" ? "Nao realizados" : "Realizados"}
+                      {packsLoading ? "..." : "↻ Atualizar"}
                     </button>
-                  ))}
-                  <button
-                    type="button"
-                    disabled={packsLoading}
-                    onClick={() => setPacksRefreshKey((k) => k + 1)}
-                    className="ml-auto border border-[var(--pixel-border)] px-3 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50 disabled:opacity-40"
-                  >
-                    {packsLoading ? "..." : "↻ Atualizar"}
-                  </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={packsSearch}
+                      onChange={(e) => setPacksSearch(e.target.value)}
+                      placeholder="Buscar pack..."
+                      className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-1.5 font-mono text-[10px] text-[var(--pixel-text)] outline-none focus:border-[var(--pixel-primary)]/50"
+                    />
+                    <select
+                      value={packsSort}
+                      onChange={(e) => setPacksSort(e.target.value as typeof packsSort)}
+                      className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-1.5 font-mono text-[10px] text-[var(--pixel-subtext)] outline-none"
+                    >
+                      <option value="newest">Mais recentes</option>
+                      <option value="oldest">Mais antigos</option>
+                      <option value="name_az">Nome A-Z</option>
+                      <option value="score_desc">Melhor pontuacao</option>
+                    </select>
+                    {packsSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setPacksSearch("")}
+                        className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-primary)]"
+                      >
+                        ✕ Limpar busca
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
@@ -1305,8 +1353,27 @@ export function SimuladoScreen() {
                   </div>
                 )}
 
+                {(() => {
+                  const search = packsSearch.trim().toLowerCase();
+                  const filtered = search
+                    ? packs.filter((p) => p.name.toLowerCase().includes(search))
+                    : packs;
+                  const sorted = [...filtered].sort((a, b) => {
+                    if (packsSort === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                    if (packsSort === "name_az") return a.name.localeCompare(b.name);
+                    if (packsSort === "score_desc") return (b.bestScore ?? -1) - (a.bestScore ?? -1);
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  });
+                  if (!packsLoading && filtered.length === 0 && packs.length > 0) {
+                    return (
+                      <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
+                        Nenhum pack encontrado para &ldquo;{packsSearch}&rdquo;.
+                      </p>
+                    );
+                  }
+                  return (
                 <div className="grid gap-3 md:grid-cols-2">
-                  {packs.map((pack) => {
+                  {sorted.map((pack) => {
                     const done = pack.attempts > 0;
                     const passed = done && pack.bestScore !== null && pack.bestScore >= 70;
                     const isExpanded = expandedPackHistory === pack.id;
@@ -1327,7 +1394,7 @@ export function SimuladoScreen() {
                           <div>
                             <p className="font-mono text-xs text-[var(--pixel-primary)]">{pack.name}</p>
                             <p className="mt-0.5 font-mono text-[10px] text-[var(--pixel-subtext)]">
-                              {pack.questionCount} questoes
+                              {pack.questionCount} questoes · {timeAgo(pack.createdAt)}
                             </p>
                           </div>
                           {done && (
@@ -1407,6 +1474,8 @@ export function SimuladoScreen() {
                     );
                   })}
                 </div>
+                  );
+                })()}
               </div>
             )}
 
