@@ -300,36 +300,53 @@ export function ProfileScreen() {
             {currentBadge?.imageUrl && (
               <motion.div
                 key={currentBadge.level}
-                className="shrink-0"
+                className="group shrink-0"
                 initial={{ opacity: 0, scale: 0.7, rotate: -8 }}
                 animate={{ opacity: 1, scale: 1, rotate: 0 }}
                 exit={{ opacity: 0, scale: 0.7 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
                 whileHover={{ scale: 1.12, rotate: 3 }}
               >
-                <motion.div
-                  animate={
-                    currentLevel.tone === "legendary"
-                      ? { boxShadow: ["0 0 8px 2px #ffd70080", "0 0 24px 8px #ffd700cc", "0 0 8px 2px #ffd70080"] }
-                      : {
-                          boxShadow: [
-                            "0 0 0px 0px transparent",
-                            "0 0 12px 4px var(--pixel-primary)",
-                            "0 0 0px 0px transparent",
-                          ],
-                        }
-                  }
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  className="border-2 border-pixel-border overflow-hidden"
-                >
-                  <Image
-                    src={currentBadge.imageUrl}
-                    alt={`Badge ${currentBadge.name}`}
-                    width={130}
-                    height={130}
-                    className="object-cover"
-                  />
-                </motion.div>
+                <div className="relative">
+                  <motion.div
+                    animate={
+                      currentLevel.tone === "legendary"
+                        ? { boxShadow: ["0 0 8px 2px #ffd70080", "0 0 24px 8px #ffd700cc", "0 0 8px 2px #ffd70080"] }
+                        : {
+                            boxShadow: [
+                              "0 0 0px 0px transparent",
+                              "0 0 12px 4px var(--pixel-primary)",
+                              "0 0 0px 0px transparent",
+                            ],
+                          }
+                    }
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    className="border-2 border-pixel-border overflow-hidden"
+                  >
+                    <Image
+                      src={currentBadge.imageUrl}
+                      alt={`Badge ${currentBadge.name}`}
+                      width={130}
+                      height={130}
+                      className="object-cover"
+                    />
+                  </motion.div>
+
+                  {ownedBadgeIds.includes(currentBadge.id) && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyShareLink("badge", currentBadge.id)}
+                        title="Compartilhar badge"
+                        aria-label="Compartilhar badge"
+                        className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-1 font-mono text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
+                      >
+                        Link
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <p className="mt-1 text-center font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
                   {currentBadge.name}
                 </p>

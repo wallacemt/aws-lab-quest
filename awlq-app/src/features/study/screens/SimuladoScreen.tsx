@@ -1383,7 +1383,7 @@ export function SimuladoScreen() {
                       <div
                         key={pack.id}
                         className={[
-                          "border p-4 space-y-3",
+                          "border overflow-hidden",
                           passed
                             ? "border-green-700/60 bg-green-900/10"
                             : done
@@ -1391,102 +1391,166 @@ export function SimuladoScreen() {
                               : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]",
                         ].join(" ")}
                       >
-                        {/* Artwork header */}
                         {pack.artworkUrl ? (
-                          <div className="relative -mx-4 -mt-4 mb-1 overflow-hidden">
+                          /* Game-cover layout — image fills square container with gradient overlay */
+                          <div className="relative aspect-square w-full">
                             <img
                               src={pack.artworkUrl}
                               alt={pack.name}
-                              className="h-28 w-full object-cover"
+                              className="h-full w-full object-cover"
                             />
-                            {done && (
-                              <span
-                                className={[
-                                  "absolute right-2 top-2 border px-2 py-0.5 font-mono text-[10px] uppercase backdrop-blur-sm",
-                                  passed
-                                    ? "border-green-700 bg-green-900/80 text-green-300"
-                                    : "border-yellow-700 bg-yellow-900/80 text-yellow-300",
-                                ].join(" ")}
-                              >
-                                {passed ? "Aprovado" : "Reprovado"}
-                              </span>
-                            )}
-                          </div>
-                        ) : null}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+                            <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3">
+                              <div className="flex items-end justify-between gap-2">
+                                <p className="font-mono text-sm font-bold leading-tight text-primary drop-shadow">
+                                  {pack.name}
+                                </p>
+                                {done && (
+                                  <span
+                                    className={[
+                                      "shrink-0 border px-2 py-0.5 font-mono text-[10px] uppercase backdrop-blur-sm",
+                                      passed
+                                        ? "border-green-600 bg-green-900/70 text-green-300"
+                                        : "border-yellow-600 bg-yellow-900/70 text-yellow-300",
+                                    ].join(" ")}
+                                  >
+                                    {passed ? "Aprovado" : "Reprovado"}
+                                  </span>
+                                )}
+                              </div>
 
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-3">
-                            {!pack.artworkUrl && (
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--pixel-border)] bg-[var(--pixel-primary)]/10">
-                                <span className="font-mono text-lg font-bold text-[var(--pixel-primary)]">
-                                  {pack.name.charAt(0).toUpperCase()}
+                              {done && (
+                                <div className="flex items-center gap-3 font-mono text-[10px] text-white/70">
+                                  <span>
+                                    Melhor: <span className="text-white">{pack.bestScore}%</span>
+                                  </span>
+                                  <span>
+                                    Tentativas: <span className="text-white">{pack.attempts}</span>
+                                  </span>
+                                </div>
+                              )}
+
+                              <p className="font-mono text-[10px] text-white/50">
+                                {pack.questionCount} questoes · {timeAgo(pack.createdAt)}
+                              </p>
+
+                              <div className="flex flex-wrap gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPackRulesModal(pack.id, pack.name)}
+                                  disabled={loading}
+                                  className="border border-white/50 bg-black/40 px-3 py-1.5 font-mono text-[10px] uppercase text-white backdrop-blur-sm hover:bg-white/10 disabled:opacity-50"
+                                >
+                                  {loading ? "..." : done ? "Refazer" : "Iniciar"}
+                                </button>
+
+                                {done && pack.lastSessionId && (
+                                  <a
+                                    href={`/study/history/${pack.lastSessionId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="border border-white/30 bg-black/40 px-3 py-1.5 font-mono text-[10px] uppercase text-white/70 backdrop-blur-sm hover:text-white"
+                                  >
+                                    Revisar ultima ↗
+                                  </a>
+                                )}
+
+                                {pack.attempts > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedPackHistory(isExpanded ? null : pack.id)}
+                                    className="border border-white/30 bg-black/40 px-3 py-1.5 font-mono text-[10px] uppercase text-white/60 backdrop-blur-sm hover:text-white/90"
+                                  >
+                                    {isExpanded ? "Fechar" : `Historico (${pack.attempts})`}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Compact layout — no artwork */
+                          <div className="space-y-3 p-4">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--pixel-border)] bg-[var(--pixel-primary)]/10">
+                                  <span className="font-mono text-lg font-bold text-[var(--pixel-primary)]">
+                                    {pack.name.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="font-mono text-xs text-[var(--pixel-primary)]">{pack.name}</p>
+                                  <p className="mt-0.5 font-mono text-[10px] text-[var(--pixel-subtext)]">
+                                    {pack.questionCount} questoes · {timeAgo(pack.createdAt)}
+                                  </p>
+                                </div>
+                              </div>
+                              {done && (
+                                <span
+                                  className={[
+                                    "shrink-0 border px-2 py-0.5 font-mono text-[10px] uppercase",
+                                    passed
+                                      ? "border-green-700 text-green-400"
+                                      : "border-yellow-700 text-yellow-400",
+                                  ].join(" ")}
+                                >
+                                  {passed ? "Aprovado" : "Reprovado"}
+                                </span>
+                              )}
+                            </div>
+
+                            {done && (
+                              <div className="flex items-center gap-4 font-mono text-[10px] text-[var(--pixel-subtext)]">
+                                <span>
+                                  Melhor: <span className="text-[var(--pixel-text)]">{pack.bestScore}%</span>
+                                </span>
+                                <span>
+                                  Tentativas: <span className="text-[var(--pixel-text)]">{pack.attempts}</span>
                                 </span>
                               </div>
                             )}
-                            <div>
-                              <p className="font-mono text-xs text-[var(--pixel-primary)]">{pack.name}</p>
-                              <p className="mt-0.5 font-mono text-[10px] text-[var(--pixel-subtext)]">
-                                {pack.questionCount} questoes · {timeAgo(pack.createdAt)}
-                              </p>
-                            </div>
-                          </div>
-                          {done && !pack.artworkUrl && (
-                            <span
-                              className={[
-                                "shrink-0 border px-2 py-0.5 font-mono text-[10px] uppercase",
-                                passed ? "border-green-700 text-green-400" : "border-yellow-700 text-yellow-400",
-                              ].join(" ")}
-                            >
-                              {passed ? "Aprovado" : "Reprovado"}
-                            </span>
-                          )}
-                        </div>
 
-                        {done && (
-                          <div className="flex items-center gap-4 text-[10px] font-mono text-[var(--pixel-subtext)]">
-                            <span>Melhor: <span className="text-[var(--pixel-text)]">{pack.bestScore}%</span></span>
-                            <span>Tentativas: <span className="text-[var(--pixel-text)]">{pack.attempts}</span></span>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPackRulesModal(pack.id, pack.name)}
+                                disabled={loading}
+                                className="border border-[var(--pixel-primary)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10 disabled:opacity-50"
+                              >
+                                {loading ? "..." : done ? "Refazer" : "Iniciar"}
+                              </button>
+
+                              {done && pack.lastSessionId && (
+                                <a
+                                  href={`/study/history/${pack.lastSessionId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+                                >
+                                  Revisar ultima ↗
+                                </a>
+                              )}
+
+                              {pack.attempts > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedPackHistory(isExpanded ? null : pack.id)}
+                                  className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50"
+                                >
+                                  {isExpanded ? "Fechar" : `Historico (${pack.attempts})`}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         )}
 
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPackRulesModal(pack.id, pack.name)}
-                            disabled={loading}
-                            className="border border-[var(--pixel-primary)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10 disabled:opacity-50"
-                          >
-                            {loading ? "..." : done ? "Refazer" : "Iniciar"}
-                          </button>
-
-                          {done && pack.lastSessionId && (
-                            <a
-                              href={`/study/history/${pack.lastSessionId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
-                            >
-                              Revisar ultima ↗
-                            </a>
-                          )}
-
-                          {pack.attempts > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedPackHistory(isExpanded ? null : pack.id)}
-                              className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50"
-                            >
-                              {isExpanded ? "Fechar" : `Historico (${pack.attempts})`}
-                            </button>
-                          )}
-                        </div>
-
                         {isExpanded && (
-                          <div className="border border-[var(--pixel-border)] divide-y divide-[var(--pixel-border)]">
+                          <div className="divide-y divide-[var(--pixel-border)] border-t border-[var(--pixel-border)]">
                             {pack.sessions.map((s) => (
                               <div key={s.id} className="flex items-center justify-between px-3 py-2">
                                 <div>
-                                  <p className="font-mono text-[10px] text-[var(--pixel-text)]">{s.scorePercent}% — {s.correctAnswers}/{s.totalQuestions}</p>
+                                  <p className="font-mono text-[10px] text-[var(--pixel-text)]">
+                                    {s.scorePercent}% — {s.correctAnswers}/{s.totalQuestions}
+                                  </p>
                                   <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">
                                     {new Date(s.completedAt).toLocaleDateString("pt-BR")}
                                   </p>
