@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   simuladoDraft: "awlq_simulado_draft",
   kcAttempts: "awlq_kc_attempts",
   simuladoRulesConsent: "awlq_simulado_rules_consent",
+  simuladoPacksView: "awlq_simulado_packs_view",
 } as const;
 
 export function safeLocalStorageGet<T>(key: string, fallback: T): T {

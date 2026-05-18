@@ -293,6 +293,7 @@ export function SimuladoScreen() {
   const [packsRefreshKey, setPacksRefreshKey] = useState(0);
   const [packsSearch, setPacksSearch] = useState("");
   const [packsSort, setPacksSort] = useState<"newest" | "oldest" | "name_az" | "score_desc">("newest");
+  const { value: packsView, setValue: setPacksView } = useLocalStorage<"grid" | "list">(STORAGE_KEYS.simuladoPacksView, "grid");
   const [certInfo, setCertInfo] = useState<{ code: string; name: string } | null>(null);
   const [pendingPackId, setPendingPackId] = useState<string | null>(null);
   const [pendingPackName, setPendingPackName] = useState<string | null>(null);
@@ -1293,14 +1294,32 @@ export function SimuladoScreen() {
                         {f === "all" ? "Todos" : f === "todo" ? "Nao realizados" : "Realizados"}
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      disabled={packsLoading}
-                      onClick={() => setPacksRefreshKey((k) => k + 1)}
-                      className="ml-auto border border-[var(--pixel-border)] px-3 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50 disabled:opacity-40"
-                    >
-                      {packsLoading ? "..." : "↻ Atualizar"}
-                    </button>
+                    <div className="ml-auto flex items-center gap-1">
+                      {(["grid", "list"] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setPacksView(v)}
+                          title={v === "grid" ? "Grade" : "Lista"}
+                          className={[
+                            "border px-2 py-1 font-mono text-[11px] leading-none",
+                            packsView === v
+                              ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
+                              : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
+                          ].join(" ")}
+                        >
+                          {v === "grid" ? "⊞" : "☰"}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={packsLoading}
+                        onClick={() => setPacksRefreshKey((k) => k + 1)}
+                        className="border border-[var(--pixel-border)] px-3 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50 disabled:opacity-40"
+                      >
+                        {packsLoading ? "..." : "↻ Atualizar"}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <input
@@ -1373,7 +1392,7 @@ export function SimuladoScreen() {
                     );
                   }
                   return (
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className={packsView === "list" ? "flex flex-col gap-2" : "grid gap-3 md:grid-cols-2"}>
                   {sorted.map((pack) => {
                     const done = pack.attempts > 0;
                     const passed = done && pack.bestScore !== null && pack.bestScore >= 70;
@@ -1391,7 +1410,90 @@ export function SimuladoScreen() {
                               : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]",
                         ].join(" ")}
                       >
-                        {pack.artworkUrl ? (
+                        {packsView === "list" ? (
+                          /* List row layout — image left, content right */
+                          <div className="flex min-h-[5.5rem] items-stretch">
+                            <div className="w-24 shrink-0 overflow-hidden border-r border-[var(--pixel-border)]">
+                              {pack.artworkUrl ? (
+                                <img
+                                  src={pack.artworkUrl}
+                                  alt={pack.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-primary)]/10">
+                                  <span className="font-mono text-2xl font-bold text-[var(--pixel-primary)]">
+                                    {pack.name.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex min-w-0 flex-1 flex-col justify-between p-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="truncate font-mono text-xs font-bold text-[var(--pixel-primary)]">
+                                    {pack.name}
+                                  </p>
+                                  <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+                                    {pack.questionCount} questoes · {timeAgo(pack.createdAt)}
+                                  </p>
+                                  {done && (
+                                    <p className="mt-0.5 font-mono text-[10px] text-[var(--pixel-subtext)]">
+                                      Melhor:{" "}
+                                      <span className="text-[var(--pixel-text)]">{pack.bestScore}%</span>
+                                      {" · "}
+                                      Tent.:{" "}
+                                      <span className="text-[var(--pixel-text)]">{pack.attempts}</span>
+                                    </p>
+                                  )}
+                                </div>
+                                {done && (
+                                  <span
+                                    className={[
+                                      "shrink-0 border px-2 py-0.5 font-mono text-[10px] uppercase",
+                                      passed
+                                        ? "border-green-700 text-green-400"
+                                        : "border-yellow-700 text-yellow-400",
+                                    ].join(" ")}
+                                  >
+                                    {passed ? "Aprovado" : "Reprovado"}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPackRulesModal(pack.id, pack.name)}
+                                  disabled={loading}
+                                  className="border border-[var(--pixel-primary)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10 disabled:opacity-50"
+                                >
+                                  {loading ? "..." : done ? "Refazer" : "Iniciar"}
+                                </button>
+                                {done && pack.lastSessionId && (
+                                  <a
+                                    href={`/study/history/${pack.lastSessionId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="border border-[var(--pixel-border)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+                                  >
+                                    Revisar ↗
+                                  </a>
+                                )}
+                                {pack.attempts > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedPackHistory(isExpanded ? null : pack.id)}
+                                    className="border border-[var(--pixel-border)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50"
+                                  >
+                                    {isExpanded ? "Fechar" : `Hist. (${pack.attempts})`}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : pack.artworkUrl ? (
                           /* Game-cover layout — image fills square container with gradient overlay */
                           <div className="relative aspect-square w-full">
                             <img

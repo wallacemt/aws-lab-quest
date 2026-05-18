@@ -335,6 +335,30 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
     void generateAndPersist();
   }, [failedExplanationByQuestion, historyId, selectedCachedExplanation, selectedQuestion]);
 
+  function handleRetryExplanation(questionId: string) {
+    inFlightExplanationRef.current[questionId] = false;
+    setFailedExplanationByQuestion((prev) => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    setExplanationCacheByQuestion((prev) => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    // Clear the fallback summary so hasSummaryOrExplanation returns false and the useEffect retries
+    setSession((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        answersSnapshot: prev.answersSnapshot.map((a) =>
+          a.questionId !== questionId ? a : { ...a, explanationSummary: "" },
+        ),
+      };
+    });
+  }
+
   function openNeighborQuestion(delta: number) {
     if (!selectedQuestion || filteredSnapshots.length === 0) {
       return;
@@ -470,6 +494,22 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
                     questionIndex={selectedIndex + 1}
                     questionCount={filteredSnapshots.length}
                   />
+
+                  {failedExplanationByQuestion[selectedQuestion.questionId] &&
+                    !loadingExplanationByQuestion[selectedQuestion.questionId] && (
+                      <div className="flex items-center justify-between gap-3 border border-yellow-700/50 bg-yellow-900/10 px-3 py-2">
+                        <p className="font-mono text-[10px] text-yellow-400">
+                          Nao foi possivel gerar a explicacao automaticamente.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleRetryExplanation(selectedQuestion.questionId)}
+                          className="shrink-0 border border-[var(--pixel-primary)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10"
+                        >
+                          Gerar Explicacao
+                        </button>
+                      </div>
+                    )}
 
                   <div className="flex flex-wrap justify-between gap-2">
                     <PixelButton variant="ghost" onClick={() => openNeighborQuestion(-1)}>
