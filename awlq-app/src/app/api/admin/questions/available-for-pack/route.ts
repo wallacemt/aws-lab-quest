@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
   const certificationCode = searchParams.get("certificationCode");
   const search = searchParams.get("search")?.trim() ?? "";
   const difficulty = searchParams.get("difficulty") ?? "";
+  const topic = searchParams.get("topic")?.trim() ?? "";
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "30", 10)));
 
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
     id: { notIn: usedIds },
     ...(difficulty ? { difficulty: difficulty as "easy" | "medium" | "hard" } : {}),
     ...(search ? { statement: { contains: search, mode: "insensitive" } } : {}),
+    ...(topic ? { topic: { contains: topic, mode: "insensitive" as const } } : {}),
   };
 
   const [total, questions] = await Promise.all([
