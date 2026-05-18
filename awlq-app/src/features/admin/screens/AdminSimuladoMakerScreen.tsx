@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import { CertificationOption } from "@/features/admin/types";
 
 type AvailableQuestion = {
@@ -31,8 +32,10 @@ export function AdminSimuladoMakerScreen() {
   // Step 2 — question picker
   const [search, setSearch] = useState("");
   const [difficulty, setDifficulty] = useState("");
+  const [topicFilter, setTopicFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(30);
+  const [showNewQuestionModal, setShowNewQuestionModal] = useState(false);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsData, setQuestionsData] = useState<AvailableQuestionsPayload | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -62,6 +65,7 @@ export function AdminSimuladoMakerScreen() {
       const params = new URLSearchParams({ certificationCode, page: String(page), pageSize: String(pageSize) });
       if (search) params.set("search", search);
       if (difficulty) params.set("difficulty", difficulty);
+      if (topicFilter) params.set("topic", topicFilter);
       const res = await fetch(`/api/admin/questions/available-for-pack?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error();
       const json = (await res.json()) as AvailableQuestionsPayload;
@@ -71,7 +75,7 @@ export function AdminSimuladoMakerScreen() {
     } finally {
       setQuestionsLoading(false);
     }
-  }, [certificationCode, page, pageSize, search, difficulty]);
+  }, [certificationCode, page, pageSize, search, difficulty, topicFilter]);
 
   useEffect(() => {
     if (step === 2) void loadQuestions();
@@ -260,6 +264,12 @@ export function AdminSimuladoMakerScreen() {
                 <option value="medium">Medio</option>
                 <option value="hard">Dificil</option>
               </select>
+              <input
+                value={topicFilter}
+                onChange={(e) => { setTopicFilter(e.target.value); setPage(1); }}
+                placeholder="Filtrar por topico..."
+                className="border border-[#334155] bg-[#0f172a] px-3 py-2 text-xs text-[#e2e8f0] outline-none"
+              />
               <select
                 value={pageSize}
                 onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
@@ -292,6 +302,12 @@ export function AdminSimuladoMakerScreen() {
                   </button>
                 );
               })()}
+              <button
+                onClick={() => setShowNewQuestionModal(true)}
+                className="border border-[#14532d] bg-green-900/10 px-3 py-2 font-mono text-[10px] uppercase text-green-300 hover:bg-green-900/20"
+              >
+                + Nova questao
+              </button>
               <span className={`font-mono text-xs ${selectedIds.size >= 20 ? "text-green-400" : "text-yellow-400"}`}>
                 {selectedIds.size}/65 selecionadas (min: 20)
               </span>
@@ -390,6 +406,26 @@ export function AdminSimuladoMakerScreen() {
             </div>
           )}
         </div>
+      )}
+
+      {showNewQuestionModal && (
+        <QuestionCreateModal
+          certifications={certifications}
+          defaultCertificationCode={certificationCode}
+          onClose={() => setShowNewQuestionModal(false)}
+          onCreated={(q: CreatedQuestion) => {
+            setShowNewQuestionModal(false);
+            const newQ: AvailableQuestion = {
+              id: q.id,
+              statement: q.statement,
+              topic: q.topic,
+              difficulty: q.difficulty,
+              questionType: q.questionType,
+              createdAt: new Date().toISOString(),
+            };
+            toggleSelect(newQ);
+          }}
+        />
       )}
 
       {/* Step 3 — Confirm */}

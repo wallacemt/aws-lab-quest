@@ -2,7 +2,36 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import { CertificationOption } from "@/features/admin/types";
+
+type PackQuestion = {
+  packQuestionId: string;
+  id: string;
+  position: number;
+  statement: string;
+  topic: string | null;
+  difficulty: string;
+  questionType: string;
+};
+
+type PackDetail = {
+  id: string;
+  name: string;
+  active: boolean;
+  questionCount: number;
+  certificationPreset: { id: string; code: string; name: string } | null;
+  questions: PackQuestion[];
+};
+
+type AvailableQuestion = {
+  id: string;
+  statement: string;
+  topic: string | null;
+  difficulty: string;
+  questionType: string;
+  createdAt: string;
+};
 
 type SimuladoPackItem = {
   id: string;
@@ -48,6 +77,23 @@ export function AdminSimuladosScreen() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Edit modal
+  const [editPack, setEditPack] = useState<PackDetail | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editRemovedIds, setEditRemovedIds] = useState<Set<string>>(new Set());
+  const [editAddedIds, setEditAddedIds] = useState<Set<string>>(new Set());
+  const [editAddedQuestions, setEditAddedQuestions] = useState<AvailableQuestion[]>([]);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editAvailSearch, setEditAvailSearch] = useState("");
+  const [editAvailDiff, setEditAvailDiff] = useState("");
+  const [editAvailItems, setEditAvailItems] = useState<AvailableQuestion[]>([]);
+  const [editAvailLoading, setEditAvailLoading] = useState(false);
+  const [editAvailPage, setEditAvailPage] = useState(1);
+  const [editAvailTotal, setEditAvailTotal] = useState(0);
+  const [showNewQuestionModal, setShowNewQuestionModal] = useState(false);
 
   useEffect(() => {
     async function loadCerts() {
@@ -176,6 +222,103 @@ export function AdminSimuladosScreen() {
       setDeleting(false);
     }
   }
+
+  async function handleOpenEdit(packId: string) {
+    setEditLoading(true);
+    setEditError(null);
+    setEditRemovedIds(new Set());
+    setEditAddedIds(new Set());
+    setEditAddedQuestions([]);
+    setEditAvailSearch("");
+    setEditAvailDiff("");
+    setEditAvailPage(1);
+    setEditAvailItems([]);
+    try {
+      const res = await fetch(`/api/admin/simulado-packs/${packId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Falha ao carregar pack");
+      const data = (await res.json()) as PackDetail;
+      setEditPack(data);
+      setEditName(data.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro");
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!editPack) return;
+    let cancelled = false;
+    async function loadAvail() {
+      setEditAvailLoading(true);
+      try {
+        const params = new URLSearchParams({
+          certificationCode: editPack!.certificationPreset?.code ?? "",
+          page: String(editAvailPage),
+          pageSize: "20",
+        });
+        if (editAvailSearch) params.set("search", editAvailSearch);
+        if (editAvailDiff) params.set("difficulty", editAvailDiff);
+        const res = await fetch(`/api/admin/questions/available-for-pack?${params.toString()}`, {
+          credentials: "include",
+        });
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as { items: AvailableQuestion[]; total: number };
+        if (!cancelled) {
+          setEditAvailItems(json.items);
+          setEditAvailTotal(json.total);
+        }
+      } catch {
+        /* non-fatal */
+      } finally {
+        if (!cancelled) setEditAvailLoading(false);
+      }
+    }
+    if (editPack.certificationPreset?.code) void loadAvail();
+    return () => { cancelled = true; };
+  }, [editPack, editAvailPage, editAvailSearch, editAvailDiff]);
+
+  async function handleSaveEdit() {
+    if (!editPack) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const body: Record<string, unknown> = {};
+      if (editName.trim() !== editPack.name) body.name = editName.trim();
+      if (editRemovedIds.size > 0) body.removeQuestionIds = Array.from(editRemovedIds);
+      if (editAddedIds.size > 0) body.addQuestionIds = Array.from(editAddedIds);
+
+      const res = await fetch(`/api/admin/simulado-packs/${editPack.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Falha ao salvar");
+      setEditPack(null);
+      setGlobalMessage("Pack atualizado com sucesso.");
+      void loadPacks();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Erro ao salvar");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function editToggleAdd(q: AvailableQuestion) {
+    const existingIds = new Set(editPack?.questions.map((pq) => pq.id) ?? []);
+    if (existingIds.has(q.id)) return;
+    setEditAddedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(q.id)) { next.delete(q.id); setEditAddedQuestions((qs) => qs.filter((x) => x.id !== q.id)); }
+      else { next.add(q.id); setEditAddedQuestions((qs) => [...qs, q]); }
+      return next;
+    });
+  }
+
+  const currentQuestionCount = editPack
+    ? editPack.questions.length - editRemovedIds.size + editAddedIds.size
+    : 0;
 
   const totalPages = result ? Math.ceil(result.total / result.pageSize) : 1;
 
@@ -312,6 +455,12 @@ export function AdminSimuladosScreen() {
                   <td className="px-3 py-2">
                     <div className="flex justify-center gap-2">
                       <button
+                        onClick={() => void handleOpenEdit(pack.id)}
+                        className="border border-[#1e3a5f] px-2 py-1 text-[10px] uppercase text-[#38bdf8] hover:border-[#38bdf8]/50"
+                      >
+                        Editar
+                      </button>
+                      <button
                         onClick={() => void handleToggleActive(pack)}
                         className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:border-[#475569]"
                       >
@@ -443,6 +592,181 @@ export function AdminSimuladosScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Pack Modal */}
+      {editPack && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 px-4 pb-4 pt-6">
+          <div className="mx-auto w-full max-w-3xl space-y-5 border border-[#334155] bg-[#0f172a] p-5">
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-xs uppercase text-[#38bdf8]">Editar Pack</p>
+              <button onClick={() => setEditPack(null)} className="text-xs text-[#64748b] hover:text-[#e2e8f0]">
+                ✕ Fechar
+              </button>
+            </div>
+
+            <label className="block space-y-1">
+              <span className="text-xs uppercase text-[#64748b]">Nome do Pack</span>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+              />
+            </label>
+
+            {/* Current questions */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase text-[#64748b]">
+                  Questoes atuais ({currentQuestionCount})
+                </p>
+                <button
+                  onClick={() => setShowNewQuestionModal(true)}
+                  className="border border-[#14532d] bg-green-900/10 px-3 py-1 text-[10px] uppercase text-green-300 hover:bg-green-900/20"
+                >
+                  + Nova questao
+                </button>
+              </div>
+              <div className="max-h-56 overflow-y-auto border border-[#1e293b] divide-y divide-[#1e293b]">
+                {editPack.questions
+                  .filter((pq) => !editRemovedIds.has(pq.id))
+                  .map((pq) => (
+                    <div key={pq.id} className="flex items-start gap-3 px-3 py-2 text-xs">
+                      <p className="flex-1 truncate text-[#cbd5e1]">{pq.statement}</p>
+                      <span className={`shrink-0 font-mono text-[10px] ${pq.difficulty === "easy" ? "text-green-400" : pq.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}>
+                        {pq.difficulty}
+                      </span>
+                      <button
+                        onClick={() => setEditRemovedIds((prev) => new Set([...prev, pq.id]))}
+                        className="shrink-0 text-[10px] text-[#64748b] hover:text-red-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                {editAddedQuestions.filter((q) => !editRemovedIds.has(q.id)).map((q) => (
+                  <div key={q.id} className="flex items-start gap-3 bg-green-900/10 px-3 py-2 text-xs">
+                    <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
+                    <span className="shrink-0 font-mono text-[10px] text-green-400">+novo</span>
+                    <button
+                      onClick={() => {
+                        setEditAddedIds((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
+                        setEditAddedQuestions((qs) => qs.filter((x) => x.id !== q.id));
+                      }}
+                      className="shrink-0 text-[10px] text-[#64748b] hover:text-red-400"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Add from bank */}
+            {editPack.certificationPreset && (
+              <div className="space-y-2">
+                <p className="text-xs uppercase text-[#64748b]">Adicionar do banco</p>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    value={editAvailSearch}
+                    onChange={(e) => { setEditAvailSearch(e.target.value); setEditAvailPage(1); }}
+                    placeholder="Buscar enunciado..."
+                    className="border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none"
+                  />
+                  <select
+                    value={editAvailDiff}
+                    onChange={(e) => { setEditAvailDiff(e.target.value); setEditAvailPage(1); }}
+                    className="border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0]"
+                  >
+                    <option value="">Todas dificuldades</option>
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+                <div className="max-h-44 overflow-y-auto border border-[#1e293b] divide-y divide-[#1e293b]">
+                  {editAvailLoading && (
+                    <p className="px-3 py-4 text-center text-xs text-[#64748b]">Carregando...</p>
+                  )}
+                  {!editAvailLoading && editAvailItems.length === 0 && (
+                    <p className="px-3 py-4 text-center text-xs text-[#64748b]">Nenhuma questao disponivel.</p>
+                  )}
+                  {!editAvailLoading && editAvailItems.map((q) => {
+                    const added = editAddedIds.has(q.id);
+                    return (
+                      <div
+                        key={q.id}
+                        onClick={() => editToggleAdd(q)}
+                        className={`flex cursor-pointer items-start gap-2 px-3 py-2 text-xs hover:bg-white/[0.02] ${added ? "bg-green-900/10" : ""}`}
+                      >
+                        <input type="checkbox" checked={added} readOnly className="mt-0.5 shrink-0 accent-[#38bdf8]" />
+                        <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
+                        <span className={`shrink-0 font-mono text-[10px] ${q.difficulty === "easy" ? "text-green-400" : q.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}>
+                          {q.difficulty}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {editAvailTotal > 20 && (
+                  <div className="flex items-center gap-3 text-xs">
+                    <button
+                      onClick={() => setEditAvailPage((p) => Math.max(1, p - 1))}
+                      disabled={editAvailPage === 1}
+                      className="border border-[#334155] px-2 py-1 uppercase disabled:opacity-30"
+                    >
+                      ←
+                    </button>
+                    <span className="text-[#64748b]">{editAvailPage} / {Math.ceil(editAvailTotal / 20)}</span>
+                    <button
+                      onClick={() => setEditAvailPage((p) => p + 1)}
+                      disabled={editAvailPage >= Math.ceil(editAvailTotal / 20)}
+                      className="border border-[#334155] px-2 py-1 uppercase disabled:opacity-30"
+                    >
+                      →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {editError && <p className="text-xs text-red-400">{editError}</p>}
+
+            <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-3">
+              <button onClick={() => setEditPack(null)} className="border border-[#334155] px-4 py-2 text-xs uppercase text-[#94a3b8]">
+                Cancelar
+              </button>
+              <button
+                onClick={() => void handleSaveEdit()}
+                disabled={editSaving}
+                className="border border-[#14532d] bg-green-900/20 px-4 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
+              >
+                {editSaving ? "Salvando..." : "Salvar alteracoes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editPack && showNewQuestionModal && (
+        <QuestionCreateModal
+          certifications={certifications}
+          defaultCertificationCode={editPack.certificationPreset?.code}
+          onClose={() => setShowNewQuestionModal(false)}
+          onCreated={(q: CreatedQuestion) => {
+            setShowNewQuestionModal(false);
+            const avail: AvailableQuestion = {
+              id: q.id,
+              statement: q.statement,
+              topic: q.topic,
+              difficulty: q.difficulty,
+              questionType: q.questionType,
+              createdAt: new Date().toISOString(),
+            };
+            setEditAddedIds((prev) => new Set([...prev, q.id]));
+            setEditAddedQuestions((qs) => [...qs, avail]);
+          }}
+        />
       )}
 
       {/* Confirm Delete Modal */}

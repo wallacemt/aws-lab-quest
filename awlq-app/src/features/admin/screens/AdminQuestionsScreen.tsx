@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import {
   batchAdminQuestions,
   deleteAdminQuestion,
@@ -222,6 +223,7 @@ export function AdminQuestionsScreen() {
   const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
   const [reportActionRunningId, setReportActionRunningId] = useState<string | null>(null);
   const [reportsResult, setReportsResult] = useState<PaginatedResult<AdminQuestionReportListItem> | null>(null);
+  const [newQuestionModalOpen, setNewQuestionModalOpen] = useState(false);
   const [jsonImportModalOpen, setJsonImportModalOpen] = useState(false);
   const [jsonImportText, setJsonImportText] = useState("");
   const [jsonImportDefaultCert, setJsonImportDefaultCert] = useState("");
@@ -1072,6 +1074,13 @@ export function AdminQuestionsScreen() {
           </button>
           <button
             type="button"
+            onClick={() => setNewQuestionModalOpen(true)}
+            className="border border-[#14532d] bg-green-900/10 px-3 py-1 text-xs uppercase text-green-300"
+          >
+            + Nova questao
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setJsonImportModalOpen(true);
               setJsonImportError(null);
@@ -1907,6 +1916,18 @@ export function AdminQuestionsScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {newQuestionModalOpen && (
+        <QuestionCreateModal
+          certifications={certifications}
+          defaultCertificationCode={certificationCode || undefined}
+          onClose={() => setNewQuestionModalOpen(false)}
+          onCreated={(_q: CreatedQuestion) => {
+            setNewQuestionModalOpen(false);
+            setRefreshKey((prev) => prev + 1);
+          }}
+        />
       )}
 
       {jsonImportModalOpen && (
