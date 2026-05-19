@@ -12,6 +12,7 @@ type ImportItem = {
   topic?: string;
   certificationCode?: string;
   explanations?: Partial<Record<"A" | "B" | "C" | "D" | "E", string>>;
+  awsServiceCodes?: string[];
 };
 
 type Body = {
@@ -82,6 +83,18 @@ export async function POST(request: NextRequest) {
     for (const p of presets) certMap.set(p.code, p.id);
   }
 
+  const allServiceCodes = Array.from(
+    new Set(questions.flatMap((q) => q.awsServiceCodes ?? [])),
+  );
+  const serviceMap = new Map<string, string>();
+  if (allServiceCodes.length > 0) {
+    const svcs = await prisma.awsService.findMany({
+      where: { code: { in: allServiceCodes } },
+      select: { id: true, code: true },
+    });
+    for (const s of svcs) serviceMap.set(s.code, s.id);
+  }
+
   if (dryRun) {
     return NextResponse.json({
       dryRun: true,
@@ -132,6 +145,18 @@ export async function POST(request: NextRequest) {
       },
       select: { id: true },
     });
+
+    const serviceCodes = q.awsServiceCodes ?? [];
+    if (serviceCodes.length > 0) {
+      const serviceLinks = serviceCodes
+        .map((code) => serviceMap.get(code))
+        .filter((id): id is string => Boolean(id))
+        .map((serviceId) => ({ questionId: record.id, serviceId }));
+      if (serviceLinks.length > 0) {
+        await prisma.questionAwsService.createMany({ data: serviceLinks, skipDuplicates: true });
+      }
+    }
+
     created.push(record.id);
   }
 
