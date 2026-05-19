@@ -1922,6 +1922,7 @@ export function AdminQuestionsScreen() {
         <QuestionCreateModal
           certifications={certifications}
           defaultCertificationCode={certificationCode || undefined}
+          allServices={allAwsServices}
           onClose={() => setNewQuestionModalOpen(false)}
           onCreated={(_q: CreatedQuestion) => {
             setNewQuestionModalOpen(false);

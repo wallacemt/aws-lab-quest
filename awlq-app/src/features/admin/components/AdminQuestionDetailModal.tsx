@@ -14,8 +14,7 @@ import {
   AdminQuestionReportListItem,
   PaginatedResult,
 } from "@/features/admin/types";
-
-type AwsServiceOption = { id: string; code: string; name: string };
+import { ServiceMultiSelect, ServiceOption as AwsServiceOption } from "@/features/admin/components/ServiceMultiSelect";
 
 type Props = {
   questionId: string | null;
@@ -55,9 +54,6 @@ function toInitials(name: string): string {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
-function normalizeForSearch(value: string): string {
-  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-}
 
 function resolveQuestionOptions(question: AdminQuestionListItem) {
   const labels = ["A", "B", "C", "D", "E"] as const;
@@ -138,21 +134,8 @@ export function AdminQuestionDetailModal({ questionId, onClose, onDeleted }: Pro
   const [reportsResult, setReportsResult] = useState<PaginatedResult<AdminQuestionReportListItem> | null>(null);
   const [reportActionRunningId, setReportActionRunningId] = useState<string | null>(null);
   const [allAwsServices, setAllAwsServices] = useState<AwsServiceOption[]>([]);
-  const [serviceSearch, setServiceSearch] = useState("");
 
   const questionOptions = useMemo(() => (question ? resolveQuestionOptions(question) : []), [question]);
-
-  const filteredAwsServices = useMemo(() => {
-    const q = normalizeForSearch(serviceSearch);
-    if (!q) return allAwsServices;
-    return allAwsServices
-      .filter((s) => normalizeForSearch(`${s.code} ${s.name}`).includes(q))
-      .sort((a, b) => {
-        const aS = normalizeForSearch(a.code).startsWith(q) ? 1 : 0;
-        const bS = normalizeForSearch(b.code).startsWith(q) ? 1 : 0;
-        return bS - aS || a.code.localeCompare(b.code, "pt-BR");
-      });
-  }, [allAwsServices, serviceSearch]);
 
   useEffect(() => {
     if (!questionId) {
@@ -265,14 +248,6 @@ export function AdminQuestionDetailModal({ questionId, onClose, onDeleted }: Pro
     }
   }
 
-  function toggleServiceCode(code: string) {
-    setEditForm((prev) => ({
-      ...prev,
-      serviceCodes: prev.serviceCodes.includes(code)
-        ? prev.serviceCodes.filter((c) => c !== code)
-        : [...prev.serviceCodes, code],
-    }));
-  }
 
   if (!questionId) return null;
 
@@ -509,40 +484,12 @@ export function AdminQuestionDetailModal({ questionId, onClose, onDeleted }: Pro
                 </label>
 
                 <div className="space-y-2 md:col-span-2">
-                  <p className="text-xs uppercase text-[#94a3b8]">Servicos AWS vinculados</p>
-                  <div className="flex items-center gap-2 p-2">
-                    <label htmlFor="modal_search_services">Pesquisar:</label>
-                    <input
-                      type="text"
-                      id="modal_search_services"
-                      value={serviceSearch}
-                      placeholder="Nome ou codigo"
-                      className="w-full border border-[#334155] bg-[#0b1220] px-3 py-1 text-sm text-[#e2e8f0] outline-none"
-                      onChange={(e) => setServiceSearch(e.target.value)}
-                    />
-                    {serviceSearch && (
-                      <button type="button" onClick={() => setServiceSearch("")} className="border border-[#334155] px-2 py-1 text-[10px] uppercase">
-                        Limpar
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-40 overflow-auto rounded border border-[#334155] bg-[#0b1220] p-2">
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {filteredAwsServices.map((service) => (
-                        <label key={`svc-${service.code}`} className="inline-flex items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={editForm.serviceCodes.includes(service.code)}
-                            onChange={() => toggleServiceCode(service.code)}
-                          />
-                          <span>{service.code} - {service.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {filteredAwsServices.length === 0 && (
-                      <p className="p-2 text-xs text-[#94a3b8]">Nenhum servico encontrado.</p>
-                    )}
-                  </div>
+                  <p className="text-xs uppercase text-[#94a3b8]">Serviços AWS vinculados</p>
+                  <ServiceMultiSelect
+                    allServices={allAwsServices}
+                    selectedCodes={editForm.serviceCodes}
+                    onChange={(codes) => setEditForm((prev) => ({ ...prev, serviceCodes: codes }))}
+                  />
                 </div>
 
                 {(["A", "B", "C", "D", "E"] as const).map((letter) => (

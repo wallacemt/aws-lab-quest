@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CertificationOption } from "@/features/admin/types";
+import { ServiceMultiSelect, ServiceOption } from "@/features/admin/components/ServiceMultiSelect";
 
 export type CreatedQuestion = {
   id: string;
@@ -16,12 +17,13 @@ type Props = {
   onCreated: (question: CreatedQuestion) => void;
   certifications: CertificationOption[];
   defaultCertificationCode?: string;
+  allServices?: ServiceOption[];
 };
 
 const ALL_OPTIONS = ["A", "B", "C", "D", "E"] as const;
 type OptionKey = (typeof ALL_OPTIONS)[number];
 
-export function QuestionCreateModal({ onClose, onCreated, certifications, defaultCertificationCode }: Props) {
+export function QuestionCreateModal({ onClose, onCreated, certifications, defaultCertificationCode, allServices = [] }: Props) {
   const [statement, setStatement] = useState("");
   const [options, setOptions] = useState<Record<OptionKey, string>>({ A: "", B: "", C: "", D: "", E: "" });
   const [questionType, setQuestionType] = useState<"single" | "multi">("single");
@@ -30,6 +32,7 @@ export function QuestionCreateModal({ onClose, onCreated, certifications, defaul
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [topic, setTopic] = useState("");
   const [certCode, setCertCode] = useState(defaultCertificationCode ?? "");
+  const [selectedServiceCodes, setSelectedServiceCodes] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,6 +74,7 @@ export function QuestionCreateModal({ onClose, onCreated, certifications, defaul
         questionType,
         topic: topic.trim() || "OUTROS",
         certificationCode: certCode || undefined,
+        awsServiceCodes: selectedServiceCodes.length > 0 ? selectedServiceCodes : undefined,
       };
 
       const res = await fetch("/api/admin/questions/import-json", {
@@ -195,6 +199,17 @@ export function QuestionCreateModal({ onClose, onCreated, certifications, defaul
             })}
           </div>
         </div>
+
+        {allServices.length > 0 && (
+          <div className="space-y-1">
+            <span className="text-xs uppercase text-[#64748b]">Serviços AWS</span>
+            <ServiceMultiSelect
+              allServices={allServices}
+              selectedCodes={selectedServiceCodes}
+              onChange={setSelectedServiceCodes}
+            />
+          </div>
+        )}
 
         <label className="block space-y-1">
           <span className="text-xs uppercase text-[#64748b]">Certificacao</span>
