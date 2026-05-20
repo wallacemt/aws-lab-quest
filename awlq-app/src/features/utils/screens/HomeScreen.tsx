@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import GameCard from "../../../components/ui/game-card";
@@ -37,14 +38,65 @@ const GAME_MODES: GameMode[] = [
   },
 ];
 
+function JornadaCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group text-left w-full col-span-full bg-pixel-card border-4 border-yellow-600 retro-shadow relative overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/50 hover:border-yellow-400 transition-colors"
+    >
+      {/* Decorative glow */}
+      <div className="absolute -right-8 -top-8 w-32 h-32 bg-yellow-500/10 rounded-full blur-2xl" />
+      <div className="absolute left-20 bottom-0 w-20 h-20 bg-yellow-400/5 rounded-full blur-xl" />
+
+      <div className="relative p-5 md:p-6 flex items-center gap-6">
+        <div className="shrink-0 flex items-center justify-center w-16 h-16 border-2 border-yellow-500 bg-yellow-900/30">
+          <span className="text-3xl">⚔</span>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[10px] uppercase text-yellow-400 font-bold tracking-widest">
+              ⚡ Modo Especial
+            </span>
+          </div>
+          <h3 className="font-mono text-xl md:text-2xl font-bold text-yellow-300 uppercase tracking-wide mb-1">
+            Jornada do Heroi
+          </h3>
+          <p className="text-pixel-subtext text-sm leading-relaxed">
+            Enfrente packs de simulado em ordem crescente de dificuldade. Derrote o BOSS e conquiste a certificacao.
+          </p>
+        </div>
+
+        <div className="shrink-0 hidden md:flex flex-col items-end gap-1 font-mono text-[10px] uppercase text-yellow-600 group-hover:text-yellow-400 transition-colors">
+          <span>Entrar na</span>
+          <span className="text-lg font-bold text-yellow-400">Jornada ▶</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export function HomeScreen() {
   const router = useRouter();
+  const [showJornada, setShowJornada] = useState(false);
+
+  useEffect(() => {
+    void fetch("/api/study/jornada?count=true", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { totalCount?: number }) => {
+        if (typeof data.totalCount === "number" && data.totalCount >= 5) {
+          setShowJornada(true);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
   return (
     <AppLayout credits>
       <main className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 xl:px-8">
         {/* Welcome */}
         <section className="mb-8 md:mb-12 retro-border bg-pixel-card p-6 md:p-10 retro-shadow relative overflow-hidden">
-          {/* Decorative background elements */}
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl" />
           <div className="absolute right-20 bottom-10 w-20 h-20 bg-accent/10 rounded-full blur-2xl" />
 
@@ -77,12 +129,14 @@ export function HomeScreen() {
                 key={mode.id}
                 {...mode}
                 handleClick={() => {
-                  if(mode.id != "simulado"){
+                  if (mode.id !== "simulado") {
                     router.push(`/${mode.id}`);
                   }
                 }}
               />
             ))}
+
+            {showJornada && <JornadaCard onClick={() => router.push("/jornada")} />}
           </div>
         </section>
       </main>

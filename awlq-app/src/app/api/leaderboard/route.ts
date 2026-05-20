@@ -67,14 +67,20 @@ export async function GET(request: NextRequest) {
         include: { profile: { select: { avatarUrl: true } } },
       });
       const userMap = new Map(users.map((u) => [u.id, u]));
+      const profileReq = await prisma.userProfile.findMany({
+        where: { userId: { in: topEntries.map((e) => e.userId) }}
+      })
+
 
       return topEntries.map((entry, index) => {
         const user = userMap.get(entry.userId);
+        const profileFilter = profileReq.filter((p) => p.userId === entry.userId)
         return {
           rank: index + 1,
           userId: entry.userId,
           name: user?.name ?? "Anonimo",
           username: user?.username ?? null,
+          certification: profileFilter[0].certification,
           avatarUrl:
             user?.profile?.avatarUrl ??
             "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
