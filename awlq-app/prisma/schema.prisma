@@ -157,6 +157,7 @@ enum StudyQuestionDifficulty {
   easy
   medium
   hard
+  nightmare
 }
 
 enum StudyQuestionType {
@@ -655,8 +656,10 @@ model SimuladoPack {
   createdByUserId       String?
   createdBy             User?                  @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   questionCount         Int                    @default(65)
+  difficultyScore       Int                    @default(1)
   active                Boolean                @default(true)
   artworkUrl            String?
+  journeyNarrative      Json?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
