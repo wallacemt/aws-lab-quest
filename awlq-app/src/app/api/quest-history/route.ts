@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { syncUserAchievements } from "@/lib/achievements";
+import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { getLevel, getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
 import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
@@ -38,11 +39,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const history = await prisma.questHistory.findMany({
-    where: { userId: session.user.id },
-    orderBy: { completedAt: "desc" },
-    take: 50,
-  });
+  const history = await cacheGetOrSet(
+    CACHE_KEYS.userQuestHistory(session.user.id),
+    () =>
+      prisma.questHistory.findMany({
+        where: { userId: session.user.id },
+        orderBy: { completedAt: "desc" },
+        take: 50,
+      }),
+    CACHE_TTL.USER_HISTORY,
+  );
 
   return NextResponse.json({ history });
 }
@@ -144,6 +150,13 @@ export async function POST(request: NextRequest) {
     gainedXp: item.xp,
   });
   void syncUserAchievements(session.user.id);
+
+  void cacheDel(
+    CACHE_KEYS.userQuestHistory(session.user.id),
+    CACHE_KEYS.userPublicProfile(session.user.id),
+    CACHE_KEYS.userAchievements(session.user.id),
+    CACHE_KEYS.leaderboard(),
+  );
 
   return NextResponse.json({ item }, { status: 201 });
 }

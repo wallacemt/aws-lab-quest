@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getLevel } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
+import { cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -9,7 +10,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const badges = await prisma.levelBadge.findMany({ orderBy: { level: "asc" } });
+  const badges = await cacheGetOrSet(
+    CACHE_KEYS.badgesList(),
+    () => prisma.levelBadge.findMany({ orderBy: { level: "asc" } }),
+    CACHE_TTL.BADGES_LIST,
+  );
 
   // Backfill ownership for existing users based on current total XP.
   const totals = await prisma.questHistory.aggregate({

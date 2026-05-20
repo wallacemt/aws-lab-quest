@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { inferCertificationCode } from "@/lib/certification-presets";
 import { listActiveCertificationPresets } from "@/lib/certification-service";
+import { cacheGetOrSet, cacheDel, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { getProfileValidationError, sanitizeProfileInput } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
 import { generateUniqueUsername } from "@/lib/username";
@@ -65,47 +66,47 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const username = await ensureUserUsername(session.user.id);
-  const migration = await maybeMigrateCertificationPreset(session.user.id);
+  const userId = session.user.id;
 
-  const profile = await prisma.userProfile.upsert({
-    where: { userId: session.user.id },
-    create: { userId: session.user.id },
-    update: {},
-    include: {
-      certificationPreset: {
-        select: {
-          code: true,
-          name: true,
+  const profileData = await cacheGetOrSet(
+    CACHE_KEYS.userProfile(userId),
+    async () => {
+      const username = await ensureUserUsername(userId);
+      const migration = await maybeMigrateCertificationPreset(userId);
+
+      const profile = await prisma.userProfile.upsert({
+        where: { userId },
+        create: { userId },
+        update: {},
+        include: {
+          certificationPreset: { select: { code: true, name: true } },
         },
-      },
-    },
-  });
+      });
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      name: true,
-      email: true,
-      username: true,
-      role: true,
-    },
-  });
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true, username: true, role: true },
+      });
 
-  return NextResponse.json({
-    ...profile,
-    role: user?.role,
-    avatarUrl:
-      profile?.avatarUrl ??
-      "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
-    user: {
-      name: user?.name ?? session.user.name,
-      email: user?.email ?? session.user.email,
-      username: user?.username ?? username,
+      return {
+        ...profile,
+        role: user?.role,
+        avatarUrl:
+          profile?.avatarUrl ??
+          "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
+        user: {
+          name: user?.name ?? session.user.name,
+          email: user?.email ?? session.user.email,
+          username: user?.username ?? username,
+        },
+        certificationPresetCode: profile.certificationPreset?.code ?? "",
+        needsCertificationReview: migration.needsReview,
+      };
     },
-    certificationPresetCode: profile.certificationPreset?.code ?? "",
-    needsCertificationReview: migration.needsReview,
-  });
+    CACHE_TTL.USER_PROFILE,
+  );
+
+  return NextResponse.json(profileData);
 }
 
 export async function PUT(request: NextRequest) {
@@ -181,6 +182,11 @@ export async function PUT(request: NextRequest) {
       },
     }),
   ]);
+
+  await cacheDel(
+    CACHE_KEYS.userProfile(session.user.id),
+    CACHE_KEYS.userPublicProfile(session.user.id),
+  );
 
   return NextResponse.json({
     ...updatedProfile,
