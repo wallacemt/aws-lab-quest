@@ -1,74 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { CurrentQuestionState, NormalizedOptionItem, OptionLabel, PatchBody, QuestionDificult, RouteContext } from "@/types/questions";
 
-type OptionLabel = "A" | "B" | "C" | "D" | "E";
 
-type NormalizedOptionItem = {
-  order: number;
-  content: string;
-  isCorrect: boolean;
-  explanation: string | null;
-};
-
-type RouteContext = {
-  params: Promise<{
-    questionId: string;
-  }>;
-};
-
-type PatchBody = {
-  statement?: string;
-  topic?: string;
-  difficulty?: "easy" | "medium" | "hard";
-  questionType?: "single" | "multi";
-  usage?: "KC" | "SIMULADO" | "BOTH";
-  active?: boolean;
-  optionA?: string;
-  optionB?: string;
-  optionC?: string;
-  optionD?: string;
-  optionE?: string | null;
-  correctOption?: string;
-  correctOptions?: string[] | null;
-  explanationA?: string | null;
-  explanationB?: string | null;
-  explanationC?: string | null;
-  explanationD?: string | null;
-  explanationE?: string | null;
-  options?: Array<{
-    label?: string;
-    content?: string | null;
-    explanation?: string | null;
-    isCorrect?: boolean;
-  }>;
-  serviceCodes?: string[] | null;
-};
-
-type CurrentQuestionState = {
-  id: string;
-  questionType: "single" | "multi";
-  statement: string;
-  topic: string;
-  difficulty: "easy" | "medium" | "hard";
-  usage: "KC" | "SIMULADO" | "BOTH";
-  active: boolean;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
-  optionE: string | null;
-  correctOption: string;
-  correctOptions: unknown;
-  explanationA: string | null;
-  explanationB: string | null;
-  explanationC: string | null;
-  explanationD: string | null;
-  explanationE: string | null;
-  awsService: { code: string } | null;
-  questionAwsServices: Array<{ service: { code: string } }>;
-  questionOptions: NormalizedOptionItem[];
-};
 
 function resolveCurrentFrame(current: CurrentQuestionState): {
   options: Record<OptionLabel, string | null>;
@@ -141,7 +76,7 @@ function toResponseQuestion(item: {
   externalId: string;
   statement: string;
   topic: string;
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: QuestionDificult;
   questionType: "single" | "multi";
   usage: "KC" | "SIMULADO" | "BOTH";
   active: boolean;

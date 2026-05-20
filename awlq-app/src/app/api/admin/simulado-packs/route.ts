@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     certificationCode: p.certificationPreset?.code ?? null,
     certificationName: p.certificationPreset?.name ?? null,
     questionCount: p.questionCount,
+    difficultyScore: p.difficultyScore,
     active: p.active,
     artworkUrl: p.artworkUrl ?? null,
     createdAt: p.createdAt.toISOString(),
@@ -56,6 +57,7 @@ type CreateBody = {
   certificationCode: string;
   questionIds: string[];
   artworkUrl?: string;
+  difficultyScore?: number;
 };
 
 export async function POST(request: NextRequest) {
@@ -82,19 +84,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Certificacao nao encontrada" }, { status: 404 });
   }
 
+  const difficultyScore = Math.min(10, Math.max(1, typeof body.difficultyScore === "number" ? body.difficultyScore : 1));
+
   const pack = await prisma.simuladoPack.create({
     data: {
       name,
       certificationPresetId: certPreset.id,
       createdByUserId: adminResult.userId,
       questionCount: questionIds.length,
+      difficultyScore,
       active: true,
-      artworkUrl: body.artworkUrl ?? null,
+      artworkUrl: body.artworkUrl ?? "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/cert-badges/527007c2-c79f-4240-8a20-4b502c2f5b04.png",
       questions: {
         create: questionIds.map((questionId, position) => ({ questionId, position })),
       },
     },
-    select: { id: true, name: true, questionCount: true, artworkUrl: true },
+    select: { id: true, name: true, questionCount: true, difficultyScore: true, artworkUrl: true },
   });
 
   return NextResponse.json(pack, { status: 201 });

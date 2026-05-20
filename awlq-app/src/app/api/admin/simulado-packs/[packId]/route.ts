@@ -16,6 +16,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       name: true,
       active: true,
       questionCount: true,
+      difficultyScore: true,
       artworkUrl: true,
       createdAt: true,
       certificationPreset: { select: { id: true, code: true, name: true } },
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     name: pack.name,
     active: pack.active,
     questionCount: pack.questionCount,
+    difficultyScore: pack.difficultyScore,
     artworkUrl: pack.artworkUrl ?? null,
     createdAt: pack.createdAt,
     certificationPreset: pack.certificationPreset,
@@ -65,6 +67,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     active?: boolean;
     name?: string;
     artworkUrl?: string | null;
+    difficultyScore?: number;
     addQuestionIds?: string[];
     removeQuestionIds?: string[];
   };
@@ -75,10 +78,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   });
   if (!pack) return NextResponse.json({ error: "Pack nao encontrado" }, { status: 404 });
 
-  const updateData: { active?: boolean; name?: string; artworkUrl?: string | null; questionCount?: number } = {};
+  const updateData: { active?: boolean; name?: string; artworkUrl?: string | null; questionCount?: number; difficultyScore?: number } = {};
   if (body.active !== undefined) updateData.active = body.active;
   if (body.name !== undefined) updateData.name = body.name.trim();
   if ("artworkUrl" in body) updateData.artworkUrl = body.artworkUrl ?? null;
+  if (body.difficultyScore !== undefined) updateData.difficultyScore = Math.min(10, Math.max(1, body.difficultyScore));
 
   let newCount = pack.questionCount;
 

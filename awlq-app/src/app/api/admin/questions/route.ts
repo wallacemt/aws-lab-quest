@@ -200,6 +200,8 @@ export async function GET(request: NextRequest) {
   const reportStatus = request.nextUrl.searchParams.get("reportStatus")?.trim().toUpperCase() ?? "";
   const sortBy = parseSortBy(request.nextUrl.searchParams.get("sortBy"));
   const sortOrder = parseSortOrder(request.nextUrl.searchParams.get("sortOrder"));
+  const createdFrom = request.nextUrl.searchParams.get("createdFrom")?.trim() ?? "";
+  const createdTo = request.nextUrl.searchParams.get("createdTo")?.trim() ?? "";
 
   const where: Prisma.StudyQuestionWhereInput = {};
   const andFilters: Prisma.StudyQuestionWhereInput[] = [];
@@ -272,6 +274,22 @@ export async function GET(request: NextRequest) {
         },
       },
     });
+  }
+
+  // Filtro de data — usa início e fim do dia UTC para cobrir o dia completo
+  if (createdFrom || createdTo) {
+    const dateFilter: Prisma.DateTimeFilter<"StudyQuestion"> = {};
+    if (createdFrom) {
+      const from = new Date(createdFrom);
+      from.setUTCHours(0, 0, 0, 0);
+      dateFilter.gte = from;
+    }
+    if (createdTo) {
+      const to = new Date(createdTo);
+      to.setUTCHours(23, 59, 59, 999);
+      dateFilter.lte = to;
+    }
+    where.createdAt = dateFilter;
   }
 
   if (andFilters.length > 0) {

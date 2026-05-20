@@ -12,7 +12,8 @@ type ImportItem = {
   topic?: string;
   certificationCode?: string;
   explanations?: Partial<Record<"A" | "B" | "C" | "D" | "E", string>>;
-  awsServiceCodes?: string[];
+  awsServiceCodes?: string[];   // match exato por code
+  awsServiceNames?: string[];   // match fuzzy por name/code (gerado pelo extrator)
 };
 
 type Body = {
@@ -83,28 +84,63 @@ export async function POST(request: NextRequest) {
     for (const p of presets) certMap.set(p.code, p.id);
   }
 
+  // Pass 1 — match exato por code (awsServiceCodes)
   const allServiceCodes = Array.from(
     new Set(questions.flatMap((q) => q.awsServiceCodes ?? [])),
   );
-  const serviceMap = new Map<string, string>();
+  const serviceCodeMap = new Map<string, string>(); // code → id
   if (allServiceCodes.length > 0) {
     const svcs = await prisma.awsService.findMany({
       where: { code: { in: allServiceCodes } },
       select: { id: true, code: true },
     });
-    for (const s of svcs) serviceMap.set(s.code, s.id);
+    for (const s of svcs) serviceCodeMap.set(s.code, s.id);
   }
+
+  // Pass 2 — match fuzzy por nome (awsServiceNames gerado pelo extrator)
+  const allServiceNames = Array.from(
+    new Set(questions.flatMap((q) => q.awsServiceNames ?? [])),
+  );
+  const serviceNameMap = new Map<string, string>(); // nome normalizado → id
+  if (allServiceNames.length > 0) {
+    const allSvcs = await prisma.awsService.findMany({
+      where: { active: true },
+      select: { id: true, code: true, name: true },
+    });
+    for (const rawName of allServiceNames) {
+      const normalized = rawName.toLowerCase().trim();
+      // Tenta: código exato (case-insensitive)
+      const byCode = allSvcs.find((s) => s.code.toLowerCase() === normalized);
+      if (byCode) { serviceNameMap.set(normalized, byCode.id); continue; }
+      // Tenta: nome contém o termo OU termo contém o código do serviço
+      const byName = allSvcs.find(
+        (s) =>
+          s.name.toLowerCase().includes(normalized) ||
+          normalized.includes(s.code.toLowerCase()),
+      );
+      if (byName) { serviceNameMap.set(normalized, byName.id); }
+    }
+  }
+
+  // Mapa unificado retrocompatível para uso no loop abaixo
+  const serviceMap = serviceCodeMap;
 
   if (dryRun) {
     return NextResponse.json({
       dryRun: true,
       count: questions.length,
-      previewItems: questions.slice(0, 5).map((q, i) => ({
+      previewItems: questions.slice(0, 10).map((q, i) => ({
         index: i + 1,
-        statement: q.statement.slice(0, 100),
+        statement: q.statement.slice(0, 120),
         difficulty: q.difficulty ?? "medium",
         questionType: q.questionType ?? "single",
         certificationCode: q.certificationCode ?? defaultCertificationCode ?? null,
+        resolvedServiceIds: [
+          ...(q.awsServiceCodes ?? []).map((c) => serviceMap.get(c)).filter(Boolean),
+          ...(q.awsServiceNames ?? []).map((n) => serviceNameMap.get(n.toLowerCase().trim())).filter(Boolean),
+        ].length,
+        awsServiceNames: q.awsServiceNames ?? [],
+        awsServiceCodes: q.awsServiceCodes ?? [],
       })),
     });
   }
@@ -146,15 +182,20 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
-    const serviceCodes = q.awsServiceCodes ?? [];
-    if (serviceCodes.length > 0) {
-      const serviceLinks = serviceCodes
-        .map((code) => serviceMap.get(code))
-        .filter((id): id is string => Boolean(id))
-        .map((serviceId) => ({ questionId: record.id, serviceId }));
-      if (serviceLinks.length > 0) {
-        await prisma.questionAwsService.createMany({ data: serviceLinks, skipDuplicates: true });
-      }
+    const codeIds = (q.awsServiceCodes ?? [])
+      .map((code) => serviceMap.get(code))
+      .filter((id): id is string => Boolean(id));
+
+    const nameIds = (q.awsServiceNames ?? [])
+      .map((name) => serviceNameMap.get(name.toLowerCase().trim()))
+      .filter((id): id is string => Boolean(id));
+
+    const allServiceIds = Array.from(new Set([...codeIds, ...nameIds]));
+    if (allServiceIds.length > 0) {
+      await prisma.questionAwsService.createMany({
+        data: allServiceIds.map((serviceId) => ({ questionId: record.id, serviceId })),
+        skipDuplicates: true,
+      });
     }
 
     created.push(record.id);
