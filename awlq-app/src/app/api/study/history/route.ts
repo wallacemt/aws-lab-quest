@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncUserAchievements } from "@/lib/achievements";
 import { auth } from "@/lib/auth";
+import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
 import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
@@ -47,11 +48,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const history = await prisma.studySessionHistory.findMany({
-    where: { userId: session.user.id },
-    orderBy: { completedAt: "desc" },
-    take: 50,
-  });
+  const history = await cacheGetOrSet(
+    CACHE_KEYS.userStudyHistory(session.user.id),
+    async () => {
+      const sessions = await prisma.studySessionHistory.findMany({
+        where: { userId: session.user.id },
+        orderBy: { completedAt: "desc" },
+        take: 50,
+        include: { pack: { select: { name: true, artworkUrl: true } } },
+      });
+      return sessions.map((s) => ({
+        ...s,
+        packName: s.pack?.name ?? null,
+        packArtworkUrl: s.pack?.artworkUrl ?? null,
+        pack: undefined,
+      }));
+    },
+    CACHE_TTL.USER_HISTORY,
+  );
 
   return NextResponse.json({ history });
 }
@@ -161,6 +175,13 @@ export async function POST(request: NextRequest) {
     gainedXp: item.gainedXp,
   });
   void syncUserAchievements(session.user.id);
+
+  void cacheDel(
+    CACHE_KEYS.userStudyHistory(session.user.id),
+    CACHE_KEYS.userPublicProfile(session.user.id),
+    CACHE_KEYS.userAchievements(session.user.id),
+    CACHE_KEYS.leaderboard(),
+  );
 
   return NextResponse.json({ item }, { status: 201 });
 }

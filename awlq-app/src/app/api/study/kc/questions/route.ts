@@ -6,7 +6,7 @@ import { extractJsonObject, getAiModel } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
 
-const VALID_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
+const VALID_DIFFICULTIES = new Set(["easy", "medium", "hard", "nightmare"]);
 const OPTION_LABELS = ["A", "B", "C", "D", "E"] as const;
 
 type Body = {
@@ -28,7 +28,6 @@ type ParsedAiQuestion = {
   options: ParsedAiOption[];
 };
 
-const MAX_KC_TOPICS = 3;
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -215,7 +214,7 @@ async function generateAndPersistFallbackQuestions(params: {
   certificationCode: string;
   certificationName: string;
   topicCodes: string[];
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: "easy" | "medium" | "hard" | "nightmare";
   neededCount: number;
 }): Promise<{ generated: number; saved: number; error?: string }> {
   if (params.neededCount <= 0) {
@@ -387,12 +386,16 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as Body;
   const topics = (body.topics ?? []).map((topic) => topic.trim()).filter(Boolean);
   const difficulty = VALID_DIFFICULTIES.has(String(body.difficulty ?? "easy"))
-    ? (body.difficulty as "easy" | "medium" | "hard")
+    ? (body.difficulty as "easy" | "medium" | "hard" | "nightmare")
     : "easy";
-  const count = Math.max(1, Math.min(20, Number(body.count ?? 10)));
+  const count = Math.max(5, Math.min(30, Number(body.count ?? 10)));
+  const maxTopics = Math.max(1, Math.floor(count / 5));
 
-  if (topics.length > MAX_KC_TOPICS) {
-    return NextResponse.json({ error: `Selecione no maximo ${MAX_KC_TOPICS} servicos para o KC.` }, { status: 400 });
+  if (topics.length > maxTopics) {
+    return NextResponse.json(
+      { error: `Com ${count} questoes, selecione no maximo ${maxTopics} servicos.` },
+      { status: 400 },
+    );
   }
 
   const profile = await prisma.userProfile.findUnique({

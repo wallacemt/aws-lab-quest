@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       name: true,
       questionCount: true,
       artworkUrl: true,
+      difficultyScore: true,
       createdAt: true,
       sessions: {
         where: { userId: session.user.id, sessionType: "SIMULADO" },
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
         name: pack.name,
         questionCount: pack.questionCount,
         artworkUrl: pack.artworkUrl ?? null,
+        difficultyScore: pack.difficultyScore,
         createdAt: pack.createdAt.toISOString(),
         attempts,
         bestScore: bestAttempt?.scorePercent ?? null,
