@@ -124,7 +124,7 @@ export function AdminQuestionsChartTab({ from, to, certificationCode }: Props) {
                 contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 0 }}
                 labelStyle={{ color: "#e2e8f0", fontFamily: "monospace", fontSize: 11 }}
                 itemStyle={{ color: "#cbd5e1", fontSize: 11 }}
-                formatter={(value: number, name: string) => [value, name]}
+                formatter={(value, name) => [value as number, name as string]}
               />
               <Legend
                 wrapperStyle={{ fontSize: 11, fontFamily: "monospace", color: "#94a3b8", paddingTop: 12 }}

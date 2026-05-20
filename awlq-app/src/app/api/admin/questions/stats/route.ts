@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 function endOfDay(date: Date): Date {
   const d = new Date(date);
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Datas inválidas" }, { status: 400 });
   }
 
-  const where: Parameters<typeof prisma.studyQuestion.findMany>[0]["where"] = {
+  const where: Prisma.StudyQuestionWhereInput = {
     createdAt: { gte: fromDate, lte: toDate },
   };
 
