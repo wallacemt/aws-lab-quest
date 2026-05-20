@@ -13,6 +13,7 @@ export type StudyServiceItem = {
   code: string;
   name: string;
   description?: string | null;
+  questionCount?: number;
 };
 
 export type StudyAnswerSnapshotPayload = {
@@ -67,6 +68,8 @@ export type StudyHistoryItem = {
   durationSeconds?: number | null;
   completedAt: string;
   answersSnapshot: StudyAnswerSnapshotPayload[];
+  packName?: string | null;
+  packArtworkUrl?: string | null;
 };
 
 export type WeakServiceItem = {
@@ -117,8 +120,12 @@ async function parseJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function listStudyServices(): Promise<StudyServiceItem[]> {
-  const response = await fetch("/api/study/services");
+export async function listStudyServices(params?: { withCount?: boolean; difficulty?: string }): Promise<StudyServiceItem[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.withCount) searchParams.set("withCount", "true");
+  if (params?.difficulty) searchParams.set("difficulty", params.difficulty);
+  const suffix = searchParams.toString();
+  const response = await fetch(`/api/study/services${suffix ? `?${suffix}` : ""}`);
   const data = await parseJson<{ services?: StudyServiceItem[]; error?: string }>(response);
   if (!response.ok || data.error) {
     throw new Error(data.error ?? "Falha ao carregar serviços AWS.");
@@ -371,4 +378,21 @@ export async function fetchWeakServices(params?: { take?: number; sample?: numbe
   }
 
   return data.weakServices ?? [];
+}
+
+export async function suggestStudyQuestion(params: {
+  serviceCode: string;
+  serviceName?: string;
+  difficulty: string;
+}): Promise<void> {
+  const response = await fetch("/api/study/question-suggestion", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const data = await parseJson<{ error?: string }>(response).catch(() => ({ error: undefined }));
+    throw new Error(data.error ?? "Nao foi possivel enviar a sugestao.");
+  }
 }

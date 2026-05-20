@@ -10,6 +10,8 @@ import { normalizeOptionText } from "@/lib/study-option-text";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOptionMapping, Task } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { STORAGE_KEYS } from "@/lib/storage";
 
 type HistoryItem = QuestHistoryItem;
 
@@ -28,10 +30,11 @@ type StudyAnswerSnapshot = {
 
 type StudySessionItem = Omit<StudyHistoryItem, "answersSnapshot"> & { answersSnapshot: StudyAnswerSnapshot[] };
 
-const DIFFICULTY_LABEL: Record<"easy" | "medium" | "hard", string> = {
+const DIFFICULTY_LABEL: Record<string, string> = {
   easy: "Facil",
   medium: "Media",
   hard: "Dificil",
+  nightmare: "Nightmare",
 };
 
 function normalizeSnapshot(tasks: Task[] | undefined): Task[] {
@@ -48,6 +51,8 @@ function normalizeSnapshot(tasks: Task[] | undefined): Task[] {
   }));
 }
 
+type ActiveTab = "LAB" | "KC" | "SIMULADO";
+
 export function HistoryScreen() {
   const router = useRouter();
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -57,6 +62,7 @@ export function HistoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [selectedStudyItem, setSelectedStudyItem] = useState<StudySessionItem | null>(null);
+  const { value: activeTab, setValue: setActiveTab } = useLocalStorage<ActiveTab>(STORAGE_KEYS.historyActiveTab, "LAB");
 
   useEffect(() => {
     Promise.all([fetchQuestHistory(), fetchStudyHistory()])
@@ -97,16 +103,38 @@ export function HistoryScreen() {
 
     return studyHistory.filter((item) => {
       const date = new Date(item.completedAt).toLocaleDateString("pt-BR");
-      const haystack = `${item.title} ${item.sessionType} ${item.certificationCode ?? ""} ${date}`.toLowerCase();
+      const haystack =
+        `${item.title} ${item.sessionType} ${item.certificationCode ?? ""} ${item.packName ?? ""} ${date}`.toLowerCase();
       return haystack.includes(normalizedSearch);
     });
   }, [normalizedSearch, studyHistory]);
 
-  const hasAnyResult = filteredLabs.length > 0 || filteredStudyHistory.length > 0;
+  const filteredKC = useMemo(
+    () => filteredStudyHistory.filter((item) => item.sessionType === "KC"),
+    [filteredStudyHistory],
+  );
+
+  const filteredSimulado = useMemo(
+    () => filteredStudyHistory.filter((item) => item.sessionType === "SIMULADO"),
+    [filteredStudyHistory],
+  );
+
+  const activeTabCount =
+    activeTab === "LAB" ? filteredLabs.length : activeTab === "KC" ? filteredKC.length : filteredSimulado.length;
+  const hasAnyResult = activeTabCount > 0;
+
+  const kcCount = studyHistory.filter((i) => i.sessionType === "KC").length;
+  const simuladoCount = studyHistory.filter((i) => i.sessionType === "SIMULADO").length;
+
+  const tabs: { id: ActiveTab; label: string; total: number }[] = [
+    { id: "LAB", label: "LAB", total: history.length },
+    { id: "KC", label: "KC", total: kcCount },
+    { id: "SIMULADO", label: "Simulado", total: simuladoCount },
+  ];
 
   return (
     <AppLayout>
-      <main className="mx-auto  w-fit max-w-4xl space-y-6 px-2 py-4 xl:px-4">
+      <main className="mx-auto w-fit max-w-4xl space-y-6 px-2 py-4 xl:px-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Histórico</h1>
@@ -114,27 +142,39 @@ export function HistoryScreen() {
               Labs finalizados e sessoes de estudo (KC e Simulado)
             </p>
           </div>
-          {(history.length > 0 || studyHistory.length > 0) && (
-            <div className="border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2">
-              <span className="font-mono text-[10px] uppercase">
-                {filteredLabs.length}/{history.length} labs · {filteredStudyHistory.length}/{studyHistory.length}{" "}
-                estudos ·
-              </span>
-            </div>
-          )}
         </div>
+
+        {!loading && !error && (history.length > 0 || studyHistory.length > 0) && (
+          <div className="flex gap-0 border-2 border-[var(--pixel-border)]">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 px-4 py-2 font-mono text-[10px] uppercase transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-[var(--pixel-primary)] text-[var(--pixel-bg)]"
+                    : "bg-[var(--pixel-card)] text-[var(--pixel-subtext)] hover:bg-[var(--pixel-muted)]"
+                }`}
+              >
+                {tab.label}
+                <span className="ml-1 opacity-70">({tab.total})</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {!loading && !error && (history.length > 0 || studyHistory.length > 0) && (
           <PixelCard className="space-y-3">
             <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-              Busca no historico (LAB, KC e Simulado)
+              Busca no historico ({activeTab})
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar por titulo, tema, certificacao, tipo ou data"
+                placeholder="Buscar por titulo, tema, certificacao ou data"
                 className="min-w-[240px] flex-1 border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] text-sm"
               />
               {search && (
@@ -171,22 +211,21 @@ export function HistoryScreen() {
           </PixelCard>
         )}
 
-        {!loading && !error && (history.length > 0 || studyHistory.length > 0) && !hasAnyResult && (
+        {!loading && !error && (history.length > 0 || studyHistory.length > 0) && search && !hasAnyResult && (
           <PixelCard className="py-8 text-center">
             <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
-              Nenhum resultado para &quot;{search}&quot;.
+              Nenhum resultado para &quot;{search}&quot; em {activeTab}.
             </p>
             <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-              Tente outro termo, como nome do lab, tipo da sessao (KC/SIMULADO) ou certificacao.
+              Tente outro termo ou mude de aba.
             </p>
           </PixelCard>
         )}
 
-        {!loading && filteredLabs.length > 0 && (
+        {!loading && activeTab === "LAB" && filteredLabs.length > 0 && (
           <div className="space-y-3">
-            <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Labs</h2>
-            <ScrollArea className="h-92 w-full rounded-md  border border-pixel-border">
-              <div className="flex flex-col p-4 gap-3 ">
+            <ScrollArea className="h-92 w-full rounded-md border border-pixel-border">
+              <div className="flex flex-col gap-3 p-4">
                 {filteredLabs.map((item) => (
                   <button key={item.id} type="button" onClick={() => setSelectedItem(item)} className="text-left">
                     <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-primary)]">
@@ -220,31 +259,18 @@ export function HistoryScreen() {
           </div>
         )}
 
-        {!loading && filteredStudyHistory.length > 0 && (
+        {!loading && activeTab === "KC" && filteredKC.length > 0 && (
           <div className="space-y-3">
-            <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">KC e Simulados</h2>
-            <ScrollArea className="h-92 w-full rounded-md  border border-pixel-border">
-              <div className="grid gap-3 grid-cols-1 p-4 sm:grid-cols-2">
-                {filteredStudyHistory.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      if (item.sessionType === "SIMULADO") {
-                        router.push(`/simulado/historico/${item.id}`);
-                        return;
-                      }
-
-                      setSelectedStudyItem(item);
-                    }}
-                    className="text-left"
-                  >
+            <ScrollArea className="h-92 w-full rounded-md border border-pixel-border">
+              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                {filteredKC.map((item) => (
+                  <button key={item.id} type="button" onClick={() => setSelectedStudyItem(item)} className="text-left">
                     <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate font-[var(--font-body)] text-base">{item.title}</p>
                           <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                            {item.sessionType} · {item.certificationCode ?? "Certificacao nao definida"}
+                            {item.certificationCode ?? "Certificacao nao definida"}
                           </p>
                         </div>
                         <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
@@ -254,7 +280,6 @@ export function HistoryScreen() {
                           +{item.gainedXp} XP
                         </span>
                       </div>
-
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pixel-subtext)]">
                         <span className="font-[var(--font-body)]">
                           {item.correctAnswers}/{item.totalQuestions} corretas
@@ -272,6 +297,82 @@ export function HistoryScreen() {
               </div>
             </ScrollArea>
           </div>
+        )}
+
+        {!loading && activeTab === "SIMULADO" && filteredSimulado.length > 0 && (
+          <div className="space-y-3">
+            <ScrollArea className="h-92 w-full rounded-md border border-pixel-border">
+              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                {filteredSimulado.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => router.push(`/simulado/historico/${item.id}`)}
+                    className="text-left"
+                  >
+                    <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">
+                      <div className="relative h-44 w-44 overflow-hidden border-2 mx-auto border-[var(--pixel-border)]">
+                         
+                        <img
+                          src={
+                            item.packArtworkUrl ??
+                            "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/cert-badges/527007c2-c79f-4240-8a20-4b502c2f5b04.png"
+                          }
+                          alt={item.packName ?? item.title}
+                          className="h-full w-full object-cover"
+                        />
+                        {item.packName && (
+                          <span className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1 font-mono text-[9px] uppercase text-white">
+                            {item.packName}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-[var(--font-body)] text-base">{item.packName??item.title}</p>
+                          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+                            {item.certificationCode ?? "Certificacao nao definida"}
+                            {!item.packArtworkUrl && item.packName ? ` · ${item.packName}` : ""}
+                          </p>
+                        </div>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
+                          {item.scorePercent}%
+                        </span>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                          +{item.gainedXp} XP
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pixel-subtext)]">
+                        <span className="font-[var(--font-body)]">
+                          {item.correctAnswers}/{item.totalQuestions} corretas
+                        </span>
+                        <span className="font-[var(--font-body)]">
+                          · {new Date(item.completedAt).toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                      <p className="font-mono text-[9px] uppercase text-[var(--pixel-accent)]">
+                        Clique para ver o resultado completo
+                      </p>
+                    </PixelCard>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {!loading && !error && (history.length > 0 || studyHistory.length > 0) && !search && activeTabCount === 0 && (
+          <PixelCard className="py-12 text-center">
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
+              Nenhum registro em {activeTab} ainda.
+            </p>
+            <p className="mt-3 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+              {activeTab === "LAB" && "Complete um lab para aparecer aqui."}
+              {activeTab === "KC" && "Complete uma sessao de Knowledge Check para aparecer aqui."}
+              {activeTab === "SIMULADO" && "Complete um simulado para aparecer aqui."}
+            </p>
+          </PixelCard>
         )}
 
         {selectedItem && (

@@ -13,6 +13,7 @@ type LeaderboardEntry = {
   userId: string;
   name: string;
   username: string;
+  certification?:string;
   avatarUrl: string | null;
   totalXp: number;
   labsCompleted: number;
@@ -246,8 +247,7 @@ export function LeaderBoardScreen() {
                       )}
                     </p>
                     <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                      {entry.labsCompleted} lab{entry.labsCompleted !== 1 ? "s" : ""} completo
-                      {entry.labsCompleted !== 1 ? "s" : ""}
+                      {entry.certification}
                     </p>
                   </div>
 
