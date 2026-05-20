@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getAdminStatus } from "@/features/admin/services/admin-api";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminModeStore } from "@/stores/adminModeStore";
 
 const ADMIN_MENU = [
   { href: "/admin", label: "Dashboard" },
@@ -20,10 +21,12 @@ const ADMIN_MENU = [
 
 export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { signOut } = useAuth();
+  const { setMode } = useAdminModeStore();
 
   useEffect(() => {
     async function bootstrap() {
@@ -138,6 +141,17 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
+
+              <button
+                type="button"
+                className="flex w-full cursor-pointer items-center gap-2 border border-[#38bdf8]/40 px-3 py-2 text-xs uppercase text-[#38bdf8] transition-colors hover:border-[#38bdf8]/70 hover:bg-[#111827]"
+                onClick={() => {
+                  setMode("user");
+                  router.push("/");
+                }}
+              >
+                <span aria-hidden>🎮</span> Ver como Jogador
+              </button>
 
               <button
                 className="flex w-full cursor-pointer border border-red-500/40 px-3 py-2 text-xs uppercase transition-colors hover:border-red-500/80 hover:bg-[#111827]"

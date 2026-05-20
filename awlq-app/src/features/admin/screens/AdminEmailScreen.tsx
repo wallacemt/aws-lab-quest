@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createAdminEmailTemplate,
@@ -257,13 +258,17 @@ export function AdminEmailScreen() {
     setSendError(null);
 
     try {
-      const result = await sendAdminEmailTemplate({
+      await sendAdminEmailTemplate({
         templateId: sendTemplate.id,
         targetMode,
         userId: targetMode === "single-user" ? selectedUserId : undefined,
       });
 
-      setSendMessage(`Envio enfileirado: ${result.sent} enviados, ${result.failed} falharam.`);
+      setSendMessage(
+        targetMode === "single-user"
+          ? "Email enfileirado para envio pelo worker. O destinatario recebera em instantes."
+          : "Emails enfileirados para todos os usuarios aprovados. O worker processara o envio em segundo plano.",
+      );
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Falha ao enviar template.");
     } finally {
@@ -594,7 +599,18 @@ export function AdminEmailScreen() {
               {sending ? "Enfileirando..." : "Enfileirar Envio"}
             </button>
 
-            {sendMessage && <p className="text-sm text-[#86efac]">{sendMessage}</p>}
+            {sendMessage && (
+              <div className="space-y-2 border border-green-800 bg-green-900/15 px-4 py-3">
+                <p className="text-sm text-[#86efac]">{sendMessage}</p>
+                <p className="text-xs text-[#4ade80]">
+                  Acompanhe o status em{" "}
+                  <Link href="/admin?tab=worker" className="underline hover:text-white">
+                    Admin → Worker
+                  </Link>
+                  .
+                </p>
+              </div>
+            )}
             {sendError && <p className="text-sm text-[#fca5a5]">{sendError}</p>}
           </div>
         </section>

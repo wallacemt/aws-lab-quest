@@ -30,6 +30,7 @@ export function AdminSimuladoMakerScreen() {
   const [name, setName] = useState("");
   const [certificationCode, setCertificationCode] = useState("");
   const [artworkUrl, setArtworkUrl] = useState<string | null>(null);
+  const [difficultyScore, setDifficultyScore] = useState(5);
 
   // Step 2 — question picker
   const [search, setSearch] = useState("");
@@ -137,6 +138,7 @@ export function AdminSimuladoMakerScreen() {
           certificationCode,
           questionIds: Array.from(selectedIds),
           artworkUrl: artworkUrl ?? undefined,
+          difficultyScore,
         }),
       });
       const json = (await res.json()) as { id?: string; name?: string; error?: string };
@@ -238,6 +240,33 @@ export function AdminSimuladoMakerScreen() {
           </div>
 
           <ArtworkUploadField value={artworkUrl} onChange={setArtworkUrl} />
+
+          <div className="space-y-2">
+            <label className="block font-mono text-[10px] uppercase text-[#64748b]">
+              Score de Dificuldade —{" "}
+              <span className="text-[#f97316]">
+                {difficultyScore === 1 ? "1 · Iniciante" :
+                 difficultyScore <= 3 ? `${difficultyScore} · Fácil` :
+                 difficultyScore <= 6 ? `${difficultyScore} · Intermediário` :
+                 difficultyScore <= 9 ? `${difficultyScore} · Difícil` :
+                 "10 · BOSS ⚡"}
+              </span>
+            </label>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              step={1}
+              value={difficultyScore}
+              onChange={(e) => setDifficultyScore(Number(e.target.value))}
+              className="w-full accent-[#f97316]"
+            />
+            <div className="flex justify-between font-mono text-[9px] text-[#475569]">
+              <span>1 Iniciante</span>
+              <span>5 Médio</span>
+              <span>10 BOSS</span>
+            </div>
+          </div>
 
           <button
             onClick={() => setStep(2)}
@@ -458,6 +487,12 @@ export function AdminSimuladoMakerScreen() {
                   {selectedQuestions.filter((q) => q.difficulty === "easy").length} easy ·{" "}
                   {selectedQuestions.filter((q) => q.difficulty === "medium").length} medium ·{" "}
                   {selectedQuestions.filter((q) => q.difficulty === "hard").length} hard
+                </p>
+              </div>
+              <div>
+                <p className="font-mono text-[10px] uppercase text-[#64748b]">Score de Dificuldade</p>
+                <p className="mt-0.5 text-[#f97316]">
+                  {difficultyScore === 10 ? "10 · BOSS ⚡" : `${difficultyScore}/10`}
                 </p>
               </div>
             </div>

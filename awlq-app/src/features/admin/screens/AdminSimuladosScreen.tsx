@@ -21,6 +21,7 @@ type PackDetail = {
   name: string;
   active: boolean;
   questionCount: number;
+  difficultyScore: number;
   artworkUrl: string | null;
   certificationPreset: { id: string; code: string; name: string } | null;
   questions: PackQuestion[];
@@ -41,6 +42,7 @@ type SimuladoPackItem = {
   certificationCode: string | null;
   certificationName: string | null;
   questionCount: number;
+  difficultyScore: number;
   active: boolean;
   createdAt: string;
   createdByName: string | null;
@@ -89,6 +91,7 @@ export function AdminSimuladosScreen() {
   const [editRemovedIds, setEditRemovedIds] = useState<Set<string>>(new Set());
   const [editAddedIds, setEditAddedIds] = useState<Set<string>>(new Set());
   const [editAddedQuestions, setEditAddedQuestions] = useState<AvailableQuestion[]>([]);
+  const [editDifficultyScore, setEditDifficultyScore] = useState(5);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editAvailSearch, setEditAvailSearch] = useState("");
@@ -244,6 +247,7 @@ export function AdminSimuladosScreen() {
       setEditPack(data);
       setEditName(data.name);
       setEditArtworkUrl(data.artworkUrl);
+      setEditDifficultyScore(data.difficultyScore ?? 5);
       setEditArtworkChanged(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro");
@@ -292,6 +296,7 @@ export function AdminSimuladosScreen() {
       const body: Record<string, unknown> = {};
       if (editName.trim() !== editPack.name) body.name = editName.trim();
       if (editArtworkChanged) body.artworkUrl = editArtworkUrl;
+      if (editDifficultyScore !== editPack.difficultyScore) body.difficultyScore = editDifficultyScore;
       if (editRemovedIds.size > 0) body.removeQuestionIds = Array.from(editRemovedIds);
       if (editAddedIds.size > 0) body.addQuestionIds = Array.from(editAddedIds);
 
@@ -408,6 +413,7 @@ export function AdminSimuladosScreen() {
               <th className="px-3 py-2 text-left font-mono uppercase text-[#64748b]">Nome</th>
               <th className="px-3 py-2 text-left font-mono uppercase text-[#64748b]">Cert</th>
               <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Questoes</th>
+              <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Score</th>
               <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Sessoes</th>
               <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Status</th>
               <th className="px-3 py-2 text-left font-mono uppercase text-[#64748b]">Criado em</th>
@@ -443,6 +449,9 @@ export function AdminSimuladosScreen() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-center text-[#cbd5e1]">{pack.questionCount}</td>
+                  <td className="px-3 py-2 text-center font-mono text-xs text-[#f97316]">
+                    {pack.difficultyScore === 10 ? "BOSS⚡" : `${pack.difficultyScore}/10`}
+                  </td>
                   <td className="px-3 py-2 text-center text-[#94a3b8]">{pack.sessionCount}</td>
                   <td className="px-3 py-2 text-center">
                     <span
@@ -626,6 +635,32 @@ export function AdminSimuladosScreen() {
               onChange={(url) => { setEditArtworkUrl(url); setEditArtworkChanged(true); }}
               label="Arte do pack"
             />
+
+            <label className="block space-y-1">
+              <span className="text-xs uppercase text-[#64748b]">
+                Score de Dificuldade —{" "}
+                <span className="text-[#f97316]">
+                  {editDifficultyScore === 10 ? "10 · BOSS ⚡" :
+                   editDifficultyScore <= 3 ? `${editDifficultyScore} · Fácil` :
+                   editDifficultyScore <= 6 ? `${editDifficultyScore} · Intermediário` :
+                   `${editDifficultyScore} · Difícil`}
+                </span>
+              </span>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                step={1}
+                value={editDifficultyScore}
+                onChange={(e) => setEditDifficultyScore(Number(e.target.value))}
+                className="w-full accent-[#f97316]"
+              />
+              <div className="flex justify-between font-mono text-[9px] text-[#475569]">
+                <span>1 Iniciante</span>
+                <span>5 Médio</span>
+                <span>10 BOSS</span>
+              </div>
+            </label>
 
             {/* Current questions */}
             <div className="space-y-2">

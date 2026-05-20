@@ -25,6 +25,7 @@ import {
   AdminUserUpdatePayload,
   AdminUsersListParams,
   AdminUserListItem,
+  AdminQuestionsStats,
   PaginatedResult,
 } from "@/features/admin/types";
 
@@ -266,6 +267,23 @@ export async function listAdminQuestions(
   }
 
   return (await response.json()) as PaginatedResult<AdminQuestionListItem>;
+}
+
+export async function getAdminQuestionsStats(params: {
+  from: string;
+  to: string;
+  certificationCode?: string;
+}): Promise<AdminQuestionsStats> {
+  const qs = toQueryString({ ...params });
+  const response = await fetch(`/api/admin/questions/stats?${qs}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar estatisticas.");
+  }
+  return (await response.json()) as AdminQuestionsStats;
 }
 
 export async function getAdminQuestion(questionId: string): Promise<AdminQuestionListItem> {

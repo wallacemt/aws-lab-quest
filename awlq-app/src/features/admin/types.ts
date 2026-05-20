@@ -86,6 +86,25 @@ export type AdminQuestionsListParams = {
   reportStatus?: "REPORTED" | "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED";
   sortBy?: "createdAt" | "difficulty" | "usage" | "topic" | "externalId" | "active" | "questionType";
   sortOrder?: AdminListSortOrder;
+  createdFrom?: string;
+  createdTo?: string;
+};
+
+export type AdminQuestionsStatDay = {
+  date: string;
+  total: number;
+  easy: number;
+  medium: number;
+  hard: number;
+  nightmare: number;
+};
+
+export type AdminQuestionsStats = {
+  days: AdminQuestionsStatDay[];
+  total: number;
+  peak: number;
+  from: string;
+  to: string;
 };
 
 export type AdminQuestionListItem = {

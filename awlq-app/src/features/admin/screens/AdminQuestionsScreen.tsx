@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AdminQuestionsChartTab } from "@/features/admin/components/AdminQuestionsChartTab";
 import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import {
   batchAdminQuestions,
@@ -174,6 +180,9 @@ function resolveQuestionOptions(question: AdminQuestionListItem) {
 }
 
 export function AdminQuestionsScreen() {
+  const [activeTab, setActiveTab] = useState<"lista" | "graficos">("lista");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [difficulty, setDifficulty] = useState<"" | "easy" | "medium" | "hard">("");
   const [questionType, setQuestionType] = useState<"" | "single" | "multi">("");
@@ -231,16 +240,19 @@ export function AdminQuestionsScreen() {
   const [jsonImportLoading, setJsonImportLoading] = useState(false);
   const [jsonImportError, setJsonImportError] = useState<string | null>(null);
   const [jsonImportSuccess, setJsonImportSuccess] = useState<string | null>(null);
-  const [jsonImportDryRunResult, setJsonImportDryRunResult] = useState<{
-    count: number;
-    previewItems: Array<{
+  const [jsonImportPreviewList, setJsonImportPreviewList] = useState<
+    Array<{
+      id: string;
+      selected: boolean;
       index: number;
       statement: string;
       difficulty: string;
       questionType: string;
       certificationCode: string | null;
-    }>;
-  } | null>(null);
+      services: string[];
+      raw: Record<string, unknown>;
+    }>
+  >([]);
   const [editForm, setEditForm] = useState<{
     statement: string;
     topic: string;
@@ -764,10 +776,10 @@ export function AdminQuestionsScreen() {
     }
   }
 
-  async function handleJsonImportPreview() {
+  function handleJsonImportPreview() {
     setJsonImportError(null);
     setJsonImportSuccess(null);
-    setJsonImportDryRunResult(null);
+    setJsonImportPreviewList([]);
 
     let parsed: unknown;
     try {
@@ -785,73 +797,62 @@ export function AdminQuestionsScreen() {
       return;
     }
 
-    setJsonImportLoading(true);
-    try {
-      const res = await fetch("/api/admin/questions/import-json", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          questions,
-          defaultCertificationCode: jsonImportDefaultCert || undefined,
-          dryRun: true,
-        }),
-      });
-      const data = (await res.json()) as Record<string, unknown>;
-      if (!res.ok) {
-        const errMsg = Array.isArray(data.errors)
-          ? (data.errors as string[]).slice(0, 5).join(" | ")
-          : String(data.error ?? "Erro desconhecido");
-        setJsonImportError(errMsg);
-      } else {
-        setJsonImportDryRunResult(
-          data as {
-            count: number;
-            previewItems: Array<{
-              index: number;
-              statement: string;
-              difficulty: string;
-              questionType: string;
-              certificationCode: string | null;
-            }>;
-          },
-        );
-      }
-    } catch {
-      setJsonImportError("Falha na requisicao");
-    } finally {
-      setJsonImportLoading(false);
+    if (questions.length === 0) {
+      setJsonImportError("Lista de questoes vazia.");
+      return;
     }
+
+    if (questions.length > 200) {
+      setJsonImportError("Maximo 200 questoes por importacao.");
+      return;
+    }
+
+    const items = questions.map((q, i) => {
+      const item = (q ?? {}) as Record<string, unknown>;
+      const statement = String(item.statement ?? "").trim();
+      const difficulty = String(item.difficulty ?? "medium");
+      const questionType = String(item.questionType ?? "single");
+      const certCode =
+        String(item.certificationCode ?? jsonImportDefaultCert ?? "").trim() || null;
+      const rawServices =
+        (item.awsServiceNames as string[] | undefined) ??
+        (item.awsServiceCodes as string[] | undefined) ??
+        [];
+      const services = Array.isArray(rawServices) ? rawServices.map(String) : [];
+      return {
+        id: `preview-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        selected: true,
+        index: i + 1,
+        statement,
+        difficulty,
+        questionType,
+        certificationCode: certCode,
+        services,
+        raw: item,
+      };
+    });
+
+    setJsonImportPreviewList(items);
   }
 
   async function handleJsonImportSave() {
+    const selected = jsonImportPreviewList.filter((item) => item.selected);
+    if (selected.length === 0) {
+      setJsonImportError("Selecione ao menos uma questao para importar.");
+      return;
+    }
+
     setJsonImportError(null);
     setJsonImportSuccess(null);
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonImportText.trim());
-    } catch {
-      setJsonImportError("JSON invalido. Verifique a sintaxe.");
-      return;
-    }
-
-    const questions = Array.isArray(parsed)
-      ? parsed
-      : (parsed as Record<string, unknown>)?.questions;
-    if (!Array.isArray(questions)) {
-      setJsonImportError("Esperado array de questoes ou { questions: [...] }");
-      return;
-    }
-
     setJsonImportLoading(true);
+
     try {
       const res = await fetch("/api/admin/questions/import-json", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          questions,
+          questions: selected.map((item) => item.raw),
           defaultCertificationCode: jsonImportDefaultCert || undefined,
         }),
       });
@@ -864,7 +865,7 @@ export function AdminQuestionsScreen() {
       } else {
         setJsonImportSuccess(`${String(data.created)} questoes importadas com sucesso.`);
         setJsonImportText("");
-        setJsonImportDryRunResult(null);
+        setJsonImportPreviewList([]);
         setRefreshKey((prev) => prev + 1);
       }
     } catch {
@@ -930,6 +931,8 @@ export function AdminQuestionsScreen() {
           reportStatus: reportStatus || undefined,
           sortBy,
           sortOrder,
+          createdFrom: dateRange?.from ? startOfDay(dateRange.from).toISOString().slice(0, 10) : undefined,
+          createdTo: dateRange?.to ? endOfDay(dateRange.to).toISOString().slice(0, 10) : dateRange?.from ? endOfDay(dateRange.from).toISOString().slice(0, 10) : undefined,
         });
         setResult(data);
       } catch (err) {
@@ -954,6 +957,7 @@ export function AdminQuestionsScreen() {
     sortBy,
     sortOrder,
     refreshKey,
+    dateRange,
   ]);
 
   useEffect(() => {
@@ -1085,7 +1089,7 @@ export function AdminQuestionsScreen() {
               setJsonImportModalOpen(true);
               setJsonImportError(null);
               setJsonImportSuccess(null);
-              setJsonImportDryRunResult(null);
+              setJsonImportPreviewList([]);
             }}
             className="border border-[#1e3a5f] bg-blue-900/20 px-3 py-1 text-xs uppercase text-[#38bdf8]"
           >
@@ -1264,6 +1268,106 @@ export function AdminQuestionsScreen() {
           </label>
         </div>
 
+        {/* Date range picker */}
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[#1e293b] pt-3">
+          <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Período de criação:</p>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-2 border border-[#334155] bg-[#0b1220] px-3 py-1.5 text-xs text-[#e2e8f0] hover:border-[#4a5568]"
+              >
+                <span>
+                  {dateRange?.from
+                    ? dateRange.to && dateRange.to.toDateString() !== dateRange.from.toDateString()
+                      ? `${format(dateRange.from, "dd/MM/yy", { locale: ptBR })} → ${format(dateRange.to, "dd/MM/yy", { locale: ptBR })}`
+                      : format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                    : "Filtrar por data"}
+                </span>
+                <span className="text-[#64748b]">▾</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto border border-[#334155] bg-[#000] p-0 text-[#e2e8f0]"
+              align="start"
+            >
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={(range) => {
+                  setDateRange(range);
+                  setPage(1);
+                  if (range?.from && range?.to) setCalendarOpen(false);
+                }}
+                locale={ptBR}
+                className="rounded-none"
+                classNames={{
+                  months: "flex flex-col sm:flex-row gap-4 p-3",
+                  month: "space-y-2",
+                  caption: "flex justify-center pt-1 relative items-center",
+                  caption_label: "text-sm font-mono uppercase text-[#94a3b8]",
+                 
+                  nav_button: "h-7 w-7 bg-transparent border border-[#334155] text-[#94a3b8] hover:text-[#e2e8f0] flex items-center justify-center",
+                  nav_button_previous: "absolute left-1",
+                  nav_button_next: "absolute right-1",
+                  table: "w-full border-collapse",
+                  head_row: "flex",
+                  head_cell: "text-[#475569] rounded-none w-9 font-mono text-[10px] uppercase",
+                  row: "flex w-full mt-1",
+                  cell: "h-9 w-9 text-center text-xs relative [&:has([aria-selected])]:bg-[#1e293b] first:[&:has([aria-selected])]:rounded-l-none last:[&:has([aria-selected])]:rounded-r-none focus-within:relative focus-within:z-20",
+                  day: "h-9 w-9 p-0 font-mono text-xs text-[#cbd5e1] hover:bg-[#1e293b] hover:text-[#f8fafc] aria-selected:opacity-100",
+                  day_selected: "bg-[#f97316] text-black hover:bg-[#ea6c00] hover:text-black focus:bg-[#f97316] focus:text-black",
+                  day_today: "border border-[#f97316] text-[#f97316]",
+                  day_outside: "text-[#334155] opacity-50",
+                  day_disabled: "text-[#334155] opacity-30",
+                  day_range_middle: "aria-selected:bg-[#1e293b] aria-selected:text-[#e2e8f0]",
+                  day_range_end: "day-range-end",
+                  day_hidden: "invisible",
+                }}
+              />
+              <div className="flex flex-wrap gap-2 border-t border-[#1e293b] p-3">
+                <button
+                  type="button"
+                  onClick={() => { setDateRange({ from: new Date(), to: new Date() }); setPage(1); setCalendarOpen(false); }}
+                  className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
+                >
+                  Hoje
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setDateRange({ from: subDays(new Date(), 6), to: new Date() }); setPage(1); setCalendarOpen(false); }}
+                  className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
+                >
+                  7 dias
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setDateRange({ from: subDays(new Date(), 29), to: new Date() }); setPage(1); setCalendarOpen(false); }}
+                  className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
+                >
+                  30 dias
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setDateRange(undefined); setPage(1); setCalendarOpen(false); }}
+                  className="border border-[#7f1d1d] px-2 py-1 text-[10px] uppercase text-[#fca5a5] hover:text-[#fecaca]"
+                >
+                  Limpar
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+          {dateRange?.from && (
+            <button
+              type="button"
+              onClick={() => { setDateRange(undefined); setPage(1); }}
+              className="text-[10px] uppercase text-[#64748b] hover:text-[#fca5a5]"
+            >
+              ✕ limpar data
+            </button>
+          )}
+        </div>
+
         <div className="mt-4 space-y-2 border-t border-[#1e293b] pt-3">
           <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Dados exibidos na tabela</p>
           <div className="flex flex-wrap gap-3">
@@ -1281,10 +1385,28 @@ export function AdminQuestionsScreen() {
         </div>
       </section>
 
-      {loading && <p className="text-sm text-[#94a3b8]">Carregando questoes...</p>}
-      {error && <p className="text-sm text-[#fca5a5]">{error}</p>}
+      {/* Tab navigation */}
+      <div className="flex border-b border-[#1e293b]">
+        <button
+          type="button"
+          onClick={() => setActiveTab("lista")}
+          className={`border-b-2 px-4 py-2 text-xs font-mono uppercase transition-colors ${activeTab === "lista" ? "border-[#f97316] text-[#f97316]" : "border-transparent text-[#64748b] hover:text-[#e2e8f0]"}`}
+        >
+          Lista
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("graficos")}
+          className={`border-b-2 px-4 py-2 text-xs font-mono uppercase transition-colors ${activeTab === "graficos" ? "border-[#f97316] text-[#f97316]" : "border-transparent text-[#64748b] hover:text-[#e2e8f0]"}`}
+        >
+          Graficos
+        </button>
+      </div>
 
-      {!loading && result && (
+      {activeTab === "lista" && loading && <p className="text-sm text-[#94a3b8]">Carregando questoes...</p>}
+      {activeTab === "lista" && error && <p className="text-sm text-[#fca5a5]">{error}</p>}
+
+      {activeTab === "lista" && !loading && result && (
         <>
           <section className="overflow-x-auto border border-[#1e293b] bg-[#111827]">
             <table className="w-full min-w-[1000px] text-left text-sm">
@@ -1468,6 +1590,14 @@ export function AdminQuestionsScreen() {
             </div>
           </footer>
         </>
+      )}
+
+      {activeTab === "graficos" && (
+        <AdminQuestionsChartTab
+          from={dateRange?.from ?? subDays(new Date(), 29)}
+          to={dateRange?.to ?? dateRange?.from ?? new Date()}
+          certificationCode={certificationCode || undefined}
+        />
       )}
 
       {selectedQuestion && (
@@ -1933,11 +2063,11 @@ export function AdminQuestionsScreen() {
 
       {jsonImportModalOpen && (
         <div className="fixed inset-0 z-40 grid place-items-start justify-center overflow-y-auto bg-black/70 p-4 pt-10">
-          <div className="w-full max-w-2xl space-y-4 rounded border border-[#334155] bg-[#111827] p-5 text-[#e2e8f0]">
+          <div className="w-full max-w-3xl space-y-4 rounded border border-[#334155] bg-[#111827] p-5 text-[#e2e8f0]">
             <div className="space-y-1">
               <p className="font-mono text-xs uppercase text-[#38bdf8]">Importar questoes via JSON</p>
               <p className="text-xs text-[#94a3b8]">
-                Cole o JSON abaixo. Maximo de 200 questoes por importacao.
+                Cole o JSON, clique em Preview para auditar, remova questoes indesejadas e importe.
               </p>
             </div>
 
@@ -1961,11 +2091,11 @@ export function AdminQuestionsScreen() {
               <label className="block space-y-1">
                 <span className="text-xs uppercase text-[#94a3b8]">JSON das questoes</span>
                 <textarea
-                  rows={10}
+                  rows={8}
                   value={jsonImportText}
                   onChange={(e) => {
                     setJsonImportText(e.target.value);
-                    setJsonImportDryRunResult(null);
+                    setJsonImportPreviewList([]);
                     setJsonImportError(null);
                     setJsonImportSuccess(null);
                   }}
@@ -2001,6 +2131,7 @@ export function AdminQuestionsScreen() {
     "questionType": "single",                          // single | multi
     "topic": "Storage",                                // padrao: OUTROS
     "certificationCode": "SAA-C03",                    // sobreescreve padrao
+    "awsServiceNames": ["Amazon S3", "Amazon EC2"],    // servicos (nome livre)
     "explanations": {                                  // opcional
       "A": "S3 e usado para...",
       "B": "EC2 nao e..."
@@ -2023,28 +2154,95 @@ export function AdminQuestionsScreen() {
               </p>
             )}
 
-            {jsonImportDryRunResult && (
+            {jsonImportPreviewList.length > 0 && (
               <div className="space-y-2 border border-[#1e3a5f] bg-blue-900/10 p-3">
-                <p className="text-xs font-semibold text-[#38bdf8]">
-                  Preview: {jsonImportDryRunResult.count} questoes validas
-                </p>
-                <div className="space-y-1">
-                  {jsonImportDryRunResult.previewItems.map((item) => (
-                    <div key={item.index} className="flex gap-3 text-xs text-[#94a3b8]">
-                      <span className="w-5 shrink-0 text-right text-[#64748b]">{item.index}.</span>
-                      <span className="flex-1 truncate">{item.statement}</span>
-                      <span className="shrink-0 text-[#fbbf24]">{item.difficulty}</span>
-                      <span className="shrink-0 text-[#a78bfa]">{item.questionType}</span>
-                      {item.certificationCode && (
-                        <span className="shrink-0 text-[#34d399]">{item.certificationCode}</span>
-                      )}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-[#38bdf8]">
+                    {jsonImportPreviewList.filter((i) => i.selected).length} de {jsonImportPreviewList.length} questoes selecionadas
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setJsonImportPreviewList((prev) => prev.map((i) => ({ ...i, selected: true })))}
+                      className="text-xs text-[#94a3b8] hover:text-[#e2e8f0] underline"
+                    >
+                      Selecionar todas
+                    </button>
+                    <span className="text-[#334155]">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setJsonImportPreviewList((prev) => prev.map((i) => ({ ...i, selected: false })))}
+                      className="text-xs text-[#94a3b8] hover:text-[#e2e8f0] underline"
+                    >
+                      Desmarcar todas
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-80 overflow-y-auto space-y-1 pr-1">
+                  {jsonImportPreviewList.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-start gap-2 rounded border px-2 py-2 text-xs transition-colors ${
+                        item.selected
+                          ? "border-[#1e3a5f] bg-[#0d1f33]"
+                          : "border-[#1e293b] bg-[#0b1220] opacity-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.selected}
+                        onChange={(e) =>
+                          setJsonImportPreviewList((prev) =>
+                            prev.map((i) => (i.id === item.id ? { ...i, selected: e.target.checked } : i)),
+                          )
+                        }
+                        className="mt-0.5 shrink-0 accent-[#f97316]"
+                      />
+                      <span className="w-5 shrink-0 text-right text-[#475569]">{item.index}.</span>
+                      <span className="flex-1 text-[#cbd5e1] leading-snug">{item.statement.slice(0, 160)}{item.statement.length > 160 ? "..." : ""}</span>
+                      <div className="shrink-0 flex flex-col items-end gap-1">
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          <span className={`px-1 rounded text-[10px] font-mono ${item.difficulty === "easy" ? "bg-green-900/40 text-green-300" : item.difficulty === "hard" ? "bg-red-900/40 text-red-300" : "bg-yellow-900/40 text-yellow-300"}`}>
+                            {item.difficulty}
+                          </span>
+                          <span className="px-1 rounded text-[10px] font-mono bg-purple-900/40 text-purple-300">
+                            {item.questionType}
+                          </span>
+                          {item.certificationCode && (
+                            <span className="px-1 rounded text-[10px] font-mono bg-teal-900/40 text-teal-300">
+                              {item.certificationCode}
+                            </span>
+                          )}
+                        </div>
+                        {item.services.length > 0 && (
+                          <div className="flex gap-1 flex-wrap justify-end">
+                            {item.services.slice(0, 3).map((svc) => (
+                              <span key={svc} className="px-1 rounded text-[10px] font-mono bg-[#1e293b] text-[#94a3b8]">
+                                {svc}
+                              </span>
+                            ))}
+                            {item.services.length > 3 && (
+                              <span className="text-[10px] text-[#475569]">+{item.services.length - 3}</span>
+                            )}
+                          </div>
+                        )}
+                        {item.services.length === 0 && (
+                          <span className="text-[10px] text-[#ef4444]">sem servicos</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setJsonImportPreviewList((prev) => prev.filter((i) => i.id !== item.id))
+                        }
+                        className="shrink-0 ml-1 text-[#475569] hover:text-[#fca5a5] text-sm leading-none"
+                        title="Remover esta questao"
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
-                  {jsonImportDryRunResult.count > jsonImportDryRunResult.previewItems.length && (
-                    <p className="text-xs text-[#64748b]">
-                      ... e mais {jsonImportDryRunResult.count - jsonImportDryRunResult.previewItems.length} questoes
-                    </p>
-                  )}
                 </div>
               </div>
             )}
@@ -2055,7 +2253,7 @@ export function AdminQuestionsScreen() {
                 onClick={() => {
                   setJsonImportModalOpen(false);
                   setJsonImportText("");
-                  setJsonImportDryRunResult(null);
+                  setJsonImportPreviewList([]);
                   setJsonImportError(null);
                   setJsonImportSuccess(null);
                 }}
@@ -2065,19 +2263,21 @@ export function AdminQuestionsScreen() {
               </button>
               <button
                 type="button"
-                disabled={jsonImportLoading || !jsonImportText.trim()}
-                onClick={() => void handleJsonImportPreview()}
+                disabled={!jsonImportText.trim()}
+                onClick={() => handleJsonImportPreview()}
                 className="border border-[#1e3a5f] bg-blue-900/20 px-3 py-2 text-xs uppercase text-[#38bdf8] disabled:opacity-60"
               >
-                {jsonImportLoading && !jsonImportDryRunResult ? "Validando..." : "Validar / Preview"}
+                Preview / Auditar
               </button>
               <button
                 type="button"
-                disabled={jsonImportLoading || !jsonImportText.trim()}
+                disabled={jsonImportLoading || jsonImportPreviewList.filter((i) => i.selected).length === 0}
                 onClick={() => void handleJsonImportSave()}
                 className="border border-[#14532d] bg-green-900/20 px-3 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
               >
-                {jsonImportLoading && jsonImportDryRunResult ? "Importando..." : "Importar questoes"}
+                {jsonImportLoading
+                  ? "Importando..."
+                  : `Importar (${jsonImportPreviewList.filter((i) => i.selected).length}) questoes`}
               </button>
             </div>
           </div>
