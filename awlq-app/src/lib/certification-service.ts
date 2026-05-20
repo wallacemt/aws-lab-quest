@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AWS_CERTIFICATION_PRESETS } from "@/lib/certification-presets";
+import { cacheGetOrSet, cacheDel, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 
 export async function ensureCertificationPresets() {
   await prisma.$transaction(
@@ -27,9 +28,19 @@ export async function ensureCertificationPresets() {
 }
 
 export async function listActiveCertificationPresets() {
-  await ensureCertificationPresets();
-  return prisma.certificationPreset.findMany({
-    where: { active: true },
-    orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-  });
+  return cacheGetOrSet(
+    CACHE_KEYS.certifications(),
+    async () => {
+      await ensureCertificationPresets();
+      return prisma.certificationPreset.findMany({
+        where: { active: true },
+        orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+      });
+    },
+    CACHE_TTL.CERTIFICATIONS,
+  );
+}
+
+export async function invalidateCertificationsCache(): Promise<void> {
+  await cacheDel(CACHE_KEYS.certifications());
 }

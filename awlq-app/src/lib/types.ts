@@ -9,7 +9,7 @@ export type Task = {
   completed?: boolean;
 };
 
-export type TaskDifficulty = "easy" | "medium" | "hard";
+export type TaskDifficulty = "easy" | "medium" | "hard" | "nightmare";
 
 export type LevelTone = "base" | "base-mid" | "mid" | "mid-top" | "top" | "legendary";
 

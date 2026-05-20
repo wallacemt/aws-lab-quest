@@ -5,6 +5,7 @@ export const TASK_DIFFICULTY_MULTIPLIER: Record<TaskDifficulty, number> = {
   easy: 0.8,
   medium: 1,
   hard: 1.4,
+  nightmare: 2.0,
 };
 
 export function getTaskXpByDifficulty(difficulty: TaskDifficulty): number {
