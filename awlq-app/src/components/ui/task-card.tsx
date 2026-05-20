@@ -5,10 +5,11 @@ import { PixelCard } from "@/components/ui/pixel-card";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { Task } from "@/lib/types";
 
-const DIFFICULTY_LABEL: Record<"easy" | "medium" | "hard", string> = {
+const DIFFICULTY_LABEL: Record<"easy" | "medium" | "hard" |"nightmare", string> = {
   easy: "Facil",
   medium: "Media",
   hard: "Dificil",
+  nightmare: "Pesadelo",
 };
 
 export function TaskCard({

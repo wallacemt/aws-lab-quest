@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useOnlineUsers } from "@/hooks/useOnlineUsers";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "../ui/theme-toggle";
+import { useAdminModeStore } from "@/stores/adminModeStore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,8 @@ export const Header = () => {
   const { isActive: simulatedExamActive, remainingSeconds } = useSimulatedExam();
   const router = useRouter();
   const { avatarUrl, profile } = useUserProfile();
+  const { setMode } = useAdminModeStore();
+  const isAdmin = profile.role === "admin";
   const xpTarget = profile.totalXp ?? 0;
   const [displayXp, setDisplayXp] = useState(xpTarget);
   const displayXpRef = useRef(xpTarget);
@@ -131,6 +134,27 @@ export const Header = () => {
               <TooltipContent>XP Acumulado</TooltipContent>
             </Tooltip>
           </>
+        )}
+
+        {/* Admin mode toggle — visible only to admin users */}
+        {isAdmin && !simulatedExamActive && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("admin");
+                  router.push("/admin");
+                }}
+                className="flex items-center gap-1.5 border border-[#f97316]/50 bg-[#f97316]/10 px-2 py-1 font-mono text-[10px] uppercase text-[#f97316] transition-colors hover:border-[#f97316] hover:bg-[#f97316]/20 active:scale-95"
+                aria-label="Ir para painel admin"
+              >
+                <span aria-hidden>🛡️</span>
+                <span className="hidden sm:inline">Admin</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Ir para o painel de administracao</TooltipContent>
+          </Tooltip>
         )}
 
         {/* Icons de utilidades*/}

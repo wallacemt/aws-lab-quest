@@ -5,12 +5,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
-import { getAdminStatus } from "@/features/admin/services/admin-api";
+import { useAdminModeStore } from "@/stores/adminModeStore";
 
 import BottomNav from "../ui/bottom-nav";
 import RetroLoading from "../ui/retro-loading";
 import { Header } from "@/components/layout/header";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { AdminModePickerModal } from "@/components/layout/AdminModePickerModal";
 
 type AppRouteShellProps = {
   children: ReactNode;
@@ -20,6 +21,8 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { hydrated, isProfileComplete, profile } = useUserProfile();
+  const { mode: adminMode, hydrated: adminModeHydrated, hydrate: hydrateAdminMode, setMode } = useAdminModeStore();
+  const isAdmin = profile.role === "admin";
   const {
     hydrated: simHydrated,
     isActive: simulatedExamActive,
@@ -33,25 +36,22 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   const onboardingStep = getOnboardingStep();
   const guardReady =
     hydrated &&
+    (!isAdmin || adminModeHydrated) &&
     (isProfileComplete ||
       (onboardingStep === "manual" && pathname === "/help") ||
       (onboardingStep === "profile" && pathname === "/profile") ||
       (!onboardingStep && (pathname === "/profile" || pathname === "/help")));
 
   useEffect(() => {
-    const checkAdminAndRedirect = async () => {
-      try {
-        const res = await getAdminStatus();
-        if (res.ready) {
-          router.replace("/admin");
-        }
-      } catch {
-        return;
-      }
-    };
-    if (profile.role === "admin") {
-      checkAdminAndRedirect();
-    }
+    hydrateAdminMode();
+  }, [hydrateAdminMode]);
+
+  useEffect(() => {
+    if (!isAdmin || !adminModeHydrated || adminMode !== "admin") return;
+    router.replace("/admin");
+  }, [isAdmin, adminMode, adminModeHydrated, router]);
+
+  useEffect(() => {
     if (!pathname || !simHydrated) {
       return;
     }
@@ -69,7 +69,7 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
     }
 
     router.replace("/simulado");
-  }, [pathname, restoredFromStorage, router, simHydrated, simulatedExamActive, profile.role]);
+  }, [pathname, restoredFromStorage, router, simHydrated, simulatedExamActive]);
 
   useEffect(() => {
     if (!pathname || !hydrated) {
@@ -115,6 +115,32 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
           <RetroLoading />
         </main>
       </div>
+    );
+  }
+
+  // Admin chose "admin" mode — redirect is in flight, show loading
+  if (isAdmin && adminMode === "admin") {
+    return (
+      <div className="min-h-screen pb-12">
+        <main className="flex min-h-[60vh] items-center justify-center px-4">
+          <RetroLoading />
+        </main>
+      </div>
+    );
+  }
+
+  // Admin hasn't chosen yet — show the mode picker
+  if (isAdmin && adminMode === null) {
+    return (
+      <AdminModePickerModal
+        userName={profile.name || undefined}
+        onSelect={(mode) => {
+          setMode(mode);
+          if (mode === "admin") {
+            router.replace("/admin");
+          }
+        }}
+      />
     );
   }
 
