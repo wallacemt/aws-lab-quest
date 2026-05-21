@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -92,12 +93,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     artworkUrl?: string | null;
     questionCount?: number;
     difficultyScore?: number;
-    journeyNarrative?: { stageName: string; storyText: string; awsContext: string } | null;
+    journeyNarrative?: Prisma.InputJsonValue | Prisma.NullTypes.DbNull;
   } = {};
   if (body.active !== undefined) updateData.active = body.active;
   if (body.name !== undefined) updateData.name = body.name.trim();
   if (body.difficultyScore !== undefined) updateData.difficultyScore = Math.min(10, Math.max(1, body.difficultyScore));
-  if ("journeyNarrative" in body) updateData.journeyNarrative = body.journeyNarrative ?? null;
+  if ("journeyNarrative" in body) updateData.journeyNarrative = body.journeyNarrative ?? Prisma.DbNull;
 
   let uploadedArtworkForCleanup: string | null = null;
   if ("artworkUrl" in body) {
