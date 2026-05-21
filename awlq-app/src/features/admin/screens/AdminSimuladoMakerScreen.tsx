@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
+import { AiArtworkGenerator } from "@/features/admin/components/AiArtworkGenerator";
 import { CertificationOption } from "@/features/admin/types";
 
 type AvailableQuestion = {
@@ -240,6 +241,11 @@ export function AdminSimuladoMakerScreen() {
           </div>
 
           <ArtworkUploadField value={artworkUrl} onChange={setArtworkUrl} />
+
+          <AiArtworkGenerator
+            simuladoName={name}
+            onConfirm={(dataUrl) => setArtworkUrl(dataUrl)}
+          />
 
           <div className="space-y-2">
             <label className="block font-mono text-[10px] uppercase text-[#64748b]">

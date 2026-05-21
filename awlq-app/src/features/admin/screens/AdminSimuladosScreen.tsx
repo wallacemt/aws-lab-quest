@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
+import { AiArtworkGenerator } from "@/features/admin/components/AiArtworkGenerator";
 import { CertificationOption } from "@/features/admin/types";
 
 type PackQuestion = {
@@ -82,6 +83,9 @@ export function AdminSimuladosScreen() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [artworkMigrationPending, setArtworkMigrationPending] = useState<number>(0);
+  const [artworkMigrating, setArtworkMigrating] = useState(false);
+
   // Edit modal
   const [editPack, setEditPack] = useState<PackDetail | null>(null);
   const [editLoading, setEditLoading] = useState(false);
@@ -137,6 +141,54 @@ export function AdminSimuladosScreen() {
   useEffect(() => {
     void loadPacks();
   }, [loadPacks]);
+
+  const loadArtworkMigrationStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/simulado-packs/migrate-artwork", { credentials: "include" });
+      if (!res.ok) return;
+      const json = (await res.json()) as { pending?: number };
+      setArtworkMigrationPending(json.pending ?? 0);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadArtworkMigrationStatus();
+  }, [loadArtworkMigrationStatus]);
+
+  async function handleMigrateArtworks() {
+    setArtworkMigrating(true);
+    try {
+      const res = await fetch("/api/admin/simulado-packs/migrate-artwork", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 25 }),
+      });
+      const json = (await res.json()) as {
+        migrated?: number;
+        failed?: number;
+        remaining?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(json.error ?? "Falha ao migrar artes");
+        return;
+      }
+      setGlobalMessage(
+        `Migracao concluida: ${json.migrated ?? 0} arte(s) movida(s) para o Supabase` +
+          (json.failed ? ` · ${json.failed} falha(s)` : "") +
+          (json.remaining ? ` · ${json.remaining} restante(s)` : ""),
+      );
+      setArtworkMigrationPending(json.remaining ?? 0);
+      void loadPacks();
+    } catch {
+      setError("Erro de conexao ao migrar artes");
+    } finally {
+      setArtworkMigrating(false);
+    }
+  }
 
   async function loadGenerateStats(code: string) {
     if (!code) {
@@ -364,6 +416,21 @@ export function AdminSimuladosScreen() {
           {globalMessage}
           <button onClick={() => setGlobalMessage(null)} className="ml-4 underline">
             Fechar
+          </button>
+        </div>
+      )}
+
+      {artworkMigrationPending > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border border-yellow-700/60 bg-yellow-900/10 px-4 py-3 text-xs text-yellow-200">
+          <span>
+            {artworkMigrationPending} pack(s) com arte armazenada em base64 no banco. Migre para o Supabase.
+          </span>
+          <button
+            onClick={() => void handleMigrateArtworks()}
+            disabled={artworkMigrating}
+            className="border border-yellow-600 px-3 py-1.5 font-mono text-[10px] uppercase text-yellow-200 hover:bg-yellow-900/30 disabled:opacity-50"
+          >
+            {artworkMigrating ? "Migrando..." : `Migrar lote (até 25)`}
           </button>
         </div>
       )}
@@ -634,6 +701,11 @@ export function AdminSimuladosScreen() {
               value={editArtworkUrl}
               onChange={(url) => { setEditArtworkUrl(url); setEditArtworkChanged(true); }}
               label="Arte do pack"
+            />
+
+            <AiArtworkGenerator
+              simuladoName={editName}
+              onConfirm={(dataUrl) => { setEditArtworkUrl(dataUrl); setEditArtworkChanged(true); }}
             />
 
             <label className="block space-y-1">
