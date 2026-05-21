@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import {
+  deleteArtworkFromSupabase,
+  isSupabaseArtworkUrl,
+  resolveArtworkForStorage,
+} from "@/lib/simulado-pack-artwork";
 
 type Params = { params: Promise<{ packId: string }> };
 
@@ -74,15 +79,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const pack = await prisma.simuladoPack.findUnique({
     where: { id: packId },
-    select: { id: true, questionCount: true },
+    select: { id: true, questionCount: true, artworkUrl: true },
   });
   if (!pack) return NextResponse.json({ error: "Pack nao encontrado" }, { status: 404 });
 
   const updateData: { active?: boolean; name?: string; artworkUrl?: string | null; questionCount?: number; difficultyScore?: number } = {};
   if (body.active !== undefined) updateData.active = body.active;
   if (body.name !== undefined) updateData.name = body.name.trim();
-  if ("artworkUrl" in body) updateData.artworkUrl = body.artworkUrl ?? null;
   if (body.difficultyScore !== undefined) updateData.difficultyScore = Math.min(10, Math.max(1, body.difficultyScore));
+
+  let uploadedArtworkForCleanup: string | null = null;
+  if ("artworkUrl" in body) {
+    try {
+      const resolved = await resolveArtworkForStorage(body.artworkUrl ?? null, packId);
+      if (resolved && resolved !== body.artworkUrl) {
+        uploadedArtworkForCleanup = resolved;
+      }
+      updateData.artworkUrl = resolved;
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Falha ao processar arte do pack" },
+        { status: 502 },
+      );
+    }
+  }
 
   let newCount = pack.questionCount;
 
@@ -119,11 +139,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   updateData.questionCount = Math.max(0, newCount);
 
-  const updated = await prisma.simuladoPack.update({
-    where: { id: packId },
-    data: updateData,
-    select: { id: true, name: true, active: true, questionCount: true },
-  });
+  let updated;
+  try {
+    updated = await prisma.simuladoPack.update({
+      where: { id: packId },
+      data: updateData,
+      select: { id: true, name: true, active: true, questionCount: true },
+    });
+  } catch (err) {
+    if (uploadedArtworkForCleanup) {
+      await deleteArtworkFromSupabase(uploadedArtworkForCleanup).catch(() => undefined);
+    }
+    throw err;
+  }
+
+  if ("artworkUrl" in body && pack.artworkUrl && pack.artworkUrl !== updateData.artworkUrl && isSupabaseArtworkUrl(pack.artworkUrl)) {
+    await deleteArtworkFromSupabase(pack.artworkUrl).catch(() => undefined);
+  }
 
   return NextResponse.json(updated);
 }
@@ -135,7 +167,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const { packId } = await params;
   const pack = await prisma.simuladoPack.findUnique({
     where: { id: packId },
-    select: { id: true, _count: { select: { sessions: true } } },
+    select: { id: true, artworkUrl: true, _count: { select: { sessions: true } } },
   });
   if (!pack) return NextResponse.json({ error: "Pack nao encontrado" }, { status: 404 });
 
@@ -145,5 +177,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   await prisma.simuladoPack.delete({ where: { id: packId } });
+
+  if (pack.artworkUrl && isSupabaseArtworkUrl(pack.artworkUrl)) {
+    await deleteArtworkFromSupabase(pack.artworkUrl).catch(() => undefined);
+  }
+
   return NextResponse.json({ deleted: true });
 }

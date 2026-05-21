@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { deleteArtworkFromSupabase, resolveArtworkForStorage } from "@/lib/simulado-pack-artwork";
 
 export async function GET(request: NextRequest) {
   const adminResult = await requireAdmin(request);
@@ -86,21 +87,41 @@ export async function POST(request: NextRequest) {
 
   const difficultyScore = Math.min(10, Math.max(1, typeof body.difficultyScore === "number" ? body.difficultyScore : 1));
 
-  const pack = await prisma.simuladoPack.create({
-    data: {
-      name,
-      certificationPresetId: certPreset.id,
-      createdByUserId: adminResult.userId,
-      questionCount: questionIds.length,
-      difficultyScore,
-      active: true,
-      artworkUrl: body.artworkUrl ?? "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/cert-badges/527007c2-c79f-4240-8a20-4b502c2f5b04.png",
-      questions: {
-        create: questionIds.map((questionId, position) => ({ questionId, position })),
-      },
-    },
-    select: { id: true, name: true, questionCount: true, difficultyScore: true, artworkUrl: true },
-  });
+  let storedArtworkUrl: string | null = null;
+  try {
+    storedArtworkUrl = await resolveArtworkForStorage(body.artworkUrl ?? null);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Falha ao processar arte do pack" },
+      { status: 502 },
+    );
+  }
 
-  return NextResponse.json(pack, { status: 201 });
+  const finalArtworkUrl = storedArtworkUrl
+    ?? "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/cert-badges/527007c2-c79f-4240-8a20-4b502c2f5b04.png";
+
+  try {
+    const pack = await prisma.simuladoPack.create({
+      data: {
+        name,
+        certificationPresetId: certPreset.id,
+        createdByUserId: adminResult.userId,
+        questionCount: questionIds.length,
+        difficultyScore,
+        active: true,
+        artworkUrl: finalArtworkUrl,
+        questions: {
+          create: questionIds.map((questionId, position) => ({ questionId, position })),
+        },
+      },
+      select: { id: true, name: true, questionCount: true, difficultyScore: true, artworkUrl: true },
+    });
+
+    return NextResponse.json(pack, { status: 201 });
+  } catch (err) {
+    if (storedArtworkUrl) {
+      await deleteArtworkFromSupabase(storedArtworkUrl).catch(() => undefined);
+    }
+    throw err;
+  }
 }
