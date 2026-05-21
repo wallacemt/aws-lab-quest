@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 type JourneyNarrative = {
   stageName: string;
   storyText: string;
@@ -54,9 +56,9 @@ export function JornadaStageNode({ stage, isCurrent, isFogged, onSelect }: Props
     >
       <div className="flex items-start gap-3">
         {/* Artwork thumbnail or placeholder */}
-        <div className="shrink-0 w-12 h-12 border border-[var(--pixel-border)] overflow-hidden">
+        <div className="relative shrink-0 w-12 h-12 border border-[var(--pixel-border)] overflow-hidden">
           {artworkUrl && !isFogged ? (
-            <img src={artworkUrl} alt={stage.packName} className="w-full h-full object-cover" />
+            <Image src={artworkUrl} alt={stage.packName} fill sizes="48px" className="object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-[var(--pixel-muted)]">
               <span className={`font-mono text-lg ${statusColor}`}>{statusIcon}</span>

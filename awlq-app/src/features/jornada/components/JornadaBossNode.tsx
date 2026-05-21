@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 type JourneyNarrative = {
   stageName: string;
   storyText: string;
@@ -51,9 +53,9 @@ export function JornadaBossNode({ stage, isCurrent, isFogged, onSelect }: Props)
 
       <div className="relative flex items-start gap-4">
         {/* Boss artwork / icon */}
-        <div className="shrink-0 w-16 h-16 border-2 border-yellow-500 overflow-hidden">
+        <div className="relative shrink-0 w-16 h-16 border-2 border-yellow-500 overflow-hidden">
           {artworkUrl && !isFogged ? (
-            <img src={artworkUrl} alt={stage.packName} className="w-full h-full object-cover" />
+            <Image src={artworkUrl} alt={stage.packName} fill sizes="64px" className="object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-yellow-900/30">
               <span className="text-2xl">{isFogged ? "🌫" : "⚡"}</span>

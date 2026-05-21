@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
@@ -17,6 +18,12 @@ type PackQuestion = {
   questionType: string;
 };
 
+type JourneyNarrative = {
+  stageName: string;
+  storyText: string;
+  awsContext: string;
+};
+
 type PackDetail = {
   id: string;
   name: string;
@@ -24,6 +31,7 @@ type PackDetail = {
   questionCount: number;
   difficultyScore: number;
   artworkUrl: string | null;
+  journeyNarrative: JourneyNarrative | null;
   certificationPreset: { id: string; code: string; name: string } | null;
   questions: PackQuestion[];
 };
@@ -45,6 +53,7 @@ type SimuladoPackItem = {
   questionCount: number;
   difficultyScore: number;
   active: boolean;
+  artworkUrl: string | null;
   createdAt: string;
   createdByName: string | null;
   sessionCount: number;
@@ -88,6 +97,7 @@ export function AdminSimuladosScreen() {
 
   // Edit modal
   const [editPack, setEditPack] = useState<PackDetail | null>(null);
+  const [editTab, setEditTab] = useState<"geral" | "jornada">("geral");
   const [editLoading, setEditLoading] = useState(false);
   const [editName, setEditName] = useState("");
   const [editArtworkUrl, setEditArtworkUrl] = useState<string | null>(null);
@@ -105,6 +115,11 @@ export function AdminSimuladosScreen() {
   const [editAvailPage, setEditAvailPage] = useState(1);
   const [editAvailTotal, setEditAvailTotal] = useState(0);
   const [showNewQuestionModal, setShowNewQuestionModal] = useState(false);
+  // Journey narrative editing
+  const [editJourneyStageName, setEditJourneyStageName] = useState("");
+  const [editJourneyStoryText, setEditJourneyStoryText] = useState("");
+  const [editJourneyAwsContext, setEditJourneyAwsContext] = useState("");
+  const [editJourneyChanged, setEditJourneyChanged] = useState(false);
 
   useEffect(() => {
     async function loadCerts() {
@@ -292,6 +307,7 @@ export function AdminSimuladosScreen() {
     setEditAvailDiff("");
     setEditAvailPage(1);
     setEditAvailItems([]);
+    setEditTab("geral");
     try {
       const res = await fetch(`/api/admin/simulado-packs/${packId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Falha ao carregar pack");
@@ -301,6 +317,10 @@ export function AdminSimuladosScreen() {
       setEditArtworkUrl(data.artworkUrl);
       setEditDifficultyScore(data.difficultyScore ?? 5);
       setEditArtworkChanged(false);
+      setEditJourneyStageName(data.journeyNarrative?.stageName ?? "");
+      setEditJourneyStoryText(data.journeyNarrative?.storyText ?? "");
+      setEditJourneyAwsContext(data.journeyNarrative?.awsContext ?? "");
+      setEditJourneyChanged(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro");
     } finally {
@@ -351,6 +371,14 @@ export function AdminSimuladosScreen() {
       if (editDifficultyScore !== editPack.difficultyScore) body.difficultyScore = editDifficultyScore;
       if (editRemovedIds.size > 0) body.removeQuestionIds = Array.from(editRemovedIds);
       if (editAddedIds.size > 0) body.addQuestionIds = Array.from(editAddedIds);
+      if (editJourneyChanged) {
+        const stageName = editJourneyStageName.trim();
+        const storyText = editJourneyStoryText.trim();
+        const awsContext = editJourneyAwsContext.trim();
+        body.journeyNarrative = stageName || storyText || awsContext
+          ? { stageName, storyText, awsContext }
+          : null;
+      }
 
       const res = await fetch(`/api/admin/simulado-packs/${editPack.id}`, {
         method: "PATCH",
@@ -442,34 +470,51 @@ export function AdminSimuladosScreen() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <select
-          value={filterCert}
-          onChange={(e) => { setFilterCert(e.target.value); setPage(1); }}
-          className="border border-[#334155] bg-[#0f172a] px-3 py-2 text-xs text-[#e2e8f0]"
-        >
-          <option value="">Todas certificacoes</option>
-          {certifications.map((c) => (
-            <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
-          ))}
-        </select>
+      <div className="border border-[#1e293b] bg-[#080e1a] px-4 py-3">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Certificação</span>
+            <select
+              value={filterCert}
+              onChange={(e) => { setFilterCert(e.target.value); setPage(1); }}
+              className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
+            >
+              <option value="">Todas</option>
+              {certifications.map((c) => (
+                <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
+              ))}
+            </select>
+          </div>
 
-        <select
-          value={filterActive}
-          onChange={(e) => { setFilterActive(e.target.value as "" | "true" | "false"); setPage(1); }}
-          className="border border-[#334155] bg-[#0f172a] px-3 py-2 text-xs text-[#e2e8f0]"
-        >
-          <option value="">Todos status</option>
-          <option value="true">Ativos</option>
-          <option value="false">Inativos</option>
-        </select>
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Status</span>
+            <select
+              value={filterActive}
+              onChange={(e) => { setFilterActive(e.target.value as "" | "true" | "false"); setPage(1); }}
+              className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
+            >
+              <option value="">Todos</option>
+              <option value="true">Ativos</option>
+              <option value="false">Inativos</option>
+            </select>
+          </div>
 
-        <button
-          onClick={() => { setFilterCert(""); setFilterActive(""); setPage(1); }}
-          className="border border-[#334155] px-3 py-2 text-xs uppercase text-[#94a3b8] hover:border-[#475569]"
-        >
-          Limpar filtros
-        </button>
+          <div className="flex items-end gap-2 ml-auto">
+            {(filterCert || filterActive) && (
+              <button
+                onClick={() => { setFilterCert(""); setFilterActive(""); setPage(1); }}
+                className="flex items-center gap-1 border border-[#334155] px-3 py-1.5 text-[10px] uppercase text-[#64748b] hover:border-[#f97316]/40 hover:text-[#f97316]"
+              >
+                ✕ Limpar
+              </button>
+            )}
+            {result && (
+              <span className="font-mono text-[10px] text-[#475569]">
+                {result.total} pack{result.total !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Table */}
@@ -477,28 +522,28 @@ export function AdminSimuladosScreen() {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="border-b border-[#1e293b]">
-              <th className="px-3 py-2 text-left font-mono uppercase text-[#64748b]">Nome</th>
-              <th className="px-3 py-2 text-left font-mono uppercase text-[#64748b]">Cert</th>
-              <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Questoes</th>
-              <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Score</th>
-              <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Sessoes</th>
-              <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Status</th>
-              <th className="px-3 py-2 text-left font-mono uppercase text-[#64748b]">Criado em</th>
-              <th className="px-3 py-2 text-left font-mono uppercase text-[#64748b]">Criado por</th>
-              <th className="px-3 py-2 text-center font-mono uppercase text-[#64748b]">Acoes</th>
+              <th className="w-12 px-2 py-2 font-mono text-[10px] uppercase text-[#64748b]">Arte</th>
+              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Nome</th>
+              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Cert</th>
+              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Qtd</th>
+              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Score</th>
+              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Sessoes</th>
+              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Status</th>
+              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Criado em</th>
+              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Acoes</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-[#64748b]">
+                <td colSpan={9} className="px-3 py-8 text-center text-[#64748b]">
                   Carregando...
                 </td>
               </tr>
             )}
             {!loading && result?.items.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-[#64748b]">
+                <td colSpan={9} className="px-3 py-8 text-center text-[#64748b]">
                   Nenhum pack encontrado.
                 </td>
               </tr>
@@ -507,19 +552,43 @@ export function AdminSimuladosScreen() {
               result?.items.map((pack) => (
                 <tr
                   key={pack.id}
-                  className={`border-b border-[#1e293b] hover:bg-[#111827] ${!pack.active ? "opacity-50" : ""}`}
+                  className={`border-b border-[#1e293b] hover:bg-[#0b111e] ${!pack.active ? "opacity-40" : ""}`}
                 >
-                  <td className="px-3 py-2 font-mono text-[#e2e8f0]">{pack.name}</td>
+                  <td className="px-2 py-1.5">
+                    <div className="relative mx-auto h-10 w-10 overflow-hidden border border-[#1e293b]">
+                      {pack.artworkUrl ? (
+                        pack.artworkUrl.startsWith("data:") ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={pack.artworkUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <Image
+                            src={pack.artworkUrl}
+                            alt={pack.name}
+                            fill
+                            sizes="40px"
+                            className="object-cover"
+                          />
+                        )
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-[#111827]">
+                          <span className="font-mono text-[10px] font-bold text-[#334155]">
+                            {pack.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-[#e2e8f0]">{pack.name}</td>
                   <td className="px-3 py-2">
                     <span className="border border-[#334155] px-2 py-0.5 font-mono text-[10px] uppercase text-[#94a3b8]">
                       {pack.certificationCode ?? "—"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-center text-[#cbd5e1]">{pack.questionCount}</td>
+                  <td className="px-3 py-2 text-center font-mono text-xs text-[#cbd5e1]">{pack.questionCount}</td>
                   <td className="px-3 py-2 text-center font-mono text-xs text-[#f97316]">
                     {pack.difficultyScore === 10 ? "BOSS⚡" : `${pack.difficultyScore}/10`}
                   </td>
-                  <td className="px-3 py-2 text-center text-[#94a3b8]">{pack.sessionCount}</td>
+                  <td className="px-3 py-2 text-center font-mono text-xs text-[#94a3b8]">{pack.sessionCount}</td>
                   <td className="px-3 py-2 text-center">
                     <span
                       className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${
@@ -531,10 +600,9 @@ export function AdminSimuladosScreen() {
                       {pack.active ? "Ativo" : "Inativo"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-[#64748b]">
+                  <td className="px-3 py-2 font-mono text-[10px] text-[#64748b]">
                     {new Date(pack.createdAt).toLocaleDateString("pt-BR")}
                   </td>
-                  <td className="px-3 py-2 text-[#64748b]">{pack.createdByName ?? "—"}</td>
                   <td className="px-3 py-2">
                     <div className="flex justify-center gap-2">
                       <button
@@ -680,189 +748,298 @@ export function AdminSimuladosScreen() {
       {/* Edit Pack Modal */}
       {editPack && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 px-4 pb-4 pt-6">
-          <div className="mx-auto w-full max-w-3xl space-y-5 border border-[#334155] bg-[#0f172a] p-5">
-            <div className="flex items-center justify-between">
+          <div className="mx-auto w-full max-w-3xl border border-[#334155] bg-[#0f172a]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#1e293b] px-5 pt-5 pb-3">
               <p className="font-mono text-xs uppercase text-[#38bdf8]">Editar Pack</p>
               <button onClick={() => setEditPack(null)} className="text-xs text-[#64748b] hover:text-[#e2e8f0]">
                 ✕ Fechar
               </button>
             </div>
 
-            <label className="block space-y-1">
-              <span className="text-xs uppercase text-[#64748b]">Nome do Pack</span>
-              <input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
-              />
-            </label>
-
-            <ArtworkUploadField
-              value={editArtworkUrl}
-              onChange={(url) => { setEditArtworkUrl(url); setEditArtworkChanged(true); }}
-              label="Arte do pack"
-            />
-
-            <AiArtworkGenerator
-              simuladoName={editName}
-              onConfirm={(dataUrl) => { setEditArtworkUrl(dataUrl); setEditArtworkChanged(true); }}
-            />
-
-            <label className="block space-y-1">
-              <span className="text-xs uppercase text-[#64748b]">
-                Score de Dificuldade —{" "}
-                <span className="text-[#f97316]">
-                  {editDifficultyScore === 10 ? "10 · BOSS ⚡" :
-                   editDifficultyScore <= 3 ? `${editDifficultyScore} · Fácil` :
-                   editDifficultyScore <= 6 ? `${editDifficultyScore} · Intermediário` :
-                   `${editDifficultyScore} · Difícil`}
-                </span>
-              </span>
-              <input
-                type="range"
-                min={1}
-                max={10}
-                step={1}
-                value={editDifficultyScore}
-                onChange={(e) => setEditDifficultyScore(Number(e.target.value))}
-                className="w-full accent-[#f97316]"
-              />
-              <div className="flex justify-between font-mono text-[9px] text-[#475569]">
-                <span>1 Iniciante</span>
-                <span>5 Médio</span>
-                <span>10 BOSS</span>
-              </div>
-            </label>
-
-            {/* Current questions */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs uppercase text-[#64748b]">
-                  Questoes atuais ({currentQuestionCount})
-                </p>
-                <button
-                  onClick={() => setShowNewQuestionModal(true)}
-                  className="border border-[#14532d] bg-green-900/10 px-3 py-1 text-[10px] uppercase text-green-300 hover:bg-green-900/20"
-                >
-                  + Nova questao
-                </button>
-              </div>
-              <div className="max-h-56 overflow-y-auto border border-[#1e293b] divide-y divide-[#1e293b]">
-                {editPack.questions
-                  .filter((pq) => !editRemovedIds.has(pq.id))
-                  .map((pq) => (
-                    <div key={pq.id} className="flex items-start gap-3 px-3 py-2 text-xs">
-                      <p className="flex-1 truncate text-[#cbd5e1]">{pq.statement}</p>
-                      <span className={`shrink-0 font-mono text-[10px] ${pq.difficulty === "easy" ? "text-green-400" : pq.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}>
-                        {pq.difficulty}
-                      </span>
-                      <button
-                        onClick={() => setEditRemovedIds((prev) => new Set([...prev, pq.id]))}
-                        className="shrink-0 text-[10px] text-[#64748b] hover:text-red-400"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                {editAddedQuestions.filter((q) => !editRemovedIds.has(q.id)).map((q) => (
-                  <div key={q.id} className="flex items-start gap-3 bg-green-900/10 px-3 py-2 text-xs">
-                    <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
-                    <span className="shrink-0 font-mono text-[10px] text-green-400">+novo</span>
-                    <button
-                      onClick={() => {
-                        setEditAddedIds((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
-                        setEditAddedQuestions((qs) => qs.filter((x) => x.id !== q.id));
-                      }}
-                      className="shrink-0 text-[10px] text-[#64748b] hover:text-red-400"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Add from bank */}
-            {editPack.certificationPreset && (
-              <div className="space-y-2">
-                <p className="text-xs uppercase text-[#64748b]">Adicionar do banco</p>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    value={editAvailSearch}
-                    onChange={(e) => { setEditAvailSearch(e.target.value); setEditAvailPage(1); }}
-                    placeholder="Buscar enunciado..."
-                    className="border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none"
-                  />
-                  <select
-                    value={editAvailDiff}
-                    onChange={(e) => { setEditAvailDiff(e.target.value); setEditAvailPage(1); }}
-                    className="border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0]"
-                  >
-                    <option value="">Todas dificuldades</option>
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
-                <div className="max-h-44 overflow-y-auto border border-[#1e293b] divide-y divide-[#1e293b]">
-                  {editAvailLoading && (
-                    <p className="px-3 py-4 text-center text-xs text-[#64748b]">Carregando...</p>
-                  )}
-                  {!editAvailLoading && editAvailItems.length === 0 && (
-                    <p className="px-3 py-4 text-center text-xs text-[#64748b]">Nenhuma questao disponivel.</p>
-                  )}
-                  {!editAvailLoading && editAvailItems.map((q) => {
-                    const added = editAddedIds.has(q.id);
-                    return (
-                      <div
-                        key={q.id}
-                        onClick={() => editToggleAdd(q)}
-                        className={`flex cursor-pointer items-start gap-2 px-3 py-2 text-xs hover:bg-white/[0.02] ${added ? "bg-green-900/10" : ""}`}
-                      >
-                        <input type="checkbox" checked={added} readOnly className="mt-0.5 shrink-0 accent-[#38bdf8]" />
-                        <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
-                        <span className={`shrink-0 font-mono text-[10px] ${q.difficulty === "easy" ? "text-green-400" : q.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}>
-                          {q.difficulty}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {editAvailTotal > 20 && (
-                  <div className="flex items-center gap-3 text-xs">
-                    <button
-                      onClick={() => setEditAvailPage((p) => Math.max(1, p - 1))}
-                      disabled={editAvailPage === 1}
-                      className="border border-[#334155] px-2 py-1 uppercase disabled:opacity-30"
-                    >
-                      ←
-                    </button>
-                    <span className="text-[#64748b]">{editAvailPage} / {Math.ceil(editAvailTotal / 20)}</span>
-                    <button
-                      onClick={() => setEditAvailPage((p) => p + 1)}
-                      disabled={editAvailPage >= Math.ceil(editAvailTotal / 20)}
-                      className="border border-[#334155] px-2 py-1 uppercase disabled:opacity-30"
-                    >
-                      →
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {editError && <p className="text-xs text-red-400">{editError}</p>}
-
-            <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-3">
-              <button onClick={() => setEditPack(null)} className="border border-[#334155] px-4 py-2 text-xs uppercase text-[#94a3b8]">
-                Cancelar
+            {/* Tabs */}
+            <div className="flex border-b border-[#1e293b]">
+              <button
+                onClick={() => setEditTab("geral")}
+                className={`px-5 py-2.5 font-mono text-[11px] uppercase transition-colors ${
+                  editTab === "geral"
+                    ? "border-b-2 border-[#38bdf8] text-[#38bdf8]"
+                    : "text-[#64748b] hover:text-[#94a3b8]"
+                }`}
+              >
+                Geral
               </button>
               <button
-                onClick={() => void handleSaveEdit()}
-                disabled={editSaving}
-                className="border border-[#14532d] bg-green-900/20 px-4 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
+                onClick={() => setEditTab("jornada")}
+                className={`flex items-center gap-1.5 px-5 py-2.5 font-mono text-[11px] uppercase transition-colors ${
+                  editTab === "jornada"
+                    ? "border-b-2 border-[#f97316] text-[#f97316]"
+                    : "text-[#64748b] hover:text-[#94a3b8]"
+                }`}
               >
-                {editSaving ? "Salvando..." : "Salvar alteracoes"}
+                ⚔ Jornada do Heroi
+                {editJourneyChanged && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#f97316]" />
+                )}
               </button>
+            </div>
+
+            <div className="space-y-5 p-5">
+              {/* Tab: Geral */}
+              {editTab === "geral" && (
+                <>
+                  <label className="block space-y-1">
+                    <span className="text-xs uppercase text-[#64748b]">Nome do Pack</span>
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+                    />
+                  </label>
+
+                  <ArtworkUploadField
+                    value={editArtworkUrl}
+                    onChange={(url) => { setEditArtworkUrl(url); setEditArtworkChanged(true); }}
+                    label="Arte do pack"
+                  />
+
+                  <AiArtworkGenerator
+                    simuladoName={editName}
+                    onConfirm={(dataUrl) => { setEditArtworkUrl(dataUrl); setEditArtworkChanged(true); }}
+                  />
+
+                  <label className="block space-y-1">
+                    <span className="text-xs uppercase text-[#64748b]">
+                      Score de Dificuldade —{" "}
+                      <span className="text-[#f97316]">
+                        {editDifficultyScore === 10 ? "10 · BOSS ⚡" :
+                         editDifficultyScore <= 3 ? `${editDifficultyScore} · Fácil` :
+                         editDifficultyScore <= 6 ? `${editDifficultyScore} · Intermediário` :
+                         `${editDifficultyScore} · Difícil`}
+                      </span>
+                    </span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      step={1}
+                      value={editDifficultyScore}
+                      onChange={(e) => setEditDifficultyScore(Number(e.target.value))}
+                      className="w-full accent-[#f97316]"
+                    />
+                    <div className="flex justify-between font-mono text-[9px] text-[#475569]">
+                      <span>1 Iniciante</span>
+                      <span>5 Médio</span>
+                      <span>10 BOSS</span>
+                    </div>
+                  </label>
+
+                  {/* Current questions */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs uppercase text-[#64748b]">
+                        Questoes atuais ({currentQuestionCount})
+                      </p>
+                      <button
+                        onClick={() => setShowNewQuestionModal(true)}
+                        className="border border-[#14532d] bg-green-900/10 px-3 py-1 text-[10px] uppercase text-green-300 hover:bg-green-900/20"
+                      >
+                        + Nova questao
+                      </button>
+                    </div>
+                    <div className="max-h-56 overflow-y-auto border border-[#1e293b] divide-y divide-[#1e293b]">
+                      {editPack.questions
+                        .filter((pq) => !editRemovedIds.has(pq.id))
+                        .map((pq) => (
+                          <div key={pq.id} className="flex items-start gap-3 px-3 py-2 text-xs">
+                            <p className="flex-1 truncate text-[#cbd5e1]">{pq.statement}</p>
+                            <span className={`shrink-0 font-mono text-[10px] ${pq.difficulty === "easy" ? "text-green-400" : pq.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}>
+                              {pq.difficulty}
+                            </span>
+                            <button
+                              onClick={() => setEditRemovedIds((prev) => new Set([...prev, pq.id]))}
+                              className="shrink-0 text-[10px] text-[#64748b] hover:text-red-400"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      {editAddedQuestions.filter((q) => !editRemovedIds.has(q.id)).map((q) => (
+                        <div key={q.id} className="flex items-start gap-3 bg-green-900/10 px-3 py-2 text-xs">
+                          <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
+                          <span className="shrink-0 font-mono text-[10px] text-green-400">+novo</span>
+                          <button
+                            onClick={() => {
+                              setEditAddedIds((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
+                              setEditAddedQuestions((qs) => qs.filter((x) => x.id !== q.id));
+                            }}
+                            className="shrink-0 text-[10px] text-[#64748b] hover:text-red-400"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Add from bank */}
+                  {editPack.certificationPreset && (
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase text-[#64748b]">Adicionar do banco</p>
+                      <div className="flex flex-wrap gap-2">
+                        <input
+                          value={editAvailSearch}
+                          onChange={(e) => { setEditAvailSearch(e.target.value); setEditAvailPage(1); }}
+                          placeholder="Buscar enunciado..."
+                          className="border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none"
+                        />
+                        <select
+                          value={editAvailDiff}
+                          onChange={(e) => { setEditAvailDiff(e.target.value); setEditAvailPage(1); }}
+                          className="border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0]"
+                        >
+                          <option value="">Todas dificuldades</option>
+                          <option value="easy">Easy</option>
+                          <option value="medium">Medium</option>
+                          <option value="hard">Hard</option>
+                        </select>
+                      </div>
+                      <div className="max-h-44 overflow-y-auto border border-[#1e293b] divide-y divide-[#1e293b]">
+                        {editAvailLoading && (
+                          <p className="px-3 py-4 text-center text-xs text-[#64748b]">Carregando...</p>
+                        )}
+                        {!editAvailLoading && editAvailItems.length === 0 && (
+                          <p className="px-3 py-4 text-center text-xs text-[#64748b]">Nenhuma questao disponivel.</p>
+                        )}
+                        {!editAvailLoading && editAvailItems.map((q) => {
+                          const added = editAddedIds.has(q.id);
+                          return (
+                            <div
+                              key={q.id}
+                              onClick={() => editToggleAdd(q)}
+                              className={`flex cursor-pointer items-start gap-2 px-3 py-2 text-xs hover:bg-white/[0.02] ${added ? "bg-green-900/10" : ""}`}
+                            >
+                              <input type="checkbox" checked={added} readOnly className="mt-0.5 shrink-0 accent-[#38bdf8]" />
+                              <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
+                              <span className={`shrink-0 font-mono text-[10px] ${q.difficulty === "easy" ? "text-green-400" : q.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}>
+                                {q.difficulty}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {editAvailTotal > 20 && (
+                        <div className="flex items-center gap-3 text-xs">
+                          <button
+                            onClick={() => setEditAvailPage((p) => Math.max(1, p - 1))}
+                            disabled={editAvailPage === 1}
+                            className="border border-[#334155] px-2 py-1 uppercase disabled:opacity-30"
+                          >
+                            ←
+                          </button>
+                          <span className="text-[#64748b]">{editAvailPage} / {Math.ceil(editAvailTotal / 20)}</span>
+                          <button
+                            onClick={() => setEditAvailPage((p) => p + 1)}
+                            disabled={editAvailPage >= Math.ceil(editAvailTotal / 20)}
+                            className="border border-[#334155] px-2 py-1 uppercase disabled:opacity-30"
+                          >
+                            →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Tab: Jornada do Herói */}
+              {editTab === "jornada" && (
+                <div className="space-y-5">
+                  <div className="border border-[#f97316]/20 bg-[#f97316]/5 px-4 py-3 text-xs text-[#94a3b8]">
+                    <p className="font-mono text-[10px] uppercase text-[#f97316] mb-1">Modo Jornada do Herói</p>
+                    Personalize como esta fase aparece no mapa da jornada. Deixe os campos vazios para usar narrativa gerada automaticamente pela IA.
+                  </div>
+
+                  <label className="block space-y-1">
+                    <span className="text-xs uppercase text-[#64748b]">Título da fase</span>
+                    <p className="text-[10px] text-[#475569]">Nome épico exibido no mapa (ex: "A Forja do Conhecimento")</p>
+                    <input
+                      value={editJourneyStageName}
+                      onChange={(e) => { setEditJourneyStageName(e.target.value); setEditJourneyChanged(true); }}
+                      placeholder="Nome épico da fase..."
+                      className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none placeholder:text-[#334155]"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-xs uppercase text-[#64748b]">Roteiro / Narrativa</span>
+                    <p className="text-[10px] text-[#475569]">Texto de flavour exibido ao iniciar a fase (2-3 frases)</p>
+                    <textarea
+                      value={editJourneyStoryText}
+                      onChange={(e) => { setEditJourneyStoryText(e.target.value); setEditJourneyChanged(true); }}
+                      placeholder="Narrativa épica da fase..."
+                      rows={4}
+                      className="w-full resize-none border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none placeholder:text-[#334155]"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-xs uppercase text-[#64748b]">Contexto AWS</span>
+                    <p className="text-[10px] text-[#475569]">Serviço AWS principal desta fase (ex: "Amazon S3", "AWS Lambda")</p>
+                    <input
+                      value={editJourneyAwsContext}
+                      onChange={(e) => { setEditJourneyAwsContext(e.target.value); setEditJourneyChanged(true); }}
+                      placeholder="ex: Amazon S3"
+                      className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none placeholder:text-[#334155]"
+                    />
+                  </label>
+
+                  {/* Preview */}
+                  {(editJourneyStageName || editJourneyStoryText || editJourneyAwsContext) && (
+                    <div className="border border-[#f97316]/30 bg-[#111827] p-4 space-y-2">
+                      <p className="font-mono text-[10px] uppercase text-[#f97316]/60">Preview</p>
+                      {editJourneyStageName && (
+                        <p className="font-mono text-sm font-bold text-[#f97316]">{editJourneyStageName}</p>
+                      )}
+                      {editJourneyStoryText && (
+                        <p className="text-xs leading-relaxed text-[#cbd5e1]">{editJourneyStoryText}</p>
+                      )}
+                      {editJourneyAwsContext && (
+                        <span className="inline-block border border-[#38bdf8]/40 px-2 py-0.5 font-mono text-[10px] uppercase text-[#38bdf8]">
+                          {editJourneyAwsContext}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setEditJourneyStageName("");
+                      setEditJourneyStoryText("");
+                      setEditJourneyAwsContext("");
+                      setEditJourneyChanged(true);
+                    }}
+                    className="border border-[#334155] px-3 py-1.5 text-[10px] uppercase text-[#64748b] hover:border-[#475569] hover:text-[#94a3b8]"
+                  >
+                    Limpar — usar geração automática
+                  </button>
+                </div>
+              )}
+
+              {editError && <p className="text-xs text-red-400">{editError}</p>}
+
+              <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-3">
+                <button onClick={() => setEditPack(null)} className="border border-[#334155] px-4 py-2 text-xs uppercase text-[#94a3b8]">
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void handleSaveEdit()}
+                  disabled={editSaving}
+                  className="border border-[#14532d] bg-green-900/20 px-4 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
+                >
+                  {editSaving ? "Salvando..." : "Salvar alteracoes"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

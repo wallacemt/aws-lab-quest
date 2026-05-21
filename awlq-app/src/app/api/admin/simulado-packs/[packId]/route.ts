@@ -23,6 +23,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       questionCount: true,
       difficultyScore: true,
       artworkUrl: true,
+      journeyNarrative: true,
       createdAt: true,
       certificationPreset: { select: { id: true, code: true, name: true } },
       questions: {
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     questionCount: pack.questionCount,
     difficultyScore: pack.difficultyScore,
     artworkUrl: pack.artworkUrl ?? null,
+    journeyNarrative: pack.journeyNarrative ?? null,
     createdAt: pack.createdAt,
     certificationPreset: pack.certificationPreset,
     questions: pack.questions.map((pq) => ({
@@ -75,6 +77,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     difficultyScore?: number;
     addQuestionIds?: string[];
     removeQuestionIds?: string[];
+    journeyNarrative?: { stageName: string; storyText: string; awsContext: string } | null;
   };
 
   const pack = await prisma.simuladoPack.findUnique({
@@ -83,10 +86,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   });
   if (!pack) return NextResponse.json({ error: "Pack nao encontrado" }, { status: 404 });
 
-  const updateData: { active?: boolean; name?: string; artworkUrl?: string | null; questionCount?: number; difficultyScore?: number } = {};
+  const updateData: {
+    active?: boolean;
+    name?: string;
+    artworkUrl?: string | null;
+    questionCount?: number;
+    difficultyScore?: number;
+    journeyNarrative?: { stageName: string; storyText: string; awsContext: string } | null;
+  } = {};
   if (body.active !== undefined) updateData.active = body.active;
   if (body.name !== undefined) updateData.name = body.name.trim();
   if (body.difficultyScore !== undefined) updateData.difficultyScore = Math.min(10, Math.max(1, body.difficultyScore));
+  if ("journeyNarrative" in body) updateData.journeyNarrative = body.journeyNarrative ?? null;
 
   let uploadedArtworkForCleanup: string | null = null;
   if ("artworkUrl" in body) {

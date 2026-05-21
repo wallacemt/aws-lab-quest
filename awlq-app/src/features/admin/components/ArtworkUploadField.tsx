@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 import { compressImageToDataUrl, validateImageFile } from "@/lib/image-utils";
 
@@ -52,12 +53,13 @@ export function ArtworkUploadField({ value, onChange, label = "Arte do pack" }: 
         className="relative border border-dashed border-[#334155] bg-[#0b1220]"
       >
         {value ? (
-          <div className="relative">
-            <img
-              src={value}
-              alt="Arte do pack"
-              className="h-36 w-full object-cover"
-            />
+          <div className="relative h-36">
+            {value.startsWith("data:") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={value} alt="Arte do pack" className="h-full w-full object-cover" />
+            ) : (
+              <Image src={value} alt="Arte do pack" fill sizes="640px" className="object-cover" />
+            )}
             <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-opacity hover:bg-black/50 hover:opacity-100">
               <button
                 type="button"

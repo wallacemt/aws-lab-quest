@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 type PackSession = {
   id: string;
   scorePercent: number;
@@ -254,9 +256,9 @@ export function SimuladoPacksGrid({
               {packsView === "list" ? (
                 /* List row layout */
                 <div className="flex min-h-[5.5rem] items-stretch">
-                  <div className="w-24 shrink-0 overflow-hidden border-r border-[var(--pixel-border)]">
+                  <div className="relative w-24 h-[88px] shrink-0 overflow-hidden border-r border-[var(--pixel-border)]">
                     {pack.artworkUrl ? (
-                      <img src={pack.artworkUrl} alt={pack.name} className="h-full w-full object-cover" />
+                      <Image src={pack.artworkUrl} alt={pack.name} fill sizes="96px" className="object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center bg-[var(--pixel-primary)]/10">
                         <span className="font-mono text-2xl font-bold text-[var(--pixel-primary)]">
@@ -331,7 +333,7 @@ export function SimuladoPacksGrid({
               ) : pack.artworkUrl ? (
                 /* Game-cover layout */
                 <div className="relative aspect-square w-full">
-                  <img src={pack.artworkUrl} alt={pack.name} className="h-full w-full object-cover" />
+                  <Image src={pack.artworkUrl} alt={pack.name} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3">
                     <div className="flex items-end justify-between gap-2">

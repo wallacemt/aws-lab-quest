@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -131,11 +132,15 @@ export function JornadaScreen() {
                   </div>
 
                   {selectedStage.artworkUrl && (
-                    <img
-                      src={selectedStage.artworkUrl}
-                      alt={selectedStage.packName}
-                      className="w-full aspect-video object-cover border border-[var(--pixel-border)]"
-                    />
+                    <div className="relative w-full aspect-video border border-[var(--pixel-border)]">
+                      <Image
+                        src={selectedStage.artworkUrl}
+                        alt={selectedStage.packName}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        className="object-cover"
+                      />
+                    </div>
                   )}
 
                   <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)] leading-relaxed">
