@@ -47,4 +47,7 @@ export const config = {
     password: optional("MAIL_PASSWORD", ""),
     from: optional("EMAIL_FROM", "AWS Quest <noreply@example.com>"),
   },
+  app: {
+    url: optional("APP_URL", "https://awslabquest.com"),
+  },
 };

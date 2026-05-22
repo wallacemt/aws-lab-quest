@@ -1,8 +1,12 @@
 import { Worker } from "bullmq";
 import { redis, EmailSendJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
+import { config } from "../config.js";
 import { sendEmail, buildEmailContent } from "../services/email.js";
 import { logger } from "../shared/logger.js";
+
+const STATIC_LOGO_URL =
+  "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/android-chrome-512x512.png";
 
 export function createEmailSendWorker(): Worker {
   return new Worker<EmailSendJobData>(
@@ -31,8 +35,8 @@ export function createEmailSendWorker(): Worker {
               select: { email: true, name: true },
             });
 
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://awslabquest.com";
-      const logoUrl = `${appUrl}/icon.png`;
+      const appUrl = config.app.url;
+      const logoUrl = STATIC_LOGO_URL;
 
       let sent = 0;
       let failed = 0;

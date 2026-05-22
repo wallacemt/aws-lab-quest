@@ -3,6 +3,9 @@ import { getSystemEmailTemplates } from "@/features/admin/email/templates";
 
 const ALLOWED_VARIABLES = ["name", "app_url", "logo_url", "reset_url"] as const;
 
+const STATIC_LOGO_URL =
+  "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/android-chrome-512x512.png";
+
 type TemplateVariables = {
   name: string;
   app_url: string;
@@ -27,13 +30,7 @@ export function renderTemplateWithVariables(template: string, vars: TemplateVari
 }
 
 export async function ensureSystemTemplates(): Promise<void> {
-  const appUrl = getBaseAppUrl();
-  const logoUrl = `${appUrl}/android-chrome-192x192.png`;
-  const drafts = getSystemEmailTemplates({
-    name: "Aluno",
-    appUrl,
-    logoUrl,
-  });
+  const drafts = getSystemEmailTemplates({ name: "Aluno" });
 
   for (const draft of drafts) {
     await prisma.adminEmailTemplate.upsert({
@@ -49,8 +46,11 @@ export async function ensureSystemTemplates(): Promise<void> {
         isSystem: true,
       },
       update: {
-        // Keep user customizations for existing templates and only enforce system marker.
+        // System templates are code-managed — regenerate to apply placeholder/URL changes.
         isSystem: true,
+        subject: draft.subject,
+        html: draft.html,
+        text: draft.text ?? null,
       },
     });
   }
@@ -61,7 +61,7 @@ export function buildTemplateVariables(input: { name: string; resetUrl?: string 
   return {
     name: input.name,
     app_url: appUrl,
-    logo_url: `${appUrl}/android-chrome-192x192.png`,
+    logo_url: STATIC_LOGO_URL,
     reset_url: input.resetUrl ?? `${appUrl}/login`,
   };
 }

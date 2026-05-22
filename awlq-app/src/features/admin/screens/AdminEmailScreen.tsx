@@ -32,14 +32,15 @@ const EMPTY_DRAFT: DraftState = {
   active: true,
 };
 
-function renderPreview(template: string, name: string): string {
-  const appUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-  const logoUrl = `${appUrl}/icon.png`;
+const STATIC_LOGO_URL =
+  "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/android-chrome-512x512.png";
 
+function renderPreview(template: string, name: string, appUrl: string): string {
   return template
     .replace(/{{\s*name\s*}}/gi, name)
     .replace(/{{\s*app_url\s*}}/gi, appUrl)
-    .replace(/{{\s*logo_url\s*}}/gi, logoUrl);
+    .replace(/{{\s*logo_url\s*}}/gi, STATIC_LOGO_URL)
+    .replace(/{{\s*reset_url\s*}}/gi, `${appUrl}/reset-password`);
 }
 
 export function AdminEmailScreen() {
@@ -57,6 +58,9 @@ export function AdminEmailScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState("Aluno AWS");
+  const [previewAppUrl, setPreviewAppUrl] = useState(
+    typeof window !== "undefined" ? window.location.origin : "http://localhost:3000",
+  );
 
   // Send tab state
   const [sending, setSending] = useState(false);
@@ -282,7 +286,7 @@ export function AdminEmailScreen() {
         <p className="font-mono text-xs uppercase text-[#f97316]">Admin Email</p>
         <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Gestao de templates e envio</h1>
         <p className="text-sm text-[#94a3b8]">
-          Variaveis suportadas: {"{{name}}"}, {"{{app_url}}"}, {"{{logo_url}}"}.
+          Variaveis suportadas: {"{{name}}"}, {"{{app_url}}"}, {"{{logo_url}}"}, {"{{reset_url}}"}.
         </p>
       </header>
 
@@ -485,11 +489,23 @@ export function AdminEmailScreen() {
                     placeholder="Nome para preview"
                     className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
                   />
+                  <div className="space-y-1">
+                    <p className="font-mono text-[10px] uppercase text-[#94a3b8]">URL do app ({{"{{"}}app_url{"}}"})</p>
+                    <input
+                      value={previewAppUrl}
+                      onChange={(event) => setPreviewAppUrl(event.target.value)}
+                      placeholder="https://seuapp.com"
+                      className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
+                    />
+                    <p className="text-[10px] text-[#475569]">
+                      Usada nos links do preview. No envio real, usa a variavel APP_URL do servidor.
+                    </p>
+                  </div>
                   <div className="max-h-[80vh] overflow-auto rounded border border-[#334155] bg-white p-2">
                     <div
                       className="min-h-[240px]"
                       dangerouslySetInnerHTML={{
-                        __html: renderPreview(draft.html || "<p>Sem HTML para preview.</p>", previewName),
+                        __html: renderPreview(draft.html || "<p>Sem HTML para preview.</p>", previewName, previewAppUrl),
                       }}
                     />
                   </div>

@@ -1,3 +1,6 @@
+const STATIC_LOGO_URL =
+  "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/android-chrome-512x512.png";
+
 type BaseEmailParams = {
   name: string;
   appUrl?: string;
@@ -17,12 +20,8 @@ export type SystemTemplateDraft = {
   text: string;
 };
 
-function getAppUrl(params: BaseEmailParams): string {
-  return params.appUrl ?? process.env.APP_URL ?? process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
-}
-
 function getLogoUrl(params: BaseEmailParams): string {
-  return params.logoUrl ?? `${getAppUrl(params)}/android-chrome-192x192.png`;
+  return params.logoUrl ?? STATIC_LOGO_URL;
 }
 
 function renderBrandedEmail(input: {
@@ -64,12 +63,11 @@ function renderBrandedEmail(input: {
 }
 
 export function renderDailyPraticeInviteTemplate(params: InviteParams) {
-  const appUrl = getAppUrl(params);
   const logoUrl = getLogoUrl(params);
 
   const subject = "Sua trilha AWS de hoje ja esta pronta";
   const html = renderBrandedEmail({
-    title: `Ola, ${params.name}!`,
+    title: `Ola, {{name}}!`,
     subtitle: "Seu treino diario esta esperando por voce.",
     intro: "Manter consistencia diaria acelera sua aprovacao nas certificacoes AWS.",
     highlights: [
@@ -78,7 +76,7 @@ export function renderDailyPraticeInviteTemplate(params: InviteParams) {
       "Lab para praticar cenario real",
     ],
     ctaLabel: "Comecar pratica agora",
-    ctaHref: `${appUrl}/`,
+    ctaHref: `{{app_url}}/`,
     footer: "Dica: 20 minutos por dia geram progresso continuo.",
     logoUrl,
   });
@@ -86,22 +84,21 @@ export function renderDailyPraticeInviteTemplate(params: InviteParams) {
   return {
     subject,
     html,
-    text: `Ola, ${params.name}! Sua pratica diaria esta pronta. Acesse ${appUrl} e faca um KC, Simulado ou Lab hoje.`,
+    text: `Ola, {{name}}! Sua pratica diaria esta pronta. Acesse {{app_url}} e faca um KC, Simulado ou Lab hoje.`,
   };
 }
 
 export function renderFreeAcessTemplate(params: FreeAccessParams) {
-  const appUrl = getAppUrl(params);
   const logoUrl = getLogoUrl(params);
 
   const subject = "Seu acesso foi liberado";
   const html = renderBrandedEmail({
-    title: `Parabens, ${params.name}!`,
+    title: `Parabens, {{name}}!`,
     subtitle: "Seu acesso ao AWS Lab Quest foi aprovado.",
     intro: "Seu ambiente de estudo esta pronto para acelerar sua preparacao.",
     highlights: ["Monte uma rotina com Labs e KC", "Acompanhe seu nivel e badges", "Use simulados para medir evolucao"],
     ctaLabel: "Entrar na plataforma",
-    ctaHref: `${appUrl}/login`,
+    ctaHref: `{{app_url}}/login`,
     footer: "Seja bem-vindo(a)! Vamos construir sua aprovacao certificacao por certificacao.",
     logoUrl,
   });
@@ -109,7 +106,7 @@ export function renderFreeAcessTemplate(params: FreeAccessParams) {
   return {
     subject,
     html,
-    text: `Parabens, ${params.name}! Seu acesso ao AWS Lab Quest foi liberado. Entre em ${appUrl}/login e comece agora.`,
+    text: `Parabens, {{name}}! Seu acesso ao AWS Lab Quest foi liberado. Entre em {{app_url}}/login e comece agora.`,
   };
 }
 
@@ -118,7 +115,7 @@ export function renderPasswordResetTemplate(params: PasswordResetParams) {
 
   const subject = "Redefinicao de senha AWS Lab Quest";
   const html = renderBrandedEmail({
-    title: `Ola, ${params.name}!`,
+    title: `Ola, {{name}}!`,
     subtitle: "Recebemos um pedido para redefinir sua senha.",
     intro: "Se voce fez essa solicitacao, use o botao abaixo para criar uma nova senha com seguranca.",
     highlights: [
