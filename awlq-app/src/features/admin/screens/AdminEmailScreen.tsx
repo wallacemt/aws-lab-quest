@@ -490,7 +490,7 @@ export function AdminEmailScreen() {
                     className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
                   />
                   <div className="space-y-1">
-                    <p className="font-mono text-[10px] uppercase text-[#94a3b8]">URL do app ({{"{{"}}app_url{"}}"})</p>
+                    <p className="font-mono text-[10px] uppercase text-[#94a3b8]">URL do app ({previewAppUrl})</p>
                     <input
                       value={previewAppUrl}
                       onChange={(event) => setPreviewAppUrl(event.target.value)}
