@@ -1,6 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type PackSession = {
   id: string;
@@ -101,89 +106,123 @@ export function SimuladoPacksGrid({
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
+  const difficultyOptions: {
+    value: DifficultyFilter;
+    icon: string;
+    label: string;
+  }[] = [
+    { value: "all", icon: "◈", label: "Todas as dificuldades" },
+    { value: "easy", icon: "★", label: "Fácil — níveis 1 a 3" },
+    { value: "medium", icon: "★★", label: "Médio — níveis 4 a 6" },
+    { value: "hard", icon: "★★★", label: "Difícil — níveis 7 a 9" },
+    { value: "boss", icon: "⚡", label: "Boss — nível 10" },
+  ];
+
   return (
     <div className="space-y-4">
-      {/* Filter bar */}
+      {/* Filter bar — row 1: status + difficulty + view controls */}
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
+          {/* Status filters */}
           {(["all", "todo", "done"] as const).map((f) => (
             <button
               key={f}
               type="button"
               onClick={() => onFilterChange(f)}
               className={[
-                "border px-3 py-1 font-mono text-[10px] uppercase",
+                "border px-2.5 py-1 font-mono text-[10px] uppercase",
                 packsFilter === f
                   ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
                   : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
               ].join(" ")}
             >
-              {f === "all" ? "Todos" : f === "todo" ? "Nao realizados" : "Realizados"}
+              {f === "all" ? "Todos" : f === "todo" ? "Pend." : "Feitos"}
             </button>
           ))}
+
+          <span className="font-mono text-[10px] text-[var(--pixel-border)]">|</span>
+
+          {/* Difficulty filters with tooltips */}
+          {difficultyOptions.map(({ value, icon, label }) => (
+            <Tooltip key={value}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onDifficultyFilterChange(value)}
+                  className={[
+                    "border px-2 py-1 font-mono text-[10px]",
+                    packsDifficultyFilter === value
+                      ? value === "boss"
+                        ? "border-yellow-500 text-yellow-400"
+                        : "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
+                      : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
+                  ].join(" ")}
+                >
+                  {icon}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{label}</TooltipContent>
+            </Tooltip>
+          ))}
+
+          {/* View + refresh controls */}
           <div className="ml-auto flex items-center gap-1">
             {(["grid", "list"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => onViewChange(v)}
-                title={v === "grid" ? "Grade" : "Lista"}
-                className={[
-                  "border px-2 py-1 font-mono text-[11px] leading-none",
-                  packsView === v
-                    ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
-                    : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
-                ].join(" ")}
-              >
-                {v === "grid" ? "⊞" : "☰"}
-              </button>
+              <Tooltip key={v}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => onViewChange(v)}
+                    className={[
+                      "border px-2 py-1 font-mono text-[11px] leading-none",
+                      packsView === v
+                        ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
+                        : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
+                    ].join(" ")}
+                  >
+                    {v === "grid" ? "⊞" : "☰"}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {v === "grid" ? "Visualização em grade" : "Visualização em lista"}
+                </TooltipContent>
+              </Tooltip>
             ))}
-            <button
-              type="button"
-              disabled={packsLoading}
-              onClick={onRefresh}
-              className="border border-[var(--pixel-border)] px-3 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50 disabled:opacity-40"
-            >
-              {packsLoading ? "..." : "↻ Atualizar"}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  disabled={packsLoading}
+                  onClick={onRefresh}
+                  className="border border-[var(--pixel-border)] px-2 py-1 font-mono text-[11px] leading-none text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50 disabled:opacity-40"
+                >
+                  {packsLoading ? "·" : "↻"}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Atualizar lista</TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
+        {/* Row 2: search + sort */}
         <div className="flex flex-wrap items-center gap-2">
-          {(["all", "easy", "medium", "hard", "boss"] as const).map((df) => {
-            const label =
-              df === "all" ? "Todos" :
-              df === "easy" ? "Facil (1–3)" :
-              df === "medium" ? "Medio (4–6)" :
-              df === "hard" ? "Dificil (7–9)" :
-              "BOSS ⚡";
-            return (
+          <div className="flex items-center gap-1">
+            <input
+              value={packsSearch}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Buscar pack..."
+              className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-1.5 font-mono text-[10px] text-[var(--pixel-text)] outline-none focus:border-[var(--pixel-primary)]/50"
+            />
+            {packsSearch && (
               <button
-                key={df}
                 type="button"
-                onClick={() => onDifficultyFilterChange(df)}
-                className={[
-                  "border px-3 py-1 font-mono text-[10px] uppercase",
-                  packsDifficultyFilter === df
-                    ? df === "boss"
-                      ? "border-yellow-500 text-yellow-400"
-                      : "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
-                    : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
-                ].join(" ")}
+                onClick={() => onSearchChange("")}
+                className="font-mono text-[10px] text-[var(--pixel-subtext)] hover:text-[var(--pixel-primary)]"
               >
-                {label}
+                ✕
               </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            value={packsSearch}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Buscar pack..."
-            className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-1.5 font-mono text-[10px] text-[var(--pixel-text)] outline-none focus:border-[var(--pixel-primary)]/50"
-          />
+            )}
+          </div>
           <select
             value={packsSort}
             onChange={(e) => onSortChange(e.target.value as PacksSort)}
@@ -194,15 +233,6 @@ export function SimuladoPacksGrid({
             <option value="name_az">Nome A-Z</option>
             <option value="score_desc">Melhor pontuacao</option>
           </select>
-          {packsSearch && (
-            <button
-              type="button"
-              onClick={() => onSearchChange("")}
-              className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:text-[var(--pixel-primary)]"
-            >
-              ✕ Limpar busca
-            </button>
-          )}
         </div>
       </div>
 
