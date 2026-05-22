@@ -15,6 +15,9 @@ services:
       LOG_LEVEL: info
       WEAK_AREA_THRESHOLD: "0.60"
       WEAK_AREA_WINDOW_DAYS: "30"
+      EMAIL_FROM: ${EMAIL_FROM}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
     networks:
      - rt-network
   rt-awslq-app:
