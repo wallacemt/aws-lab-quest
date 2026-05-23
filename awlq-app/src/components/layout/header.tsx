@@ -161,7 +161,7 @@ export const Header = () => {
         <div className="flex items-center gap-1 md:gap-2">
           <DropdownMenu>
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger asChild>
                 <DropdownMenuTrigger
                   asChild
                   className="border-none p-2 text-pixel-subtext hover:text-pixel-text transition-colors rounded-lg hover:bg-pixel-muted active:scale-95  "

@@ -1,15 +1,17 @@
 "use client";
 
-import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
+  const initialValueRef = useRef(initialValue);
+
   const [storageState, setStorageState] = useState<{ value: T; hydrated: boolean }>({
     value: initialValue,
     hydrated: false,
   });
 
   useEffect(() => {
-    let nextValue = initialValue;
+    let nextValue = initialValueRef.current;
 
     try {
       const raw = window.localStorage.getItem(key);
@@ -17,12 +19,11 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
         nextValue = JSON.parse(raw) as T;
       }
     } catch {
-      nextValue = initialValue;
+      nextValue = initialValueRef.current;
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStorageState({ value: nextValue, hydrated: true });
-  }, [initialValue, key]);
+  }, [key]);
 
   useEffect(() => {
     if (!storageState.hydrated) {
