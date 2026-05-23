@@ -13,6 +13,7 @@ import { KCSummaryCard } from "@/features/study/components/kc/KCSummaryCard";
 import {
   createKcQuestions,
   createStudyExplanation,
+  fetchWeakServices,
   isAnswerCorrect,
   listStudyServices,
   normalizeAnswerValue,
@@ -21,6 +22,7 @@ import {
   saveStudyHistory,
   suggestStudyQuestion,
   StudyServiceItem,
+  WeakServiceItem,
 } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
@@ -75,6 +77,11 @@ export function KCScreen() {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
 
+  // Gaps state
+  const [weakServices, setWeakServices] = useState<WeakServiceItem[]>([]);
+  const [loadingWeakServices, setLoadingWeakServices] = useState(false);
+  const [gapQuestionCount, setGapQuestionCount] = useState(10);
+
   useEffect(() => {
     setServicesLoading(true);
     listStudyServices({ withCount: true, difficulty: selectedDifficulty })
@@ -82,6 +89,16 @@ export function KCScreen() {
       .catch((error) => setServicesError(error instanceof Error ? error.message : "Falha ao carregar serviços AWS."))
       .finally(() => setServicesLoading(false));
   }, [selectedDifficulty]);
+
+  useEffect(() => {
+    if (questions.length > 0) return;
+    setLoadingWeakServices(true);
+    fetchWeakServices({ take: 8, sample: 35 })
+      .then((items) => setWeakServices(items))
+      .catch(() => setWeakServices([]))
+      .finally(() => setLoadingWeakServices(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions.length]);
 
   useEffect(() => {
     const topicsRaw = searchParams.get("topics");
@@ -173,6 +190,38 @@ export function KCScreen() {
       setSuggestionSent(service.code);
       setTimeout(() => setSuggestionSent(null), 4000);
     } catch { /* silently ignore */ }
+  }
+
+  async function startKCFromGaps() {
+    const maxTopics = maxTopicsForCount(gapQuestionCount);
+    const availableCodes = new Set(services.map((s) => s.code.toUpperCase()));
+    const gapCodes = weakServices
+      .map((item) => (item.serviceCode || item.topic).toUpperCase())
+      .filter((code) => availableCodes.has(code))
+      .slice(0, maxTopics);
+
+    if (gapCodes.length === 0) {
+      setFlowError("Nenhum gap encontrado corresponde aos servicos disponiveis. Selecione manualmente.");
+      return;
+    }
+
+    setFlowError(null);
+    setCompletionMessage(null);
+    setLoadingQuestions(true);
+    try {
+      const nextQuestions = await createKcQuestions({ topics: gapCodes, difficulty: selectedDifficulty, count: gapQuestionCount });
+      setQuestions(nextQuestions);
+      setAnswers({});
+      setCurrentIndex(0);
+      setExplanationByQuestion({});
+      setSubmittedCurrent(false);
+      setSelectedTopics(gapCodes);
+      setQuestionCount(gapQuestionCount);
+    } catch (error) {
+      setFlowError(error instanceof Error ? error.message : "Erro ao iniciar KC dos gaps.");
+    } finally {
+      setLoadingQuestions(false);
+    }
   }
 
   async function startKC() {
@@ -339,6 +388,64 @@ export function KCScreen() {
             quando houver erro.
           </p>
         </PixelCard>
+
+        {!inProgress && !kcSummary && (weakServices.length > 0 || loadingWeakServices) && (
+          <PixelCard className="space-y-3 border-[var(--pixel-accent)]/50 bg-[var(--pixel-accent)]/5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
+                Gaps de Revisao
+              </p>
+              {loadingWeakServices && (
+                <span className="font-mono text-[10px] text-[var(--pixel-subtext)]">Carregando...</span>
+              )}
+            </div>
+
+            {weakServices.length > 0 && (
+              <>
+                <div className="space-y-1.5">
+                  {weakServices.slice(0, 5).map((item) => (
+                    <div key={`${item.serviceCode}-${item.topic}`} className="flex items-center justify-between gap-2">
+                      <p className="font-mono text-xs text-[var(--pixel-text)]">
+                        {item.serviceName || item.topic}
+                      </p>
+                      <span className="font-mono text-[10px] text-red-400">
+                        {item.errorRate}% erro · {item.errors}/{item.attempts}
+                      </span>
+                    </div>
+                  ))}
+                  {weakServices.length > 5 && (
+                    <p className="font-mono text-[9px] text-[var(--pixel-subtext)]">
+                      +{weakServices.length - 5} outros gaps
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 border-t border-[var(--pixel-border)] pt-3">
+                  <div className="flex items-center gap-2">
+                    <label className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Questoes</label>
+                    <select
+                      value={gapQuestionCount}
+                      onChange={(e) => setGapQuestionCount(Number(e.target.value))}
+                      className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 font-mono text-[10px] text-[var(--pixel-text)] outline-none"
+                    >
+                      {[5, 10, 15, 20, 30].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void startKCFromGaps()}
+                    disabled={loadingQuestions || servicesLoading}
+                    className="border border-[var(--pixel-accent)] px-3 py-2 font-mono text-[10px] uppercase text-[var(--pixel-accent)] hover:bg-[var(--pixel-accent)]/10 disabled:opacity-50"
+                  >
+                    {loadingQuestions ? "Gerando KC..." : "Fazer KC dos gaps"}
+                  </button>
+                </div>
+              </>
+            )}
+          </PixelCard>
+        )}
 
         {!inProgress && !kcSummary && (
           <KCSetupPanel

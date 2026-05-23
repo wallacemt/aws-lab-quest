@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { STUDY_OPTIONS, StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import { SimuladoExamFlow } from "@/features/study/components/simulado/SimuladoExamFlow";
@@ -34,6 +33,7 @@ import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { STORAGE_KEYS, safeLocalStorageGet, safeLocalStorageRemove, safeLocalStorageSet } from "@/lib/storage";
 import { QuestionOption, SimuladoDraft, StudyQuestion, TaskDifficulty } from "@/lib/types";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const GAP_TOP_N = 10;
@@ -135,15 +135,6 @@ async function triggerConfetti() {
   }
 }
 
-function formatGuideLines(text: string): string[] {
-  return text
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length >= 18)
-    .slice(0, 10);
-}
-
 function buildTopicPerformance(questions: StudyQuestion[], answers: StudyAnswerMap): TopicPerformance[] {
   const byTopic = new Map<string, TopicPerformance>();
 
@@ -231,7 +222,6 @@ export function SimuladoScreen() {
 
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [rulesAccepted, setRulesAccepted] = useState(false);
-  const [showExamGuidePanel, setShowExamGuidePanel] = useState(true);
   const [examGuideInfo, setExamGuideInfo] = useState<{
     markdown: string;
     preview: string;
@@ -262,11 +252,16 @@ export function SimuladoScreen() {
   const [packs, setPacks] = useState<SimuladoPackListItem[]>([]);
   const [packsLoading, setPacksLoading] = useState(false);
   const [packsFilter, setPacksFilter] = useState<"all" | "todo" | "done">("all");
-  const [packsDifficultyFilter, setPacksDifficultyFilter] = useState<"all" | "easy" | "medium" | "hard" | "boss">("all");
+  const [packsDifficultyFilter, setPacksDifficultyFilter] = useState<"all" | "easy" | "medium" | "hard" | "boss">(
+    "all",
+  );
   const [packsRefreshKey, setPacksRefreshKey] = useState(0);
   const [packsSearch, setPacksSearch] = useState("");
   const [packsSort, setPacksSort] = useState<"newest" | "oldest" | "name_az" | "score_desc">("newest");
-  const { value: packsView, setValue: setPacksView } = useLocalStorage<"grid" | "list">(STORAGE_KEYS.simuladoPacksView, "grid");
+  const { value: packsView, setValue: setPacksView } = useLocalStorage<"grid" | "list">(
+    STORAGE_KEYS.simuladoPacksView,
+    "grid",
+  );
   const [certInfo, setCertInfo] = useState<{ code: string; name: string } | null>(null);
   const [pendingPackId, setPendingPackId] = useState<string | null>(null);
   const [pendingPackName, setPendingPackName] = useState<string | null>(null);
@@ -340,7 +335,7 @@ export function SimuladoScreen() {
 
   const currentReview = currentQuestion ? reviewByQuestion[currentQuestion.id] : undefined;
   const consentScope = profile.certificationPresetCode?.trim() || "default";
-  const guidePreviewLines = useMemo(() => formatGuideLines(examGuideInfo?.preview ?? ""), [examGuideInfo?.preview]);
+
   const strongestGapTopics = useMemo(() => {
     const source = historicalWeakServices.length > 0 ? historicalWeakServices : weakServicesCurrentExam;
     return source
@@ -480,7 +475,9 @@ export function SimuladoScreen() {
     }
 
     void loadPacks();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [hydrated, inExamFlow, inReviewFlow, packsFilter, packsRefreshKey]);
 
   useEffect(() => {
@@ -620,16 +617,6 @@ export function SimuladoScreen() {
     setShowPreSubmitSummary(false);
     confettiFiredRef.current = false;
     startSession("DEV", 4 / 60);
-  }
-
-  async function handleStartWithRulesGate() {
-    if (hasValidRulesConsent(consentScope)) {
-      await handleStart();
-      return;
-    }
-
-    setRulesAccepted(false);
-    setShowRulesModal(true);
   }
 
   async function confirmRulesAndStart() {
@@ -1077,194 +1064,202 @@ export function SimuladoScreen() {
 
   return (
     <SimuladoContext.Provider value={simuladoContextValue}>
-    <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
-      {process.env.NODE_ENV !== "production" && !inExamFlow && !inReviewFlow && (
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => void handleStartDevTest()}
-            className="border border-yellow-700 px-3 py-2 text-xs uppercase text-yellow-300"
-          >
-            Simulado Teste (1q / 4s)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMockScoreOverview({
-                points: 742,
-                maxPoints: 1000,
-                minimumCertificationPoints: 700,
-                bestArea: {
-                  topic: "IAM",
-                  attempts: 12,
-                  correct: 10,
-                  wrong: 2,
-                  accuracyPercent: 83,
-                },
-                weakestArea: {
-                  topic: "Billing and Pricing",
-                  attempts: 8,
-                  correct: 3,
-                  wrong: 5,
-                  accuracyPercent: 38,
-                },
-              });
-              setShowScoreOverview(true);
-            }}
-            className="border border-[#334155] px-3 py-2 text-xs uppercase text-[#cbd5e1]"
-          >
-            Score mock (dev)
-          </button>
-        </div>
-      )}
-
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-      >
-        <PixelCard>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
-          <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
-          </p>
-        </PixelCard>
-      </motion.div>
-
-      {(activeOverview ?? (calculating && !submitted)) && (
-        <SimuladoResultOverview
-          overview={activeOverview ?? { points: 0, maxPoints: 1000, minimumCertificationPoints: 700, bestArea: null, weakestArea: null }}
-          calculating={calculating}
-          submitted={submitted}
-          loadingMotivationalMessage={loadingMotivationalMessage}
-          motivationalMessage={motivationalMessage}
-          onHideOverview={process.env.NODE_ENV !== "production" ? () => setShowScoreOverview(false) : undefined}
-        />
-      )}
-
-      {!inExamFlow && !inReviewFlow && !calculating && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
-          className="space-y-4"
-        >
-          {/* Certification header */}
-          {certInfo && (
-            <div className="flex flex-wrap items-center justify-between gap-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-4 py-3">
-              <div>
-                <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Certificacao alvo</p>
-                <p className="mt-0.5 font-mono text-sm text-[var(--pixel-primary)]">
-                  {certInfo.code} — {certInfo.name}
-                </p>
-              </div>
-              <a
-                href="/profile"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+      <TooltipProvider>
+        <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
+          {process.env.NODE_ENV !== "production" && !inExamFlow && !inReviewFlow && (
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => void handleStartDevTest()}
+                className="border border-yellow-700 px-3 py-2 text-xs uppercase text-yellow-300"
               >
-                Alterar no perfil ↗
-              </a>
+                Simulado Teste (1q / 4s)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMockScoreOverview({
+                    points: 742,
+                    maxPoints: 1000,
+                    minimumCertificationPoints: 700,
+                    bestArea: {
+                      topic: "IAM",
+                      attempts: 12,
+                      correct: 10,
+                      wrong: 2,
+                      accuracyPercent: 83,
+                    },
+                    weakestArea: {
+                      topic: "Billing and Pricing",
+                      attempts: 8,
+                      correct: 3,
+                      wrong: 5,
+                      accuracyPercent: 38,
+                    },
+                  });
+                  setShowScoreOverview(true);
+                }}
+                className="border border-[#334155] px-3 py-2 text-xs uppercase text-[#cbd5e1]"
+              >
+                Score mock (dev)
+              </button>
             </div>
           )}
 
-          <PixelCard className="space-y-0 p-0 overflow-hidden">
-            {/* Tabs */}
-            <div className="flex border-b border-[var(--pixel-border)]">
-              {(["simulados", "examGuide"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={[
-                    "flex-1 px-4 py-3 font-mono text-[10px] uppercase transition-colors",
-                    activeTab === tab
-                      ? "border-b-2 border-[var(--pixel-primary)] bg-[var(--pixel-bg)] text-[var(--pixel-primary)]"
-                      : "text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]",
-                  ].join(" ")}
-                >
-                  {tab === "simulados" ? "Simulados" : "Exam Guide"}
-                </button>
-              ))}
-            </div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            <PixelCard>
+              <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
+              <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
+              </p>
+            </PixelCard>
+          </motion.div>
 
-            {/* Simulados Tab */}
-            {activeTab === "simulados" && (
-              <div className="space-y-4 p-4">
-                <SimuladoPacksGrid
-                  packs={packs}
-                  packsLoading={packsLoading}
-                  error={error}
-                  packsFilter={packsFilter}
-                  packsDifficultyFilter={packsDifficultyFilter}
-                  packsSearch={packsSearch}
-                  packsSort={packsSort}
-                  packsView={packsView}
-                  expandedPackHistory={expandedPackHistory}
-                  loading={loading}
-                  onFilterChange={setPacksFilter}
-                  onDifficultyFilterChange={setPacksDifficultyFilter}
-                  onSearchChange={setPacksSearch}
-                  onSortChange={setPacksSort}
-                  onViewChange={setPacksView}
-                  onRefresh={() => setPacksRefreshKey((k) => k + 1)}
-                  onToggleHistory={(id) => setExpandedPackHistory(id)}
-                  onStartPack={handleOpenPackRulesModal}
-                />
-              </div>
-            )}
+          {(activeOverview ?? (calculating && !submitted)) && (
+            <SimuladoResultOverview
+              overview={
+                activeOverview ?? {
+                  points: 0,
+                  maxPoints: 1000,
+                  minimumCertificationPoints: 700,
+                  bestArea: null,
+                  weakestArea: null,
+                }
+              }
+              calculating={calculating}
+              submitted={submitted}
+              loadingMotivationalMessage={loadingMotivationalMessage}
+              motivationalMessage={motivationalMessage}
+              onHideOverview={process.env.NODE_ENV !== "production" ? () => setShowScoreOverview(false) : undefined}
+            />
+          )}
 
+          {!inExamFlow && !inReviewFlow && !calculating && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
+              className="space-y-4"
+            >
+              {/* Certification header */}
+              {certInfo && (
+                <div className="flex flex-wrap items-center justify-between gap-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-4 py-3">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Certificacao alvo</p>
+                    <p className="mt-0.5 font-mono text-sm text-[var(--pixel-primary)]">
+                      {certInfo.code} — {certInfo.name}
+                    </p>
+                  </div>
+                  <a
+                    href="/profile"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+                  >
+                    Alterar no perfil ↗
+                  </a>
+                </div>
+              )}
 
-            {/* Exam Guide Tab */}
-            {activeTab === "examGuide" && (
-              <div className="space-y-4 p-4">
-                <SimuladoExamGuide
-                  examGuideInfo={examGuideInfo}
-                  loadingExamGuide={loadingExamGuide}
-                  examGuideError={examGuideError}
-                />
-              </div>
-            )}
-          </PixelCard>
-        </motion.div>
-      )}
+              <PixelCard className="space-y-0 p-0 overflow-hidden">
+                {/* Tabs */}
+                <div className="flex border-b border-[var(--pixel-border)]">
+                  {(["simulados", "examGuide"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setActiveTab(tab)}
+                      className={[
+                        "flex-1 px-4 py-3 font-mono text-[10px] uppercase transition-colors",
+                        activeTab === tab
+                          ? "border-b-2 border-[var(--pixel-primary)] bg-[var(--pixel-bg)] text-[var(--pixel-primary)]"
+                          : "text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]",
+                      ].join(" ")}
+                    >
+                      {tab === "simulados" ? "Simulados" : "Exam Guide"}
+                    </button>
+                  ))}
+                </div>
 
-      <SimuladoRulesModal
-        open={showRulesModal}
-        packName={pendingPackName ?? null}
-        rulesAccepted={rulesAccepted}
-        loading={loading}
-        onAcceptedChange={setRulesAccepted}
-        onCancel={() => setShowRulesModal(false)}
-        onConfirm={() => void confirmRulesAndStart()}
-      />
+                {/* Simulados Tab */}
+                {activeTab === "simulados" && (
+                  <div className="space-y-4 p-4">
+                    <SimuladoPacksGrid
+                      packs={packs}
+                      packsLoading={packsLoading}
+                      error={error}
+                      packsFilter={packsFilter}
+                      packsDifficultyFilter={packsDifficultyFilter}
+                      packsSearch={packsSearch}
+                      packsSort={packsSort}
+                      packsView={packsView}
+                      expandedPackHistory={expandedPackHistory}
+                      loading={loading}
+                      onFilterChange={setPacksFilter}
+                      onDifficultyFilterChange={setPacksDifficultyFilter}
+                      onSearchChange={setPacksSearch}
+                      onSortChange={setPacksSort}
+                      onViewChange={setPacksView}
+                      onRefresh={() => setPacksRefreshKey((k) => k + 1)}
+                      onToggleHistory={(id) => setExpandedPackHistory(id)}
+                      onStartPack={handleOpenPackRulesModal}
+                    />
+                  </div>
+                )}
 
-      <SimuladoExamFlow />
+                {/* Exam Guide Tab */}
+                {activeTab === "examGuide" && (
+                  <div className="space-y-4 p-4">
+                    <SimuladoExamGuide
+                      examGuideInfo={examGuideInfo}
+                      loadingExamGuide={loadingExamGuide}
+                      examGuideError={examGuideError}
+                    />
+                  </div>
+                )}
+              </PixelCard>
+            </motion.div>
+          )}
 
+          <SimuladoRulesModal
+            open={showRulesModal}
+            packName={pendingPackName ?? null}
+            rulesAccepted={rulesAccepted}
+            loading={loading}
+            onAcceptedChange={setRulesAccepted}
+            onCancel={() => setShowRulesModal(false)}
+            onConfirm={() => void confirmRulesAndStart()}
+          />
 
-      <SimuladoResumeModal
-        open={showResumeModal}
-        draft={resumeDraft}
-        timerLabel={timerLabel}
-        onResume={() => {
-          if (!resumeDraft) return;
-          setQuestions(resumeDraft.questions);
-          setAnswers(resumeDraft.answers as StudyAnswerMap);
-          setCurrentIndex(resumeDraft.currentIndex);
-          setMarkedForReview(new Set(resumeDraft.markedForReview));
-          if (isPaused) resumeSession();
-          setShowResumeModal(false);
-          setResumeDraft(null);
-        }}
-        onDiscard={() => {
-          safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
-          clearSession();
-          setShowResumeModal(false);
-          setResumeDraft(null);
-        }}
-      />
-    </main>
+          <SimuladoExamFlow />
+
+          <SimuladoResumeModal
+            open={showResumeModal}
+            draft={resumeDraft}
+            timerLabel={timerLabel}
+            onResume={() => {
+              if (!resumeDraft) return;
+              setQuestions(resumeDraft.questions);
+              setAnswers(resumeDraft.answers as StudyAnswerMap);
+              setCurrentIndex(resumeDraft.currentIndex);
+              setMarkedForReview(new Set(resumeDraft.markedForReview));
+              if (isPaused) resumeSession();
+              setShowResumeModal(false);
+              setResumeDraft(null);
+            }}
+            onDiscard={() => {
+              safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
+              clearSession();
+              setShowResumeModal(false);
+              setResumeDraft(null);
+            }}
+          />
+        </main>
+      </TooltipProvider>
     </SimuladoContext.Provider>
   );
 }

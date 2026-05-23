@@ -16,12 +16,18 @@ export async function GET(request: NextRequest) {
     CACHE_TTL.BADGES_LIST,
   );
 
-  // Backfill ownership for existing users based on current total XP.
-  const totals = await prisma.questHistory.aggregate({
-    where: { userId: session.user.id },
-    _sum: { xp: true },
-  });
-  const totalXp = totals._sum.xp ?? 0;
+  // Backfill ownership using the same XP sources as the profile store.
+  const [questTotals, studyTotals] = await Promise.all([
+    prisma.questHistory.aggregate({
+      where: { userId: session.user.id },
+      _sum: { xp: true },
+    }),
+    prisma.studySessionHistory.aggregate({
+      where: { userId: session.user.id },
+      _sum: { gainedXp: true },
+    }),
+  ]);
+  const totalXp = (questTotals._sum.xp ?? 0) + (studyTotals._sum.gainedXp ?? 0);
   const currentLevel = getLevel(totalXp);
 
   const eligible = badges.filter((b) => b.level <= currentLevel.number);
