@@ -1,3 +1,31 @@
+// LSF-2026-007: verify file magic bytes instead of trusting client-supplied MIME type.
+// This prevents SVG/HTML/executable files disguised as images from being stored.
+const IMAGE_MAGIC_BYTES: Array<{ mime: string; bytes: number[]; offset?: number }> = [
+  { mime: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
+  { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+  { mime: "image/gif", bytes: [0x47, 0x49, 0x46, 0x38] },
+  // WebP: bytes 0-3 = "RIFF", bytes 8-11 = "WEBP"
+  { mime: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46] },
+];
+
+export function verifyImageMagicBytes(buffer: Buffer): string | null {
+  for (const sig of IMAGE_MAGIC_BYTES) {
+    const offset = sig.offset ?? 0;
+    if (buffer.length < offset + sig.bytes.length) continue;
+    const match = sig.bytes.every((byte, i) => buffer[offset + i] === byte);
+    if (match) {
+      // Extra check for WebP: bytes 8-11 must be "WEBP"
+      if (sig.mime === "image/webp") {
+        if (buffer.length < 12) continue;
+        const webp = [0x57, 0x45, 0x42, 0x50];
+        if (!webp.every((byte, i) => buffer[8 + i] === byte)) continue;
+      }
+      return sig.mime;
+    }
+  }
+  return null;
+}
+
 const INJECTION_PATTERNS = [
   /ignore\s+(all|any|previous|prior)\s+instructions?/i,
   /disregard\s+(all|any|previous|prior)\s+instructions?/i,
