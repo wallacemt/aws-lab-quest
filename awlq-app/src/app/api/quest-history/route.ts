@@ -79,7 +79,10 @@ export async function POST(request: NextRequest) {
   const completedTasks = taskSnapshot.filter((task) => task.completed);
   const taskBase = completedTasks.length > 0 ? completedTasks : taskSnapshot;
 
-  let computedXp = Math.max(0, Math.round(body.xp ?? 0));
+  // LSF-2026-008: ignore client-supplied XP when no tasks are present; prevents
+  // leaderboard manipulation via empty taskSnapshot + inflated xp field.
+  // LSF-2026-014: tasksCount is capped to the normalizeTaskSnapshot limit (20).
+  let computedXp = taskBase.length > 0 ? 0 : 0; // always recomputed below when tasks exist
   if (taskBase.length > 0) {
     const weights = await listXpWeightsByActivity("LAB");
 
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
       title: body.title,
       theme: body.theme,
       xp: computedXp,
-      tasksCount: body.tasksCount,
+      tasksCount: Math.max(1, Math.min(20, Math.round(body.tasksCount))), // LSF-2026-014: cap range
       taskSnapshot,
       sourceLabText: body.sourceLabText ? String(body.sourceLabText).slice(0, 30000) : null,
       completedAt: new Date(body.completedAt),

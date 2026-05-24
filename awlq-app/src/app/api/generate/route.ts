@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { containsPromptInjection, isLikelyAwsLabText, sanitizeUserText } from "@/lib/input-validation";
 import { parseTasksFromText } from "@/lib/parser";
 import { GenerateQuestInput } from "@/lib/types";
 import { getAiModel } from "@/lib/ai";
 
 export async function POST(request: NextRequest) {
+  // LSF-2026-001: require authenticated session before consuming AI quota
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = (await request.json()) as Partial<GenerateQuestInput>;
     const theme = sanitizeUserText(body.theme ?? "");

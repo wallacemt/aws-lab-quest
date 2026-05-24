@@ -80,7 +80,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     data.username = body.username.trim() || null;
   }
 
-  if (typeof body.role === "string" && body.role.trim()) {
+  // LSF-2026-005: allowlist role values to prevent arbitrary role strings in DB
+  const ALLOWED_ROLES = new Set(["admin", "user"]);
+  if (typeof body.role === "string" && ALLOWED_ROLES.has(body.role.trim())) {
     data.role = body.role.trim();
   }
 

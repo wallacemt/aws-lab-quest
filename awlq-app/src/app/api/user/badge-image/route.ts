@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { verifyImageMagicBytes } from "@/lib/input-validation";
 import { supabase } from "@/lib/supabase";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 4 * 1024 * 1024; // 4 MB
+
+const EXT_MAP: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -30,7 +37,14 @@ export async function POST(request: NextRequest) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.type === "image/jpeg" ? "jpg" : file.type === "image/webp" ? "webp" : "png";
+
+  // LSF-2026-007: verify actual file content via magic bytes — do not trust client MIME type
+  const detectedMime = verifyImageMagicBytes(buffer);
+  if (!detectedMime || !ALLOWED_TYPES.includes(detectedMime)) {
+    return NextResponse.json({ error: "Conteudo do arquivo nao corresponde a uma imagem valida." }, { status: 400 });
+  }
+
+  const ext = EXT_MAP[detectedMime] ?? "png";
   const path = `cert-badges/${session.user.id}/${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
@@ -38,7 +52,9 @@ export async function POST(request: NextRequest) {
     .upload(path, buffer, { contentType: file.type, upsert: false });
 
   if (uploadError) {
-    return NextResponse.json({ error: `Upload falhou: ${uploadError.message}` }, { status: 502 });
+    // LSF-2026-009: do not reflect storage provider error details to client
+    console.error("[badge-image] Supabase upload error:", uploadError.message);
+    return NextResponse.json({ error: "Upload falhou. Tente novamente." }, { status: 502 });
   }
 
   const { data } = supabase.storage.from("aws-lab-quest").getPublicUrl(path);

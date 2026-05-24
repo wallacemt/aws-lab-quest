@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { verifyImageMagicBytes } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
+const EXT_MAP: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -33,7 +41,14 @@ export async function POST(request: NextRequest) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.type.split("/")[1] ?? "png";
+
+  // LSF-2026-007: verify actual file content via magic bytes — do not trust client MIME type
+  const detectedMime = verifyImageMagicBytes(buffer);
+  if (!detectedMime || !ALLOWED_TYPES.includes(detectedMime)) {
+    return NextResponse.json({ error: "File content does not match an allowed image type." }, { status: 400 });
+  }
+
+  const ext = EXT_MAP[detectedMime] ?? "png";
   const path = `avatars/${session.user.id}/${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
@@ -41,7 +56,9 @@ export async function POST(request: NextRequest) {
     .upload(path, buffer, { contentType: file.type, upsert: true });
 
   if (uploadError) {
-    return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 502 });
+    // LSF-2026-009: do not reflect storage provider error details to client
+    console.error("[upload-avatar] Supabase upload error:", uploadError.message);
+    return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 502 });
   }
 
   const { data } = supabase.storage.from("aws-lab-quest").getPublicUrl(path);
