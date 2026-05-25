@@ -23,14 +23,14 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10)));
 
-  const where: Parameters<typeof prisma.simuladoPack.findMany>[0]["where"] = {
+  const where: NonNullable<Parameters<typeof prisma.simuladoPack.findMany>[0]>["where"] = {
     ...(certificationCode ? { certificationPreset: { code: certificationCode } } : {}),
     ...(active !== undefined ? { active } : {}),
     ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
     ...((minDiffScore > 1 || maxDiffScore < 10) ? { difficultyScore: { gte: minDiffScore, lte: maxDiffScore } } : {}),
   };
 
-  const orderBy: Parameters<typeof prisma.simuladoPack.findMany>[0]["orderBy"] =
+  const orderBy: NonNullable<Parameters<typeof prisma.simuladoPack.findMany>[0]>["orderBy"] =
     sortBy === "questionCount"
       ? { questions: { _count: sortOrder } }
       : { [sortBy]: sortOrder };
@@ -66,20 +66,6 @@ export async function GET(request: NextRequest) {
 
   if (hasSessions === "true") items = items.filter((i) => i.sessionCount > 0);
   if (hasSessions === "false") items = items.filter((i) => i.sessionCount === 0);
-
-  const items = packs.map((p) => ({
-    id: p.id,
-    name: p.name,
-    certificationCode: p.certificationPreset?.code ?? null,
-    certificationName: p.certificationPreset?.name ?? null,
-    questionCount: p._count.questions,
-    difficultyScore: p.difficultyScore,
-    active: p.active,
-    artworkUrl: p.artworkUrl ?? null,
-    createdAt: p.createdAt.toISOString(),
-    createdByName: p.createdBy?.name ?? null,
-    sessionCount: p._count.sessions,
-  }));
 
   return NextResponse.json({ items, total, page, pageSize });
 }
