@@ -537,6 +537,32 @@ export async function deleteAdminUploadFile(fileId: string): Promise<void> {
   }
 }
 
+export type DuplicateGroup = {
+  ids: string[];
+  statements: string[];
+  externalIds: string[];
+  certificationCode: string | null;
+};
+
+export async function findAdminQuestionDuplicates(certificationCode?: string): Promise<{
+  groups: DuplicateGroup[];
+  method: string;
+  total: number;
+}> {
+  const params = new URLSearchParams();
+  if (certificationCode) params.set("certificationCode", certificationCode);
+  const res = await fetch(`/api/admin/questions/duplicates?${params.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error ?? "Falha ao buscar duplicatas.");
+  }
+  return res.json() as Promise<{ groups: DuplicateGroup[]; method: string; total: number }>;
+}
+
 export async function cancelAdminIngestionJob(jobId: string): Promise<void> {
   const response = await fetch(`/api/admin/uploads/jobs/${jobId}`, {
     method: "PATCH",
