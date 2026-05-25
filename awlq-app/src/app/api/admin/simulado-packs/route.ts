@@ -11,37 +11,68 @@ export async function GET(request: NextRequest) {
   const certificationCode = searchParams.get("certificationCode") ?? undefined;
   const activeParam = searchParams.get("active");
   const active = activeParam === "true" ? true : activeParam === "false" ? false : undefined;
+  const search = searchParams.get("search")?.trim() ?? "";
+  const sortByRaw = searchParams.get("sortBy") ?? "createdAt";
+  const sortBy = ["createdAt", "name", "difficultyScore", "questionCount"].includes(sortByRaw)
+    ? sortByRaw
+    : "createdAt";
+  const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
+  const minDiffScore = parseInt(searchParams.get("minDifficultyScore") ?? "0", 10);
+  const maxDiffScore = parseInt(searchParams.get("maxDifficultyScore") ?? "10", 10);
+  const hasSessions = searchParams.get("hasSessions");
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10)));
 
-  const where = {
-    ...(certificationCode
-      ? { certificationPreset: { code: certificationCode } }
-      : {}),
+  const where: Parameters<typeof prisma.simuladoPack.findMany>[0]["where"] = {
+    ...(certificationCode ? { certificationPreset: { code: certificationCode } } : {}),
     ...(active !== undefined ? { active } : {}),
+    ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
+    ...((minDiffScore > 1 || maxDiffScore < 10) ? { difficultyScore: { gte: minDiffScore, lte: maxDiffScore } } : {}),
   };
+
+  const orderBy: Parameters<typeof prisma.simuladoPack.findMany>[0]["orderBy"] =
+    sortBy === "questionCount"
+      ? { questions: { _count: sortOrder } }
+      : { [sortBy]: sortOrder };
 
   const [total, packs] = await Promise.all([
     prisma.simuladoPack.count({ where }),
     prisma.simuladoPack.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
         certificationPreset: { select: { code: true, name: true } },
         createdBy: { select: { name: true, email: true } },
-        _count: { select: { sessions: true } },
+        _count: { select: { sessions: true, questions: true } },
       },
     }),
   ]);
+
+  let items = packs.map((p) => ({
+    id: p.id,
+    name: p.name,
+    certificationCode: p.certificationPreset?.code ?? null,
+    certificationName: p.certificationPreset?.name ?? null,
+    questionCount: p._count.questions,
+    difficultyScore: p.difficultyScore,
+    active: p.active,
+    artworkUrl: p.artworkUrl ?? null,
+    createdAt: p.createdAt.toISOString(),
+    createdByName: p.createdBy?.name ?? null,
+    sessionCount: p._count.sessions,
+  }));
+
+  if (hasSessions === "true") items = items.filter((i) => i.sessionCount > 0);
+  if (hasSessions === "false") items = items.filter((i) => i.sessionCount === 0);
 
   const items = packs.map((p) => ({
     id: p.id,
     name: p.name,
     certificationCode: p.certificationPreset?.code ?? null,
     certificationName: p.certificationPreset?.name ?? null,
-    questionCount: p.questionCount,
+    questionCount: p._count.questions,
     difficultyScore: p.difficultyScore,
     active: p.active,
     artworkUrl: p.artworkUrl ?? null,
