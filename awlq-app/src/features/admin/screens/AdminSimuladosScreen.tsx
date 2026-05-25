@@ -76,6 +76,12 @@ export function AdminSimuladosScreen() {
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [filterCert, setFilterCert] = useState("");
   const [filterActive, setFilterActive] = useState<"" | "true" | "false">("");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterSortBy, setFilterSortBy] = useState("createdAt");
+  const [filterSortOrder, setFilterSortOrder] = useState<"asc" | "desc">("desc");
+  const [filterMinDiff, setFilterMinDiff] = useState("");
+  const [filterMaxDiff, setFilterMaxDiff] = useState("");
+  const [filterHasSessions, setFilterHasSessions] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +148,12 @@ export function AdminSimuladosScreen() {
       const params = new URLSearchParams({ page: String(page), pageSize: "20" });
       if (filterCert) params.set("certificationCode", filterCert);
       if (filterActive) params.set("active", filterActive);
+      if (filterSearch) params.set("search", filterSearch);
+      if (filterSortBy) params.set("sortBy", filterSortBy);
+      params.set("sortOrder", filterSortOrder);
+      if (filterMinDiff) params.set("minDifficultyScore", filterMinDiff);
+      if (filterMaxDiff) params.set("maxDifficultyScore", filterMaxDiff);
+      if (filterHasSessions) params.set("hasSessions", filterHasSessions);
       const res = await fetch(`/api/admin/simulado-packs?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Falha ao carregar packs");
       const json = (await res.json()) as PacksPayload;
@@ -151,7 +163,7 @@ export function AdminSimuladosScreen() {
     } finally {
       setLoading(false);
     }
-  }, [page, filterCert, filterActive]);
+  }, [page, filterCert, filterActive, filterSearch, filterSortBy, filterSortOrder, filterMinDiff, filterMaxDiff, filterHasSessions]);
 
   useEffect(() => {
     void loadPacks();
@@ -470,8 +482,18 @@ export function AdminSimuladosScreen() {
       )}
 
       {/* Filters */}
-      <div className="border border-[#1e293b] bg-[#080e1a] px-4 py-3">
-        <div className="flex flex-wrap items-end gap-4">
+      <div className="border border-[#1e293b] bg-[#080e1a] px-4 py-3 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Buscar por nome</span>
+            <input
+              value={filterSearch}
+              onChange={(e) => { setFilterSearch(e.target.value); setPage(1); }}
+              placeholder="Nome do pack..."
+              className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569] w-48"
+            />
+          </div>
+
           <div className="flex flex-col gap-1">
             <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Certificação</span>
             <select
@@ -499,10 +521,84 @@ export function AdminSimuladosScreen() {
             </select>
           </div>
 
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Sessoes</span>
+            <select
+              value={filterHasSessions}
+              onChange={(e) => { setFilterHasSessions(e.target.value as "" | "true" | "false"); setPage(1); }}
+              className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
+            >
+              <option value="">Todos</option>
+              <option value="true">Com sessoes</option>
+              <option value="false">Sem sessoes</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3 border-t border-[#1e293b] pt-3">
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Ordenar por</span>
+            <div className="flex gap-1">
+              <select
+                value={filterSortBy}
+                onChange={(e) => { setFilterSortBy(e.target.value); setPage(1); }}
+                className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
+              >
+                <option value="createdAt">Criacao</option>
+                <option value="name">Nome</option>
+                <option value="difficultyScore">Dificuldade</option>
+                <option value="questionCount">Qtd questoes</option>
+              </select>
+              <select
+                value={filterSortOrder}
+                onChange={(e) => { setFilterSortOrder(e.target.value as "asc" | "desc"); setPage(1); }}
+                className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
+              >
+                <option value="desc">Desc</option>
+                <option value="asc">Asc</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Score dificuldade</span>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={filterMinDiff}
+                onChange={(e) => { setFilterMinDiff(e.target.value); setPage(1); }}
+                placeholder="Min"
+                className="w-14 border border-[#334155] bg-[#0f172a] px-2 py-1.5 text-xs text-[#e2e8f0] outline-none"
+              />
+              <span className="text-[#475569] text-xs">—</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={filterMaxDiff}
+                onChange={(e) => { setFilterMaxDiff(e.target.value); setPage(1); }}
+                placeholder="Max"
+                className="w-14 border border-[#334155] bg-[#0f172a] px-2 py-1.5 text-xs text-[#e2e8f0] outline-none"
+              />
+            </div>
+          </div>
+
           <div className="flex items-end gap-2 ml-auto">
-            {(filterCert || filterActive) && (
+            {(filterCert || filterActive || filterSearch || filterMinDiff || filterMaxDiff || filterHasSessions || filterSortBy !== "createdAt") && (
               <button
-                onClick={() => { setFilterCert(""); setFilterActive(""); setPage(1); }}
+                onClick={() => {
+                  setFilterCert("");
+                  setFilterActive("");
+                  setFilterSearch("");
+                  setFilterMinDiff("");
+                  setFilterMaxDiff("");
+                  setFilterHasSessions("");
+                  setFilterSortBy("createdAt");
+                  setFilterSortOrder("desc");
+                  setPage(1);
+                }}
                 className="flex items-center gap-1 border border-[#334155] px-3 py-1.5 text-[10px] uppercase text-[#64748b] hover:border-[#f97316]/40 hover:text-[#f97316]"
               >
                 ✕ Limpar

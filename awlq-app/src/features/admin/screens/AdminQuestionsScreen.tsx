@@ -807,6 +807,35 @@ export function AdminQuestionsScreen() {
     );
   }
 
+  function handleSelectAllDuplicatesKeepOne() {
+    const toRemove = duplicatesGroups.flatMap((group) => group.ids.slice(1));
+    setSelectedDuplicateIds(toRemove);
+  }
+
+  async function handleAutoRemoveDuplicates() {
+    const toRemove = duplicatesGroups.flatMap((group) => group.ids.slice(1));
+    if (toRemove.length === 0) return;
+    const confirmed = window.confirm(
+      `Remover ${toRemove.length} duplicatas mantendo 1 questao por grupo?`,
+    );
+    if (!confirmed) return;
+    setBulkRunning(true);
+    setBulkResultMessage(null);
+    try {
+      const result = await batchAdminQuestions({ ids: toRemove, action: "delete" });
+      setBulkResultMessage(
+        `Duplicatas removidas. Solicitadas: ${result.requested} | Afetadas: ${result.affected}`,
+      );
+      setSelectedDuplicateIds([]);
+      setDuplicatesModalOpen(false);
+      setRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      setDuplicatesError(error instanceof Error ? error.message : "Falha ao remover duplicatas.");
+    } finally {
+      setBulkRunning(false);
+    }
+  }
+
   async function handleDeleteSelectedDuplicates() {
     if (selectedDuplicateIds.length === 0) return;
     const confirmed = window.confirm(
@@ -2430,49 +2459,75 @@ export function AdminQuestionsScreen() {
       )}
 
       {duplicatesModalOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
-          <div className="w-full max-w-3xl space-y-4 rounded border border-[#334155] bg-[#111827] p-4 text-[#e2e8f0] overflow-y-auto max-h-[90vh]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="font-mono text-xs uppercase text-[#f97316]">Questoes Duplicadas</p>
-                <p className="text-xs text-[#94a3b8]">
-                  {duplicatesGroups.length} grupo(s) · metodo: {duplicatesMethod}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={bulkRunning || selectedDuplicateIds.length === 0}
-                  onClick={() => void handleDeleteSelectedDuplicates()}
-                  className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-xs uppercase text-red-200 disabled:opacity-60"
-                >
-                  {bulkRunning
-                    ? "Removendo..."
-                    : `Remover selecionadas (${selectedDuplicateIds.length})`}
-                </button>
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-2 sm:p-4 overflow-y-auto">
+          <div className="my-auto w-full max-w-3xl border border-[#334155] bg-[#111827] text-[#e2e8f0]">
+            {/* Header */}
+            <div className="sticky top-0 z-10 border-b border-[#1e293b] bg-[#111827] px-4 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="font-mono text-xs uppercase text-[#f97316]">Questoes Duplicadas</p>
+                  <p className="text-[10px] text-[#94a3b8]">
+                    {duplicatesGroups.length} grupo(s) · metodo: {duplicatesMethod}
+                    {duplicatesGroups.length > 0
+                      ? ` · ${duplicatesGroups.reduce((s, g) => s + g.ids.length - 1, 0)} removiveis`
+                      : ""}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
                     setDuplicatesModalOpen(false);
                     setSelectedDuplicateIds([]);
                   }}
-                  className="border border-[#334155] px-3 py-1 text-xs uppercase"
+                  className="border border-[#334155] px-3 py-1 text-[10px] uppercase text-[#94a3b8]"
                 >
                   Fechar
                 </button>
               </div>
+
+              {duplicatesGroups.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={bulkRunning}
+                    onClick={() => void handleAutoRemoveDuplicates()}
+                    className="border border-[#7c2d12] bg-orange-900/20 px-3 py-1 text-[10px] uppercase text-orange-200 disabled:opacity-60"
+                  >
+                    {bulkRunning ? "Removendo..." : "Remover duplicatas (manter 1 por grupo)"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={bulkRunning}
+                    onClick={handleSelectAllDuplicatesKeepOne}
+                    className="border border-[#334155] px-3 py-1 text-[10px] uppercase text-[#94a3b8]"
+                  >
+                    Selecionar todas duplicatas
+                  </button>
+                  {selectedDuplicateIds.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={bulkRunning}
+                      onClick={() => void handleDeleteSelectedDuplicates()}
+                      className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-[10px] uppercase text-red-200 disabled:opacity-60"
+                    >
+                      {bulkRunning ? "Removendo..." : `Remover selecionadas (${selectedDuplicateIds.length})`}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {duplicatesError && <p className="text-sm text-[#fca5a5]">{duplicatesError}</p>}
+            {/* Body */}
+            <div className="max-h-[65vh] overflow-y-auto p-4 space-y-3">
+              {duplicatesError && <p className="text-sm text-[#fca5a5]">{duplicatesError}</p>}
 
-            {duplicatesGroups.length === 0 ? (
-              <p className="text-sm text-[#94a3b8]">Nenhuma duplicata encontrada.</p>
-            ) : (
-              <div className="space-y-4">
-                {duplicatesGroups.map((group, groupIndex) => (
+              {duplicatesGroups.length === 0 ? (
+                <p className="text-sm text-[#94a3b8]">Nenhuma duplicata encontrada.</p>
+              ) : (
+                duplicatesGroups.map((group, groupIndex) => (
                   <div
                     key={groupIndex}
-                    className="rounded border border-[#1e293b] bg-[#0b1220] p-3 space-y-2"
+                    className="border border-[#1e293b] bg-[#0b1220] p-3 space-y-2"
                   >
                     <p className="font-mono text-[10px] uppercase text-[#94a3b8]">
                       Grupo {groupIndex + 1} · {group.ids.length} questoes
@@ -2481,7 +2536,13 @@ export function AdminQuestionsScreen() {
                     {group.ids.map((id, i) => (
                       <label
                         key={id}
-                        className="flex items-start gap-2 text-xs text-[#cbd5e1] cursor-pointer"
+                        className={`flex items-start gap-2 text-xs cursor-pointer rounded px-2 py-1.5 ${
+                          i === 0
+                            ? "text-[#64748b] bg-[#111827]"
+                            : selectedDuplicateIds.includes(id)
+                              ? "text-[#fca5a5] bg-red-900/10"
+                              : "text-[#cbd5e1]"
+                        }`}
                       >
                         <input
                           type="checkbox"
@@ -2489,16 +2550,19 @@ export function AdminQuestionsScreen() {
                           onChange={() => toggleDuplicateId(id)}
                           className="mt-0.5 shrink-0"
                         />
-                        <span>
-                          <span className="font-mono text-[#64748b]">{group.externalIds[i]} </span>
-                          {group.statements[i]}...
+                        <span className="min-w-0">
+                          {i === 0 && (
+                            <span className="mr-1 font-mono text-[9px] uppercase text-green-600 border border-green-800 px-1 py-0.5">manter</span>
+                          )}{" "}
+                          <span className="font-mono text-[#475569] mr-1">{group.externalIds[i]}</span>
+                          <span className="break-words">{group.statements[i]}...</span>
                         </span>
                       </label>
                     ))}
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
