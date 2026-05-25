@@ -256,7 +256,7 @@ export async function GET(request: NextRequest) {
   if (reportStatus === "REPORTED") {
     andFilters.push({
       questionReports: {
-        some: {},
+        some: { status: { in: ["OPEN", "IN_REVIEW"] } },
       },
     });
   }
