@@ -8,6 +8,8 @@ import {
 } from "../shared/ingestion-pipeline.js";
 import { logger } from "../shared/logger.js";
 import { StudyQuestionUsage } from "@prisma/client";
+import { prisma } from "../prisma.js";
+import { reviewGeneratedQuestions } from "./exam-guide-reviewer.js";
 
 export type DomainTarget = {
   domainName: string;
@@ -164,6 +166,34 @@ function parseQuestionsFromLlm(text: string): ParsedQuestion[] {
     .filter((q): q is ParsedQuestion => q !== null);
 }
 
+async function checkSemanticDuplicate(
+  statement: string,
+  certificationPresetId: string
+): Promise<boolean> {
+  const normalized = statement.toLowerCase().replace(/\s+/g, " ").trim();
+  try {
+    type Row = { cnt: bigint };
+    const rows = await prisma.$queryRaw<Row[]>`
+      SELECT COUNT(*)::bigint AS cnt
+      FROM "StudyQuestion"
+      WHERE "certificationPresetId" = ${certificationPresetId}
+        AND similarity(LOWER(REGEXP_REPLACE(statement, '\\s+', ' ', 'g')), ${normalized}) > 0.82
+      LIMIT 1
+    `;
+    return (rows[0]?.cnt ?? BigInt(0)) > BigInt(0);
+  } catch {
+    const prefix = normalized.slice(0, 100);
+    type Row = { cnt: bigint };
+    const rows = await prisma.$queryRaw<Row[]>`
+      SELECT COUNT(*)::bigint AS cnt
+      FROM "StudyQuestion"
+      WHERE "certificationPresetId" = ${certificationPresetId}
+        AND LEFT(LOWER(REGEXP_REPLACE(statement, '\\s+', ' ', 'g')), 100) = ${prefix}
+    `;
+    return (rows[0]?.cnt ?? BigInt(0)) > BigInt(0);
+  }
+}
+
 export async function generateAndPersistQuestions(
   options: GenerationOptions
 ): Promise<GenerationResult> {
@@ -202,11 +232,45 @@ export async function generateAndPersistQuestions(
       continue;
     }
 
-    for (const question of questions) {
+    const BATCH_SIZE = 5;
+    const reviewedQueue: Array<{ question: ParsedQuestion; reviewAction: string }> = [];
+    for (let batchStart = 0; batchStart < questions.length; batchStart += BATCH_SIZE) {
+      const batch = questions.slice(batchStart, batchStart + BATCH_SIZE);
+      const reviews = await reviewGeneratedQuestions(
+        batch,
+        domainTarget,
+        options.certificationCode,
+        options.certificationName,
+      );
+      for (let j = 0; j < batch.length; j++) {
+        const review = reviews[j] ?? { action: "accept" as const, reason: "no review" };
+        logger.debug(
+          { action: review.action, reason: review.reason.slice(0, 80), domain: domainTarget.domainName },
+          "exam-guide-reviewer: decision",
+        );
+        const finalQuestion =
+          review.action === "improve" && review.improved ? review.improved : batch[j]!;
+        reviewedQueue.push({ question: finalQuestion, reviewAction: review.action });
+      }
+    }
+
+    for (const { question, reviewAction } of reviewedQueue) {
+      if (reviewAction === "reject") {
+        result.rejectedCount++;
+        continue;
+      }
+
       const validation = validateQuestion(question);
       if (!validation.valid) {
         logger.debug({ reason: validation.reason }, "Question rejected by validator");
         result.rejectedCount++;
+        continue;
+      }
+
+      const semDup = await checkSemanticDuplicate(question.statement, options.certificationPresetId);
+      if (semDup) {
+        logger.debug({ statement: question.statement.slice(0, 60) }, "Question rejected: semantic duplicate");
+        result.duplicateCount++;
         continue;
       }
 
