@@ -92,6 +92,34 @@ export async function deleteAdminUploadedFileById(fileId: string): Promise<{
   return file;
 }
 
+export async function bulkDeleteAdminUploadedFiles(fileIds: string[]): Promise<{ deleted: number }> {
+  if (fileIds.length === 0) return { deleted: 0 };
+
+  const files = await prisma.adminUploadedFile.findMany({
+    where: { id: { in: fileIds } },
+    select: { id: true, storageBucket: true, storagePath: true },
+  });
+
+  const byBucket = new Map<string, string[]>();
+  for (const file of files) {
+    const paths = byBucket.get(file.storageBucket) ?? [];
+    paths.push(file.storagePath);
+    byBucket.set(file.storageBucket, paths);
+  }
+
+  await Promise.allSettled(
+    Array.from(byBucket.entries()).map(([bucket, paths]) =>
+      supabase.storage.from(bucket).remove(paths),
+    ),
+  );
+
+  const result = await prisma.adminUploadedFile.deleteMany({
+    where: { id: { in: files.map((f) => f.id) } },
+  });
+
+  return { deleted: result.count };
+}
+
 export async function createUploadedFileRecord(input: {
   uploadType: AdminUploadType;
   certificationPresetId?: string | null;

@@ -214,6 +214,24 @@ export async function syncUserAchievements(userId: string): Promise<void> {
   );
 }
 
+export async function syncAndGetNewAchievements(
+  userId: string,
+  since: Date,
+): Promise<{ code: string; name: string; description: string; rarity: string; imageUrl: string | null }[]> {
+  await syncUserAchievements(userId);
+
+  const newlyUnlocked = await prisma.userAchievement.findMany({
+    where: { userId, unlockedAt: { gte: since } },
+    select: {
+      achievement: {
+        select: { code: true, name: true, description: true, rarity: true, imageUrl: true },
+      },
+    },
+  });
+
+  return newlyUnlocked.map((ua) => ua.achievement);
+}
+
 export async function getUserAchievementSummary(userId: string): Promise<AchievementSummary> {
   await syncUserAchievements(userId);
 
