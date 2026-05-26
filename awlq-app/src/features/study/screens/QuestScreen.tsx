@@ -48,7 +48,7 @@ export function QuestScreen() {
     <AppLayout xp={activeQuest.completed ? 0 : xp} credits creditsCompact>
       <main className="mx-auto grid w-full max-w-[1600px] gap-6 px-4 py-8 xl:grid-cols-[420px_minmax(0,1fr)] xl:px-8">
         <div className="space-y-6 xl:sticky xl:top-24 xl:self-start">
-          <XPPanel xp={profile.totalXp} />
+          <XPPanel xp={profile.totalXp ?? 0} />
         </div>
         <TasksBoard tasks={activeQuest.tasks} completedCount={completedCount} onToggle={toggleTask} />
       </main>

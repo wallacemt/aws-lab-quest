@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminUserEditModal } from "@/features/admin/components/AdminUserEditModal";
 import { fetchAdminUserDetail, AdminUserDetailPayload } from "@/features/admin/services/admin-api";
-import { AdminUserListItem } from "@/features/admin/types";
+import { AdminUserListItem, CertificationOption } from "@/features/admin/types";
 import { HistoryTabs } from "@/features/study/components/history/HistoryTabs";
 import { QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
@@ -20,6 +20,7 @@ export function AdminUserDetailScreen({ userId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUserListItem | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [certificationOptions, setCertificationOptions] = useState<CertificationOption[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -29,6 +30,15 @@ export function AdminUserDetailScreen({ userId }: Props) {
       .catch((err) => setError(err instanceof Error ? err.message : "Erro ao carregar usuario."))
       .finally(() => setLoading(false));
   }, [userId, refreshKey]);
+
+  useEffect(() => {
+    fetch("/api/certifications", { method: "GET", cache: "no-store", credentials: "include" })
+      .then((r) => r.json())
+      .then((payload: { certifications?: CertificationOption[] }) =>
+        setCertificationOptions(payload.certifications ?? [])
+      )
+      .catch(() => {});
+  }, []);
 
   if (loading) {
     return <p className="font-mono text-xs uppercase text-[#94a3b8]">Carregando...</p>;
@@ -218,6 +228,7 @@ export function AdminUserDetailScreen({ userId }: Props) {
         <AdminUserEditModal
           user={editingUser}
           onClose={() => setEditingUser(null)}
+          certificationOptions={certificationOptions}
           onSaved={() => {
             setEditingUser(null);
             setRefreshKey((k) => k + 1);

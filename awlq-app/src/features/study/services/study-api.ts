@@ -288,12 +288,8 @@ export async function saveStudyHistory(payload: SaveStudyHistoryPayload): Promis
     return { ok: false };
   }
 
-  const data = await parseJson<{
-    item?: { id?: string };
-    prevXp?: number;
-    newXp?: number;
-    newAchievements?: NewAchievementPayload[];
-  }>(response).catch(() => ({}) as { item?: { id?: string } });
+  type HistoryResponse = { item?: { id?: string }; prevXp?: number; newXp?: number; newAchievements?: NewAchievementPayload[] };
+  const data = await parseJson<HistoryResponse>(response).catch((): HistoryResponse => ({}));
 
   return {
     ok: true,

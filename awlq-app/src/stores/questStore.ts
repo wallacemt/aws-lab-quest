@@ -9,13 +9,19 @@ function taskDifficulty(task: Task) {
   return task.difficulty ?? "medium";
 }
 
+export type QuestSavedPayload = {
+  prevXp: number;
+  newXp: number;
+  newAchievements: { code: string; name: string; description: string; rarity: string; imageUrl?: string | null }[];
+};
+
 type QuestState = {
   activeQuest: ActiveQuest | null;
   hydrated: boolean;
   hydrate: () => void;
   startQuest: (params: { title: string; theme: string; sourceLabText: string; tasks: Task[] }) => void;
   toggleTask: (taskId: number, checked: boolean) => void;
-  finishQuest: (profile: UserProfile) => void;
+  finishQuest: (profile: UserProfile, onSaved?: (payload: QuestSavedPayload) => void) => void;
   clearActiveQuest: () => void;
 };
 
@@ -84,7 +90,7 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     persistActiveQuest(nextQuest);
     set({ activeQuest: nextQuest });
   },
-  finishQuest: (profile) => {
+  finishQuest: (profile, onSaved) => {
     const current = get().activeQuest;
     if (!current || current.completed) {
       return;
@@ -112,7 +118,20 @@ export const useQuestStore = create<QuestState>((set, get) => ({
         certification: profile.certification,
         userName: profile.name,
       }),
-    }).catch(console.error);
+    })
+      .then(async (response) => {
+        if (response.ok && onSaved) {
+          const data = (await response.json()) as Partial<QuestSavedPayload & { item: unknown }>;
+          if (typeof data.prevXp === "number" && typeof data.newXp === "number") {
+            onSaved({
+              prevXp: data.prevXp,
+              newXp: data.newXp,
+              newAchievements: Array.isArray(data.newAchievements) ? data.newAchievements : [],
+            });
+          }
+        }
+      })
+      .catch(console.error);
   },
   clearActiveQuest: () => {
     persistActiveQuest(null);
