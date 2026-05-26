@@ -4,6 +4,34 @@ import { auth } from "@/lib/auth";
 import { cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { prisma } from "@/lib/prisma";
 
+const QUEST_SELECT = {
+  id: true,
+  title: true,
+  theme: true,
+  xp: true,
+  tasksCount: true,
+  taskSnapshot: true,
+  sourceLabText: true,
+  completedAt: true,
+  certification: true,
+  userName: true,
+} as const;
+
+const STUDY_SELECT = {
+  id: true,
+  sessionType: true,
+  title: true,
+  certificationCode: true,
+  gainedXp: true,
+  scorePercent: true,
+  correctAnswers: true,
+  totalQuestions: true,
+  durationSeconds: true,
+  answersSnapshot: true,
+  completedAt: true,
+  pack: { select: { name: true, artworkUrl: true } },
+} as const;
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
@@ -11,6 +39,39 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { userId } = await params;
+  const fullHistory = request.nextUrl.searchParams.get("fullHistory") === "true";
+
+  if (fullHistory) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const [labHistory, studyHistoryRaw] = await Promise.all([
+      prisma.questHistory.findMany({
+        where: { userId },
+        orderBy: { completedAt: "desc" },
+        select: QUEST_SELECT,
+      }),
+      prisma.studySessionHistory.findMany({
+        where: { userId },
+        orderBy: { completedAt: "desc" },
+        select: STUDY_SELECT,
+      }),
+    ]);
+
+    const studyHistory = studyHistoryRaw.map((s) => ({
+      ...s,
+      pack: undefined,
+      packName: s.pack?.name ?? null,
+      packArtworkUrl: s.pack?.artworkUrl ?? null,
+    }));
+
+    return NextResponse.json({ labHistory, studyHistory });
+  }
 
   const profileData = await cacheGetOrSet(
     CACHE_KEYS.userPublicProfile(userId),
@@ -49,31 +110,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           where: { userId },
           orderBy: { completedAt: "desc" },
           take: 10,
-          select: {
-            id: true,
-            title: true,
-            theme: true,
-            xp: true,
-            tasksCount: true,
-            completedAt: true,
-            certification: true,
-          },
+          select: QUEST_SELECT,
         }),
         prisma.studySessionHistory.findMany({
           where: { userId },
           orderBy: { completedAt: "desc" },
           take: 8,
-          select: {
-            id: true,
-            sessionType: true,
-            title: true,
-            certificationCode: true,
-            gainedXp: true,
-            scorePercent: true,
-            correctAnswers: true,
-            totalQuestions: true,
-            completedAt: true,
-          },
+          select: { id: true, sessionType: true, title: true, certificationCode: true, gainedXp: true, scorePercent: true, correctAnswers: true, totalQuestions: true, completedAt: true },
         }),
         getUserAchievementSummary(userId),
         prisma.userCertBadge.findMany({

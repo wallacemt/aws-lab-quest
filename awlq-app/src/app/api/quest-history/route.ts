@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { syncUserAchievements } from "@/lib/achievements";
+import { syncAndGetNewAchievements } from "@/lib/achievements";
 import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { getLevel, getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
@@ -147,19 +147,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const [prevQuestXp, prevStudyXp] = await Promise.all([
+    prisma.questHistory.aggregate({ where: { userId: session.user.id, id: { not: item.id } }, _sum: { xp: true } }),
+    prisma.studySessionHistory.aggregate({ where: { userId: session.user.id }, _sum: { gainedXp: true } }),
+  ]);
+  const prevXp = (prevQuestXp._sum.xp ?? 0) + (prevStudyXp._sum.gainedXp ?? 0);
+  const newXp = prevXp + item.xp;
+  const syncSince = new Date();
+
   void publishLeaderboardUpdatedEvent({
     userId: session.user.id,
     source: "LAB",
     gainedXp: item.xp,
   });
-  void syncUserAchievements(session.user.id);
 
-  void cacheDel(
-    CACHE_KEYS.userQuestHistory(session.user.id),
-    CACHE_KEYS.userPublicProfile(session.user.id),
-    CACHE_KEYS.userAchievements(session.user.id),
-    CACHE_KEYS.leaderboard(),
-  );
+  const [newAchievements] = await Promise.all([
+    syncAndGetNewAchievements(session.user.id, syncSince),
+    cacheDel(
+      CACHE_KEYS.userQuestHistory(session.user.id),
+      CACHE_KEYS.userPublicProfile(session.user.id),
+      CACHE_KEYS.userAchievements(session.user.id),
+      CACHE_KEYS.leaderboard(),
+    ),
+  ]);
 
-  return NextResponse.json({ item }, { status: 201 });
+  return NextResponse.json({ item, prevXp, newXp, newAchievements }, { status: 201 });
 }

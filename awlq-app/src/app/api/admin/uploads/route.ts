@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin-auth";
+import { bulkDeleteAdminUploadedFiles } from "@/lib/admin-ingestion";
 import { prisma } from "@/lib/prisma";
 
 function parseLimit(raw: string | null): number {
@@ -139,4 +140,37 @@ export async function GET(request: NextRequest) {
     recentJobs,
     recentJobsLimit: limit,
   });
+}
+
+export async function DELETE(request: NextRequest) {
+  const adminCheck = await requireAdmin(request);
+  if (!adminCheck.ok) {
+    return adminCheck.response;
+  }
+
+  let ids: unknown;
+  try {
+    const body = (await request.json()) as { ids?: unknown };
+    ids = body.ids;
+  } catch {
+    return NextResponse.json({ error: "Body invalido." }, { status: 400 });
+  }
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return NextResponse.json({ error: "Nenhum ID informado." }, { status: 400 });
+  }
+
+  const validIds = ids.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 200);
+
+  if (validIds.length === 0) {
+    return NextResponse.json({ error: "IDs invalidos." }, { status: 400 });
+  }
+
+  try {
+    const result = await bulkDeleteAdminUploadedFiles(validIds);
+    return NextResponse.json({ ok: true, deleted: result.deleted });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha ao remover uploads.";
+    return NextResponse.json({ error: message }, { status: 422 });
+  }
 }

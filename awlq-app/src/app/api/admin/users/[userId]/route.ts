@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUserAchievementSummary } from "@/lib/achievements";
 import { requireAdmin } from "@/lib/admin-auth";
 import { devAuditLog } from "@/lib/dev-audit";
+import { getLevel } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -36,6 +38,121 @@ async function ensureNotLastActiveAdmin(userId: string, nextRole?: string, nextA
 
   const activeAdmins = await prisma.user.count({ where: { role: "admin", active: true } });
   return activeAdmins > 1;
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  const adminCheck = await requireAdmin(request);
+  if (!adminCheck.ok) {
+    return adminCheck.response;
+  }
+
+  const { userId } = await context.params;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      username: true,
+      role: true,
+      accessStatus: true,
+      active: true,
+      lastSeen: true,
+      createdAt: true,
+      profile: {
+        select: { avatarUrl: true, certification: true, favoriteTheme: true },
+      },
+      _count: {
+        select: { questHistory: true, studyHistory: true },
+      },
+    },
+  });
+
+  if (!user) {
+    return NextResponse.json({ error: "Usuario nao encontrado." }, { status: 404 });
+  }
+
+  const [questAggregate, studyAggregate, allStudySessions, recentLabs, achievements] = await Promise.all([
+    prisma.questHistory.aggregate({ where: { userId }, _sum: { xp: true } }),
+    prisma.studySessionHistory.aggregate({ where: { userId }, _sum: { gainedXp: true }, _avg: { scorePercent: true } }),
+    prisma.studySessionHistory.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        sessionType: true,
+        title: true,
+        certificationCode: true,
+        gainedXp: true,
+        scorePercent: true,
+        correctAnswers: true,
+        totalQuestions: true,
+        durationSeconds: true,
+        completedAt: true,
+        pack: { select: { name: true, artworkUrl: true } },
+      },
+      orderBy: { completedAt: "desc" },
+    }),
+    prisma.questHistory.findMany({
+      where: { userId },
+      orderBy: { completedAt: "desc" },
+      take: 20,
+      select: { id: true, title: true, theme: true, xp: true, tasksCount: true, completedAt: true, certification: true, userName: true, sourceLabText: true, taskSnapshot: true },
+    }),
+    getUserAchievementSummary(userId),
+  ]);
+
+  const totalXp = (questAggregate._sum.xp ?? 0) + (studyAggregate._sum.gainedXp ?? 0);
+  const currentLevel = getLevel(totalXp);
+
+  const certMap = new Map<string, { sessions: number; totalScore: number }>();
+  for (const s of allStudySessions) {
+    const code = s.certificationCode ?? "outros";
+    const entry = certMap.get(code) ?? { sessions: 0, totalScore: 0 };
+    entry.sessions += 1;
+    entry.totalScore += s.scorePercent;
+    certMap.set(code, entry);
+  }
+  const certBreakdown = Array.from(certMap.entries()).map(([code, data]) => ({
+    code,
+    sessions: data.sessions,
+    avgScore: Math.round(data.totalScore / data.sessions),
+  }));
+
+  const recentSessions = allStudySessions.slice(0, 20).map((s) => ({
+    ...s,
+    pack: undefined,
+    packName: s.pack?.name ?? null,
+    packArtworkUrl: s.pack?.artworkUrl ?? null,
+  }));
+
+  const weakAreas = allStudySessions
+    .filter((s) => s.scorePercent < 50)
+    .slice(0, 10)
+    .map((s) => ({ ...s, pack: undefined, packName: s.pack?.name ?? null, packArtworkUrl: s.pack?.artworkUrl ?? null }));
+
+  const strongAreas = allStudySessions
+    .filter((s) => s.scorePercent >= 80)
+    .slice(0, 10)
+    .map((s) => ({ ...s, pack: undefined, packName: s.pack?.name ?? null, packArtworkUrl: s.pack?.artworkUrl ?? null }));
+
+  return NextResponse.json({
+    user: {
+      ...user,
+      labsCompleted: user._count.questHistory,
+      studySessions: user._count.studyHistory,
+      _count: undefined,
+    },
+    totalXp,
+    currentLevel,
+    avgScore: Math.round(studyAggregate._avg.scorePercent ?? 0),
+    certBreakdown,
+    weakAreas,
+    strongAreas,
+    recentSessions,
+    recentLabs,
+    achievements,
+  });
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
