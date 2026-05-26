@@ -24,10 +24,10 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       name: true,
-      questionCount: true,
       artworkUrl: true,
       difficultyScore: true,
       createdAt: true,
+      _count: { select: { questions: true } },
       sessions: {
         where: { userId: session.user.id, sessionType: "SIMULADO" },
         orderBy: { completedAt: "desc" },
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       return {
         id: pack.id,
         name: pack.name,
-        questionCount: pack.questionCount,
+        questionCount: pack._count.questions,
         artworkUrl: pack.artworkUrl ?? null,
         difficultyScore: pack.difficultyScore,
         createdAt: pack.createdAt.toISOString(),
