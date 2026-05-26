@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { deleteAdminUploadFile, getAdminUploadSignedUrl, listAdminUploads } from "@/features/admin/services/admin-api";
+import { bulkDeleteAdminUploadFiles, deleteAdminUploadFile, getAdminUploadSignedUrl, listAdminUploads } from "@/features/admin/services/admin-api";
 import { AdminUploadedFileItem, AdminUploadJobItem, AdminUploadType } from "@/features/admin/types";
 
 type CertificationOption = {
@@ -35,6 +35,8 @@ export function AdminUploadsScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [files, setFiles] = useState<AdminUploadedFileItem[]>([]);
   const [recentJobs, setRecentJobs] = useState<AdminUploadJobItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
@@ -115,12 +117,65 @@ export function AdminUploadsScreen() {
 
     try {
       await deleteAdminUploadFile(file.id);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(file.id);
+        return next;
+      });
       setRefreshKey((prev) => prev + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao remover upload.");
     } finally {
       setDeletingId(null);
     }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    if (!window.confirm(`Remover ${ids.length.toString()} arquivo(s) selecionado(s)?`)) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    setError(null);
+
+    try {
+      await bulkDeleteAdminUploadFiles(ids);
+      setSelectedIds(new Set());
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao remover uploads.");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  function toggleSelectAll() {
+    const pageIds = files.map((f) => f.id);
+    const allSelected = pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        pageIds.forEach((id) => next.delete(id));
+      } else {
+        pageIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   }
 
   return (
@@ -190,6 +245,15 @@ export function AdminUploadsScreen() {
             <table className="w-full min-w-[1200px] text-left text-sm">
               <thead className="border-b border-[#1e293b] bg-[#0f172a] text-xs uppercase text-[#94a3b8]">
                 <tr>
+                  <th className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Selecionar todos da pagina"
+                      checked={files.length > 0 && files.every((f) => selectedIds.has(f.id))}
+                      onChange={toggleSelectAll}
+                      className="accent-[#f97316]"
+                    />
+                  </th>
                   <th className="px-3 py-2">Arquivo</th>
                   <th className="px-3 py-2">Tipo</th>
                   <th className="px-3 py-2">Certificacao</th>
@@ -202,13 +266,25 @@ export function AdminUploadsScreen() {
               <tbody>
                 {files.length === 0 && (
                   <tr className="border-b border-[#1e293b] text-[#94a3b8]">
-                    <td colSpan={7} className="px-3 py-4">
+                    <td colSpan={8} className="px-3 py-4">
                       Nenhum arquivo encontrado para os filtros aplicados.
                     </td>
                   </tr>
                 )}
                 {files.map((file) => (
-                  <tr key={file.id} className="border-b border-[#1e293b] text-[#e2e8f0]">
+                  <tr
+                    key={file.id}
+                    className={`border-b border-[#1e293b] text-[#e2e8f0] ${selectedIds.has(file.id) ? "bg-[#1e293b]" : ""}`}
+                  >
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${file.fileName}`}
+                        checked={selectedIds.has(file.id)}
+                        onChange={() => toggleSelectOne(file.id)}
+                        className="accent-[#f97316]"
+                      />
+                    </td>
                     <td className="px-3 py-2">
                       <p>{file.fileName}</p>
                       <p className="text-xs text-[#94a3b8]">{file.storagePath}</p>
@@ -247,6 +323,31 @@ export function AdminUploadsScreen() {
               </tbody>
             </table>
           </section>
+
+          {selectedIds.size > 0 && (
+            <div className="sticky bottom-4 z-10 mx-auto flex max-w-xl items-center justify-between gap-4 border border-[#334155] bg-[#0f172a] px-4 py-3 shadow-lg">
+              <span className="text-sm text-[#cbd5e1]">
+                {selectedIds.size.toString()} arquivo(s) selecionado(s)
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#94a3b8]"
+                >
+                  Limpar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { void handleBulkDelete(); }}
+                  disabled={bulkDeleting}
+                  className="border border-[#7f1d1d] bg-[#7f1d1d]/20 px-3 py-1 text-xs uppercase text-[#fca5a5] disabled:opacity-50"
+                >
+                  {bulkDeleting ? "Removendo..." : "Excluir selecionados"}
+                </button>
+              </div>
+            </div>
+          )}
 
           <footer className="flex items-center justify-between border border-[#1e293b] bg-[#111827] px-4 py-3 text-sm text-[#cbd5e1]">
             <span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { listAdminUsers } from "@/features/admin/services/admin-api";
 import { AdminUserEditModal } from "@/features/admin/components/AdminUserEditModal";
 import { AdminUserListItem, CertificationOption, PaginatedResult } from "@/features/admin/types";
@@ -12,6 +13,7 @@ function isOnline(lastSeen: string): boolean {
 }
 
 export function AdminUsersScreen() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   const [accessStatus, setAccessStatus] = useState<"" | "pending" | "approved" | "rejected">("");
@@ -309,10 +311,10 @@ export function AdminUsersScreen() {
                     <td className="px-3 py-2">
                       <button
                         type="button"
-                        onClick={() => { setGlobalMessage(null); setEditingUser(item); }}
+                        onClick={() => router.push(`/admin/users/${item.id}`)}
                         className="border border-[#334155] px-3 py-1 font-mono text-[10px] uppercase text-[#94a3b8] transition-colors hover:border-[#f97316] hover:text-[#f97316]"
                       >
-                        Gerenciar
+                        Detalhes
                       </button>
                     </td>
                   </tr>

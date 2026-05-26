@@ -13,6 +13,8 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LevelBadge } from "@/components/ui/level-badge";
+import { HistoryTabs } from "@/features/study/components/history/HistoryTabs";
+import { QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { AchievementItem } from "@/lib/achievements";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
@@ -32,27 +34,6 @@ type UserStats = {
   labsCompleted: number;
 };
 
-type HistoryEntry = {
-  id: string;
-  title: string;
-  theme: string;
-  xp: number;
-  tasksCount: number;
-  completedAt: string;
-  certification: string;
-};
-
-type StudyEntry = {
-  id: string;
-  sessionType: "KC" | "SIMULADO";
-  title: string;
-  certificationCode: string | null;
-  gainedXp: number;
-  scorePercent: number;
-  correctAnswers: number;
-  totalQuestions: number;
-  completedAt: string;
-};
 
 type CertBadge = {
   id: string;
@@ -180,16 +161,15 @@ export function PublicProfileScreen() {
 
   const [user, setUser] = useState<PublicUser | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [studyHistory, setStudyHistory] = useState<StudyEntry[]>([]);
   const [achievements, setAchievements] = useState<PublicAchievements | null>(null);
   const [certBadges, setCertBadges] = useState<CertBadge[]>([]);
   const [levelBadges, setLevelBadges] = useState<LevelBadgeModel[]>([]);
+  const [labHistory, setLabHistory] = useState<QuestHistoryItem[]>([]);
+  const [studyHistory, setStudyHistory] = useState<StudyHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [achievementsOpen, setAchievementsOpen] = useState(true);
-  const [historyOpen, setHistoryOpen] = useState(true);
-  const [studyHistoryOpen, setStudyHistoryOpen] = useState(true);
 
   useEffect(() => {
     if (!userId) return;
@@ -202,14 +182,21 @@ export function PublicProfileScreen() {
         }
         setUser(userData.user);
         setStats(userData.stats);
-        setHistory(userData.history ?? []);
-        setStudyHistory(userData.studyHistory ?? []);
         setAchievements(userData.achievements ?? null);
         setCertBadges((userData.certBadges as CertBadge[]) ?? []);
         setLevelBadges(badgesData.badges ?? []);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
+
+    fetch(`/api/users/${userId}?fullHistory=true`)
+      .then((r) => r.json() as Promise<{ labHistory?: QuestHistoryItem[]; studyHistory?: StudyHistoryItem[] }>)
+      .then((data) => {
+        setLabHistory(data.labHistory ?? []);
+        setStudyHistory(data.studyHistory ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
   }, [userId]);
 
   if (loading) {
@@ -420,114 +407,22 @@ export function PublicProfileScreen() {
           </motion.div>
         )}
 
-        {/* Recent quests */}
-        {history.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25, duration: 0.4 }}
-          >
-            <PixelCard className="space-y-3">
-              <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left"
-                  >
-                    <span className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
-                      Ultimos Labs ({history.length})
-                    </span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${historyOpen ? "rotate-180" : "rotate-0"}`}
-                      aria-hidden="true"
-                    />
-                  </button>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent className="pt-3">
-                  <ScrollArea className="h-[360px] pr-3">
-                    <div className="space-y-2">
-                      {history.map((item, i) => (
-                        <motion.div
-                          key={item.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.3 + i * 0.04, duration: 0.25 }}
-                          className="flex items-center justify-between border border-[var(--pixel-border)] bg-[var(--pixel-muted)]/40 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
-                            <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
-                              {item.theme} · {item.tasksCount} task{item.tasksCount !== 1 ? "s" : ""} ·{" "}
-                              {new Date(item.completedAt).toLocaleDateString("pt-BR")}
-                            </p>
-                          </div>
-                          <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
-                            +{item.xp} XP
-                          </span>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </CollapsibleContent>
-              </Collapsible>
-            </PixelCard>
-          </motion.div>
-        )}
-
-        {studyHistory.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.4 }}
-          >
-            <PixelCard className="space-y-3">
-              <Collapsible open={studyHistoryOpen} onOpenChange={setStudyHistoryOpen}>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left"
-                  >
-                    <span className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
-                      KC e Simulados ({studyHistory.length})
-                    </span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${studyHistoryOpen ? "rotate-180" : "rotate-0"}`}
-                      aria-hidden="true"
-                    />
-                  </button>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent className="pt-3">
-                  <ScrollArea className="h-[360px] pr-3">
-                    <div className="space-y-2">
-                      {studyHistory.map((item, i) => (
-                        <motion.div
-                          key={item.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.4 + i * 0.04, duration: 0.25 }}
-                          className="flex items-center justify-between border border-[var(--pixel-border)] bg-[var(--pixel-muted)]/40 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-[var(--font-body)] text-sm">{item.title}</p>
-                            <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
-                              {item.sessionType} · {item.scorePercent}% · {item.correctAnswers}/{item.totalQuestions} ·{" "}
-                              {new Date(item.completedAt).toLocaleDateString("pt-BR")}
-                            </p>
-                          </div>
-                          <span className="ml-3 shrink-0 border border-[var(--pixel-border)] px-2 py-0.5 font-mono text-[9px] uppercase text-[var(--pixel-primary)]">
-                            +{item.gainedXp} XP
-                          </span>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </CollapsibleContent>
-              </Collapsible>
-            </PixelCard>
-          </motion.div>
-        )}
+        {/* Full history tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.4 }}
+        >
+          <PixelCard className="space-y-3">
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Historico de atividades</p>
+            <HistoryTabs
+              labHistory={labHistory}
+              studyHistory={studyHistory}
+              loading={historyLoading}
+              readOnly
+            />
+          </PixelCard>
+        </motion.div>
       </main>
     </AppLayout>
   );

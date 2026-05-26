@@ -68,6 +68,41 @@ function toQueryString(params: Record<string, string | number | undefined>): str
   return query.toString();
 }
 
+export type AdminUserDetailPayload = {
+  user: AdminUserListItem & { labsCompleted: number; studySessions: number };
+  totalXp: number;
+  currentLevel: { number: number; name: string; min: number; max: number; next: string; tone: string };
+  avgScore: number;
+  certBreakdown: { code: string; sessions: number; avgScore: number }[];
+  weakAreas: {
+    id: string; sessionType: string; title: string; certificationCode: string | null;
+    gainedXp: number; scorePercent: number; correctAnswers: number; totalQuestions: number;
+    durationSeconds: number | null; completedAt: string; packName: string | null; packArtworkUrl: string | null;
+  }[];
+  strongAreas: AdminUserDetailPayload["weakAreas"];
+  recentSessions: AdminUserDetailPayload["weakAreas"];
+  recentLabs: {
+    id: string; title: string; theme: string; xp: number; tasksCount: number;
+    completedAt: string; certification: string; userName: string;
+    sourceLabText?: string | null; taskSnapshot?: unknown;
+  }[];
+  achievements: { total: number; unlockedCount: number; items: unknown[] };
+};
+
+export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDetailPayload> {
+  const response = await fetch(`/api/admin/users/${userId}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar detalhes do usuario.");
+  }
+
+  return (await response.json()) as AdminUserDetailPayload;
+}
+
 export async function listAdminUsers(input: AdminUsersListParams): Promise<PaginatedResult<AdminUserListItem>> {
   const qs = toQueryString(input);
   const response = await fetch(`/api/admin/users?${qs}`, {
@@ -535,6 +570,33 @@ export async function deleteAdminUploadFile(fileId: string): Promise<void> {
 
     throw new Error(message);
   }
+}
+
+export async function bulkDeleteAdminUploadFiles(ids: string[]): Promise<{ deleted: number }> {
+  const response = await fetch("/api/admin/uploads", {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+
+  if (!response.ok) {
+    let message = "Nao foi possivel remover uploads.";
+
+    try {
+      const payload = (await response.json()) as AdminApiError;
+      if (payload?.error) {
+        message = payload.error;
+      }
+    } catch {
+      // Keep fallback message.
+    }
+
+    throw new Error(message);
+  }
+
+  return (await response.json()) as { deleted: number };
 }
 
 export type DuplicateGroup = {
