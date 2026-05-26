@@ -96,9 +96,20 @@ type StudyExplainPayload = {
   optionMapping?: QuestionOptionMapping;
 };
 
+export type NewAchievementPayload = {
+  code: string;
+  name: string;
+  description: string;
+  rarity: string;
+  imageUrl?: string | null;
+};
+
 export type SaveStudyHistoryResult = {
   ok: boolean;
   itemId?: string;
+  prevXp?: number;
+  newXp?: number;
+  newAchievements?: NewAchievementPayload[];
 };
 
 export type ReportQuestionReason =
@@ -277,11 +288,19 @@ export async function saveStudyHistory(payload: SaveStudyHistoryPayload): Promis
     return { ok: false };
   }
 
-  const data = await parseJson<{ item?: { id?: string } }>(response).catch(() => ({}) as { item?: { id?: string } });
+  const data = await parseJson<{
+    item?: { id?: string };
+    prevXp?: number;
+    newXp?: number;
+    newAchievements?: NewAchievementPayload[];
+  }>(response).catch(() => ({}) as { item?: { id?: string } });
 
   return {
     ok: true,
     itemId: typeof data.item?.id === "string" ? data.item.id : undefined,
+    prevXp: typeof data.prevXp === "number" ? data.prevXp : undefined,
+    newXp: typeof data.newXp === "number" ? data.newXp : undefined,
+    newAchievements: Array.isArray(data.newAchievements) ? data.newAchievements : undefined,
   };
 }
 

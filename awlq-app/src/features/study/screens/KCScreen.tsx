@@ -24,6 +24,7 @@ import {
   StudyServiceItem,
   WeakServiceItem,
 } from "@/features/study/services";
+import { useProgressNotifications } from "@/features/study/components/notifications/useProgressNotifications";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
@@ -39,7 +40,8 @@ function maxTopicsForCount(count: number): number {
 export function KCScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refreshTotalXp } = useUserProfile();
+  const { refreshTotalXp, profile } = useUserProfile();
+  const notifyProgress = useProgressNotifications();
 
   // Services
   const [services, setServices] = useState<StudyServiceItem[]>([]);
@@ -335,7 +337,16 @@ export function KCScreen() {
         }),
       });
       historySaved = saveResult.ok;
-      if (historySaved) await refreshTotalXp();
+      if (historySaved) {
+        await refreshTotalXp();
+        if (saveResult.prevXp != null && saveResult.newXp != null) {
+          notifyProgress({
+            prevXp: saveResult.prevXp,
+            newXp: saveResult.newXp,
+            newAchievements: saveResult.newAchievements ?? [],
+          });
+        }
+      }
       setCompletionMessage(`KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). +${gainedXp} XP salvo no historico.`);
       setLastEarnedXp(gainedXp);
     } catch {

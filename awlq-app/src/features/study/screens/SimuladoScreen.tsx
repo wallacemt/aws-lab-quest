@@ -26,6 +26,7 @@ import {
   saveStudyHistory,
   saveStudyHistoryExplanation,
 } from "@/features/study/services";
+import { useProgressNotifications } from "@/features/study/components/notifications/useProgressNotifications";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -209,6 +210,7 @@ export function SimuladoScreen() {
     resumeSession,
   } = useSimulatedExam();
   const { profile, refreshTotalXp } = useUserProfile();
+  const notifyProgress = useProgressNotifications();
   const rulesConsent = useLocalStorage<RulesConsentMap>(STORAGE_KEYS.simuladoRulesConsent, {});
 
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
@@ -850,6 +852,13 @@ export function SimuladoScreen() {
 
       if (historySaved) {
         await refreshTotalXp();
+        if (saveResult.prevXp != null && saveResult.newXp != null) {
+          notifyProgress({
+            prevXp: saveResult.prevXp,
+            newXp: saveResult.newXp,
+            newAchievements: saveResult.newAchievements ?? [],
+          });
+        }
       }
     } catch {
       historySaved = false;

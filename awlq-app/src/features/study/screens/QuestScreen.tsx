@@ -6,12 +6,14 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { CelebrationScreen } from "@/components/ui/celebration-screen";
 import { TasksBoard } from "@/components/ui/tasks-board";
 import { XPPanel } from "@/components/ui/xp-panel";
+import { useProgressNotifications } from "@/features/study/components/notifications/useProgressNotifications";
 import { useQuest } from "@/hooks/useQuest";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function QuestScreen() {
   const router = useRouter();
   const { profile, hydrated: userHydrated, refreshTotalXp } = useUserProfile();
+  const notifyProgress = useProgressNotifications();
   const [xpSyncedQuestId, setXpSyncedQuestId] = useState<string | null>(null);
   const {
     activeQuest,
@@ -46,7 +48,7 @@ export function QuestScreen() {
     <AppLayout xp={activeQuest.completed ? 0 : xp} credits creditsCompact>
       <main className="mx-auto grid w-full max-w-[1600px] gap-6 px-4 py-8 xl:grid-cols-[420px_minmax(0,1fr)] xl:px-8">
         <div className="space-y-6 xl:sticky xl:top-24 xl:self-start">
-          <XPPanel xp={xp} />
+          <XPPanel xp={profile.totalXp} />
         </div>
         <TasksBoard tasks={activeQuest.tasks} completedCount={completedCount} onToggle={toggleTask} />
       </main>
@@ -63,7 +65,7 @@ export function QuestScreen() {
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <button
-                onClick={() => finishQuest(profile)}
+                onClick={() => finishQuest(profile, notifyProgress)}
                 className="border-2 border-[var(--pixel-primary)] bg-[var(--pixel-primary)] px-3 py-2 font-mono text-[10px] uppercase text-black hover:brightness-110"
               >
                 Finalizar LAB
