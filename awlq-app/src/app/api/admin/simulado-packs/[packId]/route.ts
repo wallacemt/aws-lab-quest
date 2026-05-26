@@ -116,13 +116,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
   }
 
-  let newCount = pack.questionCount;
-
   if (body.removeQuestionIds?.length) {
     await prisma.simuladoPackQuestion.deleteMany({
       where: { packId, questionId: { in: body.removeQuestionIds } },
     });
-    newCount -= body.removeQuestionIds.length;
   }
 
   if (body.addQuestionIds?.length) {
@@ -145,11 +142,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await prisma.simuladoPackQuestion.createMany({
         data: toAdd.map((questionId) => ({ packId, questionId, position: nextPosition++ })),
       });
-      newCount += toAdd.length;
     }
   }
 
-  updateData.questionCount = Math.max(0, newCount);
+  updateData.questionCount = await prisma.simuladoPackQuestion.count({ where: { packId } });
 
   let updated;
   try {

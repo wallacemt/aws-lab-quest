@@ -424,6 +424,29 @@ export function AdminSimuladosScreen() {
     ? editPack.questions.length - editRemovedIds.size + editAddedIds.size
     : 0;
 
+  const pageAllSelected =
+    editAvailItems.length > 0 && editAvailItems.every((q) => editAddedIds.has(q.id));
+  const pagePartialSelected =
+    !pageAllSelected && editAvailItems.some((q) => editAddedIds.has(q.id));
+
+  function editToggleSelectPage() {
+    if (pageAllSelected) {
+      setEditAddedIds((prev) => {
+        const next = new Set(prev);
+        editAvailItems.forEach((q) => { next.delete(q.id); });
+        return next;
+      });
+      setEditAddedQuestions((qs) => qs.filter((q) => !editAvailItems.some((a) => a.id === q.id)));
+    } else {
+      const existingPackIds = new Set(editPack?.questions.map((pq) => pq.id) ?? []);
+      const toAdd = editAvailItems.filter((q) => !existingPackIds.has(q.id) && !editAddedIds.has(q.id));
+      const slots = 65 - currentQuestionCount;
+      const canAdd = toAdd.slice(0, Math.max(0, slots));
+      setEditAddedIds((prev) => { const next = new Set(prev); canAdd.forEach((q) => next.add(q.id)); return next; });
+      setEditAddedQuestions((qs) => [...qs, ...canAdd]);
+    }
+  }
+
   const totalPages = result ? Math.ceil(result.total / result.pageSize) : 1;
 
   return (
@@ -981,7 +1004,23 @@ export function AdminSimuladosScreen() {
                   {/* Add from bank */}
                   {editPack.certificationPreset && (
                     <div className="space-y-2">
-                      <p className="text-xs uppercase text-[#64748b]">Adicionar do banco</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={pageAllSelected}
+                          ref={(el) => { if (el) el.indeterminate = pagePartialSelected; }}
+                          onChange={editToggleSelectPage}
+                          disabled={editAvailItems.length === 0 || currentQuestionCount >= 65}
+                          className="accent-[#38bdf8] disabled:opacity-40"
+                          title="Selecionar todos desta página"
+                        />
+                        <p className="text-xs uppercase text-[#64748b]">Adicionar do banco</p>
+                        {pagePartialSelected || pageAllSelected ? (
+                          <span className="text-[10px] text-[#38bdf8]">
+                            {editAvailItems.filter((q) => editAddedIds.has(q.id)).length} selecionados
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         <input
                           value={editAvailSearch}
