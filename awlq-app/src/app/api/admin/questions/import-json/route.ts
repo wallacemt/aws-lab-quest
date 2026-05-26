@@ -23,7 +23,7 @@ type Body = {
 };
 
 const VALID_OPTIONS = new Set(["A", "B", "C", "D", "E"]);
-const VALID_DIFFICULTY = new Set(["easy", "medium", "hard"]);
+const VALID_DIFFICULTY = new Set(["easy", "medium", "hard", "nightmare"]);
 
 function validateItem(item: ImportItem, index: number): string | null {
   if (!item.statement?.trim()) return `Item ${index + 1}: statement obrigatorio`;
