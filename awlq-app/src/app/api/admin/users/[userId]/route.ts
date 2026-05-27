@@ -57,11 +57,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
       username: true,
       role: true,
       accessStatus: true,
+      accessDecisionAt: true,
+      accessDecisionReason: true,
       active: true,
       lastSeen: true,
       createdAt: true,
       profile: {
-        select: { avatarUrl: true, certification: true, favoriteTheme: true },
+        select: {
+          avatarUrl: true,
+          certification: true,
+          favoriteTheme: true,
+          certificationPresetId: true,
+          certificationPreset: { select: { code: true, name: true } },
+        },
       },
       _count: {
         select: { questHistory: true, studyHistory: true },
@@ -141,7 +149,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       ...user,
       labsCompleted: user._count.questHistory,
       studySessions: user._count.studyHistory,
-      _count: undefined,
     },
     totalXp,
     currentLevel,

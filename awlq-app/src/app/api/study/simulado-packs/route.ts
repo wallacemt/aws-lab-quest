@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
       difficultyScore: true,
       createdAt: true,
       _count: { select: { questions: true } },
+      journeyNarrative:true,
       sessions: {
         where: { userId: session.user.id, sessionType: "SIMULADO" },
         orderBy: { completedAt: "desc" },
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
       return {
         id: pack.id,
         name: pack.name,
+        // awsContext: pack.journeyNarrative.
         questionCount: pack._count.questions,
         artworkUrl: pack.artworkUrl ?? null,
         difficultyScore: pack.difficultyScore,

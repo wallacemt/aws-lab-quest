@@ -486,16 +486,66 @@ export async function GET(request: NextRequest) {
     return adminCheck.response;
   }
 
-  const pending = await prisma.studyQuestion.count({
-    where: buildPendingWhere(),
-  });
+  const url = new URL(request.url);
+  const listMode = url.searchParams.get("list") === "true";
+  const page = Math.max(1, Number(url.searchParams.get("page") ?? "1"));
+  const pageSize = Math.min(50, Math.max(5, Number(url.searchParams.get("pageSize") ?? "20")));
 
-  return NextResponse.json({
+  const pendingWhere = buildPendingWhere();
+  const pending = await prisma.studyQuestion.count({ where: pendingWhere });
+
+  const base = {
     ok: true,
     pending,
     defaultChunkSize: DEFAULT_CHUNK_SIZE,
     maxChunkSize: MAX_CHUNK_SIZE,
     defaultDelayMs: DEFAULT_DELAY_MS,
     maxTotalPerRun: MAX_TOTAL_PER_RUN,
+  };
+
+  if (!listMode) {
+    return NextResponse.json(base);
+  }
+
+  const skip = (page - 1) * pageSize;
+  const items = await prisma.studyQuestion.findMany({
+    where: pendingWhere,
+    select: {
+      id: true,
+      externalId: true,
+      statement: true,
+      topic: true,
+      awsServiceId: true,
+      certificationPreset: { select: { code: true } },
+      questionAwsServices: { select: { serviceId: true }, take: 1 },
+    },
+    orderBy: { createdAt: "desc" },
+    skip,
+    take: pageSize,
+  });
+
+  const normalizedItems = items.map((q) => {
+    const topicNorm = normalizeTopic(q.topic ?? "");
+    const missingTopic = isPlaceholderTopic(q.topic ?? "");
+    const missingServices = !q.awsServiceId && q.questionAwsServices.length === 0;
+    return {
+      id: q.id,
+      externalId: q.externalId,
+      statement: q.statement.slice(0, 150),
+      certCode: q.certificationPreset?.code ?? null,
+      topic: topicNorm,
+      missingTopic,
+      missingServices,
+    };
+  });
+
+  return NextResponse.json({
+    ...base,
+    pendingList: {
+      items: normalizedItems,
+      total: pending,
+      page,
+      totalPages: Math.ceil(pending / pageSize),
+    },
   });
 }
