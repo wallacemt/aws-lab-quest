@@ -447,8 +447,13 @@ export async function fillAdminQuestionsMissingWithAI(
   return (await response.json()) as AdminQuestionsFillMissingResult;
 }
 
-export async function getAdminQuestionsFillMissingStats(): Promise<AdminQuestionsFillMissingStats> {
-  const response = await fetch("/api/admin/questions/fill-missing", {
+export async function getAdminQuestionsFillMissingStats(
+  listParams?: { page: number; pageSize: number },
+): Promise<AdminQuestionsFillMissingStats> {
+  const qs = listParams
+    ? `?list=true&page=${listParams.page}&pageSize=${listParams.pageSize}`
+    : "";
+  const response = await fetch(`/api/admin/questions/fill-missing${qs}`, {
     method: "GET",
     cache: "no-store",
     credentials: "include",

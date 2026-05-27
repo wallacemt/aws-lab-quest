@@ -20,7 +20,7 @@ export function AdminUsersScreen() {
   const [active, setActive] = useState<"" | "true" | "false">("");
   const [certificationCode, setCertificationCode] = useState("");
   const [onlineOnly, setOnlineOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<"createdAt" | "lastSeen" | "name" | "email" | "role">("createdAt");
+  const [sortBy, setSortBy] = useState<"createdAt" | "lastSeen" | "name" | "email" | "role">("lastSeen");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -213,8 +213,8 @@ export function AdminUsersScreen() {
               onChange={(e) => { setPage(1); setSortBy(e.target.value as typeof sortBy); }}
               className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
             >
-              <option value="createdAt">Cadastro</option>
               <option value="lastSeen">Ultimo acesso</option>
+              <option value="createdAt">Cadastro</option>
               <option value="name">Nome</option>
               <option value="email">Email</option>
               <option value="role">Role</option>

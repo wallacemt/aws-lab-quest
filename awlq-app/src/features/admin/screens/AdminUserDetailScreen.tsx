@@ -8,6 +8,7 @@ import { AdminUserListItem, CertificationOption } from "@/features/admin/types";
 import { HistoryTabs } from "@/features/study/components/history/HistoryTabs";
 import { QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
+import { LoaderCircle } from "lucide-react";
 
 type Props = {
   userId: string;
@@ -23,8 +24,6 @@ export function AdminUserDetailScreen({ userId }: Props) {
   const [certificationOptions, setCertificationOptions] = useState<CertificationOption[]>([]);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
     fetchAdminUserDetail(userId)
       .then(setData)
       .catch((err) => setError(err instanceof Error ? err.message : "Erro ao carregar usuario."))
@@ -35,20 +34,35 @@ export function AdminUserDetailScreen({ userId }: Props) {
     fetch("/api/certifications", { method: "GET", cache: "no-store", credentials: "include" })
       .then((r) => r.json())
       .then((payload: { certifications?: CertificationOption[] }) =>
-        setCertificationOptions(payload.certifications ?? [])
+        setCertificationOptions(payload.certifications ?? []),
       )
       .catch(() => {});
   }, []);
 
   if (loading) {
-    return <p className="font-mono text-xs uppercase text-[#94a3b8]">Carregando...</p>;
+    return (
+      <div className="flex flex-1 gap-2 items-center justify-center">
+        <p className="font-mono text-xs uppercase text-[#94a3b8] animate-pulse">Carregando...</p>
+      </div>
+    );
   }
 
   if (error || !data) {
     return <p className="font-mono text-xs uppercase text-[#fca5a5]">{error ?? "Usuario nao encontrado."}</p>;
   }
 
-  const { user, totalXp, currentLevel, avgScore, certBreakdown, weakAreas, strongAreas, recentSessions, recentLabs, achievements } = data;
+  const {
+    user,
+    totalXp,
+    currentLevel,
+    avgScore,
+    certBreakdown,
+    weakAreas,
+    strongAreas,
+    recentSessions,
+    recentLabs,
+    achievements,
+  } = data;
   const progress = getLevelProgressPercent(totalXp);
   const levelInfo = getLevel(totalXp);
 
@@ -94,11 +108,21 @@ export function AdminUserDetailScreen({ userId }: Props) {
           </button>
           <p className="font-mono text-xs uppercase text-[#f97316]">Admin / Usuarios</p>
           <h1 className="font-mono text-sm uppercase text-[#f8fafc]">{user.name}</h1>
-          <p className="text-xs text-[#94a3b8]">@{user.username} · {user.email}</p>
+          <p className="text-xs text-[#94a3b8]">
+            @{user.username} · {user.email}
+          </p>
         </div>
         <button
           type="button"
-          onClick={() => setEditingUser(user as unknown as AdminUserListItem)}
+          onClick={() =>
+            setEditingUser({
+              ...(user as unknown as AdminUserListItem),
+              _count: {
+                questHistory: user.labsCompleted ?? 0,
+                studyHistory: user.studySessions ?? 0,
+              },
+            })
+          }
           className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
         >
           Editar usuario
@@ -107,13 +131,19 @@ export function AdminUserDetailScreen({ userId }: Props) {
 
       {/* Status chips */}
       <div className="flex flex-wrap gap-2">
-        <span className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${user.role === "admin" ? "border-[#f97316] text-[#f97316]" : "border-[#334155] text-[#94a3b8]"}`}>
+        <span
+          className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${user.role === "admin" ? "border-[#f97316] text-[#f97316]" : "border-[#334155] text-[#94a3b8]"}`}
+        >
           {user.role}
         </span>
-        <span className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${user.accessStatus === "approved" ? "border-[#4ade80] text-[#4ade80]" : user.accessStatus === "rejected" ? "border-[#f87171] text-[#f87171]" : "border-[#fbbf24] text-[#fbbf24]"}`}>
+        <span
+          className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${user.accessStatus === "approved" ? "border-[#4ade80] text-[#4ade80]" : user.accessStatus === "rejected" ? "border-[#f87171] text-[#f87171]" : "border-[#fbbf24] text-[#fbbf24]"}`}
+        >
           {user.accessStatus}
         </span>
-        <span className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${user.active ? "border-[#4ade80] text-[#4ade80]" : "border-[#f87171] text-[#f87171]"}`}>
+        <span
+          className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${user.active ? "border-[#4ade80] text-[#4ade80]" : "border-[#f87171] text-[#f87171]"}`}
+        >
           {user.active ? "ativo" : "inativo"}
         </span>
       </div>
@@ -137,7 +167,9 @@ export function AdminUserDetailScreen({ userId }: Props) {
       <div className="border border-[#1e293b] bg-[#111827] p-4 space-y-2">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] uppercase text-[#94a3b8]">Nivel atual</span>
-          <span className="font-mono text-xs text-[#f97316]">{currentLevel.name} (Nivel {currentLevel.number})</span>
+          <span className="font-mono text-xs text-[#f97316]">
+            {currentLevel.name} (Nivel {currentLevel.number})
+          </span>
         </div>
         <div className="h-3 w-full border border-[#334155] bg-[#0b1220]">
           <div className="h-full bg-[#f97316]" style={{ width: `${progress}%` }} />
@@ -163,7 +195,9 @@ export function AdminUserDetailScreen({ userId }: Props) {
                   <tr key={cert.code} className="border-b border-[#1e293b] text-[#e2e8f0]">
                     <td className="py-1 pr-4 font-mono uppercase">{cert.code}</td>
                     <td className="py-1 pr-4">{cert.sessions}</td>
-                    <td className={`py-1 font-mono ${cert.avgScore >= 70 ? "text-[#4ade80]" : cert.avgScore < 50 ? "text-[#f87171]" : "text-[#fbbf24]"}`}>
+                    <td
+                      className={`py-1 font-mono ${cert.avgScore >= 70 ? "text-[#4ade80]" : cert.avgScore < 50 ? "text-[#f87171]" : "text-[#fbbf24]"}`}
+                    >
                       {cert.avgScore}%
                     </td>
                   </tr>
@@ -211,17 +245,15 @@ export function AdminUserDetailScreen({ userId }: Props) {
       {/* Achievements summary */}
       <div className="border border-[#1e293b] bg-[#111827] p-4 flex items-center justify-between">
         <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Conquistas</p>
-        <span className="font-mono text-xs text-[#f97316]">{achievements.unlockedCount} / {achievements.total}</span>
+        <span className="font-mono text-xs text-[#f97316]">
+          {achievements.unlockedCount} / {achievements.total}
+        </span>
       </div>
 
       {/* Full history */}
       <div className="border border-[#1e293b] bg-[#111827] p-4 space-y-3">
         <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Historico de atividades</p>
-        <HistoryTabs
-          labHistory={labHistory}
-          studyHistory={studyHistory}
-          readOnly
-        />
+        <HistoryTabs labHistory={labHistory} studyHistory={studyHistory} readOnly />
       </div>
 
       {editingUser && (

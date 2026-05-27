@@ -14,6 +14,7 @@ import {
   deleteAdminQuestion,
   fillAdminQuestionsMissingWithAI,
   findAdminQuestionDuplicates,
+  getAdminQuestion,
   getAdminQuestionsFillMissingStats,
   listAdminQuestionReports,
   listAdminQuestions,
@@ -24,6 +25,7 @@ import {
 import {
   AdminQuestionListItem,
   AdminQuestionReportListItem,
+  AdminQuestionsFillMissingPendingItem,
   AdminQuestionsFillMissingStats,
   AdminQuestionUpdatePayload,
   PaginatedResult,
@@ -213,6 +215,8 @@ export function AdminQuestionsScreen() {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [aiFillRunning, setAiFillRunning] = useState(false);
   const [bulkUsage, setBulkUsage] = useState<"KC" | "SIMULADO" | "BOTH">("BOTH");
+  const [bulkCertification, setBulkCertification] = useState("");
+  const [bulkDifficulty, setBulkDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [bulkResultMessage, setBulkResultMessage] = useState<string | null>(null);
   const [aiFillModalOpen, setAiFillModalOpen] = useState(false);
   const [aiFillStatsLoading, setAiFillStatsLoading] = useState(false);
@@ -222,6 +226,11 @@ export function AdminQuestionsScreen() {
   const [aiFillChunkSize, setAiFillChunkSize] = useState("10");
   const [aiFillDelayMs, setAiFillDelayMs] = useState("1600");
   const [aiFillDryRun, setAiFillDryRun] = useState(false);
+  const [aiFillPendingList, setAiFillPendingList] = useState<AdminQuestionsFillMissingPendingItem[]>([]);
+  const [aiFillPendingPage, setAiFillPendingPage] = useState(1);
+  const [aiFillPendingTotalPages, setAiFillPendingTotalPages] = useState(1);
+  const [aiFillPendingLoading, setAiFillPendingLoading] = useState(false);
+  const [aiFillOpeningQuestionId, setAiFillOpeningQuestionId] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [allAwsServices, setAllAwsServices] = useState<AwsServiceOption[]>([]);
@@ -666,8 +675,13 @@ export function AdminQuestionsScreen() {
   }
 
   async function runBulkAction(
-    action: "set-active" | "set-usage" | "delete",
-    input?: { active?: boolean; usage?: "KC" | "SIMULADO" | "BOTH" },
+    action: "set-active" | "set-usage" | "set-certification" | "set-difficulty" | "delete",
+    input?: {
+      active?: boolean;
+      usage?: "KC" | "SIMULADO" | "BOTH";
+      certificationCode?: string | null;
+      difficulty?: "easy" | "medium" | "hard";
+    },
   ) {
     if (selectedQuestionIds.length === 0) {
       setBulkResultMessage("Selecione ao menos uma questao.");
@@ -683,6 +697,8 @@ export function AdminQuestionsScreen() {
         action,
         ...(input?.active !== undefined ? { active: input.active } : {}),
         ...(input?.usage ? { usage: input.usage } : {}),
+        ...(input?.certificationCode !== undefined ? { certificationCode: input.certificationCode } : {}),
+        ...(input?.difficulty ? { difficulty: input.difficulty } : {}),
       };
 
       const result = await batchAdminQuestions(payload);
@@ -714,19 +730,53 @@ export function AdminQuestionsScreen() {
     setAiFillStatsLoading(true);
     setAiFillStatsError(null);
     setBulkResultMessage(null);
+    setAiFillPendingPage(1);
 
     try {
-      const stats = await getAdminQuestionsFillMissingStats();
+      const stats = await getAdminQuestionsFillMissingStats({ page: 1, pageSize: 20 });
       setAiFillStats(stats);
       setAiFillTotalToProcess(String(Math.min(10, Math.max(1, stats.pending))));
       setAiFillChunkSize(String(stats.defaultChunkSize));
       setAiFillDelayMs(String(stats.defaultDelayMs));
       setAiFillDryRun(false);
+      if (stats.pendingList) {
+        setAiFillPendingList(stats.pendingList.items);
+        setAiFillPendingTotalPages(stats.pendingList.totalPages);
+      }
       setAiFillModalOpen(true);
     } catch (error) {
       setAiFillStatsError(error instanceof Error ? error.message : "Falha ao carregar pendencias para IA.");
     } finally {
       setAiFillStatsLoading(false);
+    }
+  }
+
+  async function loadAiFillPendingPage(page: number) {
+    setAiFillPendingLoading(true);
+    try {
+      const stats = await getAdminQuestionsFillMissingStats({ page, pageSize: 20 });
+      if (stats.pendingList) {
+        setAiFillPendingList(stats.pendingList.items);
+        setAiFillPendingTotalPages(stats.pendingList.totalPages);
+        setAiFillPendingPage(page);
+      }
+    } catch {
+      // silently ignore list refresh errors
+    } finally {
+      setAiFillPendingLoading(false);
+    }
+  }
+
+  async function openPendingQuestion(id: string) {
+    setAiFillOpeningQuestionId(id);
+    try {
+      const question = await getAdminQuestion(id);
+      setAiFillModalOpen(false);
+      openQuestionModal(question);
+    } catch {
+      // ignore
+    } finally {
+      setAiFillOpeningQuestionId(null);
     }
   }
 
@@ -1138,6 +1188,41 @@ export function AdminQuestionsScreen() {
             className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] disabled:opacity-60"
           >
             {bulkRunning ? "Processando..." : "Aplicar uso selecionado"}
+          </button>
+          <select
+            value={bulkDifficulty}
+            onChange={(event) => setBulkDifficulty(event.target.value as "easy" | "medium" | "hard")}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] outline-none"
+          >
+            <option value="easy">Dif: Facil</option>
+            <option value="medium">Dif: Medio</option>
+            <option value="hard">Dif: Dificil</option>
+          </select>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void runBulkAction("set-difficulty", { difficulty: bulkDifficulty })}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Aplicar dificuldade"}
+          </button>
+          <select
+            value={bulkCertification}
+            onChange={(event) => setBulkCertification(event.target.value)}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] outline-none"
+          >
+            <option value="">Cert: Nenhuma</option>
+            {certifications.map((c) => (
+              <option key={c.code} value={c.code}>{c.code}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={bulkRunning || selectedQuestionIds.length === 0}
+            onClick={() => void runBulkAction("set-certification", { certificationCode: bulkCertification || null })}
+            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] disabled:opacity-60"
+          >
+            {bulkRunning ? "Processando..." : "Aplicar certificacao"}
           </button>
           <button
             type="button"
@@ -2376,17 +2461,26 @@ export function AdminQuestionsScreen() {
       )}
 
       {aiFillModalOpen && (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 p-4">
-          <div className="w-full max-w-lg space-y-4 rounded border border-[#334155] bg-[#111827] p-4 text-[#e2e8f0]">
-            <div className="space-y-1">
-              <p className="font-mono text-xs uppercase text-[#fbbf24]">Preencher faltantes com IA</p>
-              <p className="text-sm text-[#cbd5e1]">
-                Pendentes atuais: <strong>{aiFillStats?.pending ?? 0}</strong>
-              </p>
-              <p className="text-xs text-[#94a3b8]">
-                Maximo por requisicao IA: {aiFillStats?.maxChunkSize ?? 10} | Maximo por execucao:{" "}
-                {aiFillStats?.maxTotalPerRun ?? 200}
-              </p>
+        <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/70 p-4 overflow-y-auto">
+          <div className="my-auto w-full max-w-2xl space-y-4 rounded border border-[#334155] bg-[#111827] p-4 text-[#e2e8f0]">
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                <p className="font-mono text-xs uppercase text-[#fbbf24]">Preencher faltantes com IA</p>
+                <p className="text-sm text-[#cbd5e1]">
+                  Pendentes atuais: <strong>{aiFillStats?.pending ?? 0}</strong>
+                </p>
+                <p className="text-xs text-[#94a3b8]">
+                  Maximo por requisicao IA: {aiFillStats?.maxChunkSize ?? 10} | Maximo por execucao:{" "}
+                  {aiFillStats?.maxTotalPerRun ?? 200}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiFillModalOpen(false)}
+                className="shrink-0 border border-[#334155] px-3 py-1 text-[10px] uppercase text-[#94a3b8]"
+              >
+                Fechar
+              </button>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -2440,13 +2534,6 @@ export function AdminQuestionsScreen() {
             <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-3">
               <button
                 type="button"
-                onClick={() => setAiFillModalOpen(false)}
-                className="border border-[#334155] px-3 py-2 text-xs uppercase"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
                 disabled={aiFillRunning || (aiFillStats?.pending ?? 0) === 0}
                 onClick={() => void submitAiFillModal()}
                 className="border border-[#14532d] bg-green-900/20 px-3 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
@@ -2454,6 +2541,78 @@ export function AdminQuestionsScreen() {
                 {aiFillRunning ? "Processando..." : "Iniciar processamento"}
               </button>
             </div>
+
+            {/* Lista paginada de questoes pendentes */}
+            {(aiFillStats?.pending ?? 0) > 0 && (
+              <div className="border-t border-[#1e293b] pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[10px] uppercase text-[#94a3b8]">
+                    Questoes pendentes ({aiFillStats?.pending ?? 0})
+                  </p>
+                  {aiFillPendingLoading && (
+                    <span className="font-mono text-[10px] text-[#64748b]">Carregando...</span>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  {aiFillPendingList.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={aiFillOpeningQuestionId === item.id}
+                      onClick={() => void openPendingQuestion(item.id)}
+                      className="w-full text-left border border-[#1e293b] bg-[#0b1220] px-3 py-2 hover:border-[#334155] hover:bg-[#111827] transition-colors disabled:opacity-60"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-[10px] text-[#64748b]">
+                            {item.externalId}
+                            {item.certCode && <span className="ml-2 text-[#f97316]">[{item.certCode}]</span>}
+                          </p>
+                          <p className="mt-0.5 text-xs text-[#cbd5e1] line-clamp-2">{item.statement}</p>
+                        </div>
+                        <div className="shrink-0 flex flex-col gap-0.5 items-end">
+                          {item.missingTopic && (
+                            <span className="font-mono text-[9px] uppercase border border-[#fbbf24]/40 text-[#fbbf24] px-1.5 py-0.5">
+                              topico
+                            </span>
+                          )}
+                          {item.missingServices && (
+                            <span className="font-mono text-[9px] uppercase border border-[#38bdf8]/40 text-[#38bdf8] px-1.5 py-0.5">
+                              servico
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {aiFillPendingTotalPages > 1 && (
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={aiFillPendingPage <= 1 || aiFillPendingLoading}
+                      onClick={() => void loadAiFillPendingPage(aiFillPendingPage - 1)}
+                      className="border border-[#334155] px-3 py-1 text-[10px] uppercase text-[#94a3b8] disabled:opacity-40"
+                    >
+                      ← Anterior
+                    </button>
+                    <span className="font-mono text-[10px] text-[#64748b]">
+                      Pag. {aiFillPendingPage} / {aiFillPendingTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={aiFillPendingPage >= aiFillPendingTotalPages || aiFillPendingLoading}
+                      onClick={() => void loadAiFillPendingPage(aiFillPendingPage + 1)}
+                      className="border border-[#334155] px-3 py-1 text-[10px] uppercase text-[#94a3b8] disabled:opacity-40"
+                    >
+                      Proxima →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

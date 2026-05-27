@@ -72,6 +72,27 @@ type GenerateStats = {
   packSize: number;
 } | null;
 
+type AutoGenCertStat = {
+  code: string;
+  name: string;
+  available: number;
+  packsPossible: number;
+};
+
+type AutoGenStats = {
+  certifications: AutoGenCertStat[];
+  totalPacksPossible: number;
+  packSize: number;
+  defaultImagePromptTemplate: string;
+  defaultNarrativePrompt: string;
+};
+
+type AutoGenResult = {
+  created: number;
+  packs: Array<{ id: string; name: string; certCode: string; hasArtwork: boolean; hasNarrative: boolean }>;
+  errors: string[];
+};
+
 export function AdminSimuladosScreen() {
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [filterCert, setFilterCert] = useState("");
@@ -94,6 +115,22 @@ export function AdminSimuladosScreen() {
   const [generateStatsLoading, setGenerateStatsLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+
+  // Auto-generate modal
+  const [showAutoGenModal, setShowAutoGenModal] = useState(false);
+  const [autoGenStep, setAutoGenStep] = useState<1 | 2>(1);
+  const [autoGenCertCode, setAutoGenCertCode] = useState("");
+  const [autoGenPackSize, setAutoGenPackSize] = useState(65);
+  const [autoGenArtwork, setAutoGenArtwork] = useState(false);
+  const [autoGenPollinationsModel, setAutoGenPollinationsModel] = useState("flux");
+  const [autoGenImagePrompt, setAutoGenImagePrompt] = useState("");
+  const [autoGenNarrative, setAutoGenNarrative] = useState(false);
+  const [autoGenNarrativePrompt, setAutoGenNarrativePrompt] = useState("");
+  const [autoGenStatsLoading, setAutoGenStatsLoading] = useState(false);
+  const [autoGenStats, setAutoGenStats] = useState<AutoGenStats | null>(null);
+  const [autoGenRunning, setAutoGenRunning] = useState(false);
+  const [autoGenResult, setAutoGenResult] = useState<AutoGenResult | null>(null);
+  const [autoGenError, setAutoGenError] = useState<string | null>(null);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -268,6 +305,70 @@ export function AdminSimuladosScreen() {
       setGenerateError("Erro de conexao ao gerar packs");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  function handleOpenAutoGen() {
+    setShowAutoGenModal(true);
+    setAutoGenStep(1);
+    setAutoGenCertCode("");
+    setAutoGenPackSize(65);
+    setAutoGenArtwork(false);
+    setAutoGenPollinationsModel("flux");
+    setAutoGenImagePrompt("");
+    setAutoGenNarrative(false);
+    setAutoGenNarrativePrompt("");
+    setAutoGenStats(null);
+    setAutoGenResult(null);
+    setAutoGenError(null);
+  }
+
+  async function handleAutoGenLoadStats() {
+    setAutoGenStatsLoading(true);
+    setAutoGenError(null);
+    try {
+      const qs = new URLSearchParams({ packSize: String(autoGenPackSize) });
+      if (autoGenCertCode) qs.set("certificationCode", autoGenCertCode);
+      const res = await fetch(`/api/admin/simulado-packs/generate-auto?${qs.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Falha ao carregar estatisticas");
+      const data = (await res.json()) as AutoGenStats;
+      setAutoGenStats(data);
+      if (!autoGenImagePrompt) setAutoGenImagePrompt(data.defaultImagePromptTemplate);
+      if (!autoGenNarrativePrompt) setAutoGenNarrativePrompt(data.defaultNarrativePrompt);
+      setAutoGenStep(2);
+    } catch (err) {
+      setAutoGenError(err instanceof Error ? err.message : "Erro ao carregar dados");
+    } finally {
+      setAutoGenStatsLoading(false);
+    }
+  }
+
+  async function handleAutoGenConfirm() {
+    setAutoGenRunning(true);
+    setAutoGenError(null);
+    try {
+      const res = await fetch("/api/admin/simulado-packs/generate-auto", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          certificationCode: autoGenCertCode || undefined,
+          packSize: autoGenPackSize,
+          generateArtwork: autoGenArtwork,
+          pollinationsModel: autoGenPollinationsModel,
+          imagePromptTemplate: autoGenImagePrompt || undefined,
+          generateNarrative: autoGenNarrative,
+          narrativePrompt: autoGenNarrativePrompt || undefined,
+        }),
+      });
+      const data = (await res.json()) as AutoGenResult & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Erro ao gerar simulados");
+      setAutoGenResult(data);
+      if (data.created > 0) void loadPacks();
+    } catch (err) {
+      setAutoGenError(err instanceof Error ? err.message : "Erro ao executar geracao");
+    } finally {
+      setAutoGenRunning(false);
     }
   }
 
@@ -470,6 +571,12 @@ export function AdminSimuladosScreen() {
             className="border border-[#f97316] px-4 py-2 text-xs uppercase text-[#f97316] hover:bg-[#f97316]/10"
           >
             + Gerar Packs
+          </button>
+          <button
+            onClick={handleOpenAutoGen}
+            className="border border-[#a855f7] px-4 py-2 text-xs uppercase text-[#a855f7] hover:bg-[#a855f7]/10"
+          >
+            ✦ Auto Gerar
           </button>
         </div>
       </div>
@@ -1223,6 +1330,286 @@ export function AdminSimuladosScreen() {
               >
                 Cancelar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auto Generate Modal */}
+      {showAutoGenModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 p-4 overflow-y-auto">
+          <div className="my-8 w-full max-w-2xl border border-[#334155] bg-[#0f172a] text-[#e2e8f0]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#1e293b] px-5 py-4">
+              <div>
+                <p className="font-mono text-[10px] uppercase text-[#a855f7]">Geracao automatica</p>
+                <h2 className="font-mono text-sm uppercase text-[#f8fafc]">
+                  {autoGenResult ? "Resultado" : autoGenRunning ? "Gerando..." : autoGenStep === 1 ? "Configurar geracao" : "Confirmar geracao"}
+                </h2>
+              </div>
+              {!autoGenRunning && (
+                <button
+                  type="button"
+                  onClick={() => setShowAutoGenModal(false)}
+                  className="border border-[#334155] px-3 py-1 text-[10px] uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
+                >
+                  Fechar
+                </button>
+              )}
+            </div>
+
+            <div className="px-5 py-5 space-y-5">
+
+              {/* RESULT STATE */}
+              {autoGenResult && (
+                <div className="space-y-4">
+                  <div className={`border px-4 py-3 text-sm ${autoGenResult.created > 0 ? "border-green-700 bg-green-900/20 text-green-300" : "border-yellow-700 bg-yellow-900/10 text-yellow-300"}`}>
+                    {autoGenResult.created > 0
+                      ? `${autoGenResult.created} simulado(s) gerado(s) com sucesso!`
+                      : "Nenhum simulado foi criado. Questoes insuficientes ou certificacao sem dados."}
+                  </div>
+                  {autoGenResult.packs.length > 0 && (
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {autoGenResult.packs.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between border border-[#1e293b] bg-[#080e1a] px-3 py-2 text-xs">
+                          <span className="font-mono text-[#f8fafc]">{p.name}</span>
+                          <div className="flex gap-2">
+                            <span className="font-mono text-[10px] text-[#64748b] uppercase">{p.certCode}</span>
+                            {p.hasArtwork && <span className="font-mono text-[10px] text-[#a855f7] uppercase">arte</span>}
+                            {p.hasNarrative && <span className="font-mono text-[10px] text-[#38bdf8] uppercase">jornada</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {autoGenResult.errors.length > 0 && (
+                    <div className="border border-red-800 bg-red-900/10 px-3 py-2 space-y-1">
+                      {autoGenResult.errors.map((e, i) => (
+                        <p key={i} className="text-xs text-red-300">{e}</p>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAutoGenModal(false)}
+                      className="border border-[#334155] px-4 py-2 text-xs uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* RUNNING STATE */}
+              {!autoGenResult && autoGenRunning && (
+                <div className="flex flex-col items-center gap-4 py-8">
+                  <div className="font-mono text-xs uppercase text-[#a855f7] animate-pulse">Gerando simulados...</div>
+                  <p className="text-xs text-[#64748b] text-center max-w-sm">
+                    Criando packs, gerando narrativas e artes. Isso pode levar alguns minutos dependendo da quantidade.
+                  </p>
+                </div>
+              )}
+
+              {/* STEP 1 — CONFIG */}
+              {!autoGenResult && !autoGenRunning && autoGenStep === 1 && (
+                <div className="space-y-5">
+                  {/* Certification */}
+                  <div className="space-y-1">
+                    <label className="font-mono text-[10px] uppercase text-[#94a3b8]">Certificacao</label>
+                    <select
+                      value={autoGenCertCode}
+                      onChange={(e) => setAutoGenCertCode(e.target.value)}
+                      className="w-full border border-[#334155] bg-[#080e1a] px-3 py-2 text-xs text-[#e2e8f0] outline-none"
+                    >
+                      <option value="">Todas as certificacoes</option>
+                      {certifications.map((c) => (
+                        <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Pack size */}
+                  <div className="space-y-1">
+                    <label className="font-mono text-[10px] uppercase text-[#94a3b8]">
+                      Questoes por pack: <span className="text-[#f97316]">{autoGenPackSize}</span>
+                    </label>
+                    <input
+                      type="range" min={20} max={65} step={1}
+                      value={autoGenPackSize}
+                      onChange={(e) => setAutoGenPackSize(Number(e.target.value))}
+                      className="w-full accent-[#f97316]"
+                    />
+                    <div className="flex justify-between font-mono text-[9px] text-[#475569]">
+                      <span>20</span><span>65</span>
+                    </div>
+                  </div>
+
+                  {/* Artwork */}
+                  <div className="space-y-3 border border-[#1e293b] p-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoGenArtwork}
+                        onChange={(e) => setAutoGenArtwork(e.target.checked)}
+                        className="accent-[#a855f7]"
+                      />
+                      <span className="font-mono text-xs uppercase text-[#e2e8f0]">Gerar arte automaticamente (Pollinations)</span>
+                    </label>
+                    {autoGenArtwork && (
+                      <div className="space-y-3 pl-5">
+                        <div className="space-y-1">
+                          <label className="font-mono text-[10px] uppercase text-[#94a3b8]">Modelo Pollinations</label>
+                          <select
+                            value={autoGenPollinationsModel}
+                            onChange={(e) => setAutoGenPollinationsModel(e.target.value)}
+                            className="w-full border border-[#334155] bg-[#080e1a] px-3 py-2 text-xs text-[#e2e8f0] outline-none"
+                          >
+                            <option value="flux">flux — Alta qualidade (recomendado)</option>
+                            <option value="kontext">kontext — Flux Kontext</option>
+                            <option value="gptimage">gptimage — GPT Image</option>
+                            <option value="gptimage-large">gptimage-large — GPT Image Large</option>
+                            <option value="seedream">seedream — Rapido</option>
+                            <option value="seedream-pro">seedream-pro — Seedream Pro</option>
+                            <option value="zimage">zimage — ZImage (padrao API)</option>
+                            <option value="wan-image">wan-image — Wan Image</option>
+                            <option value="grok-imagine">grok-imagine — Grok Imagine</option>
+                            <option value="nova-canvas">nova-canvas — Nova Canvas</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="font-mono text-[10px] uppercase text-[#94a3b8]">
+                            Prompt de imagem — variaveis: {"{{packName}}"}, {"{{certCode}}"}, {"{{certName}}"}
+                          </label>
+                          <textarea
+                            value={autoGenImagePrompt}
+                            onChange={(e) => setAutoGenImagePrompt(e.target.value)}
+                            rows={4}
+                            placeholder="Deixe vazio para usar o prompt padrao ao carregar o resumo..."
+                            className="w-full border border-[#334155] bg-[#080e1a] px-3 py-2 text-xs text-[#e2e8f0] outline-none resize-y font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Narrative */}
+                  <div className="space-y-3 border border-[#1e293b] p-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoGenNarrative}
+                        onChange={(e) => setAutoGenNarrative(e.target.checked)}
+                        className="accent-[#38bdf8]"
+                      />
+                      <span className="font-mono text-xs uppercase text-[#e2e8f0]">Gerar narrativa Jornada do Heroi (IA)</span>
+                    </label>
+                    {autoGenNarrative && (
+                      <div className="pl-5 space-y-1">
+                        <label className="font-mono text-[10px] uppercase text-[#94a3b8]">
+                          Prompt de narrativa — variaveis: {"{{packName}}"}, {"{{certCode}}"}, {"{{certName}}"}
+                        </label>
+                        <textarea
+                          value={autoGenNarrativePrompt}
+                          onChange={(e) => setAutoGenNarrativePrompt(e.target.value)}
+                          rows={6}
+                          placeholder="Deixe vazio para usar o prompt padrao ao carregar o resumo..."
+                          className="w-full border border-[#334155] bg-[#080e1a] px-3 py-2 text-xs text-[#e2e8f0] outline-none resize-y font-mono"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {autoGenError && (
+                    <p className="text-xs text-red-400">{autoGenError}</p>
+                  )}
+
+                  <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowAutoGenModal(false)}
+                      className="border border-[#334155] px-4 py-2 text-xs uppercase text-[#94a3b8]"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={autoGenStatsLoading}
+                      onClick={() => void handleAutoGenLoadStats()}
+                      className="border border-[#a855f7] bg-[#a855f7]/10 px-4 py-2 text-xs uppercase text-[#a855f7] disabled:opacity-60"
+                    >
+                      {autoGenStatsLoading ? "Carregando..." : "Ver resumo →"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2 — SUMMARY */}
+              {!autoGenResult && !autoGenRunning && autoGenStep === 2 && autoGenStats && (
+                <div className="space-y-4">
+                  <div className="border border-[#1e293b] bg-[#080e1a] p-4 space-y-3">
+                    <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Packs a serem criados por certificacao</p>
+                    {autoGenStats.certifications.filter((c) => c.packsPossible > 0).length === 0 ? (
+                      <p className="text-xs text-yellow-300">Nenhuma certificacao tem questoes suficientes para gerar novos packs com {autoGenStats.packSize} questoes por pack.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {autoGenStats.certifications.map((c) => (
+                          <div key={c.code} className={`flex items-center justify-between px-3 py-2 text-xs ${c.packsPossible > 0 ? "border border-[#1e293b]" : "opacity-40"}`}>
+                            <div>
+                              <span className="font-mono text-[#f97316] mr-2">{c.code}</span>
+                              <span className="text-[#94a3b8]">{c.name}</span>
+                            </div>
+                            <div className="flex gap-4 text-right">
+                              <span className="text-[#64748b]">{c.available} questoes livres</span>
+                              <span className={`font-mono font-bold ${c.packsPossible > 0 ? "text-green-400" : "text-red-400"}`}>
+                                {c.packsPossible} pack{c.packsPossible !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between border-t border-[#1e293b] pt-3">
+                      <span className="font-mono text-[10px] uppercase text-[#94a3b8]">Total</span>
+                      <span className="font-mono text-sm text-[#f8fafc]">{autoGenStats.totalPacksPossible} simulado{autoGenStats.totalPacksPossible !== 1 ? "s" : ""}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-[#64748b]">
+                    <p>• Questoes por pack: <span className="text-[#e2e8f0]">{autoGenStats.packSize}</span></p>
+                    <p>• Arte automatica: <span className="text-[#e2e8f0]">{autoGenArtwork ? `Sim (${autoGenPollinationsModel})` : "Nao"}</span></p>
+                    <p>• Narrativa Jornada: <span className="text-[#e2e8f0]">{autoGenNarrative ? "Sim (IA)" : "Nao"}</span></p>
+                    {(autoGenArtwork || autoGenNarrative) && (
+                      <p className="text-yellow-400 border border-yellow-800 bg-yellow-900/10 px-2 py-1">
+                        ⚠ Com arte e/ou narrativa, cada pack pode levar 10-30s. Nao feche a aba durante a geracao.
+                      </p>
+                    )}
+                  </div>
+
+                  {autoGenError && (
+                    <p className="text-xs text-red-400">{autoGenError}</p>
+                  )}
+
+                  <div className="flex justify-between gap-2 border-t border-[#1e293b] pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setAutoGenStep(1)}
+                      className="border border-[#334155] px-4 py-2 text-xs uppercase text-[#94a3b8]"
+                    >
+                      ← Voltar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={autoGenStats.totalPacksPossible === 0}
+                      onClick={() => void handleAutoGenConfirm()}
+                      className="border border-green-700 bg-green-900/20 px-4 py-2 text-xs uppercase text-green-300 disabled:opacity-40"
+                    >
+                      Confirmar e gerar {autoGenStats.totalPacksPossible} simulado{autoGenStats.totalPacksPossible !== 1 ? "s" : ""}
+                    </button>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </div>

@@ -226,13 +226,15 @@ export type AdminQuestionReportUpdateResult = {
   };
 };
 
-export type AdminQuestionsBatchAction = "set-active" | "set-usage" | "delete";
+export type AdminQuestionsBatchAction = "set-active" | "set-usage" | "set-certification" | "set-difficulty" | "delete";
 
 export type AdminQuestionsBatchPayload = {
   ids: string[];
   action: AdminQuestionsBatchAction;
   active?: boolean;
   usage?: "KC" | "SIMULADO" | "BOTH";
+  certificationCode?: string | null;
+  difficulty?: "easy" | "medium" | "hard";
 };
 
 export type AdminQuestionsBatchResult = {
@@ -276,6 +278,16 @@ export type AdminQuestionsFillMissingResult = {
   }>;
 };
 
+export type AdminQuestionsFillMissingPendingItem = {
+  id: string;
+  externalId: string;
+  statement: string;
+  certCode: string | null;
+  topic: string;
+  missingTopic: boolean;
+  missingServices: boolean;
+};
+
 export type AdminQuestionsFillMissingStats = {
   ok: boolean;
   pending: number;
@@ -283,6 +295,12 @@ export type AdminQuestionsFillMissingStats = {
   maxChunkSize: number;
   defaultDelayMs: number;
   maxTotalPerRun: number;
+  pendingList?: {
+    items: AdminQuestionsFillMissingPendingItem[];
+    total: number;
+    page: number;
+    totalPages: number;
+  };
 };
 
 export type AdminQuestionsCleanupPayload = {
