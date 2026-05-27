@@ -1,3 +1,6 @@
+import { STUDY_OPTIONS } from "@/features/study";
+import { QuestionOption } from "@/lib/types";
+
 export type OptionLabel = "A" | "B" | "C" | "D" | "E";
 export type QuestionDificult = "easy" | "medium" | "hard" | "nightmare"
 export type NormalizedOptionItem = {
@@ -64,4 +67,45 @@ export type CurrentQuestionState = {
   awsService: { code: string } | null;
   questionAwsServices: Array<{ service: { code: string } }>;
   questionOptions: NormalizedOptionItem[];
+};
+
+
+export const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
+export const GAP_TOP_N = 10;
+
+export type RulesConsentMap = Record<string, string>;
+
+export type SimuladoPackListItem = {
+  id: string;
+  name: string;
+  questionCount: number;
+  artworkUrl: string | null;
+  difficultyScore: number;
+  createdAt: string;
+  attempts: number;
+  bestScore: number | null;
+  lastSessionId: string | null;
+  sessions: {
+    id: string;
+    scorePercent: number;
+    correctAnswers: number;
+    totalQuestions: number;
+    completedAt: string;
+  }[];
+};
+
+export type TopicPerformance = {
+  topic: string;
+  attempts: number;
+  correct: number;
+  wrong: number;
+  accuracyPercent: number;
+};
+
+export type ScoreOverviewData = {
+  points: number;
+  maxPoints: number;
+  minimumCertificationPoints: number;
+  bestArea: TopicPerformance | null;
+  weakestArea: TopicPerformance | null;
 };

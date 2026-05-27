@@ -75,7 +75,11 @@ function getConsecutiveDaysMax(dates: Date[]): number {
   return maxStreak;
 }
 
-function computeMetrics(input: { questHistory: QuestEvent[]; studyHistory: StudyEvent[]; certBadgesCount: number }): MetricMap {
+function computeMetrics(input: {
+  questHistory: QuestEvent[];
+  studyHistory: StudyEvent[];
+  certBadgesCount: number;
+}): MetricMap {
   const questHistory = input.questHistory;
   const studyHistory = input.studyHistory;
   const certBadgesCount = input.certBadgesCount;
@@ -117,26 +121,29 @@ function computeMetrics(input: { questHistory: QuestEvent[]; studyHistory: Study
 export async function ensureAchievementCatalog() {
   await prisma.$transaction(
     ACHIEVEMENT_DEFS.map((achievement) =>
-      prisma.achievement.upsert({
-        where: { code: achievement.code },
-        create: {
-          code: achievement.code,
-          name: achievement.name,
-          description: achievement.description,
-          rarity: achievement.rarity,
-          generationPrompt: achievement.prompt,
-          displayOrder: achievement.displayOrder,
-          active: true,
+      prisma.achievement.upsert(
+        {
+          where: { code: achievement.code },
+          create: {
+            code: achievement.code,
+            name: achievement.name,
+            description: achievement.description,
+            rarity: achievement.rarity,
+            generationPrompt: achievement.prompt,
+            displayOrder: achievement.displayOrder,
+            active: true,
+          },
+          update: {
+            name: achievement.name,
+            description: achievement.description,
+            rarity: achievement.rarity,
+            generationPrompt: achievement.prompt,
+            displayOrder: achievement.displayOrder,
+            active: true,
+          },
         },
-        update: {
-          name: achievement.name,
-          description: achievement.description,
-          rarity: achievement.rarity,
-          generationPrompt: achievement.prompt,
-          displayOrder: achievement.displayOrder,
-          active: true,
-        },
-      }),
+      ),
+      { timeout: 30000 },
     ),
   );
 }
