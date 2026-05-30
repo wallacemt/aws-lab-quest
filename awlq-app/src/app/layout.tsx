@@ -70,7 +70,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "AWS Quest",
     description: "Estude AWS em formato de jogo com quests, XP e leaderboard.",
-    images: ["/twitter-image"],
+    images: ["/icon.png"],
   },
   icons: {
     icon: [
@@ -85,7 +85,7 @@ export const metadata: Metadata = {
     ],
     apple: [
       {
-        url: "/apple-touch-icon.png",
+        url: "/icon.png",
         sizes: "180x180",
         type: "image/png",
       },

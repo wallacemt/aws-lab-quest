@@ -28,8 +28,8 @@ export default function NotFound() {
             Opps! O Modo que você tentou acessar não foi encontrado ou está corrompido. Sopre a fita e tente novamente.
           </p>
           
-          <Link 
-            href="/"
+          <Link
+            href="/home"
             className="retro-btn bg-accent text-white retro-border border-2 retro-shadow-sm px-6 py-3 font-mono font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-accent/90 active:scale-95 w-full justify-center"
           >
             <Home className="w-5 h-5" />
