@@ -29,7 +29,7 @@ export function QuestScreen() {
 
   useEffect(() => {
     if (userHydrated && questHydrated && !activeQuest) {
-      router.replace("/");
+      router.replace("/home");
     }
   }, [activeQuest, questHydrated, router, userHydrated]);
 
@@ -85,7 +85,7 @@ export function QuestScreen() {
         }}
         onBackHome={() => {
           clearActiveQuest();
-          router.push("/");
+          router.push("/home");
         }}
       />
     </AppLayout>

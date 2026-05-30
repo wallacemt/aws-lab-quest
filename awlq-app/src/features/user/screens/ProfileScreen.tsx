@@ -21,6 +21,8 @@ import { clearOnboardingStep, getOnboardingStep, setOnboardingStep } from "@/lib
 import { AchievementItem } from "@/lib/achievements";
 import { CertificationAchievementModal } from "@/features/user/components/CertificationAchievementModal";
 import { CertBadgeEditModal } from "@/features/user/components/CertBadgeEditModal";
+import { EvolutionTab } from "@/features/user/components/EvolutionTab";
+import { PersonalizationTab } from "@/features/user/components/PersonalizationTab";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
 
 type CertBadge = {
@@ -47,6 +49,7 @@ export function ProfileScreen() {
     setNeedsCertificationReview,
   } = useUserProfile();
 
+  const [activeTab, setActiveTab] = useState<"perfil" | "conquistas" | "evolucao" | "personalizar">("perfil");
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -154,7 +157,7 @@ export function ProfileScreen() {
 
       if (onboardingStep) {
         clearOnboardingStep();
-        router.replace("/");
+        router.replace("/home");
         return;
       }
 
@@ -212,7 +215,7 @@ export function ProfileScreen() {
             className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4"
           >
             <div className="w-full max-w-sm space-y-5 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] p-5 shadow-[6px_6px_0_0_var(--pixel-shadow)]">
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">AWS Lab Quest</p>
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">AWS Quest</p>
               <h2 className="font-mono text-sm uppercase leading-6 text-[var(--pixel-primary)]">
                 Bem-vindo, aventureiro!
               </h2>
@@ -355,99 +358,188 @@ export function ProfileScreen() {
           </AnimatePresence>
         </PixelCard>
 
-        {/* Badges collection */}
-        <PixelCard>
-          <BadgesView
-            xp={profile.totalXp ?? 0}
-            levelBadges={levelBadges}
-            ownedBadgeIds={ownedBadgeIds}
-            onShareBadge={(badgeId) => handleCopyShareLink("badge", badgeId)}
-            shareMsg={shareMsg?.type === "badge" ? shareMsg.message : null}
-          />
-        </PixelCard>
+        {/* Tab bar */}
+        <div className="flex border-b-2 border-[var(--pixel-border)]">
+          {(["perfil", "conquistas", "evolucao", "personalizar"] as const).map((tab) => {
+            const labels: Record<typeof tab, string> = {
+              perfil: "Perfil",
+              conquistas: "Conquistas",
+              evolucao: "Evolucao",
+              personalizar: "Personalizar",
+            };
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`border-b-2 px-4 py-2 font-mono text-[10px] uppercase transition-colors ${
+                  activeTab === tab
+                    ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
+                    : "border-transparent text-[var(--pixel-subtext)] hover:text-[var(--pixel-text)]"
+                }`}
+              >
+                {labels[tab]}
+              </button>
+            );
+          })}
+        </div>
 
-        {/* Cert badges */}
-        <PixelCard className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
-              Certificacoes Conquistadas ({certBadges.length})
-            </p>
-            <PixelButton onClick={() => setCertAchievementOpen(true)}>
-              + Adicionar
-            </PixelButton>
-          </div>
+        {/* Tab: Perfil */}
+        {activeTab === "perfil" && (
+          <>
+            {/* Edit form */}
+            <PixelCard className="space-y-4">
+              <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Perfil</h3>
 
-          {certBadges.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => setCertAchievementOpen(true)}
-              className="w-full border-2 border-dashed border-[var(--pixel-border)] py-4 text-center font-mono text-xs text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
-            >
-              Passou na sua prova? Registre aqui!
-            </button>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {certBadges.map((badge) => (
-                <div
-                  key={badge.id}
-                  className="group flex items-center gap-3 border border-amber-500/30 bg-amber-900/10 p-3 transition-all hover:border-amber-400/40"
+              {isOnboardingProfile && (
+                <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Etapa obrigatoria</p>
+                  <p className="font-sans text-sm leading-6 text-pixel-text">
+                    Complete nome, certificacao AWS alvo e tema favorito para liberar a Home e o restante da experiencia.
+                  </p>
+                </PixelCard>
+              )}
+
+              <div className="space-y-2 font-sans text-sm leading-6 text-pixel-text">
+                <p>
+                  <strong>Nome:</strong> {profile.name || "Nao definido"}
+                </p>
+                <p>
+                  <strong>Username:</strong> {profile.username ? `@${profile.username}` : "Nao definido"}
+                </p>
+                <p>
+                  <strong>Certificacao alvo:</strong> {profile.certification || "Nao definida"}
+                </p>
+                <p>
+                  <strong>Tema favorito:</strong> {profile.favoriteTheme || "Nao definido"}
+                </p>
+              </div>
+
+              {needsCertificationReview && (
+                <PixelCard className="border-yellow-500 bg-yellow-900/20 py-2">
+                  <p className="font-sans text-sm text-yellow-300">
+                    Nao conseguimos mapear automaticamente sua certificacao antiga. Selecione a certificacao alvo para
+                    concluir a migracao.
+                  </p>
+                </PixelCard>
+              )}
+
+              {saveError && (
+                <PixelCard className="border-red-500 bg-red-900/20 py-2">
+                  <p className="font-sans text-sm text-red-300">{saveError}</p>
+                </PixelCard>
+              )}
+
+              <div className="flex items-center gap-3">
+                <PixelButton id="edit-profile-btn" onClick={() => setEditProfileOpen(true)} disabled={saving}>
+                  {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
+                </PixelButton>
+                <PixelButton
+                  variant="ghost"
+                  onClick={() => {
+                    setSaveMsg(null);
+                    setSaveError(null);
+                    void reloadProfile();
+                  }}
+                  disabled={saving}
                 >
-                  {/* Badge image */}
-                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden border border-amber-500/40 bg-amber-900/30">
-                    {badge.badgeImageUrl ? (
-                      <Image
-                        src={badge.badgeImageUrl}
-                        alt={badge.certificationPreset?.name ?? "badge"}
-                        width={56}
-                        height={56}
-                        className="h-full w-full object-contain p-1"
-                        unoptimized
-                      />
-                    ) : (
-                      <span className="text-xl">🎓</span>
-                    )}
-                  </div>
+                  Atualizar dados
+                </PixelButton>
+                {saveMsg && <span className="font-sans text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
+              </div>
+            </PixelCard>
 
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-xs text-amber-300">
-                      {badge.certificationPreset?.name ?? "Certificacao AWS"}
-                    </p>
-                    {badge.certificationPreset?.code && (
-                      <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
-                        {badge.certificationPreset.code}
-                      </p>
-                    )}
-                    <p className="font-mono text-[9px] text-[var(--pixel-subtext)]">
-                      {new Date(badge.earnedAt).toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
+            {/* Badges collection */}
+            <PixelCard>
+              <BadgesView
+                xp={profile.totalXp ?? 0}
+                levelBadges={levelBadges}
+                ownedBadgeIds={ownedBadgeIds}
+                onShareBadge={(badgeId) => handleCopyShareLink("badge", badgeId)}
+                shareMsg={shareMsg?.type === "badge" ? shareMsg.message : null}
+              />
+            </PixelCard>
 
-                  {/* Actions */}
-                  <div className="flex shrink-0 flex-col gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setEditingBadge(badge)}
-                      className="border border-[#334155] px-2 py-1 font-mono text-[9px] uppercase text-[#64748b] transition-colors hover:border-amber-500/50 hover:text-amber-400"
+            {/* Cert badges */}
+            <PixelCard className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                  Certificacoes Conquistadas ({certBadges.length})
+                </p>
+                <PixelButton onClick={() => setCertAchievementOpen(true)}>
+                  + Adicionar
+                </PixelButton>
+              </div>
+
+              {certBadges.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setCertAchievementOpen(true)}
+                  className="w-full border-2 border-dashed border-[var(--pixel-border)] py-4 text-center font-mono text-xs text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+                >
+                  Passou na sua prova? Registre aqui!
+                </button>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {certBadges.map((badge) => (
+                    <div
+                      key={badge.id}
+                      className="group flex items-center gap-3 border border-amber-500/30 bg-amber-900/10 p-3 transition-all hover:border-amber-400/40"
                     >
-                      Editar
-                    </button>
-                    <a
-                      href={badge.badgeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="border border-[#334155] px-2 py-1 font-mono text-[9px] uppercase text-[#64748b] transition-colors hover:border-[#475569] hover:text-[#94a3b8]"
-                    >
-                      Ver
-                    </a>
-                  </div>
+                      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden border border-amber-500/40 bg-amber-900/30">
+                        {badge.badgeImageUrl ? (
+                          <Image
+                            src={badge.badgeImageUrl}
+                            alt={badge.certificationPreset?.name ?? "badge"}
+                            width={56}
+                            height={56}
+                            className="h-full w-full object-contain p-1"
+                            unoptimized
+                          />
+                        ) : (
+                          <span className="text-xl">🎓</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-mono text-xs text-amber-300">
+                          {badge.certificationPreset?.name ?? "Certificacao AWS"}
+                        </p>
+                        {badge.certificationPreset?.code && (
+                          <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">
+                            {badge.certificationPreset.code}
+                          </p>
+                        )}
+                        <p className="font-mono text-[9px] text-[var(--pixel-subtext)]">
+                          {new Date(badge.earnedAt).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingBadge(badge)}
+                          className="border border-[#334155] px-2 py-1 font-mono text-[9px] uppercase text-[#64748b] transition-colors hover:border-amber-500/50 hover:text-amber-400"
+                        >
+                          Editar
+                        </button>
+                        <a
+                          href={badge.badgeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="border border-[#334155] px-2 py-1 font-mono text-[9px] uppercase text-[#64748b] transition-colors hover:border-[#475569] hover:text-[#94a3b8]"
+                        >
+                          Ver
+                        </a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </PixelCard>
+              )}
+            </PixelCard>
+          </>
+        )}
 
-        {achievements.length > 0 && (
+        {/* Tab: Conquistas */}
+        {activeTab === "conquistas" && achievements.length > 0 && (
           <PixelCard>
             <Collapsible open={achievementsOpen} onOpenChange={setAchievementsOpen}>
               <CollapsibleTrigger asChild>
@@ -456,7 +548,7 @@ export function ProfileScreen() {
                   className="flex w-full items-center justify-between border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left"
                 >
                   <span className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
-                    Conquistas do Perfil ({achievements.filter((item) => item.unlocked).length}/{achievements.length})
+                    Conquistas ({achievements.filter((item) => item.unlocked).length}/{achievements.length})
                   </span>
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${achievementsOpen ? "rotate-180" : "rotate-0"}`}
@@ -464,75 +556,23 @@ export function ProfileScreen() {
                   />
                 </button>
               </CollapsibleTrigger>
-
               <CollapsibleContent className="pt-3">
                 <AchievementsView items={achievements} handleCopyShareLink={handleCopyShareLink} shareMsg={shareMsg} />
               </CollapsibleContent>
             </Collapsible>
           </PixelCard>
         )}
+        {activeTab === "conquistas" && achievements.length === 0 && (
+          <PixelCard>
+            <p className="font-mono text-xs text-[var(--pixel-subtext)]">Nenhuma conquista desbloqueada ainda.</p>
+          </PixelCard>
+        )}
 
-        {/* Edit form */}
-        <PixelCard className="space-y-4">
-          <h3 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Perfil</h3>
+        {/* Tab: Evolucao */}
+        {activeTab === "evolucao" && <EvolutionTab />}
 
-          {isOnboardingProfile && (
-            <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Etapa obrigatoria</p>
-              <p className="font-sans text-sm leading-6 text-pixel-text">
-                Complete nome, certificacao AWS alvo e tema favorito para liberar a Home e o restante da experiencia.
-              </p>
-            </PixelCard>
-          )}
-
-          <div className="space-y-2 font-sans text-sm leading-6 text-pixel-text">
-            <p>
-              <strong>Nome:</strong> {profile.name || "Nao definido"}
-            </p>
-            <p>
-              <strong>Username:</strong> {profile.username ? `@${profile.username}` : "Nao definido"}
-            </p>
-            <p>
-              <strong>Certificacao alvo:</strong> {profile.certification || "Nao definida"}
-            </p>
-            <p>
-              <strong>Tema favorito:</strong> {profile.favoriteTheme || "Nao definido"}
-            </p>
-          </div>
-
-          {needsCertificationReview && (
-            <PixelCard className="border-yellow-500 bg-yellow-900/20 py-2">
-              <p className="font-sans text-sm text-yellow-300">
-                Nao conseguimos mapear automaticamente sua certificacao antiga. Selecione a certificacao alvo para
-                concluir a migracao.
-              </p>
-            </PixelCard>
-          )}
-
-          {saveError && (
-            <PixelCard className="border-red-500 bg-red-900/20 py-2">
-              <p className="font-sans text-sm text-red-300">{saveError}</p>
-            </PixelCard>
-          )}
-
-          <div className="flex items-center gap-3">
-            <PixelButton id="edit-profile-btn" onClick={() => setEditProfileOpen(true)} disabled={saving}>
-              {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
-            </PixelButton>
-            <PixelButton
-              variant="ghost"
-              onClick={() => {
-                setSaveMsg(null);
-                setSaveError(null);
-                void reloadProfile();
-              }}
-              disabled={saving}
-            >
-              Atualizar dados
-            </PixelButton>
-            {saveMsg && <span className="font-sans text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
-          </div>
-        </PixelCard>
+        {/* Tab: Personalizar */}
+        {activeTab === "personalizar" && <PersonalizationTab />}
 
         <UserProfileModal
           open={editProfileOpen}

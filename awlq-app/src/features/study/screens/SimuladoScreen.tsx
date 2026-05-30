@@ -797,7 +797,7 @@ export function SimuladoScreen() {
     setAnswers({});
     setCurrentIndex(0);
     setCalculating(false);
-    router.replace("/");
+    router.replace("/home");
   }
 
   function handleReset() {
@@ -850,7 +850,7 @@ export function SimuladoScreen() {
   }
 
   function navigateHome() {
-    router.replace("/");
+    router.replace("/home");
   }
 
   function navigateToKcGaps() {

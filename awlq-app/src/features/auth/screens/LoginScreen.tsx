@@ -8,7 +8,8 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { EyeClosed, EyeIcon } from "lucide-react";
+import { EyeClosed, EyeIcon, HomeIcon } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function LoginScreen() {
   return <LoginScreenBase mode="user" />;
@@ -92,7 +93,7 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
     }
 
     const from = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") : null;
-    const safeTarget = from && from.startsWith("/") && !from.startsWith("//") ? from : "/";
+    const safeTarget = from && from.startsWith("/") && !from.startsWith("//") && from !== "/" ? from : "/home";
 
     const isAdmin = await checkAdminAccess();
 
@@ -118,6 +119,18 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
 
   return (
     <div className="relative min-h-screen bg-[var(--pixel-bg)]">
+      <div className="absolute left-4 top-4">
+        <Tooltip>
+          <TooltipTrigger className="w-full">
+            <Link href="/" className="hover:cursor-pointer">
+              <PixelButton variant="ghost" aria-label="Home" title={"Ir ate inicio"} className={"min-w-8 min-h-8"}>
+                <HomeIcon />
+              </PixelButton>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>Inicio do App</TooltipContent>
+        </Tooltip>
+      </div>
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>

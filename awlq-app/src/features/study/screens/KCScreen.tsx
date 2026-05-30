@@ -490,7 +490,7 @@ export function KCScreen() {
           <KCSummaryCard
             summary={kcSummary}
             onNewKC={() => { setKcSummary(null); router.push("/kc"); }}
-            onGoHome={() => { setKcSummary(null); router.push("/"); }}
+            onGoHome={() => { setKcSummary(null); router.push("/home"); }}
           />
         )}
 

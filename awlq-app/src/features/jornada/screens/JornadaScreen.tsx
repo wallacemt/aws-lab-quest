@@ -62,7 +62,7 @@ export function JornadaScreen() {
         {!loading && error && (
           <PixelCard className="border-red-500 bg-red-900/10">
             <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>
-            <PixelButton variant="ghost" onClick={() => router.push("/")} className="mt-3">
+            <PixelButton variant="ghost" onClick={() => router.push("/home")} className="mt-3">
               Voltar ao inicio
             </PixelButton>
           </PixelCard>
@@ -75,7 +75,7 @@ export function JornadaScreen() {
               A Jornada do Heroi requer pelo menos 5 packs de simulado ativos para sua certificacao.
               Atualmente ha {data.totalCount} pack(s) disponivel(is).
             </p>
-            <PixelButton variant="ghost" onClick={() => router.push("/")} className="mt-4">
+            <PixelButton variant="ghost" onClick={() => router.push("/home")} className="mt-4">
               Voltar ao inicio
             </PixelButton>
           </PixelCard>
@@ -182,7 +182,7 @@ export function JornadaScreen() {
                 </PixelCard>
               )}
 
-              <PixelButton variant="ghost" onClick={() => router.push("/")} className="w-full justify-center">
+              <PixelButton variant="ghost" onClick={() => router.push("/home")} className="w-full justify-center">
                 Voltar ao inicio
               </PixelButton>
             </div>
