@@ -106,6 +106,7 @@ export function AiArtworkGenerator({ simuladoName, onConfirm, disabled }: Props)
 
       {phase.kind === "preview" && (
         <div className="space-y-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={phase.dataUrl}
             alt="Arte gerada"

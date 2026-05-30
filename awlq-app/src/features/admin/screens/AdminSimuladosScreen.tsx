@@ -147,7 +147,7 @@ export function AdminSimuladosScreen() {
   // Edit modal
   const [editPack, setEditPack] = useState<PackDetail | null>(null);
   const [editTab, setEditTab] = useState<"geral" | "jornada">("geral");
-  const [editLoading, setEditLoading] = useState(false);
+  const [, setEditLoading] = useState(false);
   const [editName, setEditName] = useState("");
   const [editArtworkUrl, setEditArtworkUrl] = useState<string | null>(null);
   const [editArtworkChanged, setEditArtworkChanged] = useState(false);
@@ -1265,7 +1265,7 @@ export function AdminSimuladosScreen() {
 
                   <label className="block space-y-1">
                     <span className="text-xs uppercase text-[#64748b]">Título da fase</span>
-                    <p className="text-[10px] text-[#475569]">Nome épico exibido no mapa (ex: "A Forja do Conhecimento")</p>
+                    <p className="text-[10px] text-[#475569]">Nome épico exibido no mapa (ex: &quot;A Forja do Conhecimento&quot;)</p>
                     <input
                       value={editJourneyStageName}
                       onChange={(e) => { setEditJourneyStageName(e.target.value); setEditJourneyChanged(true); }}
@@ -1288,7 +1288,7 @@ export function AdminSimuladosScreen() {
 
                   <label className="block space-y-1">
                     <span className="text-xs uppercase text-[#64748b]">Contexto AWS</span>
-                    <p className="text-[10px] text-[#475569]">Serviço AWS principal desta fase (ex: "Amazon S3", "AWS Lambda")</p>
+                    <p className="text-[10px] text-[#475569]">Serviço AWS principal desta fase (ex: &quot;Amazon S3&quot;, &quot;AWS Lambda&quot;)</p>
                     <input
                       value={editJourneyAwsContext}
                       onChange={(e) => { setEditJourneyAwsContext(e.target.value); setEditJourneyChanged(true); }}

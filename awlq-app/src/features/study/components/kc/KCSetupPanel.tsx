@@ -44,14 +44,12 @@ type Props = {
 };
 
 export function KCSetupPanel({
-  services: _services,
   servicesLoading,
   servicesError,
   selectedTopics,
   selectedDifficulty,
   questionCount,
   searchTopic,
-  servicesPage: _servicesPage,
   filteredServices,
   pagedServices,
   servicePageCount,

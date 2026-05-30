@@ -22,6 +22,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       nextValue = initialValueRef.current;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStorageState({ value: nextValue, hydrated: true });
   }, [key]);
 

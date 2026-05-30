@@ -251,6 +251,7 @@ export function HistoryTabs({ labHistory, studyHistory, loading, error, readOnly
                   >
                     <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">
                       <div className="relative mx-auto h-44 w-44 overflow-hidden border-2 border-[var(--pixel-border)]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={item.packArtworkUrl ?? "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/cert-badges/527007c2-c79f-4240-8a20-4b502c2f5b04.png"}
                           alt={item.packName ?? item.title}

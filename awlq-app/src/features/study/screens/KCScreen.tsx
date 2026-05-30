@@ -40,7 +40,7 @@ function maxTopicsForCount(count: number): number {
 export function KCScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refreshTotalXp, profile } = useUserProfile();
+  const { refreshTotalXp } = useUserProfile();
   const notifyProgress = useProgressNotifications();
 
   // Services
@@ -99,7 +99,6 @@ export function KCScreen() {
       .then((items) => setWeakServices(items))
       .catch(() => setWeakServices([]))
       .finally(() => setLoadingWeakServices(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions.length]);
 
   useEffect(() => {

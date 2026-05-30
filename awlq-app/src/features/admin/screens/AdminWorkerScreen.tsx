@@ -170,6 +170,7 @@ export function AdminWorkerScreen() {
 
   useEffect(() => {
     fetchData(historyPage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyPage]);
 
   async function fetchQuestions(
@@ -198,6 +199,7 @@ export function AdminWorkerScreen() {
     if (activeTab === "questions") {
       fetchQuestions(questionsPage, questionsCertId, questionsDateFrom, questionsDateTo);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, questionsPage, questionsCertId, questionsDateFrom, questionsDateTo]);
 
   async function fetchScheduledJobs() {
@@ -218,6 +220,7 @@ export function AdminWorkerScreen() {
     if (activeTab === "scheduled") {
       fetchScheduledJobs();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   async function handleToggleJob(job: ScheduledJob) {

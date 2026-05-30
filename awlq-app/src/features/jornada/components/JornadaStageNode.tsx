@@ -28,7 +28,7 @@ type Props = {
 };
 
 export function JornadaStageNode({ stage, isCurrent, isFogged, onSelect }: Props) {
-  const { completed, isBoss, stageNumber, narrative, artworkUrl } = stage;
+  const { completed, stageNumber, narrative, artworkUrl } = stage;
 
   const borderColor = completed
     ? "border-green-500"

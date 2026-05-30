@@ -1,19 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
 const CONSENT_KEY = "cookieConsent";
 
 export function CookieBanner() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    // Only show if the user hasn't already consented
-    if (!localStorage.getItem(CONSENT_KEY)) {
-      setVisible(true);
-    }
-  }, []);
+  const [visible, setVisible] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !localStorage.getItem(CONSENT_KEY);
+  });
 
   function handleAccept() {
     localStorage.setItem(CONSENT_KEY, "true");

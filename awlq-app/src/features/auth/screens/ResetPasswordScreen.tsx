@@ -9,7 +9,6 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 export function ResetPasswordScreen() {
   const router = useRouter();

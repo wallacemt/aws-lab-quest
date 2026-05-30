@@ -7,12 +7,6 @@ import { THEME_PRESETS } from "@/lib/themes";
 import { BG_PRESETS, type BgPreset } from "@/lib/backgrounds";
 import { useUserProfileStore } from "@/stores/userProfileStore";
 
-const CATEGORIES: { key: BgPreset["category"] | "none"; label: string }[] = [
-  { key: "none", label: "Nenhum" },
-  { key: "landing", label: "Landscapes" },
-  { key: "pixel-art", label: "Pixel Art" },
-];
-
 export function PersonalizationTab() {
   const { profile, reloadProfile, patchPersonalization } = useUserProfileStore();
 

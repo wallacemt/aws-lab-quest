@@ -103,7 +103,8 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
     if (!session || !session.pausedAt) return;
     const remaining = session.pausedRemainingSeconds ?? 0;
     const newEndsAt = new Date(Date.now() + remaining * 1000).toISOString();
-    const { pausedAt: _pausedAt, pausedRemainingSeconds: _pausedRemaining, ...rest } = session;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { pausedAt, pausedRemainingSeconds, ...rest } = session;
     const next: SimulatedExamSession = { ...rest, endsAt: newEndsAt };
     persistSession(next);
     set({ session: next, nowMs: Date.now() });

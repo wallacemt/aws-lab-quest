@@ -8,7 +8,6 @@ import { AdminUserListItem, CertificationOption } from "@/features/admin/types";
 import { HistoryTabs } from "@/features/study/components/history/HistoryTabs";
 import { QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getLevel, getLevelProgressPercent } from "@/lib/levels";
-import { LoaderCircle } from "lucide-react";
 
 type Props = {
   userId: string;

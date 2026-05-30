@@ -32,7 +32,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AdminQuestionsChartTab } from "@/features/admin/components/AdminQuestionsChartTab";
-import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
+import { QuestionCreateModal } from "@/features/admin/components/QuestionCreateModal";
 import {
   batchAdminQuestions,
   deleteAdminQuestion,
@@ -2345,7 +2345,7 @@ export function AdminQuestionsScreen() {
           defaultCertificationCode={certificationCode || undefined}
           allServices={allAwsServices}
           onClose={() => setNewQuestionModalOpen(false)}
-          onCreated={(_q: CreatedQuestion) => {
+          onCreated={() => {
             setNewQuestionModalOpen(false);
             setRefreshKey((prev) => prev + 1);
           }}
