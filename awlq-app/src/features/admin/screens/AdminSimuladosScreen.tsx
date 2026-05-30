@@ -3,9 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
+import { LayoutList, LayoutGrid } from "lucide-react";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
 import { AiArtworkGenerator } from "@/features/admin/components/AiArtworkGenerator";
+import { SimuladoPackCard } from "@/features/admin/components/SimuladoPackCard";
 import { CertificationOption } from "@/features/admin/types";
 
 type PackQuestion = {
@@ -138,6 +141,9 @@ export function AdminSimuladosScreen() {
   const [artworkMigrationPending, setArtworkMigrationPending] = useState<number>(0);
   const [artworkMigrating, setArtworkMigrating] = useState(false);
 
+  const { value: viewMode, setValue: setViewMode } = useLocalStorage<"table" | "grid">("admin-simulados-view", "table");
+  const { value: pageSize, setValue: setPageSize } = useLocalStorage<number>("admin-simulados-pageSize", 20);
+
   // Edit modal
   const [editPack, setEditPack] = useState<PackDetail | null>(null);
   const [editTab, setEditTab] = useState<"geral" | "jornada">("geral");
@@ -182,7 +188,7 @@ export function AdminSimuladosScreen() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (filterCert) params.set("certificationCode", filterCert);
       if (filterActive) params.set("active", filterActive);
       if (filterSearch) params.set("search", filterSearch);
@@ -200,7 +206,7 @@ export function AdminSimuladosScreen() {
     } finally {
       setLoading(false);
     }
-  }, [page, filterCert, filterActive, filterSearch, filterSortBy, filterSortOrder, filterMinDiff, filterMaxDiff, filterHasSessions]);
+  }, [page, pageSize, filterCert, filterActive, filterSearch, filterSortBy, filterSortOrder, filterMinDiff, filterMaxDiff, filterHasSessions]);
 
   useEffect(() => {
     void loadPacks();
@@ -624,12 +630,12 @@ export function AdminSimuladosScreen() {
             />
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 ">
             <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Certificação</span>
             <select
               value={filterCert}
               onChange={(e) => { setFilterCert(e.target.value); setPage(1); }}
-              className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
+              className="border max-w-32 border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
             >
               <option value="">Todas</option>
               {certifications.map((c) => (
@@ -716,6 +722,38 @@ export function AdminSimuladosScreen() {
           </div>
 
           <div className="flex items-end gap-2 ml-auto">
+            {/* Page size */}
+            <div className="flex flex-col gap-1">
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Por pagina</span>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                className="border border-[#334155] bg-[#0f172a] px-2 py-1.5 text-xs text-[#e2e8f0] outline-none"
+              >
+                {[10, 20, 30, 50].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* View mode toggle */}
+            <div className="flex items-center gap-1 pb-0.5">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`flex items-center justify-center border p-1.5 ${viewMode === "table" ? "border-[#f97316] text-[#f97316]" : "border-[#334155] text-[#64748b] hover:border-[#475569]"}`}
+                title="Visualizacao em tabela"
+              >
+                <LayoutList size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`flex items-center justify-center border p-1.5 ${viewMode === "grid" ? "border-[#f97316] text-[#f97316]" : "border-[#334155] text-[#64748b] hover:border-[#475569]"}`}
+                title="Visualizacao em grade"
+              >
+                <LayoutGrid size={14} />
+              </button>
+            </div>
+
             {(filterCert || filterActive || filterSearch || filterMinDiff || filterMaxDiff || filterHasSessions || filterSortBy !== "createdAt") && (
               <button
                 onClick={() => {
@@ -743,7 +781,29 @@ export function AdminSimuladosScreen() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Grid view */}
+      {viewMode === "grid" && !loading && result && result.items.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {result.items.map((pack) => (
+            <SimuladoPackCard
+              key={pack.id}
+              pack={pack}
+              onEdit={(id) => void handleOpenEdit(id)}
+              onToggleActive={(p) => void handleToggleActive(p)}
+              onDelete={(id) => setConfirmDeleteId(id)}
+            />
+          ))}
+        </div>
+      )}
+      {viewMode === "grid" && !loading && result?.items.length === 0 && (
+        <p className="py-8 text-center text-xs text-[#64748b]">Nenhum pack encontrado.</p>
+      )}
+      {viewMode === "grid" && loading && (
+        <p className="py-8 text-center text-xs text-[#64748b]">Carregando...</p>
+      )}
+
+      {/* Table view */}
+      {viewMode === "table" && (
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>
@@ -856,6 +916,7 @@ export function AdminSimuladosScreen() {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Pagination */}
       {result && result.total > result.pageSize && (

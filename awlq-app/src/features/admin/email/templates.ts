@@ -42,7 +42,7 @@ function renderBrandedEmail(input: {
         <tr>
           <td style="padding:22px;background:linear-gradient(135deg,#0ea5e9,#22d3ee);text-align:center;">
             <img src="${input.logoUrl}" alt="AWS Quest" width="72" height="72" style="display:block;margin:0 auto 10px auto;border-radius:16px;border:2px solid rgba(255,255,255,0.7);" />
-            <p style="margin:0;font-size:11px;letter-spacing:1px;font-weight:700;text-transform:uppercase;color:#082f49;">AWS Lab Quest</p>
+            <p style="margin:0;font-size:11px;letter-spacing:1px;font-weight:700;text-transform:uppercase;color:#082f49;">AWS Quest</p>
             <h1 style="margin:8px 0 4px 0;font-size:22px;line-height:1.2;color:#082f49;">${input.title}</h1>
             <p style="margin:0;font-size:13px;color:#0c4a6e;">${input.subtitle}</p>
           </td>
@@ -94,7 +94,7 @@ export function renderFreeAcessTemplate(params: FreeAccessParams) {
   const subject = "Seu acesso foi liberado";
   const html = renderBrandedEmail({
     title: `Parabens, {{name}}!`,
-    subtitle: "Seu acesso ao AWS Lab Quest foi aprovado.",
+    subtitle: "Seu acesso ao AWS Lab  foi aprovado.",
     intro: "Seu ambiente de estudo esta pronto para acelerar sua preparacao.",
     highlights: ["Monte uma rotina com Labs e KC", "Acompanhe seu nivel e badges", "Use simulados para medir evolucao"],
     ctaLabel: "Entrar na plataforma",
@@ -106,14 +106,14 @@ export function renderFreeAcessTemplate(params: FreeAccessParams) {
   return {
     subject,
     html,
-    text: `Parabens, {{name}}! Seu acesso ao AWS Lab Quest foi liberado. Entre em {{app_url}}/login e comece agora.`,
+    text: `Parabens, {{name}}! Seu acesso ao AWS Quest foi liberado. Entre em {{app_url}}/login e comece agora.`,
   };
 }
 
 export function renderPasswordResetTemplate(params: PasswordResetParams) {
   const logoUrl = getLogoUrl(params);
 
-  const subject = "Redefinicao de senha AWS Lab Quest";
+  const subject = "Redefinicao de senha AWS Quest";
   const html = renderBrandedEmail({
     title: `Ola, {{name}}!`,
     subtitle: "Recebemos um pedido para redefinir sua senha.",

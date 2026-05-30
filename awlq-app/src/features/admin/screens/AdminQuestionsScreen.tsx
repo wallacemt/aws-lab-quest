@@ -4,6 +4,30 @@ import { useEffect, useMemo, useState } from "react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
+import {
+  Plus,
+  Upload,
+  Copy,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Trash2,
+  Sparkles,
+  Eye,
+  Pencil,
+  ChevronDown,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -852,9 +876,7 @@ export function AdminQuestionsScreen() {
   }
 
   function toggleDuplicateId(id: string) {
-    setSelectedDuplicateIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setSelectedDuplicateIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   function handleSelectAllDuplicatesKeepOne() {
@@ -865,17 +887,13 @@ export function AdminQuestionsScreen() {
   async function handleAutoRemoveDuplicates() {
     const toRemove = duplicatesGroups.flatMap((group) => group.ids.slice(1));
     if (toRemove.length === 0) return;
-    const confirmed = window.confirm(
-      `Remover ${toRemove.length} duplicatas mantendo 1 questao por grupo?`,
-    );
+    const confirmed = window.confirm(`Remover ${toRemove.length} duplicatas mantendo 1 questao por grupo?`);
     if (!confirmed) return;
     setBulkRunning(true);
     setBulkResultMessage(null);
     try {
       const result = await batchAdminQuestions({ ids: toRemove, action: "delete" });
-      setBulkResultMessage(
-        `Duplicatas removidas. Solicitadas: ${result.requested} | Afetadas: ${result.affected}`,
-      );
+      setBulkResultMessage(`Duplicatas removidas. Solicitadas: ${result.requested} | Afetadas: ${result.affected}`);
       setSelectedDuplicateIds([]);
       setDuplicatesModalOpen(false);
       setRefreshKey((prev) => prev + 1);
@@ -888,17 +906,13 @@ export function AdminQuestionsScreen() {
 
   async function handleDeleteSelectedDuplicates() {
     if (selectedDuplicateIds.length === 0) return;
-    const confirmed = window.confirm(
-      `Remover ${selectedDuplicateIds.length} questoes duplicadas selecionadas?`,
-    );
+    const confirmed = window.confirm(`Remover ${selectedDuplicateIds.length} questoes duplicadas selecionadas?`);
     if (!confirmed) return;
     setBulkRunning(true);
     setBulkResultMessage(null);
     try {
       const result = await batchAdminQuestions({ ids: selectedDuplicateIds, action: "delete" });
-      setBulkResultMessage(
-        `Duplicatas removidas. Solicitadas: ${result.requested} | Afetadas: ${result.affected}`,
-      );
+      setBulkResultMessage(`Duplicatas removidas. Solicitadas: ${result.requested} | Afetadas: ${result.affected}`);
       setSelectedDuplicateIds([]);
       setDuplicatesModalOpen(false);
       setRefreshKey((prev) => prev + 1);
@@ -922,9 +936,7 @@ export function AdminQuestionsScreen() {
       return;
     }
 
-    const questions = Array.isArray(parsed)
-      ? parsed
-      : (parsed as Record<string, unknown>)?.questions;
+    const questions = Array.isArray(parsed) ? parsed : (parsed as Record<string, unknown>)?.questions;
     if (!Array.isArray(questions)) {
       setJsonImportError("Esperado array de questoes ou { questions: [...] }");
       return;
@@ -945,12 +957,9 @@ export function AdminQuestionsScreen() {
       const statement = String(item.statement ?? "").trim();
       const difficulty = String(item.difficulty ?? "medium");
       const questionType = String(item.questionType ?? "single");
-      const certCode =
-        String(item.certificationCode ?? jsonImportDefaultCert ?? "").trim() || null;
+      const certCode = String(item.certificationCode ?? jsonImportDefaultCert ?? "").trim() || null;
       const rawServices =
-        (item.awsServiceNames as string[] | undefined) ??
-        (item.awsServiceCodes as string[] | undefined) ??
-        [];
+        (item.awsServiceNames as string[] | undefined) ?? (item.awsServiceCodes as string[] | undefined) ?? [];
       const services = Array.isArray(rawServices) ? rawServices.map(String) : [];
       return {
         id: `preview-${i}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1065,7 +1074,11 @@ export function AdminQuestionsScreen() {
           sortBy,
           sortOrder,
           createdFrom: dateRange?.from ? startOfDay(dateRange.from).toISOString().slice(0, 10) : undefined,
-          createdTo: dateRange?.to ? endOfDay(dateRange.to).toISOString().slice(0, 10) : dateRange?.from ? endOfDay(dateRange.from).toISOString().slice(0, 10) : undefined,
+          createdTo: dateRange?.to
+            ? endOfDay(dateRange.to).toISOString().slice(0, 10)
+            : dateRange?.from
+              ? endOfDay(dateRange.from).toISOString().slice(0, 10)
+              : undefined,
         });
         setResult(data);
       } catch (err) {
@@ -1148,130 +1161,183 @@ export function AdminQuestionsScreen() {
       <header className="space-y-2">
         <p className="font-mono text-xs uppercase text-[#f97316]">Questoes</p>
         <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Banco de questoes paginavel</h1>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setRefreshKey((prev) => prev + 1)}
-            className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
-          >
-            Atualizar dados
-          </button>
-          <button
-            type="button"
-            disabled={bulkRunning || selectedQuestionIds.length === 0}
-            onClick={() => void runBulkAction("set-active", { active: true })}
-            className="border border-[#14532d] bg-green-900/20 px-3 py-1 text-xs uppercase text-green-200 disabled:opacity-60"
-          >
-            {bulkRunning ? "Processando..." : "Ativar selecionadas"}
-          </button>
-          <button
-            type="button"
-            disabled={bulkRunning || selectedQuestionIds.length === 0}
-            onClick={() => void runBulkAction("set-active", { active: false })}
-            className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-xs uppercase text-red-200 disabled:opacity-60"
-          >
-            {bulkRunning ? "Processando..." : "Inativar selecionadas"}
-          </button>
-          <select
-            value={bulkUsage}
-            onChange={(event) => setBulkUsage(event.target.value as "KC" | "SIMULADO" | "BOTH")}
-            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] outline-none"
-          >
-            <option value="KC">Uso: KC</option>
-            <option value="SIMULADO">Uso: SIMULADO</option>
-            <option value="BOTH">Uso: BOTH</option>
-          </select>
-          <button
-            type="button"
-            disabled={bulkRunning || selectedQuestionIds.length === 0}
-            onClick={() => void runBulkAction("set-usage", { usage: bulkUsage })}
-            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] disabled:opacity-60"
-          >
-            {bulkRunning ? "Processando..." : "Aplicar uso selecionado"}
-          </button>
-          <select
-            value={bulkDifficulty}
-            onChange={(event) => setBulkDifficulty(event.target.value as "easy" | "medium" | "hard")}
-            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] outline-none"
-          >
-            <option value="easy">Dif: Facil</option>
-            <option value="medium">Dif: Medio</option>
-            <option value="hard">Dif: Dificil</option>
-          </select>
-          <button
-            type="button"
-            disabled={bulkRunning || selectedQuestionIds.length === 0}
-            onClick={() => void runBulkAction("set-difficulty", { difficulty: bulkDifficulty })}
-            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] disabled:opacity-60"
-          >
-            {bulkRunning ? "Processando..." : "Aplicar dificuldade"}
-          </button>
-          <select
-            value={bulkCertification}
-            onChange={(event) => setBulkCertification(event.target.value)}
-            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] outline-none"
-          >
-            <option value="">Cert: Nenhuma</option>
-            {certifications.map((c) => (
-              <option key={c.code} value={c.code}>{c.code}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={bulkRunning || selectedQuestionIds.length === 0}
-            onClick={() => void runBulkAction("set-certification", { certificationCode: bulkCertification || null })}
-            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#e2e8f0] disabled:opacity-60"
-          >
-            {bulkRunning ? "Processando..." : "Aplicar certificacao"}
-          </button>
-          <button
-            type="button"
-            disabled={bulkRunning || selectedQuestionIds.length === 0}
-            onClick={() => void handleBulkDelete()}
-            className="border border-[#7f1d1d] bg-red-900/20 px-3 py-1 text-xs uppercase text-red-200 disabled:opacity-60"
-          >
-            {bulkRunning ? "Processando..." : "Remover selecionadas"}
-          </button>
-          <button
-            type="button"
-            disabled={aiFillRunning || bulkRunning}
-            onClick={() => void handleFillMissingWithAI()}
-            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#fbbf24] disabled:opacity-60"
-          >
-            {aiFillStatsLoading
-              ? "Carregando pendencias..."
-              : aiFillRunning
-                ? "IA em execucao..."
-                : "Preencher faltantes com IA"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setNewQuestionModalOpen(true)}
-            className="border border-[#14532d] bg-green-900/10 px-3 py-1 text-xs uppercase text-green-300"
-          >
-            + Nova questao
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setJsonImportModalOpen(true);
-              setJsonImportError(null);
-              setJsonImportSuccess(null);
-              setJsonImportPreviewList([]);
-            }}
-            className="border border-[#1e3a5f] bg-blue-900/20 px-3 py-1 text-xs uppercase text-[#38bdf8]"
-          >
-            Importar JSON
-          </button>
-          <button
-            type="button"
-            disabled={duplicatesLoading}
-            onClick={() => void handleFindDuplicates()}
-            className="border border-[#334155] bg-[#0b1220] px-3 py-1 text-xs uppercase text-[#f97316] disabled:opacity-60"
-          >
-            {duplicatesLoading ? "Buscando..." : "Encontrar duplicatas"}
-          </button>
-        </div>
+        <TooltipProvider>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Zone 1 — always visible */}
+            <button
+              type="button"
+              onClick={() => setNewQuestionModalOpen(true)}
+              className="flex items-center gap-1.5 border border-[#14532d] bg-green-900/10 px-3 py-1.5 text-xs uppercase text-green-300 hover:bg-green-900/20"
+            >
+              <Plus size={13} />
+              Nova questao
+            </button>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJsonImportModalOpen(true);
+                    setJsonImportError(null);
+                    setJsonImportSuccess(null);
+                    setJsonImportPreviewList([]);
+                  }}
+                  className="flex items-center gap-1.5 border border-[#1e3a5f] bg-blue-900/20 px-2.5 py-1.5 text-xs text-[#38bdf8] hover:bg-blue-900/30"
+                >
+                  <Upload size={13} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Importar JSON</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  disabled={duplicatesLoading}
+                  onClick={() => void handleFindDuplicates()}
+                  className="flex items-center gap-1.5 border border-[#334155] bg-[#0b1220] px-2.5 py-1.5 text-xs text-[#f97316] hover:border-[#f97316]/50 disabled:opacity-60"
+                >
+                  <Copy size={13} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{duplicatesLoading ? "Buscando..." : "Encontrar Duplicatas"}</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setRefreshKey((prev) => prev + 1)}
+                  className="flex items-center gap-1.5 border border-[#334155] bg-[#0b1220] px-2.5 py-1.5 text-xs text-[#e2e8f0] hover:border-[#64748b]"
+                >
+                  <RefreshCw size={13} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Atualizar</TooltipContent>
+            </Tooltip>
+
+            {/* Zone 2 — bulk actions, only when items are selected */}
+            {selectedQuestionIds.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={bulkRunning}
+                    className="flex items-center gap-1.5 border border-[#f97316]/60 bg-[#f97316]/10 px-3 py-1.5 text-xs uppercase text-[#f97316] hover:bg-[#f97316]/20 disabled:opacity-60"
+                  >
+                    {bulkRunning ? "Processando..." : `Acoes (${selectedQuestionIds.length})`}
+                    <ChevronDown size={12} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="w-56 border border-[#334155] bg-[#0f172a] text-xs text-[#e2e8f0]"
+                >
+                  <DropdownMenuItem
+                    onClick={() => void runBulkAction("set-active", { active: true })}
+                    className="flex items-center gap-2 text-green-300 focus:bg-green-900/30 focus:text-green-200"
+                  >
+                    <CheckCircle size={13} />
+                    Ativar selecionadas
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => void runBulkAction("set-active", { active: false })}
+                    className="flex items-center gap-2 text-red-300 focus:bg-red-900/30 focus:text-red-200"
+                  >
+                    <XCircle size={13} />
+                    Inativar selecionadas
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator className="border-[#1e293b]" />
+
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="text-xs text-[#e2e8f0]">Uso</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="border border-[#334155] bg-[#0f172a] text-xs text-[#e2e8f0]">
+                      {(["KC", "SIMULADO", "BOTH"] as const).map((opt) => (
+                        <DropdownMenuItem
+                          key={opt}
+                          onClick={() => {
+                            setBulkUsage(opt);
+                            void runBulkAction("set-usage", { usage: opt });
+                          }}
+                          className={`flex items-center gap-2 ${bulkUsage === opt ? "text-[#f97316]" : ""}`}
+                        >
+                          {opt}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="text-xs text-[#e2e8f0]">Dificuldade</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="border border-[#334155] bg-[#0f172a] text-xs text-[#e2e8f0]">
+                      {(["easy", "medium", "hard"] as const).map((opt) => (
+                        <DropdownMenuItem
+                          key={opt}
+                          onClick={() => {
+                            setBulkDifficulty(opt);
+                            void runBulkAction("set-difficulty", { difficulty: opt });
+                          }}
+                          className={`flex items-center gap-2 capitalize ${bulkDifficulty === opt ? "text-[#f97316]" : ""}`}
+                        >
+                          {opt}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="text-xs text-[#e2e8f0]">Certificacao</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="border border-[#334155] bg-[#0f172a] text-xs text-[#e2e8f0]">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setBulkCertification("");
+                          void runBulkAction("set-certification", { certificationCode: null });
+                        }}
+                        className={`flex items-center gap-2 ${bulkCertification === "" ? "text-[#f97316]" : ""}`}
+                      >
+                        Nenhuma
+                      </DropdownMenuItem>
+                      {certifications.map((c) => (
+                        <DropdownMenuItem
+                          key={c.code}
+                          onClick={() => {
+                            setBulkCertification(c.code);
+                            void runBulkAction("set-certification", { certificationCode: c.code });
+                          }}
+                          className={`flex items-center gap-2 ${bulkCertification === c.code ? "text-[#f97316]" : ""}`}
+                        >
+                          {c.code}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+
+                  <DropdownMenuSeparator className="border-[#1e293b]" />
+
+                  <DropdownMenuItem
+                    onClick={() => void handleBulkDelete()}
+                    className="flex items-center gap-2 text-red-400 focus:bg-red-900/30 focus:text-red-300"
+                  >
+                    <Trash2 size={13} />
+                    Remover selecionadas
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => void handleFillMissingWithAI()}
+                    disabled={aiFillRunning}
+                    className="flex items-center gap-2 text-[#fbbf24] focus:bg-amber-900/20 focus:text-amber-300"
+                  >
+                    <Sparkles size={13} />
+                    {aiFillStatsLoading ? "Carregando..." : "Preencher faltantes com IA"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </TooltipProvider>
         <p className="text-xs text-[#94a3b8]">
           Selecionadas: {selectedQuestionIds.length} (na pagina: {selectedOnPageCount})
         </p>
@@ -1464,10 +1530,7 @@ export function AdminQuestionsScreen() {
                 <span className="text-[#64748b]">▾</span>
               </button>
             </PopoverTrigger>
-            <PopoverContent
-              className="w-auto border border-[#334155] bg-[#000] p-0 text-[#e2e8f0]"
-              align="start"
-            >
+            <PopoverContent className="w-auto border border-[#334155] bg-[#000] p-0 text-[#e2e8f0]" align="start">
               <Calendar
                 mode="range"
                 selected={dateRange}
@@ -1484,15 +1547,19 @@ export function AdminQuestionsScreen() {
                   month_caption: "flex justify-center pt-1 relative items-center",
                   caption_label: "text-sm font-mono uppercase text-[#94a3b8]",
                   nav: "flex items-center justify-between absolute inset-x-0 top-0",
-                  button_previous: "h-7 w-7 bg-transparent border border-[#334155] text-[#94a3b8] hover:text-[#e2e8f0] flex items-center justify-center absolute left-1",
-                  button_next: "h-7 w-7 bg-transparent border border-[#334155] text-[#94a3b8] hover:text-[#e2e8f0] flex items-center justify-center absolute right-1",
+                  button_previous:
+                    "h-7 w-7 bg-transparent border border-[#334155] text-[#94a3b8] hover:text-[#e2e8f0] flex items-center justify-center rounded-md m-2",
+                  button_next:
+                    "h-7 w-7 bg-transparent border border-[#334155] text-[#94a3b8] hover:text-[#e2e8f0] flex items-center justify-center  rounded-md m-2",
                   month_grid: "w-full border-collapse",
                   weekdays: "flex",
                   weekday: "text-[#475569] rounded-none w-9 font-mono text-[10px] uppercase",
                   week: "flex w-full mt-1",
                   day: "h-9 w-9 text-center text-xs relative [&:has([aria-selected])]:bg-[#1e293b] first:[&:has([aria-selected])]:rounded-l-none last:[&:has([aria-selected])]:rounded-r-none focus-within:relative focus-within:z-20",
-                  day_button: "h-9 w-9 p-0 font-mono text-xs text-[#cbd5e1] hover:bg-[#1e293b] hover:text-[#f8fafc] aria-selected:opacity-100",
-                  selected: "bg-[#f97316] text-black hover:bg-[#ea6c00] hover:text-black focus:bg-[#f97316] focus:text-black",
+                  day_button:
+                    "h-9 w-9 p-0 font-mono text-xs text-[#cbd5e1] hover:bg-[#1e293b] hover:text-[#f8fafc] aria-selected:opacity-100",
+                  selected:
+                    "bg-[#f97316] text-black hover:bg-[#ea6c00] hover:text-black focus:bg-[#f97316] focus:text-black",
                   today: "border border-[#f97316] text-[#f97316]",
                   outside: "text-[#334155] opacity-50",
                   disabled: "text-[#334155] opacity-30",
@@ -1504,28 +1571,44 @@ export function AdminQuestionsScreen() {
               <div className="flex flex-wrap gap-2 border-t border-[#1e293b] p-3">
                 <button
                   type="button"
-                  onClick={() => { setDateRange({ from: new Date(), to: new Date() }); setPage(1); setCalendarOpen(false); }}
+                  onClick={() => {
+                    setDateRange({ from: new Date(), to: new Date() });
+                    setPage(1);
+                    setCalendarOpen(false);
+                  }}
                   className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
                 >
                   Hoje
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setDateRange({ from: subDays(new Date(), 6), to: new Date() }); setPage(1); setCalendarOpen(false); }}
+                  onClick={() => {
+                    setDateRange({ from: subDays(new Date(), 6), to: new Date() });
+                    setPage(1);
+                    setCalendarOpen(false);
+                  }}
                   className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
                 >
                   7 dias
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setDateRange({ from: subDays(new Date(), 29), to: new Date() }); setPage(1); setCalendarOpen(false); }}
+                  onClick={() => {
+                    setDateRange({ from: subDays(new Date(), 29), to: new Date() });
+                    setPage(1);
+                    setCalendarOpen(false);
+                  }}
                   className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:text-[#e2e8f0]"
                 >
                   30 dias
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setDateRange(undefined); setPage(1); setCalendarOpen(false); }}
+                  onClick={() => {
+                    setDateRange(undefined);
+                    setPage(1);
+                    setCalendarOpen(false);
+                  }}
                   className="border border-[#7f1d1d] px-2 py-1 text-[10px] uppercase text-[#fca5a5] hover:text-[#fecaca]"
                 >
                   Limpar
@@ -1536,7 +1619,10 @@ export function AdminQuestionsScreen() {
           {dateRange?.from && (
             <button
               type="button"
-              onClick={() => { setDateRange(undefined); setPage(1); }}
+              onClick={() => {
+                setDateRange(undefined);
+                setPage(1);
+              }}
               className="text-[10px] uppercase text-[#64748b] hover:text-[#fca5a5]"
             >
               ✕ limpar data
@@ -1703,13 +1789,40 @@ export function AdminQuestionsScreen() {
                       );
                     })}
                     <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => openQuestionModal(item)}
-                        className="border border-[#334155] px-2 py-1 text-[10px] uppercase"
-                      >
-                        Visualizar / editar
-                      </button>
+                      <TooltipProvider>
+                        <div className="flex items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  openQuestionModal(item);
+                                  setEditMode(false);
+                                }}
+                                className="flex items-center justify-center border border-[#334155] p-1.5 text-[#94a3b8] hover:border-[#64748b] hover:text-[#e2e8f0]"
+                              >
+                                <Eye size={14} />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Visualizar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  openQuestionModal(item);
+                                  setEditMode(true);
+                                }}
+                                className="flex items-center justify-center border border-[#334155] p-1.5 text-[#94a3b8] hover:border-[#64748b] hover:text-[#e2e8f0]"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TooltipProvider>
                     </td>
                   </tr>
                 ))}
@@ -1950,7 +2063,9 @@ export function AdminQuestionsScreen() {
 
                       return serviceCodes.length > 0 ? serviceCodes.join(", ") : "-";
                     })()}{" "}
-                    | <strong>Certificacao:</strong> {selectedQuestion.certificationPreset?.code ?? "-"}
+                  </p>
+                  <p>
+                    <strong>Certificacao</strong>:{selectedQuestion.certificationPreset?.code ?? "-"}
                   </p>
                 </div>
 
@@ -2275,7 +2390,9 @@ export function AdminQuestionsScreen() {
                     setJsonImportError(null);
                     setJsonImportSuccess(null);
                   }}
-                  placeholder={'[{ "statement": "...", "options": { "A": "...", "B": "..." }, "correctOption": "A", "difficulty": "medium" }]'}
+                  placeholder={
+                    '[{ "statement": "...", "options": { "A": "...", "B": "..." }, "correctOption": "A", "difficulty": "medium" }]'
+                  }
                   className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 font-mono text-xs text-[#e2e8f0] outline-none"
                 />
               </label>
@@ -2334,7 +2451,8 @@ export function AdminQuestionsScreen() {
               <div className="space-y-2 border border-[#1e3a5f] bg-blue-900/10 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-[#38bdf8]">
-                    {jsonImportPreviewList.filter((i) => i.selected).length} de {jsonImportPreviewList.length} questoes selecionadas
+                    {jsonImportPreviewList.filter((i) => i.selected).length} de {jsonImportPreviewList.length} questoes
+                    selecionadas
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -2360,9 +2478,7 @@ export function AdminQuestionsScreen() {
                     <div
                       key={item.id}
                       className={`flex items-start gap-2 rounded border px-2 py-2 text-xs transition-colors ${
-                        item.selected
-                          ? "border-[#1e3a5f] bg-[#0d1f33]"
-                          : "border-[#1e293b] bg-[#0b1220] opacity-50"
+                        item.selected ? "border-[#1e3a5f] bg-[#0d1f33]" : "border-[#1e293b] bg-[#0b1220] opacity-50"
                       }`}
                     >
                       <input
@@ -2376,10 +2492,15 @@ export function AdminQuestionsScreen() {
                         className="mt-0.5 shrink-0 accent-[#f97316]"
                       />
                       <span className="w-5 shrink-0 text-right text-[#475569]">{item.index}.</span>
-                      <span className="flex-1 text-[#cbd5e1] leading-snug">{item.statement.slice(0, 160)}{item.statement.length > 160 ? "..." : ""}</span>
+                      <span className="flex-1 text-[#cbd5e1] leading-snug">
+                        {item.statement.slice(0, 160)}
+                        {item.statement.length > 160 ? "..." : ""}
+                      </span>
                       <div className="shrink-0 flex flex-col items-end gap-1">
                         <div className="flex gap-1 flex-wrap justify-end">
-                          <span className={`px-1 rounded text-[10px] font-mono ${item.difficulty === "easy" ? "bg-green-900/40 text-green-300" : item.difficulty === "hard" ? "bg-red-900/40 text-red-300" : "bg-yellow-900/40 text-yellow-300"}`}>
+                          <span
+                            className={`px-1 rounded text-[10px] font-mono ${item.difficulty === "easy" ? "bg-green-900/40 text-green-300" : item.difficulty === "hard" ? "bg-red-900/40 text-red-300" : "bg-yellow-900/40 text-yellow-300"}`}
+                          >
                             {item.difficulty}
                           </span>
                           <span className="px-1 rounded text-[10px] font-mono bg-purple-900/40 text-purple-300">
@@ -2394,7 +2515,10 @@ export function AdminQuestionsScreen() {
                         {item.services.length > 0 && (
                           <div className="flex gap-1 flex-wrap justify-end">
                             {item.services.slice(0, 3).map((svc) => (
-                              <span key={svc} className="px-1 rounded text-[10px] font-mono bg-[#1e293b] text-[#94a3b8]">
+                              <span
+                                key={svc}
+                                className="px-1 rounded text-[10px] font-mono bg-[#1e293b] text-[#94a3b8]"
+                              >
                                 {svc}
                               </span>
                             ))}
@@ -2403,15 +2527,11 @@ export function AdminQuestionsScreen() {
                             )}
                           </div>
                         )}
-                        {item.services.length === 0 && (
-                          <span className="text-[10px] text-[#ef4444]">sem servicos</span>
-                        )}
+                        {item.services.length === 0 && <span className="text-[10px] text-[#ef4444]">sem servicos</span>}
                       </div>
                       <button
                         type="button"
-                        onClick={() =>
-                          setJsonImportPreviewList((prev) => prev.filter((i) => i.id !== item.id))
-                        }
+                        onClick={() => setJsonImportPreviewList((prev) => prev.filter((i) => i.id !== item.id))}
                         className="shrink-0 ml-1 text-[#475569] hover:text-[#fca5a5] text-sm leading-none"
                         title="Remover esta questao"
                       >
@@ -2549,9 +2669,7 @@ export function AdminQuestionsScreen() {
                   <p className="font-mono text-[10px] uppercase text-[#94a3b8]">
                     Questoes pendentes ({aiFillStats?.pending ?? 0})
                   </p>
-                  {aiFillPendingLoading && (
-                    <span className="font-mono text-[10px] text-[#64748b]">Carregando...</span>
-                  )}
+                  {aiFillPendingLoading && <span className="font-mono text-[10px] text-[#64748b]">Carregando...</span>}
                 </div>
 
                 <div className="space-y-1">
@@ -2684,10 +2802,7 @@ export function AdminQuestionsScreen() {
                 <p className="text-sm text-[#94a3b8]">Nenhuma duplicata encontrada.</p>
               ) : (
                 duplicatesGroups.map((group, groupIndex) => (
-                  <div
-                    key={groupIndex}
-                    className="border border-[#1e293b] bg-[#0b1220] p-3 space-y-2"
-                  >
+                  <div key={groupIndex} className="border border-[#1e293b] bg-[#0b1220] p-3 space-y-2">
                     <p className="font-mono text-[10px] uppercase text-[#94a3b8]">
                       Grupo {groupIndex + 1} · {group.ids.length} questoes
                       {group.certificationCode ? ` · ${group.certificationCode}` : ""}
@@ -2711,7 +2826,9 @@ export function AdminQuestionsScreen() {
                         />
                         <span className="min-w-0">
                           {i === 0 && (
-                            <span className="mr-1 font-mono text-[9px] uppercase text-green-600 border border-green-800 px-1 py-0.5">manter</span>
+                            <span className="mr-1 font-mono text-[9px] uppercase text-green-600 border border-green-800 px-1 py-0.5">
+                              manter
+                            </span>
                           )}{" "}
                           <span className="font-mono text-[#475569] mr-1">{group.externalIds[i]}</span>
                           <span className="break-words">{group.statements[i]}...</span>

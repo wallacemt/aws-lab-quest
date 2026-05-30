@@ -150,7 +150,7 @@ export function AdminDashboardScreen() {
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-danger)]">Acesso negado</p>
           <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">{error}</p>
           <div>
-            <Link href="/">
+            <Link href="/home">
               <PixelButton>Voltar para home</PixelButton>
             </Link>
           </div>

@@ -67,7 +67,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
             <Link href="/admin/login" className="border border-[#f97316] px-3 py-2 text-xs uppercase text-[#f97316]">
               Login admin
             </Link>
-            <Link href="/" className="border border-[#334155] px-3 py-2 text-xs uppercase text-[#e2e8f0]">
+            <Link href="/home" className="border border-[#334155] px-3 py-2 text-xs uppercase text-[#e2e8f0]">
               Voltar
             </Link>
           </div>
@@ -147,7 +147,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
                 className="flex w-full cursor-pointer items-center gap-2 border border-[#38bdf8]/40 px-3 py-2 text-xs uppercase text-[#38bdf8] transition-colors hover:border-[#38bdf8]/70 hover:bg-[#111827]"
                 onClick={() => {
                   setMode("user");
-                  router.push("/");
+                  router.push("/home");
                 }}
               >
                 <span aria-hidden>🎮</span> Ver como Jogador
