@@ -2,10 +2,18 @@
 
 import { useEffect } from "react";
 import { useUserProfileStore } from "@/stores/userProfileStore";
-import { findThemePreset } from "@/lib/themes";
+import { findThemePreset, ALL_PIXEL_VARS } from "@/lib/themes";
 
 export function ThemeApplier() {
-  const { profile, hydrated } = useUserProfileStore();
+  const { profile, hydrated, loading, loadProfile } = useUserProfileStore();
+
+  // ThemeApplier lives above AppRouteShell in the tree, so it must trigger
+  // profile loading itself to apply themes on all routes (auth, public, admin).
+  useEffect(() => {
+    if (!hydrated && !loading) {
+      void loadProfile();
+    }
+  }, [hydrated, loading, loadProfile]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -18,14 +26,7 @@ export function ThemeApplier() {
     }
 
     if (Object.keys(preset.vars).length === 0) {
-      const defaultVarNames = [
-        "--pixel-primary",
-        "--pixel-accent",
-        "--pixel-bg",
-        "--pixel-card",
-        "--pixel-border",
-      ];
-      for (const key of defaultVarNames) {
+      for (const key of ALL_PIXEL_VARS) {
         root.style.removeProperty(key);
       }
     }

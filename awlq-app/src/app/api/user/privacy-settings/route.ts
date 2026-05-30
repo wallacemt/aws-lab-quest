@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { cacheDel, CACHE_KEYS } from "@/lib/cache";
 
 type PrivacySettingsBody = {
   leaderboardVisible?: boolean;
@@ -23,6 +24,9 @@ export async function PATCH(request: NextRequest) {
     create: { userId: session.user.id, leaderboardVisible: body.leaderboardVisible },
     update: { leaderboardVisible: body.leaderboardVisible },
   });
+
+  // Invalidate leaderboard cache so the change takes effect immediately
+  await cacheDel(CACHE_KEYS.leaderboard());
 
   return NextResponse.json({ ok: true });
 }
