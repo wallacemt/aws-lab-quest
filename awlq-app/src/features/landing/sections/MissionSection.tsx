@@ -28,7 +28,7 @@ const VALUES = [
 
 export function MissionSection() {
   return (
-    <section className="landing-section landing-section-img relative overflow-hidden">
+    <section className="landing-section landing-section-img relative overflow-hidden border-t-4 border-b-4 border-secondary-foreground">
       {/* Pixel art background */}
       <div
         className="landing-section-bg"
@@ -110,7 +110,7 @@ export function MissionSection() {
           ].map((item) => (
             <div key={item.label} className="flex flex-col items-center gap-1">
               <span
-                className="font-mono text-lg font-bold"
+                className="font-mono text-lg font-bold animate-pulse"
                 style={{ color: "var(--pixel-primary,#f97316)" }}
               >
                 {item.value}

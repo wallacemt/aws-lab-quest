@@ -8,7 +8,7 @@ const DEMOS = [
 
 export function DemoVideosSection() {
   return (
-    <section className="landing-section landing-section-img relative overflow-hidden">
+    <section className="landing-section landing-section-img relative overflow-hidden border-t-4 border-b-4 border-secondary">
       {/* Pixel art background */}
       <div
         className="landing-section-bg"

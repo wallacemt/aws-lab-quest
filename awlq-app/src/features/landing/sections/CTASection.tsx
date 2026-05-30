@@ -10,7 +10,7 @@ type Props = {
 export function CTASection({ authenticated }: Props) {
   return (
     <section
-      className="landing-section relative overflow-hidden"
+      className="landing-section relative overflow-hidden "
       style={{
         backgroundImage: "url('/landing/ruins-1.png')",
         backgroundSize: "cover",
