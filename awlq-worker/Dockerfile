@@ -1,9 +1,9 @@
-FROM oven/bun:canary-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
-COPY package*.json ./
+COPY package.json bun.lock ./
 COPY prisma/ ./prisma/
-RUN bun ci
+RUN bun install --frozen-lockfile
 
 RUN bunx prisma generate
 
@@ -12,7 +12,7 @@ COPY src/ ./src/
 RUN bun run build
 
 # ─── Runner ───────────────────────────────────────────────────────────────────
-FROM oven/bun:canary-alpine AS runner
+FROM oven/bun:1-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
