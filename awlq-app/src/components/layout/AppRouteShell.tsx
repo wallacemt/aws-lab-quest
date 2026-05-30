@@ -164,6 +164,19 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
           </div>
         )}
         {children}
+        {pathname !== "/simulado" && (
+        <>
+          <footer className="pb-2 pt-0 text-center">
+            <Link
+              href="/privacidade"
+              className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)] opacity-60 hover:opacity-100"
+            >
+              Politica de Privacidade
+            </Link>
+          </footer>
+          <BottomNav />
+        </>
+      )}
       </div>
 
       {recoveredExamDialogOpen && (
@@ -184,19 +197,7 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
         </div>
       )}
 
-      {pathname !== "/simulado" && (
-        <>
-          <footer className="pb-2 pt-0 text-center">
-            <Link
-              href="/privacidade"
-              className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)] opacity-60 hover:opacity-100"
-            >
-              Politica de Privacidade
-            </Link>
-          </footer>
-          <BottomNav />
-        </>
-      )}
+      
     </>
   );
 }
