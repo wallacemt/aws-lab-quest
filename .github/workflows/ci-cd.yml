@@ -50,6 +50,8 @@ jobs:
 
       - name: Generate Prisma client (worker)
         working-directory: awlq-worker
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost/ci
         run: bunx prisma generate
 
       - name: Type-check worker
