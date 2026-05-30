@@ -30,6 +30,8 @@ export type UserProfile = {
   username: string;
   totalXp?: number;
   role?: string;
+  bgImageUrl?: string | null;
+  themePreset?: string | null;
 };
 
 export type CertificationPreset = {

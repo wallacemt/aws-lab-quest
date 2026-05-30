@@ -13,7 +13,7 @@ const PUBLIC_PREFIXES = [
   "/twitter-image",
   "/og-image",
 ];
-const PUBLIC_EXACT_PATHS = ["/robots.txt", "/sitemap.xml", "/manifest.webmanifest"];
+const PUBLIC_EXACT_PATHS = ["/", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest"];
 
 // Better Auth may prefix secure cookies in production environments.
 const SESSION_COOKIE_NAMES = [
@@ -50,7 +50,7 @@ export function proxy(request: NextRequest) {
   }
 
   if (hasSession && isAuthPage) {
-    const target = pathname.startsWith("/admin") ? "/admin" : "/";
+    const target = pathname.startsWith("/admin") ? "/admin" : "/home";
     return NextResponse.redirect(new URL(target, request.url));
   }
 

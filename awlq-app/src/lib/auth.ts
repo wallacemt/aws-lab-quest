@@ -63,7 +63,7 @@ export const auth = betterAuth({
     resetPasswordTokenExpiresIn: 60 * 60,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
-      let subject = "Redefinicao de senha AWS Lab Quest";
+      let subject = "Redefinicao de senha AWS Quest";
       let html = buildPasswordResetFallbackHtml({
         name: user.name,
         url,

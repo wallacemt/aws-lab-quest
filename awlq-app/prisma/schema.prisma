@@ -111,6 +111,8 @@ model UserProfile {
   certificationPreset   CertificationPreset? @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
   favoriteTheme         String               @default("")
   avatarUrl             String?
+  bgImageUrl            String?
+  themePreset           String?              @default("default")
 }
 
 model CertificationPreset {

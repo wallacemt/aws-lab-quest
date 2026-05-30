@@ -11,6 +11,8 @@ type ApiProfileResponse = {
   certificationPresetCode: string;
   favoriteTheme: string;
   avatarUrl: string | null;
+  bgImageUrl?: string | null;
+  themePreset?: string | null;
   needsCertificationReview?: boolean;
   user: { name: string; email: string; username?: string | null };
 };
@@ -98,6 +100,8 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
             role: profileData.role ?? "",
             favoriteTheme: profileData.favoriteTheme ?? "",
             totalXp,
+            bgImageUrl: profileData.bgImageUrl ?? null,
+            themePreset: profileData.themePreset ?? "default",
           },
           needsCertificationReview: Boolean(profileData.needsCertificationReview),
           avatarUrl: profileData.avatarUrl,
@@ -129,6 +133,8 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
           role: profileData.role ?? "",
           favoriteTheme: profileData.favoriteTheme ?? "",
           totalXp,
+          bgImageUrl: profileData.bgImageUrl ?? null,
+          themePreset: profileData.themePreset ?? "default",
         },
         needsCertificationReview: Boolean(profileData.needsCertificationReview),
         avatarUrl: profileData.avatarUrl,
@@ -175,6 +181,9 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
         certificationPresetCode: data.certificationPresetCode ?? "",
         favoriteTheme: data.favoriteTheme ?? "",
         role: data.role ?? state.profile.role,
+        // PUT response doesn't include personalization fields — preserve current state
+        bgImageUrl: data.bgImageUrl ?? state.profile?.bgImageUrl,
+        themePreset: data.themePreset ?? state.profile?.themePreset,
       },
       needsCertificationReview: Boolean(data.needsCertificationReview),
       avatarUrl: data.avatarUrl ?? null,
