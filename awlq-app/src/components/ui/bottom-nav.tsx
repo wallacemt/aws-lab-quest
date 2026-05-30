@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Home", icon: Home, active: false },
+  { href: "/home", label: "Home", icon: Home, active: false },
 
   { href: "/achievements", label: "Conquistas", icon: Trophy, active: false },
   { href: "/history", label: "Histórico", icon: History, active: false },

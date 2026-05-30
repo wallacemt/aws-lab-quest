@@ -97,13 +97,13 @@ export const Header = () => {
     <header className=" top-0 z-40 w-full border-b-2 border-pixel-border rounded-none bg-background/90 px-4 py-3 flex items-center justify-between">
       {/* Esquerda: Logo + Nome */}
       <div className="flex items-center gap-3">
-        <Link href="/" className="flex min-w-0 items-center gap-3">
+        <Link href="/home" className="flex min-w-0 items-center gap-3">
           <div className={`pixel-cloud-icon ${theme === "dark" ? "bg-primary" : ""}`} aria-hidden="true">
             <Image src={"/logo.png"} alt="AWS Quest logo" height={260} width={260} />
           </div>
           <div className="hidden min-w-0 sm:block">
-            <h1 className="font-mono text-lg md:text-xl font-bold tracking-wider text-primary hidden sm:block mt-1">
-              AWS QUEST
+            <h1 className="font-mono text-lg md:text-xl font-bold tracking-wider  hidden sm:block mt-1">
+              AWS<span className="text-primary">Q</span>
             </h1>
           </div>
         </Link>
