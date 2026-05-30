@@ -103,7 +103,7 @@ export function RegisterScreen() {
     }
   };
   return (
-    <div className="relative min-h-screen bg-[var(--pixel-bg)]">
+    <div className="pixel-shell relative min-h-screen bg-[var(--pixel-bg)]">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>

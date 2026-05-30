@@ -3,14 +3,22 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { THEME_PRESETS } from "@/lib/themes";
+import { cacheDel, CACHE_KEYS } from "@/lib/cache";
+import { BG_PRESETS } from "@/lib/backgrounds";
 
 const KNOWN_THEME_IDS = new Set(THEME_PRESETS.map((t) => t.id));
+
+// Accept HTTPS URLs (user-provided) and same-origin static paths (preset BGs in /public).
+const PRESET_BG_URLS = new Set(BG_PRESETS.map((b) => b.url).filter(Boolean));
 
 function isValidBgImageUrl(value: unknown): value is string | null {
   if (value === null || value === undefined) return true;
   if (typeof value !== "string") return false;
   if (value === "") return true;
-  return value.startsWith("https://");
+  if (value.startsWith("https://")) return true;
+  // Allow same-origin preset paths (e.g. /backgrounds/px-city-1.png)
+  if (value.startsWith("/") && PRESET_BG_URLS.has(value)) return true;
+  return false;
 }
 
 export async function PATCH(request: NextRequest) {
@@ -36,7 +44,7 @@ export async function PATCH(request: NextRequest) {
 
   if (bgImageUrl !== undefined && !isValidBgImageUrl(bgImageUrl)) {
     return NextResponse.json(
-      { error: "bgImageUrl deve ser uma URL https:// valida ou null." },
+      { error: "bgImageUrl deve ser uma URL https:// valida, null, ou um preset padrao." },
       { status: 422 },
     );
   }
@@ -55,13 +63,17 @@ export async function PATCH(request: NextRequest) {
 
   const updated = await prisma.userProfile.upsert({
     where: { userId: session.user.id },
-    create: {
-      userId: session.user.id,
-      ...data,
-    },
+    create: { userId: session.user.id, ...data },
     update: data,
     select: { bgImageUrl: true, themePreset: true },
   });
+
+  // Invalidate the user profile cache so the next GET /api/user/profile
+  // returns the updated theme/bg immediately (no stale 10-min window).
+  await cacheDel(
+    CACHE_KEYS.userProfile(session.user.id),
+    CACHE_KEYS.userPublicProfile(session.user.id),
+  );
 
   return NextResponse.json(updated);
 }

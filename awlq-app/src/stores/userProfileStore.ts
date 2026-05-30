@@ -39,6 +39,7 @@ type UserProfileState = {
   setProfile: (next: UserProfile) => Promise<ApiProfileResponse>;
   setNeedsCertificationReview: (next: boolean) => void;
   setAvatarUrl: (next: string | null) => void;
+  patchPersonalization: (patch: { themePreset?: string; bgImageUrl?: string | null }) => void;
 };
 
 let inFlightLoad: Promise<void> | null = null;
@@ -194,4 +195,6 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
   },
   setNeedsCertificationReview: (next) => set({ needsCertificationReview: next }),
   setAvatarUrl: (next) => set({ avatarUrl: next }),
+  patchPersonalization: (patch) =>
+    set((state) => ({ profile: { ...state.profile, ...patch } })),
 }));

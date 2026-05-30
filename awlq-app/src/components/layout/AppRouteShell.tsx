@@ -156,7 +156,7 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
 
   return (
     <>
-      <div className="min-h-screen pb-28">
+      <div className="pixel-bg-adaptive min-h-screen pb-28">
         <Header />
         {simHydrated && simulatedExamActive && pathname !== "/simulado" && (
           <div className="border-b-2 border-red-500 bg-red-900/20 px-4 py-2 text-center font-mono text-[10px] uppercase text-red-300">

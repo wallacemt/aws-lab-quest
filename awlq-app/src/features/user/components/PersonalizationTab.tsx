@@ -14,7 +14,7 @@ const CATEGORIES: { key: BgPreset["category"] | "none"; label: string }[] = [
 ];
 
 export function PersonalizationTab() {
-  const { profile, reloadProfile } = useUserProfileStore();
+  const { profile, reloadProfile, patchPersonalization } = useUserProfileStore();
 
   const [selectedTheme, setSelectedTheme] = useState(profile.themePreset ?? "default");
   const [selectedBg, setSelectedBg] = useState(profile.bgImageUrl ?? "");
@@ -37,9 +37,18 @@ export function PersonalizationTab() {
         credentials: "include",
         body: JSON.stringify({ themePreset: selectedTheme, bgImageUrl }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as { bgImageUrl?: string | null; themePreset?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Falha ao salvar.");
-      await reloadProfile();
+
+      // Apply immediately to the store so ThemeApplier reacts without a network round-trip.
+      patchPersonalization({
+        themePreset: data.themePreset ?? selectedTheme,
+        bgImageUrl: data.bgImageUrl ?? bgImageUrl,
+      });
+
+      // Refresh in background to sync any other profile fields.
+      void reloadProfile();
+
       setSaveMsg("Personalizacao salva!");
       setTimeout(() => setSaveMsg(null), 2500);
     } catch (err) {

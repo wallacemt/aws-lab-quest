@@ -250,3 +250,26 @@ textarea {
   background-color: var(--pixel-accent);
   border-radius: 10px;
 }
+
+/* ─── Adaptive shell ─────────────────────────────────────────────────────── */
+/*
+ * pixel-shell: wraps full pages that already have bg-[var(--pixel-bg)].
+ * When a background image is active (html[data-has-bg]), the solid colour
+ * becomes semi-transparent so the body image shows through with contrast.
+ */
+:root[data-has-bg] .pixel-shell {
+  background-color: color-mix(in srgb, var(--pixel-bg) 80%, transparent) !important;
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+}
+
+/*
+ * pixel-bg-adaptive: adds a tinted overlay ONLY when a bg image is active.
+ * Use on transparent content wrappers (AppRouteShell) that need legibility
+ * without affecting the default no-image appearance.
+ */
+:root[data-has-bg] .pixel-bg-adaptive {
+  background-color: color-mix(in srgb, var(--pixel-bg) 72%, transparent);
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+}

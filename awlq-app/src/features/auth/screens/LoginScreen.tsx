@@ -118,7 +118,7 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
   }
 
   return (
-    <div className="relative min-h-screen bg-[var(--pixel-bg)]">
+    <div className="pixel-shell relative min-h-screen bg-[var(--pixel-bg)]">
       <div className="absolute left-4 top-4">
         <Tooltip>
           <TooltipTrigger className="w-full">

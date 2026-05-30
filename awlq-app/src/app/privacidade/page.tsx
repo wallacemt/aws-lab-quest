@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function PrivacidadePage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12 font-sans text-sm text-[var(--pixel-text)]">
+    <div className="pixel-shell mx-auto max-w-2xl px-4 py-12 font-sans text-sm text-[var(--pixel-text)]">
       <h1 className="mb-6 font-mono text-base uppercase text-[var(--pixel-primary)]">
         Politica de Privacidade
       </h1>
