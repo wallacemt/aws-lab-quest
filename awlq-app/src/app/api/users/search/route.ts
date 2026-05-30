@@ -18,6 +18,12 @@ export async function GET(request: NextRequest) {
   const users = await prisma.user.findMany({
     where: {
       OR: [{ username: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }],
+      // Exclude users who have explicitly opted out of public visibility.
+      // We achieve this by filtering for users whose profile leaderboardVisible is true,
+      // or users who don't have a profile yet (default is visible).
+      NOT: {
+        profile: { leaderboardVisible: false },
+      },
     },
     take,
     orderBy: [{ username: "asc" }],

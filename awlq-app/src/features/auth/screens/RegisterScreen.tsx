@@ -22,6 +22,8 @@ export function RegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   function normalizeUsername(value: string) {
     return value
@@ -54,6 +56,16 @@ export function RegisterScreen() {
 
     if (normalizedUsername && !isValidUsername(normalizedUsername)) {
       setError("Nome de usuario invalido. Use 3-24 caracteres com letras, numeros ou _.");
+      return;
+    }
+
+    if (!ageConfirmed) {
+      setError("Este servico e destinado a maiores de 18 anos.");
+      return;
+    }
+
+    if (!privacyAccepted) {
+      setError("Voce precisa aceitar a Politica de Privacidade para criar uma conta.");
       return;
     }
 
@@ -216,6 +228,38 @@ export function RegisterScreen() {
               </div>
             </label>
 
+            {/* Age confirmation — LGPD Art. 14 */}
+            <label className="flex cursor-pointer items-start gap-3 font-[var(--font-body)] text-sm">
+              <input
+                type="checkbox"
+                required
+                checked={ageConfirmed}
+                onChange={(e) => setAgeConfirmed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] accent-[var(--pixel-primary)]"
+              />
+              <span>
+                Confirmo que tenho{" "}
+                <strong>18 anos ou mais</strong>. Este servico e destinado a maiores de 18 anos.
+              </span>
+            </label>
+
+            {/* Privacy policy acceptance */}
+            <label className="flex cursor-pointer items-start gap-3 font-[var(--font-body)] text-sm">
+              <input
+                type="checkbox"
+                required
+                checked={privacyAccepted}
+                onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] accent-[var(--pixel-primary)]"
+              />
+              <span>
+                Li e aceito a{" "}
+                <Link href="/privacidade" target="_blank" className="font-semibold text-[var(--pixel-primary)] underline">
+                  Politica de Privacidade
+                </Link>
+              </span>
+            </label>
+
             {error && (
               <PixelCard className="border-red-500 bg-red-900/30 py-2">
                 <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>
@@ -228,7 +272,7 @@ export function RegisterScreen() {
               </PixelCard>
             )}
 
-            <PixelButton type="submit" disabled={loading} className="w-full">
+            <PixelButton type="submit" disabled={loading || !ageConfirmed || !privacyAccepted} className="w-full">
               {loading ? "Criando conta..." : "Criar Conta"}
             </PixelButton>
           </form>

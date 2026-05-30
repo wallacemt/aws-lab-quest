@@ -44,10 +44,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (fullHistory) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true },
+      select: {
+        id: true,
+        profile: { select: { leaderboardVisible: true } },
+      },
     });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Owners always see their own history regardless of leaderboard opt-out.
+    // The 403 only applies when a *different* authenticated user requests the
+    // full history of someone who opted out of public visibility.
+    const isOwner = session.user.id === userId;
+    if (!isOwner && user.profile?.leaderboardVisible === false) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const [labHistory, studyHistoryRaw] = await Promise.all([
@@ -57,7 +68,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         select: QUEST_SELECT,
       }),
       prisma.studySessionHistory.findMany({
-        where: { userId },
+        where: { userId, anonymized: false },
         orderBy: { completedAt: "desc" },
         select: STUDY_SELECT,
       }),
@@ -88,12 +99,34 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               avatarUrl: true,
               certification: true,
               favoriteTheme: true,
+              leaderboardVisible: true,
             },
           },
         },
       });
 
       if (!user) return null;
+
+      // User opted out of public visibility — return minimal stub
+      if (user.profile?.leaderboardVisible === false) {
+        return {
+          user: {
+            id: user.id,
+            name: "Usuário Privado",
+            username: null,
+            createdAt: user.createdAt,
+            avatarUrl: null,
+            certification: "",
+            favoriteTheme: "",
+          },
+          stats: { totalXp: 0, labsCompleted: 0 },
+          history: [],
+          studyHistory: [],
+          achievements: { items: [], unlockedCount: 0 },
+          certBadges: [],
+          isPrivate: true,
+        };
+      }
 
       const [labStats, studyStats, history, studyHistory, achievements, certBadges] = await Promise.all([
         prisma.questHistory.aggregate({
@@ -102,7 +135,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           _count: { id: true },
         }),
         prisma.studySessionHistory.aggregate({
-          where: { userId },
+          where: { userId, anonymized: false },
           _sum: { gainedXp: true },
           _count: { id: true },
         }),
@@ -113,7 +146,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           select: QUEST_SELECT,
         }),
         prisma.studySessionHistory.findMany({
-          where: { userId },
+          where: { userId, anonymized: false },
           orderBy: { completedAt: "desc" },
           take: 8,
           select: { id: true, sessionType: true, title: true, certificationCode: true, gainedXp: true, scorePercent: true, correctAnswers: true, totalQuestions: true, completedAt: true },
@@ -138,9 +171,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           name: user.name,
           username: user.username,
           createdAt: user.createdAt,
-          avatarUrl:
-            user.profile?.avatarUrl ??
-            "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
+          avatarUrl: user.profile?.avatarUrl ?? "/default-avatar.png",
           certification: user.profile?.certification ?? "",
           favoriteTheme: user.profile?.favoriteTheme ?? "",
         },

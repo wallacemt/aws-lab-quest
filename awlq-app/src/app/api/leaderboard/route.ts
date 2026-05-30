@@ -57,30 +57,40 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      const topEntries = Array.from(merged.values())
-        .sort((a, b) => b.totalXp - a.totalXp)
-        .slice(0, 10);
+      const sortedEntries = Array.from(merged.values()).sort((a, b) => b.totalXp - a.totalXp);
 
-      // single query instead of N+1 findUnique loop
-      const users = await prisma.user.findMany({
-        where: { id: { in: topEntries.map((e) => e.userId) } },
-        include: { profile: { select: { avatarUrl: true } } },
-      });
+      // Fetch users and their profiles in two queries; filter out opt-out profiles
+      const candidateIds = sortedEntries.map((e) => e.userId);
+
+      const [users, profiles] = await Promise.all([
+        prisma.user.findMany({
+          where: { id: { in: candidateIds } },
+          select: { id: true, name: true, username: true, profile: { select: { avatarUrl: true } } },
+        }),
+        prisma.userProfile.findMany({
+          where: { userId: { in: candidateIds } },
+          select: { userId: true, certification: true, leaderboardVisible: true },
+        }),
+      ]);
+
       const userMap = new Map(users.map((u) => [u.id, u]));
-      const profileReq = await prisma.userProfile.findMany({
-        where: { userId: { in: topEntries.map((e) => e.userId) }}
-      })
+      const profileMap = new Map(profiles.map((p) => [p.userId, p]));
 
+      // Only include users who have leaderboardVisible = true (or no profile yet — defaults to true)
+      const visibleEntries = sortedEntries.filter((e) => {
+        const profile = profileMap.get(e.userId);
+        return profile === undefined || profile.leaderboardVisible;
+      });
 
-      return topEntries.map((entry, index) => {
+      return visibleEntries.slice(0, 10).map((entry, index) => {
         const user = userMap.get(entry.userId);
-        const profileFilter = profileReq.filter((p) => p.userId === entry.userId)
+        const profile = profileMap.get(entry.userId);
         return {
           rank: index + 1,
           userId: entry.userId,
           name: user?.name ?? "Anonimo",
           username: user?.username ?? null,
-          certification: profileFilter[0].certification,
+          certification: profile?.certification ?? "",
           avatarUrl:
             user?.profile?.avatarUrl ??
             "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",

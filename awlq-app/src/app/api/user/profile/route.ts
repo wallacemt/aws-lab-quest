@@ -5,6 +5,7 @@ import { listActiveCertificationPresets } from "@/lib/certification-service";
 import { cacheGetOrSet, cacheDel, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { getProfileValidationError, sanitizeProfileInput } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
+import { getSignedAvatarUrl } from "@/lib/storage-url";
 import { generateUniqueUsername } from "@/lib/username";
 
 async function ensureUserUsername(userId: string): Promise<string> {
@@ -88,12 +89,14 @@ export async function GET(request: NextRequest) {
         select: { name: true, email: true, username: true, role: true },
       });
 
+      // getSignedAvatarUrl returns null on failure (fail-closed). We fall back
+      // to a generic local placeholder so no public storage URL is exposed.
+      const resolvedAvatarUrl = await getSignedAvatarUrl(profile?.avatarUrl) ?? "/default-avatar.png";
+
       return {
         ...profile,
         role: user?.role,
-        avatarUrl:
-          profile?.avatarUrl ??
-          "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
+        avatarUrl: resolvedAvatarUrl,
         user: {
           name: user?.name ?? session.user.name,
           email: user?.email ?? session.user.email,

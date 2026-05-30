@@ -101,3 +101,10 @@ export const emailSendQueue = new Queue<EmailSendJobData, void, string>("email-s
     backoff: { type: "fixed", delay: 5_000 },
   },
 });
+
+export const dataRetentionQueue = new Queue<Record<string, never>, void, string>("data-retention", {
+  connection,
+  defaultJobOptions: {
+    attempts: 1,
+  },
+});

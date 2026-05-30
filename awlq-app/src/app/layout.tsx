@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/stores/providers";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CookieBanner } from "@/components/ui/cookie-banner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -117,6 +118,7 @@ export default function RootLayout({
         <TooltipProvider>
           <Providers>{children}</Providers>
         </TooltipProvider>
+        <CookieBanner />
       </body>
     </html>
   );

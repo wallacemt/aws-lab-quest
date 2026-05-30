@@ -31,6 +31,7 @@ model User {
   lastSeen             DateTime         @default(now())
   emailVerified        Boolean          @default(false)
   image                String?
+  emailNotifications   Boolean          @default(true)
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -113,6 +114,7 @@ model UserProfile {
   avatarUrl             String?
   bgImageUrl            String?
   themePreset           String?              @default("default")
+  leaderboardVisible    Boolean              @default(true)
 }
 
 model CertificationPreset {
@@ -325,12 +327,17 @@ model StudySessionHistory {
   answersSnapshot   Json
   completedAt       DateTime
   createdAt         DateTime      @default(now())
+  // LGPD retention: set to true when session is older than the retention window.
+  // userId is preserved (FK cannot be nulled) but the record is excluded from
+  // any user-facing queries so no PII is exposed post-anonymization.
+  anonymized        Boolean       @default(false)
   packId            String?
   pack              SimuladoPack? @relation(fields: [packId], references: [id], onDelete: SetNull)
 
   @@index([userId, completedAt])
   @@index([sessionType])
   @@index([packId])
+  @@index([anonymized, createdAt])
 }
 
 model QuestionReport {

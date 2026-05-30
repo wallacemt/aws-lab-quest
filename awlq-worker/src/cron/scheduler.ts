@@ -4,6 +4,7 @@ import {
   questionGenerationQueue,
   feedbackAnalysisQueue,
   performanceComputeQueue,
+  dataRetentionQueue,
 } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { config } from "../config.js";
@@ -76,6 +77,17 @@ const DEFAULT_JOBS = [
     cronPattern: "0 2 * * 0",
     payload: { ingestionSourceId: "__cron__", url: "__cron__", certificationCode: "__cron__", force: true },
   },
+  {
+    jobId: "cron-data-retention-daily",
+    name: "Retencao de Dados (Diario)",
+    description: "Anonimiza contas expiradas e historico antigo conforme LGPD",
+    queue: "data-retention",
+    // 03:30 daily — avoids collision with cron-source-fetch-daily (0 3 * * *)
+    // which occupies 03:00, and cron-source-fetch-weekly (0 2 * * 0)
+    // which occupies 02:00 on Sundays.
+    cronPattern: "30 3 * * *",
+    payload: {},
+  },
 ] as const;
 
 function getQueueByName(queue: string): Queue | null {
@@ -84,6 +96,7 @@ function getQueueByName(queue: string): Queue | null {
     case "question-generation": return questionGenerationQueue;
     case "feedback-analysis": return feedbackAnalysisQueue;
     case "performance-compute": return performanceComputeQueue;
+    case "data-retention": return dataRetentionQueue;
     default: return null;
   }
 }
@@ -94,6 +107,7 @@ function getJobNameForQueue(queue: string, jobId: string): string {
     case "feedback-analysis": return "feedback-analysis-daily";
     case "question-generation": return "question-generation-scheduled";
     case "performance-compute": return "performance-compute-hourly";
+    case "data-retention": return "data-retention-daily";
     default: return jobId;
   }
 }

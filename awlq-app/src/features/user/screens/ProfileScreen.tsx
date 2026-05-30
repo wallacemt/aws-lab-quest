@@ -23,6 +23,7 @@ import { CertificationAchievementModal } from "@/features/user/components/Certif
 import { CertBadgeEditModal } from "@/features/user/components/CertBadgeEditModal";
 import { EvolutionTab } from "@/features/user/components/EvolutionTab";
 import { PersonalizationTab } from "@/features/user/components/PersonalizationTab";
+import { PrivacyTab } from "@/features/user/components/PrivacyTab";
 import type { LevelBadge as LevelBadgeModel } from "@prisma/client";
 
 type CertBadge = {
@@ -49,7 +50,7 @@ export function ProfileScreen() {
     setNeedsCertificationReview,
   } = useUserProfile();
 
-  const [activeTab, setActiveTab] = useState<"perfil" | "conquistas" | "evolucao" | "personalizar">("perfil");
+  const [activeTab, setActiveTab] = useState<"perfil" | "conquistas" | "evolucao" | "personalizar" | "privacidade">("perfil");
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -359,13 +360,14 @@ export function ProfileScreen() {
         </PixelCard>
 
         {/* Tab bar */}
-        <div className="flex border-b-2 border-[var(--pixel-border)]">
-          {(["perfil", "conquistas", "evolucao", "personalizar"] as const).map((tab) => {
+        <div className="flex overflow-x-auto border-b-2 border-[var(--pixel-border)]">
+          {(["perfil", "conquistas", "evolucao", "personalizar", "privacidade"] as const).map((tab) => {
             const labels: Record<typeof tab, string> = {
               perfil: "Perfil",
               conquistas: "Conquistas",
               evolucao: "Evolucao",
               personalizar: "Personalizar",
+              privacidade: "Privacidade",
             };
             return (
               <button
@@ -573,6 +575,9 @@ export function ProfileScreen() {
 
         {/* Tab: Personalizar */}
         {activeTab === "personalizar" && <PersonalizationTab />}
+
+        {/* Tab: Privacidade */}
+        {activeTab === "privacidade" && <PrivacyTab />}
 
         <UserProfileModal
           open={editProfileOpen}

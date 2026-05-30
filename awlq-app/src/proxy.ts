@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
   "/apple-icon",
   "/twitter-image",
   "/og-image",
+  "/privacidade"
 ];
 const PUBLIC_EXACT_PATHS = ["/", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest"];
 

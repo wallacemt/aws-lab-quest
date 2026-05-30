@@ -30,6 +30,7 @@ model User {
   lastSeen             DateTime         @default(now())
   emailVerified        Boolean          @default(false)
   image                String?
+  emailNotifications   Boolean          @default(true)
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -111,6 +112,7 @@ model UserProfile {
   avatarUrl             String?
   bgImageUrl            String?
   themePreset           String?              @default("default")
+  leaderboardVisible    Boolean              @default(true)
 }
 
 model CertificationPreset {
@@ -320,9 +322,13 @@ model StudySessionHistory {
   answersSnapshot   Json
   completedAt       DateTime
   createdAt         DateTime         @default(now())
+  // LGPD retention: mirrors the field in awlq-app/prisma/schema.prisma.
+  // Must be kept in sync — both schemas share the same physical DB table.
+  anonymized        Boolean          @default(false)
 
   @@index([userId, completedAt])
   @@index([sessionType])
+  @@index([anonymized, createdAt])
 }
 
 model QuestionReport {

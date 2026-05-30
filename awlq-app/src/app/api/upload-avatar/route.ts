@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { verifyImageMagicBytes } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { getSignedAvatarUrl } from "@/lib/storage-url";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -61,13 +62,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 502 });
   }
 
-  const { data } = supabase.storage.from("aws-lab-quest").getPublicUrl(path);
-
+  // Store the bare storage path so we can generate signed URLs at read time.
+  // TODO: convert bucket to private in the Supabase dashboard after deploy.
   await prisma.userProfile.upsert({
     where: { userId: session.user.id },
-    create: { userId: session.user.id, avatarUrl: data.publicUrl },
-    update: { avatarUrl: data.publicUrl },
+    create: { userId: session.user.id, avatarUrl: path },
+    update: { avatarUrl: path },
   });
 
-  return NextResponse.json({ avatarUrl: data.publicUrl });
+  const signedUrl = await getSignedAvatarUrl(path);
+  // Signed URL is best-effort at upload time; the client will re-fetch it
+  // via /api/user/profile when the page loads. Return the bare path as a
+  // non-sensitive fallback only within this upload response (never public URL).
+  return NextResponse.json({ avatarUrl: signedUrl ?? path });
 }
