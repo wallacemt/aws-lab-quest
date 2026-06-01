@@ -12,7 +12,7 @@ export function DemoVideosSection() {
       {/* Pixel art background */}
       <div
         className="landing-section-bg"
-        style={{ backgroundImage: "url('/backgrounds/px-city-5.png')" }}
+        style={{ backgroundImage: "url('/backgrounds/px-city-3.png')" }}
       />
       {/* Dark overlay */}
       <div className="landing-section-overlay" style={{ background: "rgba(5,10,20,0.86)" }} />
@@ -39,7 +39,7 @@ export function DemoVideosSection() {
             <div key={demo.id} className="space-y-4">
               <div className="flex items-center gap-3">
                 <span
-                  className="font-mono text-3xl font-bold tabular-nums leading-none"
+                  className="font-mono text-3xl font-bold tabular-nums leading-none animate-pulse"
                   style={{ color: "rgba(249,115,22,0.25)" }}
                 >
                   {demo.step}

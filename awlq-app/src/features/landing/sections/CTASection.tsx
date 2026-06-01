@@ -1,7 +1,7 @@
 "use client";
 
+import { GitBranch } from "lucide-react";
 import Link from "next/link";
-import { Github } from "lucide-react";
 
 type Props = {
   authenticated: boolean;
@@ -76,12 +76,12 @@ export function CTASection({ authenticated }: Props) {
         {/* Footer credits */}
         <div className="flex items-center justify-center gap-4 border-t border-white/10 pt-8">
           <a
-            href="https://github.com"
+            href="https://github.com/wallacemt/aws-lab-quest"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 font-mono text-[10px] uppercase text-white/40 hover:text-white/70 transition-colors"
           >
-            <Github size={14} />
+            <GitBranch size={14} />
             GitHub
           </a>
           <span className="text-white/20">·</span>

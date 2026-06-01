@@ -53,7 +53,7 @@ export function FeaturesSection() {
       {/* Pixel art background */}
       <div
         className="landing-section-bg"
-        style={{ backgroundImage: "url('/backgrounds/px-city-6.png')" }}
+        style={{ backgroundImage: "url('/backgrounds/px-city-2.png')" }}
       />
       {/* Dark overlay */}
       <div className="landing-section-overlay" style={{ background: "rgba(8,12,24,0.82)" }} />

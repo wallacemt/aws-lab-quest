@@ -28,11 +28,11 @@ const VALUES = [
 
 export function MissionSection() {
   return (
-    <section className="landing-section landing-section-img relative overflow-hidden border-t-4 border-b-4 border-secondary-foreground">
+    <section className="landing-section landing-section-img relative overflow-hidden  border-secondary-foreground">
       {/* Pixel art background */}
       <div
         className="landing-section-bg"
-        style={{ backgroundImage: "url('/backgrounds/px-city-3.png')" }}
+        style={{ backgroundImage: "url('/backgrounds/px-city-1.png')" }}
       />
       {/* Dark overlay for readability */}
       <div className="landing-section-overlay" />
