@@ -39,8 +39,6 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
 
-      # DATABASE_URL="postgresql://postgres.djitwkagdqgbhanenonk:MQxgePEqvKMsWzal@aws-0-us-west-2.pooler.supabase.com:5432/awlq"
-
       # Better Auth
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL:  ${BETTER_AUTH_URL}

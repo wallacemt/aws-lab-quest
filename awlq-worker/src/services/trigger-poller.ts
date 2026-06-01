@@ -1,6 +1,6 @@
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
-import { questionGenerationQueue, feedbackAnalysisQueue, sourceFetchQueue, emailSendQueue } from "../queues/index.js";
+import { questionGenerationQueue, feedbackAnalysisQueue, sourceFetchQueue, emailSendQueue, behavioralEmailQueue } from "../queues/index.js";
 import { config } from "../config.js";
 
 async function processOneTrigger(): Promise<void> {
@@ -132,6 +132,11 @@ async function processOneTrigger(): Promise<void> {
         } else {
           logger.warn({ triggerId: trigger.id }, "email-send trigger missing templateId payload");
         }
+        break;
+      }
+
+      case "behavioral-email-analysis": {
+        await behavioralEmailQueue.add("manual-behavioral-analysis", { mode: "analyze" }, { priority: 1 });
         break;
       }
 

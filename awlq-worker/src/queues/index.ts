@@ -108,3 +108,15 @@ export const dataRetentionQueue = new Queue<Record<string, never>, void, string>
     attempts: 1,
   },
 });
+
+export type BehavioralEmailJobData =
+  | { mode: "analyze" }
+  | { mode: "send"; userId: string; triggerCode: "churn_risk" | "streak_milestone" | "score_improvement" | "score_slump" };
+
+export const behavioralEmailQueue = new Queue<BehavioralEmailJobData, void, string>("behavioral-email", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+});

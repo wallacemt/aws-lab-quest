@@ -5,6 +5,7 @@ import {
   feedbackAnalysisQueue,
   performanceComputeQueue,
   dataRetentionQueue,
+  behavioralEmailQueue,
 } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { config } from "../config.js";
@@ -88,6 +89,14 @@ const DEFAULT_JOBS = [
     cronPattern: "30 3 * * *",
     payload: {},
   },
+  {
+    jobId: "cron-behavioral-email-daily",
+    name: "Emails Comportamentais (Diario)",
+    description: "Analisa comportamento dos usuarios e agenda emails personalizados",
+    queue: "behavioral-email",
+    cronPattern: "0 23 * * *",
+    payload: { mode: "analyze" },
+  },
 ] as const;
 
 function getQueueByName(queue: string): Queue | null {
@@ -97,6 +106,7 @@ function getQueueByName(queue: string): Queue | null {
     case "feedback-analysis": return feedbackAnalysisQueue;
     case "performance-compute": return performanceComputeQueue;
     case "data-retention": return dataRetentionQueue;
+    case "behavioral-email": return behavioralEmailQueue;
     default: return null;
   }
 }
@@ -108,6 +118,7 @@ function getJobNameForQueue(queue: string, jobId: string): string {
     case "question-generation": return "question-generation-scheduled";
     case "performance-compute": return "performance-compute-hourly";
     case "data-retention": return "data-retention-daily";
+    case "behavioral-email": return "behavioral-email-daily";
     default: return jobId;
   }
 }
