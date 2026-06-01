@@ -48,6 +48,8 @@ model User {
   reviewedQuestionReports QuestionReport[]      @relation("QuestionReportReviewer")
   certBadges              UserCertBadge[]
   simuladoPacks           SimuladoPack[]
+  emailEvents             UserEmailEvent[]
+  behaviorProfile         UserBehaviorProfile?
 
   @@index([accessStatus, active])
   @@map("user")
@@ -691,4 +693,36 @@ model SimuladoPackQuestion {
   @@unique([packId, questionId])
   @@unique([packId, position])
   @@index([questionId])
+}
+
+// ─── Behavioral email models ──────────────────────────────────────────────────
+
+model UserEmailEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  triggerCode String
+  subject     String
+  sentAt      DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([userId, sentAt])
+  @@index([userId, triggerCode, sentAt])
+  @@map("user_email_event")
+}
+
+model UserBehaviorProfile {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avgAccessHour      Int?
+  typicalSessionDays Json?
+  churnRiskScore     Float     @default(0)
+  streakDays         Int       @default(0)
+  lastEmailSentAt    DateTime?
+  lastAnalyzedAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("user_behavior_profile")
 }
