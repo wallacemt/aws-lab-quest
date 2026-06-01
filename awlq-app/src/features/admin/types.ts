@@ -635,3 +635,62 @@ export type SimuladoQueueItem = {
   rejectedCount?: number;
   error?: string;
 };
+
+// ─── Dashboard metrics types ───────────────────────────────────────────────────
+
+export type AdminMetricsQuestions = {
+  total: number;
+  flaggedCount: number;
+  flaggedPercent: number;
+  addedInPeriod: number;
+  byDifficulty: Array<{ difficulty: string; count: number }>;
+  byCertification: Array<{ code: string; name: string; count: number }>;
+  recentlyAdded: Array<{
+    id: string;
+    statement: string;
+    difficulty: string;
+    certCode: string | null;
+    createdAt: string;
+  }>;
+};
+
+export type AdminMetricsUsers = {
+  totalApproved: number;
+  newInPeriod: number;
+  atRiskCount: number;
+  avgSessionDurationSeconds: number;
+  newUsersOverTime: Array<{ date: string; count: number }>;
+  accessStatusBreakdown: Array<{ status: string; count: number }>;
+  topPerformers: Array<{ userId: string; name: string; totalXp: number; sessions: number }>;
+  atRisk: Array<{ userId: string; name: string; email: string; lastSeen: string; daysSilent: number }>;
+};
+
+export type AdminMetricsEngagement = {
+  kcSessions: number;
+  simuladoSessions: number;
+  avgXpPerSession: number;
+  avgDurationSeconds: number;
+  sessionsByTypeOverTime: Array<{ date: string; kc: number; simulado: number }>;
+  mostActiveHours: Array<{ hour: number; count: number }>;
+  xpHistogram: Array<{ bucket: string; count: number }>;
+};
+
+// ─── Behavioral Email types ────────────────────────────────────────────────────
+
+export type BehavioralEmailStatus = {
+  enabled: boolean;
+  stats: {
+    sentThisWeek: number;
+    sentThisMonth: number;
+    lastAnalyzedAt: string | null;
+  };
+  recentEvents: Array<{
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    triggerCode: string;
+    subject: string;
+    sentAt: string;
+  }>;
+};

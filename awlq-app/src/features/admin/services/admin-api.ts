@@ -1,6 +1,10 @@
 import {
   AdminApiError,
   AdminMetricsPayload,
+  AdminMetricsQuestions,
+  AdminMetricsUsers,
+  AdminMetricsEngagement,
+  BehavioralEmailStatus,
   AdminQuestionsListParams,
   AdminQuestionListItem,
   AdminQuestionReportListItem,
@@ -628,6 +632,90 @@ export async function findAdminQuestionDuplicates(certificationCode?: string): P
     throw new Error(data.error ?? "Falha ao buscar duplicatas.");
   }
   return res.json() as Promise<{ groups: DuplicateGroup[]; method: string; total: number }>;
+}
+
+export async function getAdminMetricsQuestions(days = 30): Promise<AdminMetricsQuestions> {
+  const response = await fetch(`/api/admin/metrics/questions?days=${days}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar metricas de questoes.");
+  }
+
+  return (await response.json()) as AdminMetricsQuestions;
+}
+
+export async function getAdminMetricsUsers(days = 30): Promise<AdminMetricsUsers> {
+  const response = await fetch(`/api/admin/metrics/users?days=${days}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar metricas de usuarios.");
+  }
+
+  return (await response.json()) as AdminMetricsUsers;
+}
+
+export async function getAdminMetricsEngagement(days = 30): Promise<AdminMetricsEngagement> {
+  const response = await fetch(`/api/admin/metrics/engagement?days=${days}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar metricas de engajamento.");
+  }
+
+  return (await response.json()) as AdminMetricsEngagement;
+}
+
+export async function getBehavioralEmailStatus(): Promise<BehavioralEmailStatus> {
+  const response = await fetch("/api/admin/behavioral-email", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar status de emails comportamentais.");
+  }
+
+  return (await response.json()) as BehavioralEmailStatus;
+}
+
+export async function toggleBehavioralEmail(enabled: boolean): Promise<void> {
+  const response = await fetch("/api/admin/behavioral-email", {
+    method: "PATCH",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel alterar configuracao de emails automaticos.");
+  }
+}
+
+export async function triggerBehavioralEmailAnalysis(): Promise<void> {
+  const response = await fetch("/api/admin/behavioral-email/trigger", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel acionar analise de emails comportamentais.");
+  }
 }
 
 export async function cancelAdminIngestionJob(jobId: string): Promise<void> {

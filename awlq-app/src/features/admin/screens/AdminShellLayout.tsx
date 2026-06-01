@@ -19,6 +19,40 @@ const ADMIN_MENU = [
   { href: "/admin/config-ia", label: "Config de IA" },
 ];
 
+const BREADCRUMB_MAP: Record<string, string> = {
+  "/admin": "Dashboard",
+  "/admin/upload": "Upload PDF",
+  "/admin/uploads": "Historico Uploads",
+  "/admin/users": "Usuarios",
+  "/admin/email": "Email",
+  "/admin/questions": "Banco de Questoes",
+  "/admin/simulados": "Simulados",
+  "/admin/worker": "Worker / Geracao",
+  "/admin/config-ia": "Config de IA",
+};
+
+function useLiveClock(): string {
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString("pt-BR"));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(new Date().toLocaleTimeString("pt-BR"));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return time;
+}
+
+function resolveBreadcrumb(pathname: string): string {
+  if (BREADCRUMB_MAP[pathname]) return BREADCRUMB_MAP[pathname];
+  // Match prefix for nested routes (e.g. /admin/users/[id])
+  for (const [key, label] of Object.entries(BREADCRUMB_MAP)) {
+    if (key !== "/admin" && pathname.startsWith(key)) return label;
+  }
+  return "Admin";
+}
+
 export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -27,6 +61,8 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { signOut } = useAuth();
   const { setMode } = useAdminModeStore();
+  const clock = useLiveClock();
+  const breadcrumb = resolveBreadcrumb(pathname);
 
   useEffect(() => {
     async function bootstrap() {
@@ -79,16 +115,22 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen  bg-[#0b1220] text-[#e2e8f0]">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#1e293b] bg-[#0f172a]/95 px-4 py-3 backdrop-blur lg:hidden">
-        <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>
-        <button
-          type="button"
-          onClick={() => setMobileMenuOpen(true)}
-          className="border border-[#334155] px-3 py-2 text-xs uppercase"
-          aria-label="Abrir menu lateral"
-          aria-expanded={mobileMenuOpen}
-        >
-          Menu
-        </button>
+        <div className="flex flex-col">
+          <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>
+          <p className="font-mono text-[10px] uppercase text-[#94a3b8]">{breadcrumb}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-xs text-[#94a3b8]">{clock}</span>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="border border-[#334155] px-3 py-2 text-xs uppercase"
+            aria-label="Abrir menu lateral"
+            aria-expanded={mobileMenuOpen}
+          >
+            Menu
+          </button>
+        </div>
       </header>
 
       <div className="mx-auto flex min-h-screen">
@@ -111,7 +153,8 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>
-                <p className="mt-2 text-xs text-[#94a3b8]">Gerencie usuarios, questoes e ingestao de simulados.</p>
+                <p className="mt-1 font-mono text-[10px] uppercase text-[#94a3b8]">{breadcrumb}</p>
+                <p className="mt-1 font-mono text-[10px] text-[#94a3b8]">{clock}</p>
               </div>
               <button
                 type="button"

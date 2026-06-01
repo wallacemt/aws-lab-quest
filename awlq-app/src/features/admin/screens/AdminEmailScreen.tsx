@@ -9,8 +9,11 @@ import {
   listAdminUsers,
   sendAdminEmailTemplate,
   updateAdminEmailTemplate,
+  getBehavioralEmailStatus,
+  toggleBehavioralEmail,
+  triggerBehavioralEmailAnalysis,
 } from "@/features/admin/services/admin-api";
-import { AdminEmailTemplateItem, AdminUserListItem } from "@/features/admin/types";
+import { AdminEmailTemplateItem, AdminUserListItem, BehavioralEmailStatus } from "@/features/admin/types";
 
 type DraftState = {
   code: string;
@@ -43,8 +46,31 @@ function renderPreview(template: string, name: string, appUrl: string): string {
     .replace(/{{\s*reset_url\s*}}/gi, `${appUrl}/reset-password`);
 }
 
+const TRIGGER_LABELS: Record<string, string> = {
+  churn_risk: "Risco de Churn",
+  streak_milestone: "Streak 7 dias",
+  score_improvement: "Melhora de Score",
+  score_slump: "Queda de Score",
+};
+
+function AutomaticosStat({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="border border-[#1e293b] bg-[#111827] p-3">
+      <p className="font-mono text-[10px] uppercase text-[#64748b]">{title}</p>
+      <p className="mt-2 font-mono text-lg uppercase text-[#f97316]">{value}</p>
+    </div>
+  );
+}
+
 export function AdminEmailScreen() {
-  const [activeTab, setActiveTab] = useState<"templates" | "send">("templates");
+  const [activeTab, setActiveTab] = useState<"templates" | "send" | "automaticos">("templates");
+
+  // Behavioral email state
+  const [behavioralStatus, setBehavioralStatus] = useState<BehavioralEmailStatus | null>(null);
+  const [behavioralLoading, setBehavioralLoading] = useState(false);
+  const [behavioralError, setBehavioralError] = useState<string | null>(null);
+  const [triggerLoading, setTriggerLoading] = useState(false);
+  const [triggerMessage, setTriggerMessage] = useState<string | null>(null);
 
   // Template management state
   const [templates, setTemplates] = useState<AdminEmailTemplateItem[]>([]);
@@ -151,6 +177,49 @@ export function AdminEmailScreen() {
     void loadUsers();
     return () => { cancelled = true; };
   }, [targetMode, userSearch]);
+
+  useEffect(() => {
+    if (activeTab !== "automaticos") return;
+    let cancelled = false;
+
+    async function loadBehavioral() {
+      setBehavioralLoading(true);
+      setBehavioralError(null);
+      try {
+        const data = await getBehavioralEmailStatus();
+        if (!cancelled) setBehavioralStatus(data);
+      } catch (err) {
+        if (!cancelled) setBehavioralError(err instanceof Error ? err.message : "Falha ao carregar emails automaticos.");
+      } finally {
+        if (!cancelled) setBehavioralLoading(false);
+      }
+    }
+
+    void loadBehavioral();
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
+  async function handleToggleBehavioral(enabled: boolean) {
+    try {
+      await toggleBehavioralEmail(enabled);
+      setBehavioralStatus((prev) => prev ? { ...prev, enabled } : prev);
+    } catch (err) {
+      setBehavioralError(err instanceof Error ? err.message : "Falha ao alterar configuracao.");
+    }
+  }
+
+  async function handleTriggerAnalysis() {
+    setTriggerLoading(true);
+    setTriggerMessage(null);
+    try {
+      await triggerBehavioralEmailAnalysis();
+      setTriggerMessage("Analise enfileirada. O worker processara em instantes.");
+    } catch (err) {
+      setBehavioralError(err instanceof Error ? err.message : "Falha ao acionar analise.");
+    } finally {
+      setTriggerLoading(false);
+    }
+  }
 
   const selectedTemplate = useMemo(
     () => templates.find((item) => item.id === selectedTemplateId) ?? null,
@@ -292,7 +361,7 @@ export function AdminEmailScreen() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-[#1e293b]">
-        {(["templates", "send"] as const).map((tab) => (
+        {(["templates", "send", "automaticos"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -303,7 +372,7 @@ export function AdminEmailScreen() {
                 : "text-[#94a3b8] hover:text-[#cbd5e1]"
             }`}
           >
-            {tab === "templates" ? "Templates" : "Envio"}
+            {tab === "templates" ? "Templates" : tab === "send" ? "Envio" : "Automaticos"}
           </button>
         ))}
       </div>
@@ -629,6 +698,121 @@ export function AdminEmailScreen() {
             )}
             {sendError && <p className="text-sm text-[#fca5a5]">{sendError}</p>}
           </div>
+        </section>
+      )}
+
+      {/* Tab: Automaticos */}
+      {activeTab === "automaticos" && (
+        <section className="space-y-5">
+          <p className="text-sm text-[#94a3b8]">
+            Emails personalizados gerados por IA e enviados automaticamente com base no comportamento do usuario.
+          </p>
+
+          {behavioralLoading && (
+            <p className="font-mono text-xs uppercase text-[#94a3b8]">Carregando...</p>
+          )}
+
+          {behavioralError && (
+            <p className="text-sm text-[#fca5a5]">{behavioralError}</p>
+          )}
+
+          {!behavioralLoading && behavioralStatus && (
+            <>
+              {/* Toggle card */}
+              <div className="space-y-3 border border-[#1e293b] bg-[#111827] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-xs uppercase text-[#e2e8f0]">Emails Automaticos com IA</p>
+                    <p className="mt-1 text-xs text-[#94a3b8]">
+                      Analisa comportamento e envia emails personalizados para engajar usuarios.
+                    </p>
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs uppercase text-[#94a3b8]">
+                    <input
+                      type="checkbox"
+                      checked={behavioralStatus.enabled}
+                      onChange={(e) => void handleToggleBehavioral(e.target.checked)}
+                      className="h-4 w-4 accent-[#f97316]"
+                    />
+                    {behavioralStatus.enabled ? (
+                      <span className="text-[#86efac]">Ativado</span>
+                    ) : (
+                      <span className="text-[#94a3b8]">Desativado</span>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <AutomaticosStat title="Enviados esta semana" value={String(behavioralStatus.stats.sentThisWeek)} />
+                <AutomaticosStat title="Enviados este mes" value={String(behavioralStatus.stats.sentThisMonth)} />
+                <AutomaticosStat
+                  title="Ultima analise"
+                  value={
+                    behavioralStatus.stats.lastAnalyzedAt
+                      ? behavioralStatus.stats.lastAnalyzedAt.slice(0, 16).replace("T", " ")
+                      : "—"
+                  }
+                />
+              </div>
+
+              {/* Manual trigger */}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleTriggerAnalysis()}
+                  disabled={triggerLoading}
+                  className="border border-[#f97316] px-4 py-2 font-mono text-xs uppercase text-[#f97316] disabled:opacity-40"
+                >
+                  {triggerLoading ? "Enfileirando..." : "Analisar Agora"}
+                </button>
+                {triggerMessage && <p className="text-xs text-[#86efac]">{triggerMessage}</p>}
+              </div>
+
+              {/* Recent events table */}
+              {behavioralStatus.recentEvents.length > 0 && (
+                <div className="border border-[#1e293b] bg-[#111827]">
+                  <div className="border-b border-[#1e293b] bg-[#0f172a] px-4 py-2">
+                    <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Emails recentes enviados</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-[#1e293b] text-[#64748b]">
+                          <th className="px-4 py-2 font-mono uppercase">Usuario</th>
+                          <th className="px-4 py-2 font-mono uppercase">Trigger</th>
+                          <th className="px-4 py-2 font-mono uppercase">Assunto</th>
+                          <th className="px-4 py-2 font-mono uppercase">Enviado em</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {behavioralStatus.recentEvents.map((event) => (
+                          <tr key={event.id} className="border-b border-[#1e293b] text-[#e2e8f0] hover:bg-[#0b1220]">
+                            <td className="px-4 py-2">
+                              <p className="text-[#e2e8f0]">{event.userName}</p>
+                              <p className="text-[10px] text-[#94a3b8]">{event.userEmail}</p>
+                            </td>
+                            <td className="px-4 py-2 font-mono text-[#f97316]">
+                              {TRIGGER_LABELS[event.triggerCode] ?? event.triggerCode}
+                            </td>
+                            <td className="max-w-[240px] truncate px-4 py-2 text-[#94a3b8]">{event.subject}</td>
+                            <td className="px-4 py-2 font-mono text-[#94a3b8]">
+                              {event.sentAt.slice(0, 16).replace("T", " ")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {behavioralStatus.recentEvents.length === 0 && (
+                <p className="text-xs text-[#94a3b8]">Nenhum email automatico enviado ainda.</p>
+              )}
+            </>
+          )}
         </section>
       )}
     </main>
