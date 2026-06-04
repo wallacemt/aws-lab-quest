@@ -36,7 +36,7 @@ export async function computeMentorRecommendations(userId: string): Promise<void
   const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
   // ── Load all data sources in parallel ──────────────────────────────────────
-  const [weakAreasByCode, falseBeliefs, dueCardsByServiceId] = await Promise.all([
+  const [weakAreasByCode, falseBeliefs, dueCardsByServiceId, userProfile] = await Promise.all([
     fetchUserWeakAreasByServiceCode(userId, twoWeeksAgo),
     prisma.falseBeliefSignal.findMany({
       where: { userId },
@@ -44,6 +44,13 @@ export async function computeMentorRecommendations(userId: string): Promise<void
       take: 20,
     }),
     fetchDueFlashcardCountsByServiceId(userId),
+    prisma.userProfile.findUnique({
+      where: { userId },
+      select: {
+        certificationPresetId: true,
+        certificationPreset: { select: { code: true, name: true } },
+      },
+    }),
   ]);
 
   // Resolve service id → code for false-belief and flashcard data
@@ -102,6 +109,20 @@ export async function computeMentorRecommendations(userId: string): Promise<void
       title: `Reforçar ${serviceCode.toUpperCase()} com KC`,
       rationale: `Você marcou ${fb.falseBeliefCount} resposta(s) errada(s) com alta confiança em ${serviceCode.toUpperCase()}`,
       priorityScore: score,
+    });
+  }
+
+  // ── Target certification recommendation ────────────────────────────────────
+  // Priority 40: lower than weak areas and false beliefs (which can reach 80–100),
+  // so it only surfaces when there are fewer than 5 higher-urgency items.
+  if (userProfile?.certificationPreset) {
+    const cert = userProfile.certificationPreset;
+    candidates.push({
+      actionType: "kc",
+      targetRef: cert.code,
+      title: `Pratique questões de ${cert.name}`,
+      rationale: `Certificação alvo: ${cert.name}. Pratique questões específicas para manter o foco.`,
+      priorityScore: 40,
     });
   }
 
