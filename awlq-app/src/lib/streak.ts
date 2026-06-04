@@ -65,9 +65,11 @@ export async function recordStudyActivity(
   const now = new Date();
 
   // Upsert-safe: get-or-create the profile, then update atomically.
+  // Cold-start: omit lastStreakDate so the record falls through to the increment
+  // path below, which correctly returns incrementedToday: true on first ever activity.
   const profile = await prisma.userBehaviorProfile.upsert({
     where: { userId },
-    create: { userId, streakDays: 1, lastStreakDate: now },
+    create: { userId, streakDays: 0, lastStreakDate: null },
     update: {},
     select: { streakDays: true, lastStreakDate: true },
   });
