@@ -24,6 +24,7 @@ import {
   StudyServiceItem,
   WeakServiceItem,
 } from "@/features/study/services";
+import { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
 import { useProgressNotifications } from "@/features/study/components/notifications/useProgressNotifications";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
@@ -78,6 +79,10 @@ export function KCScreen() {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
+
+  // Per-question confidence captured via ConfidenceSelector (RF-09, ADR-05).
+  // Keys are question IDs; values are the confidence selected after submission.
+  const [confidenceByQuestion, setConfidenceByQuestion] = useState<Record<string, AnswerConfidence>>({});
 
   // Gaps state
   const [weakServices, setWeakServices] = useState<WeakServiceItem[]>([]);
@@ -278,11 +283,17 @@ export function KCScreen() {
     setFlowError(null);
   }
 
+  function handleConfidenceSelect(confidence: AnswerConfidence) {
+    if (!currentQuestion) return;
+    setConfidenceByQuestion((prev) => ({ ...prev, [currentQuestion.id]: confidence }));
+  }
+
   function restartKC() {
     setQuestions([]);
     setAnswers({});
     setCurrentIndex(0);
     setExplanationByQuestion({});
+    setConfidenceByQuestion({});
     setSubmittedCurrent(false);
     setFlowError(null);
     setReportMessage(null);
@@ -332,6 +343,9 @@ export function KCScreen() {
             optionMapping: q.optionMapping,
             explanationSummary: explanationByQuestion[q.id]?.summary,
             explanations: mergedExplanations,
+            // Confidence captured via ConfidenceSelector (RF-09, ADR-05).
+            // Written to the snapshot so feedback-analysis.worker can derive FalseBeliefSignal.
+            confidence: confidenceByQuestion[q.id] ?? null,
           };
         }),
       });
@@ -510,6 +524,7 @@ export function KCScreen() {
             reportMessage={reportMessage}
             reportModalOpen={reportModalOpen}
             reportSubmitting={reportSubmitting}
+            currentConfidence={currentQuestion ? confidenceByQuestion[currentQuestion.id] : undefined}
             onAnswerChange={(id, value) => setAnswers((prev) => ({ ...prev, [id]: value }))}
             onSubmitAnswer={() => void submitCurrentAnswer()}
             onNextQuestion={goToNextQuestion}
@@ -518,6 +533,7 @@ export function KCScreen() {
             onOpenReport={() => setReportModalOpen(true)}
             onCloseReport={() => setReportModalOpen(false)}
             onSubmitReport={(input) => submitQuestionReport(input)}
+            onConfidenceSelect={handleConfidenceSelect}
           />
         )}
       </main>
