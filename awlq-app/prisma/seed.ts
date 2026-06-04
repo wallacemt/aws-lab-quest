@@ -17,6 +17,10 @@ const DEFAULT_XP_WEIGHTS = [
   { activityType: "KC", topic: "EC2", difficulty: "*", multiplier: 1.4, bonusXp: 20 },
   { activityType: "KC", topic: "IAM", difficulty: "*", multiplier: 1.15, bonusXp: 10 },
   { activityType: "KC", topic: "VPC", difficulty: "*", multiplier: 1.25, bonusXp: 15 },
+  // Phase 1: Retention spine activity types
+  { activityType: "flashcard",     topic: "*", difficulty: "*", multiplier: 0.5, bonusXp: 5 },
+  { activityType: "sprint",        topic: "*", difficulty: "*", multiplier: 1.0, bonusXp: 10 },
+  { activityType: "daily_review",  topic: "*", difficulty: "*", multiplier: 0.8, bonusXp: 15 },
 ] as const;
 
 async function generateBadgeImage(prompt: string): Promise<{ data: Buffer; mimeType: string }> {
