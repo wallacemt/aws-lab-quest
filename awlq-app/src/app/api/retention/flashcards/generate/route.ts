@@ -1,0 +1,40 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+type PostBody = {
+  scope?: "session";
+  sessionId?: string;
+};
+
+/**
+ * POST /api/retention/flashcards/generate
+ * Enqueues a flashcard generation job for the current user via WorkerTrigger.
+ */
+export async function POST(request: NextRequest) {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: PostBody = {};
+  try {
+    body = (await request.json()) as PostBody;
+  } catch {
+    // Body is optional — proceed with defaults.
+  }
+
+  const trigger = await prisma.workerTrigger.create({
+    data: {
+      action: "generate-flashcards",
+      source: "manual",
+      payload: {
+        userId: session.user.id,
+        sinceSessionId: body.scope === "session" ? (body.sessionId ?? undefined) : undefined,
+      },
+    },
+    select: { id: true },
+  });
+
+  return NextResponse.json({ enqueued: true, jobId: trigger.id });
+}
