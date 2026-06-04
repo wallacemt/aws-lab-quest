@@ -51,6 +51,8 @@ model User {
   emailEvents             UserEmailEvent[]
   behaviorProfile         UserBehaviorProfile?
   flashcards              Flashcard[]
+  mentorRecommendations   MentorRecommendation[]
+  questChainProgress      QuestChainProgress[]
 
   @@index([accessStatus, active])
   @@map("user")
@@ -809,4 +811,63 @@ model FalseBeliefSignal {
 
   @@unique([userId, awsServiceId, topic])
   @@index([userId, computedAt])
+}
+
+// ─── Phase 2: Mentor + Quest Chains ──────────────────────────────────────────
+
+model MentorRecommendation {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rank          Int
+  // "review_service" | "flashcards" | "sprint" | "kc" | "library"
+  actionType    String
+  // serviceCode / topic / chainId / contentId
+  targetRef     String?
+  title         String
+  rationale     String
+  priorityScore Float
+  generatedAt   DateTime @default(now())
+
+  @@index([userId, generatedAt])
+}
+
+model QuestChain {
+  id                    String            @id @default(cuid())
+  certificationPresetId String?
+  name                  String
+  description           String?
+  displayOrder          Int               @default(0)
+  active                Boolean           @default(true)
+  stages                QuestChainStage[]
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+}
+
+model QuestChainStage {
+  id           String               @id @default(cuid())
+  chainId      String
+  chain        QuestChain           @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  position     Int
+  awsServiceId String?
+  topic        String?
+  title        String
+  // e.g. { minScorePercent: 70, sessionType: "KC" }
+  unlockRule   Json?
+  progress     QuestChainProgress[]
+
+  @@unique([chainId, position])
+}
+
+model QuestChainProgress {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stageId     String
+  stage       QuestChainStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  completed   Boolean         @default(false)
+  completedAt DateTime?
+
+  @@unique([userId, stageId])
+  @@index([userId, completed])
 }
