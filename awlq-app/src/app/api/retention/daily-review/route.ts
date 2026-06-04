@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { recordStudyActivity } from "@/lib/streak";
 
 const DUE_FLASHCARDS_LIMIT = 10;
 const RECENT_WRONG_LIMIT = 5;
@@ -118,9 +117,6 @@ export async function GET(request: NextRequest) {
     });
     if (weakServices.length >= WEAK_SERVICES_LIMIT) break;
   }
-
-  // Record daily_review streak activity (1 = threshold met)
-  void recordStudyActivity(userId, "daily_review", 1);
 
   return NextResponse.json({
     dueFlashcards,

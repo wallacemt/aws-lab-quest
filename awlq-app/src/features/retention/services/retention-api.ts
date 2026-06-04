@@ -120,3 +120,14 @@ export async function submitSprint(
 export async function fetchMemoryRecovery(): Promise<{ items: MemoryRecoveryItem[] }> {
   return apiFetch("/api/retention/memory-recovery");
 }
+
+/**
+ * Signals to the server that the user completed their daily review session.
+ * Triggers streak increment (idempotent per day). (DEF-004 fix)
+ */
+export async function completeDailyReview(): Promise<{
+  streakDays: number;
+  incrementedToday: boolean;
+}> {
+  return apiFetch("/api/retention/daily-review/complete", { method: "POST" });
+}
