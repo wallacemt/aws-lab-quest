@@ -50,6 +50,7 @@ model User {
   simuladoPacks           SimuladoPack[]
   emailEvents             UserEmailEvent[]
   behaviorProfile         UserBehaviorProfile?
+  flashcards              Flashcard[]
 
   @@index([accessStatus, active])
   @@map("user")
@@ -117,6 +118,7 @@ model UserProfile {
   bgImageUrl            String?
   themePreset           String?              @default("default")
   leaderboardVisible    Boolean              @default(true)
+  targetExamDate        DateTime?
 }
 
 model CertificationPreset {
@@ -255,6 +257,7 @@ model StudyQuestion {
   questionReports       QuestionReport[]
   performance           QuestionPerformance?
   packQuestions         SimuladoPackQuestion[]
+  flashcards            Flashcard[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 
@@ -719,10 +722,91 @@ model UserBehaviorProfile {
   typicalSessionDays Json?
   churnRiskScore     Float     @default(0)
   streakDays         Int       @default(0)
+  lastStreakDate     DateTime?
+  dailyFlashcardCap  Int       @default(30)
   lastEmailSentAt    DateTime?
   lastAnalyzedAt     DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
   @@map("user_behavior_profile")
+}
+
+// ─── Phase 1: Retention spine ─────────────────────────────────────────────────
+
+enum FlashcardSource {
+  WRONG_ANSWER
+  REVIEW_FLAG
+  SLOW_ANSWER
+  AI_EXPLANATION
+  MEMORY_RECOVERY
+}
+
+enum FlashcardGrade {
+  VERY_HARD
+  HARD
+  GOOD
+  EASY
+}
+
+enum AnswerConfidence {
+  high
+  medium
+  low
+}
+
+model Flashcard {
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceQuestionId String?
+  sourceQuestion   StudyQuestion?  @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
+  awsServiceId     String?
+  topic            String?
+  front            String
+  back             String
+  hint             String?
+  source           FlashcardSource
+  // SM-2 scheduling state
+  easeFactor       Float           @default(2.5)
+  intervalDays     Int             @default(0)
+  repetitions      Int             @default(0)
+  dueAt            DateTime        @default(now())
+  lastReviewedAt   DateTime?
+  suspended        Boolean         @default(false)
+  reviews          FlashcardReview[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([userId, dueAt])
+  @@index([userId, suspended, dueAt])
+  @@index([sourceQuestionId])
+  @@unique([userId, sourceQuestionId, source])
+}
+
+model FlashcardReview {
+  id           String         @id @default(cuid())
+  flashcardId  String
+  flashcard    Flashcard      @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  grade        FlashcardGrade
+  prevInterval Int
+  newInterval  Int
+  reviewedAt   DateTime       @default(now())
+
+  @@index([flashcardId, reviewedAt])
+}
+
+model FalseBeliefSignal {
+  id               String   @id @default(cuid())
+  userId           String
+  awsServiceId     String?
+  topic            String?
+  falseBeliefCount Int      @default(0)
+  knownGapCount    Int      @default(0)
+  masteryCount     Int      @default(0)
+  windowDays       Int      @default(30)
+  computedAt       DateTime @default(now())
+
+  @@unique([userId, awsServiceId, topic])
+  @@index([userId, computedAt])
 }
