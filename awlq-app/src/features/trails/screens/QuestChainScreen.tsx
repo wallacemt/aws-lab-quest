@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { QuestChainMap } from "@/features/trails/components/QuestChainMap";
-import { fetchTrails, type QuestChain } from "@/features/trails/services/trails-api";
+import { fetchTrails, type QuestChain, type QuestStage } from "@/features/trails/services/trails-api";
 
 /**
  * Lists all active Quest Chains with per-chain progress and an expandable
@@ -16,6 +16,36 @@ export function QuestChainScreen() {
   const [error, setError] = useState<string | null>(null);
   const [expandedChainId, setExpandedChainId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<string | null>(null);
+
+  /**
+   * Optimistic update after completeStage POST succeeds.
+   *
+   * Marks the completed stage as done and, if the server reported an
+   * unlockedNext id, flips that stage's unlocked flag to true — so the UI
+   * responds immediately without a full refetch.
+   */
+  const handleStageCompleted = useCallback(
+    (chainId: string, stageId: string, unlockedNextId: string | undefined) => {
+      setChains((prev) =>
+        prev.map((chain) => {
+          if (chain.id !== chainId) return chain;
+
+          const updatedStages: QuestStage[] = chain.stages.map((stage) => {
+            if (stage.id === stageId) {
+              return { ...stage, completed: true, completedAt: new Date().toISOString() };
+            }
+            if (unlockedNextId && stage.id === unlockedNextId) {
+              return { ...stage, unlocked: true };
+            }
+            return stage;
+          });
+
+          return { ...chain, stages: updatedStages };
+        }),
+      );
+    },
+    [],
+  );
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -122,6 +152,9 @@ export function QuestChainScreen() {
                     chain={chain}
                     tooltip={tooltip}
                     onShowTooltip={setTooltip}
+                    onStageCompleted={(stageId, unlockedNextId) =>
+                      handleStageCompleted(chain.id, stageId, unlockedNextId)
+                    }
                   />
                 </div>
               )}
