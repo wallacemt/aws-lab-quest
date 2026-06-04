@@ -8,6 +8,7 @@ import {
   behavioralEmailQueue,
   flashcardGenerationQueue,
   kcGenerationQueue,
+  mentorComputeQueue,
 } from "../queues/index.js";
 import { config } from "../config.js";
 
@@ -184,6 +185,16 @@ async function processOneTrigger(): Promise<void> {
           );
         } else {
           logger.warn({ triggerId: trigger.id }, "generate-kc trigger missing requestId or userId");
+        }
+        break;
+      }
+
+      case "compute-mentor": {
+        const payload = trigger.payload as { userId?: string } | null;
+        if (payload?.userId) {
+          await mentorComputeQueue.add(`mentor-${payload.userId}`, { userId: payload.userId });
+        } else {
+          logger.warn({ triggerId: trigger.id }, "compute-mentor trigger missing userId payload");
         }
         break;
       }

@@ -12,6 +12,7 @@ import { createDataRetentionWorker } from "./workers/data-retention.worker.js";
 import { createBehavioralEmailWorker } from "./workers/behavioral-email.worker.js";
 import { createFlashcardGenerationWorker } from "./workers/flashcard-generation.worker.js";
 import { createKcGenerationWorker } from "./workers/kc-generation.worker.js";
+import { createMentorComputeWorker } from "./workers/mentor-compute.worker.js";
 import { registerCronJobs, expandCronJob, syncCronJobs } from "./cron/scheduler.js";
 import { startTriggerPoller } from "./services/trigger-poller.js";
 import { prisma } from "./prisma.js";
@@ -42,6 +43,7 @@ async function main() {
     createBehavioralEmailWorker(),
     createFlashcardGenerationWorker(),
     createKcGenerationWorker(),
+    createMentorComputeWorker(),
   ];
 
   for (const worker of workers) {

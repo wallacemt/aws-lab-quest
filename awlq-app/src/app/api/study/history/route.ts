@@ -202,6 +202,15 @@ export async function POST(request: NextRequest) {
         payload: { userId: session.user.id, sinceSessionId: item.id },
       },
     }),
+    // Enqueue mentor recompute so recommendations are fresh after each session.
+    // Fire-and-forget via WorkerTrigger — never blocks the response.
+    prisma.workerTrigger.create({
+      data: {
+        action: "compute-mentor",
+        source: "session_save",
+        payload: { userId: session.user.id },
+      },
+    }),
     // Record streak for questions activity.
     recordStudyActivity(session.user.id, "questions", item.totalQuestions),
   ]);

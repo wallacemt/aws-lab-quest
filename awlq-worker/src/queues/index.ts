@@ -154,3 +154,15 @@ export const kcGenerationQueue = new Queue<KcGenerationJobData, void, string>("k
     backoff: { type: "fixed", delay: 10_000 },
   },
 });
+
+// ─── Phase 2: Mentor compute queue ───────────────────────────────────────────
+
+export type MentorComputeJobData = { userId: string };
+
+export const mentorComputeQueue = new Queue<MentorComputeJobData, void, string>("mentor-compute", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});
