@@ -120,3 +120,37 @@ export const behavioralEmailQueue = new Queue<BehavioralEmailJobData, void, stri
     backoff: { type: "fixed", delay: 10_000 },
   },
 });
+
+// ─── Phase 1: Retention queues ────────────────────────────────────────────────
+
+export type FlashcardGenerationJobData = {
+  userId: string;
+  sinceSessionId?: string;
+};
+
+export const flashcardGenerationQueue = new Queue<FlashcardGenerationJobData, void, string>("flashcard-generation", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});
+
+// ─── Phase 1.5: KC generation queue ──────────────────────────────────────────
+
+export type KcGenerationJobData = {
+  requestId: string;
+  userId: string;
+  serviceCode?: string;
+  topic?: string;
+  difficulty: "easy" | "medium" | "hard" | "nightmare";
+  count: number;
+};
+
+export const kcGenerationQueue = new Queue<KcGenerationJobData, void, string>("kc-generation", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+});

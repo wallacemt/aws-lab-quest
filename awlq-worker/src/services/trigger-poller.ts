@@ -1,6 +1,14 @@
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
-import { questionGenerationQueue, feedbackAnalysisQueue, sourceFetchQueue, emailSendQueue, behavioralEmailQueue } from "../queues/index.js";
+import {
+  questionGenerationQueue,
+  feedbackAnalysisQueue,
+  sourceFetchQueue,
+  emailSendQueue,
+  behavioralEmailQueue,
+  flashcardGenerationQueue,
+  kcGenerationQueue,
+} from "../queues/index.js";
 import { config } from "../config.js";
 
 async function processOneTrigger(): Promise<void> {
@@ -137,6 +145,46 @@ async function processOneTrigger(): Promise<void> {
 
       case "behavioral-email-analysis": {
         await behavioralEmailQueue.add("manual-behavioral-analysis", { mode: "analyze" }, { priority: 1 });
+        break;
+      }
+
+      case "generate-flashcards": {
+        const payload = trigger.payload as { userId?: string; sinceSessionId?: string } | null;
+        if (payload?.userId) {
+          await flashcardGenerationQueue.add(
+            `flashcards-${payload.userId}`,
+            { userId: payload.userId, sinceSessionId: payload.sinceSessionId },
+          );
+        } else {
+          logger.warn({ triggerId: trigger.id }, "generate-flashcards trigger missing userId payload");
+        }
+        break;
+      }
+
+      case "generate-kc": {
+        const payload = trigger.payload as {
+          requestId?: string;
+          userId?: string;
+          serviceCode?: string;
+          topic?: string;
+          difficulty?: string;
+          count?: number;
+        } | null;
+        if (payload?.requestId && payload.userId) {
+          await kcGenerationQueue.add(
+            `kc-${payload.requestId}`,
+            {
+              requestId: payload.requestId,
+              userId: payload.userId,
+              serviceCode: payload.serviceCode,
+              topic: payload.topic,
+              difficulty: (payload.difficulty ?? "medium") as "easy" | "medium" | "hard" | "nightmare",
+              count: payload.count ?? 10,
+            },
+          );
+        } else {
+          logger.warn({ triggerId: trigger.id }, "generate-kc trigger missing requestId or userId");
+        }
         break;
       }
 
