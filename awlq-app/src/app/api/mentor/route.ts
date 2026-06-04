@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Fetch all recommendations from that same generation run (same generatedAt second)
-  const recommendations = await prisma.mentorRecommendation.findMany({
+  const rawRecommendations = await prisma.mentorRecommendation.findMany({
     where: {
       userId: session.user.id,
       generatedAt: latest.generatedAt,
@@ -45,6 +45,18 @@ export async function GET(request: NextRequest) {
       priorityScore: true,
       generatedAt: true,
     },
+  });
+
+  // For "library" recommendations, rewrite targetRef to a pre-filtered
+  // biblioteca URL so the client link lands on the correct service view.
+  const recommendations = rawRecommendations.map((rec) => {
+    if (rec.actionType === "library" && rec.targetRef) {
+      return {
+        ...rec,
+        targetRef: `/biblioteca?serviceCode=${encodeURIComponent(rec.targetRef)}`,
+      };
+    }
+    return rec;
   });
 
   return NextResponse.json({ recommendations, generatedAt: latest.generatedAt });

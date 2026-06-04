@@ -813,6 +813,42 @@ model FalseBeliefSignal {
   @@index([userId, computedAt])
 }
 
+// ─── Phase 3: Instructor Content Library ─────────────────────────────────────
+
+enum LibraryContentType {
+  PDF
+  IMAGE
+  MARKDOWN
+  SLIDES
+}
+
+model LibraryContent {
+  id                    String             @id @default(cuid())
+  type                  LibraryContentType
+  title                 String
+  description           String?
+  // Practitioner | SAA | Developer | SysOps | Security | Networking | Database | Serverless
+  category              String
+  certificationPresetId String?
+  awsServiceId          String?
+  questChainId          String?
+  storageBucket         String?
+  storagePath           String?
+  bodyMarkdown          String?            @db.Text
+  authorName            String
+  authorUrl             String?
+  authorContact         String?
+  published             Boolean            @default(false)
+  accessCount           Int                @default(0)
+  createdByUserId       String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([published, category])
+  @@index([awsServiceId, published])
+  @@index([questChainId, published])
+}
+
 // ─── Phase 2: Mentor + Quest Chains ──────────────────────────────────────────
 
 model MentorRecommendation {
