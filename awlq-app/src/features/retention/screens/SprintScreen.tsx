@@ -105,13 +105,13 @@ export function SprintScreen() {
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-6">
       <SprintRunner
+        key={currentQuestion.id}
         question={currentQuestion}
         currentIndex={currentIndex}
         totalQuestions={data.questions.length}
         limitSeconds={data.limitSeconds}
         onAnswer={recordAnswer}
         isSubmitting={isSubmitting}
-        result={result}
       />
     </div>
   );

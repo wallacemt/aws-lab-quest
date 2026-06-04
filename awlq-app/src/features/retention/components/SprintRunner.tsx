@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
-import { SprintQuestion, SprintResult } from "@/features/retention/services/retention-api";
+import { SprintQuestion } from "@/features/retention/services/retention-api";
 
 type Props = {
   question: SprintQuestion;
@@ -12,7 +12,6 @@ type Props = {
   limitSeconds: number | null;
   onAnswer: (questionId: string, correct: boolean) => void;
   isSubmitting: boolean;
-  result: SprintResult | null;
 };
 
 const OPTION_KEYS = ["A", "B", "C", "D", "E"] as const;
@@ -29,23 +28,17 @@ export function SprintRunner({
   limitSeconds,
   onAnswer,
   isSubmitting,
-  result,
 }: Props) {
+  // Key the entire component on question.id so React unmounts/remounts on question change.
+  // This avoids setState-in-effect for the reset pattern.
   const [selected, setSelected] = useState<OptionKey | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(limitSeconds ?? 0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Reset state when question changes.
-  useEffect(() => {
-    setSelected(null);
-    setSubmitted(false);
-  }, [question.id]);
-
-  // Countdown timer for timed modes.
+  // Countdown timer for timed modes — only runs once per component mount (keyed by question.id).
   useEffect(() => {
     if (!limitSeconds) return;
-    setTimeLeft(limitSeconds);
 
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -60,7 +53,8 @@ export function SprintRunner({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [limitSeconds, question.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleSelect(option: OptionKey) {
     if (submitted) return;

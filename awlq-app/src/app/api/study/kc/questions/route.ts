@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, StudyQuestionDifficulty, StudyQuestionUsage } from "@prisma/client";
 import { auth } from "@/lib/auth";
@@ -457,45 +457,56 @@ export async function POST(request: NextRequest) {
   });
 
   let questionPool = questions;
+  let generationRequestId: string | null = null;
   let aiFallbackMeta: { generated: number; saved: number; error?: string } | null = null;
 
-  if (questionPool.length < count) {
-    aiFallbackMeta = await generateAndPersistFallbackQuestions({
-      certificationPresetId: profile.certificationPresetId,
-      certificationCode: profile.certificationPreset.code,
-      certificationName: profile.certificationPreset.name,
-      topicCodes: topics,
-      difficulty,
-      neededCount: count - questionPool.length,
-    });
+  const gap = count - questionPool.length;
 
-    questionPool = await prisma.studyQuestion.findMany({
-      where: baseWhere,
-      include: {
-        certificationPreset: { select: { code: true } },
-        awsService: { select: { code: true, name: true } },
-        questionOptions: {
-          select: {
-            order: true,
-            content: true,
-            isCorrect: true,
-            explanation: true,
+  if (gap > 0) {
+    if (gap <= 2) {
+      // Small gap (≤2): inline generation is fast enough; keep existing path.
+      aiFallbackMeta = await generateAndPersistFallbackQuestions({
+        certificationPresetId: profile.certificationPresetId,
+        certificationCode: profile.certificationPreset.code,
+        certificationName: profile.certificationPreset.name,
+        topicCodes: topics,
+        difficulty,
+        neededCount: gap,
+      });
+
+      questionPool = await prisma.studyQuestion.findMany({
+        where: baseWhere,
+        include: {
+          certificationPreset: { select: { code: true } },
+          awsService: { select: { code: true, name: true } },
+          questionOptions: {
+            select: { order: true, content: true, isCorrect: true, explanation: true },
+            orderBy: { order: "asc" },
           },
-          orderBy: { order: "asc" },
+          questionAwsServices: { select: { service: { select: { code: true, name: true } } } },
         },
-        questionAwsServices: {
-          select: {
-            service: {
-              select: {
-                code: true,
-                name: true,
-              },
-            },
+        take: 200,
+      });
+    } else {
+      // Large gap (>2): enqueue background generation via WorkerTrigger (ADR-03, CA-08).
+      // Return existing questions immediately; client polls generate-status to backfill.
+      generationRequestId = randomBytes(16).toString("hex");
+
+      await prisma.workerTrigger.create({
+        data: {
+          action: "generate-kc",
+          source: "kc_gap_fill",
+          payload: {
+            requestId: generationRequestId,
+            userId: session.user.id,
+            serviceCode: topics[0] ?? null,
+            topic: topics[0] ? null : "AWS General",
+            difficulty,
+            count: gap,
           },
         },
-      },
-      take: 200,
-    });
+      });
+    }
   }
 
   if (questionPool.length === 0) {
@@ -503,22 +514,17 @@ export async function POST(request: NextRequest) {
       {
         error:
           aiFallbackMeta?.error ??
-          "Nenhuma questao encontrada para os filtros selecionados e nao foi possivel gerar questoes com IA.",
+          "Nenhuma questao encontrada. Geracao em andamento — tente novamente em instantes.",
+        generationRequestId,
       },
       { status: 404 },
     );
   }
 
-  if (questionPool.length < count) {
-    return NextResponse.json(
-      {
-        error: `Banco de questoes insuficiente para os filtros selecionados. Disponivel apos IA: ${questionPool.length}, necessario: ${count}.`,
-        aiFallback: aiFallbackMeta,
-      },
-      { status: 422 },
-    );
-  }
-
-  const selected = pickRandomItems(questionPool, count).map(mapDbQuestionToStudyQuestion);
-  return NextResponse.json({ questions: selected });
+  const selected = pickRandomItems(questionPool, Math.min(count, questionPool.length)).map(mapDbQuestionToStudyQuestion);
+  return NextResponse.json({
+    questions: selected,
+    generationRequestId, // non-null when background generation was enqueued
+    aiFallback: aiFallbackMeta,
+  });
 }
