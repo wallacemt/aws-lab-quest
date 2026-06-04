@@ -48,9 +48,24 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     data.unlockRule = body.unlockRule === null ? Prisma.JsonNull : (body.unlockRule as Prisma.InputJsonValue);
   }
 
-  const stage = await prisma.questChainStage.update({ where: { id: stageId }, data });
-
-  return NextResponse.json({ stage });
+  try {
+    const stage = await prisma.questChainStage.update({ where: { id: stageId }, data });
+    return NextResponse.json({ stage });
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "Já existe um stage nessa posição nesta trilha." },
+        { status: 409 },
+      );
+    }
+    console.error("PUT /api/admin/trails/[chainId]/stages/[stageId] error:", error);
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: NextRequest, context: RouteContext) {

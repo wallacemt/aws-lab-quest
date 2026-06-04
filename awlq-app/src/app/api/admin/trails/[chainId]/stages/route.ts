@@ -60,16 +60,32 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Chain not found" }, { status: 404 });
   }
 
-  const stage = await prisma.questChainStage.create({
-    data: {
-      chainId,
-      title: body.title.trim(),
-      position: body.position,
-      awsServiceId: body.awsServiceId ?? null,
-      topic: body.topic?.trim() ?? null,
-      unlockRule: body.unlockRule != null ? (body.unlockRule as Prisma.InputJsonValue) : Prisma.JsonNull,
-    },
-  });
+  try {
+    const stage = await prisma.questChainStage.create({
+      data: {
+        chainId,
+        title: body.title.trim(),
+        position: body.position,
+        awsServiceId: body.awsServiceId ?? null,
+        topic: body.topic?.trim() ?? null,
+        unlockRule: body.unlockRule != null ? (body.unlockRule as Prisma.InputJsonValue) : Prisma.JsonNull,
+      },
+    });
 
-  return NextResponse.json({ stage }, { status: 201 });
+    return NextResponse.json({ stage }, { status: 201 });
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "Já existe um stage nessa posição nesta trilha." },
+        { status: 409 },
+      );
+    }
+    console.error("POST /api/admin/trails/[chainId]/stages error:", error);
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+  }
 }
