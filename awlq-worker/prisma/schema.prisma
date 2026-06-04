@@ -116,6 +116,8 @@ model UserProfile {
   bgImageUrl            String?
   themePreset           String?              @default("default")
   leaderboardVisible    Boolean              @default(true)
+  // Added to mirror awlq-app schema (DEF-008, RNF-08): used by SM-2 interval compression.
+  targetExamDate        DateTime?
 }
 
 model CertificationPreset {
