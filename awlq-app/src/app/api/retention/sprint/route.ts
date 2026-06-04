@@ -109,10 +109,7 @@ export async function POST(request: NextRequest) {
   const scorePercent = Math.round((correctCount / answers.length) * 100);
 
   // Compute XP using the sprint-specific weight config (DEF-005 fix).
-  // listXpWeightsByActivity queries by activityType string; casting lets us use
-  // the "sprint" activityType seeded in XpWeightConfig without changing the lib's
-  // typed API (which is scoped to the original "LAB"|"KC"|"SIMULADO" union).
-  const SPRINT_ACTIVITY = "sprint" as Parameters<typeof listXpWeightsByActivity>[0];
+  const SPRINT_ACTIVITY: Parameters<typeof listXpWeightsByActivity>[0] = "sprint";
   const questionIds = answers.map((a) => a.questionId).filter(Boolean);
   const [questions, weights] = await Promise.all([
     prisma.studyQuestion.findMany({
