@@ -101,12 +101,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
     },
   });
 
-  // Determine which stage is now newly unlocked (the next one in the chain)
+  // Determine which stage is now newly unlocked (the next one in the chain).
+  // We must verify the next stage's own unlockRule is satisfied before advertising
+  // it as unlocked — completing the predecessor is necessary but may not be sufficient.
   const nextStage = allStages.find((s) => s.position === targetStage.position + 1);
   let unlockedNext: string | undefined;
 
   if (nextStage) {
-    unlockedNext = nextStage.id;
+    // The predecessor of nextStage is the stage we just completed (targetStage).
+    // Check whether targetStage's unlockRule is also satisfied for this user.
+    const nextStageUnlocked = await satisfiesUnlockRule(targetStage, userId);
+    if (nextStageUnlocked) {
+      unlockedNext = nextStage.id;
+    }
   }
 
   return NextResponse.json({ unlockedNext });
