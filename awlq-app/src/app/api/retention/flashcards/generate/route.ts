@@ -24,6 +24,18 @@ export async function POST(request: NextRequest) {
     // Body is optional — proceed with defaults.
   }
 
+  // IDOR guard (DEF-009): if a sessionId is provided, verify it belongs to the
+  // current user before enqueueing generation scoped to that session.
+  if (body.scope === "session" && body.sessionId) {
+    const ownedSession = await prisma.studySessionHistory.findFirst({
+      where: { id: body.sessionId, userId: session.user.id },
+      select: { id: true },
+    });
+    if (!ownedSession) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   const trigger = await prisma.workerTrigger.create({
     data: {
       action: "generate-flashcards",
