@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
+import { cacheDel, CACHE_KEYS } from "@/lib/cache";
 import { recordStudyActivity } from "@/lib/streak";
 import { getTaskXpByDifficulty } from "@/lib/levels";
+import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 
 // Sprint modes and their question counts / time limits.
@@ -106,14 +108,18 @@ export async function POST(request: NextRequest) {
   const correctCount = answers.filter((a) => a.correct).length;
   const scorePercent = Math.round((correctCount / answers.length) * 100);
 
-  // Compute XP using existing weight system.
+  // Compute XP using the sprint-specific weight config (DEF-005 fix).
+  // listXpWeightsByActivity queries by activityType string; casting lets us use
+  // the "sprint" activityType seeded in XpWeightConfig without changing the lib's
+  // typed API (which is scoped to the original "LAB"|"KC"|"SIMULADO" union).
+  const SPRINT_ACTIVITY = "sprint" as Parameters<typeof listXpWeightsByActivity>[0];
   const questionIds = answers.map((a) => a.questionId).filter(Boolean);
   const [questions, weights] = await Promise.all([
     prisma.studyQuestion.findMany({
       where: { id: { in: questionIds } },
       select: { id: true, topic: true, difficulty: true },
     }),
-    listXpWeightsByActivity("KC"), // sprint uses KC-style weights
+    listXpWeightsByActivity(SPRINT_ACTIVITY),
   ]);
 
   const questionMap = new Map(questions.map((q) => [q.id, q]));
@@ -124,21 +130,50 @@ export async function POST(request: NextRequest) {
     const difficulty = (question?.difficulty ?? "medium") as "easy" | "medium" | "hard";
     const topic = question?.topic ?? "*";
     const baseXp = Math.max(20, Math.round(getTaskXpByDifficulty(difficulty) / 4));
-    const weight = resolveXpWeight(weights, { activityType: "KC", topic, difficulty });
+    const weight = resolveXpWeight(weights, { activityType: SPRINT_ACTIVITY, topic, difficulty });
     return total + applyWeightedXp(baseXp, weight);
   }, 0);
+
+  // Persist sprint XP through the same StudySessionHistory path as KC/Simulado (DEF-003 fix).
+  // This ensures the leaderboard, achievements, and history reflect the sprint result.
+  const sprintTitle = `Sprint ${body.mode.toUpperCase()} — ${correctCount}/${answers.length} corretas`;
+
+  const historyItem = await prisma.studySessionHistory.create({
+    data: {
+      userId,
+      sessionType: "KC", // sprint is a KC-style micro-session
+      title: sprintTitle,
+      gainedXp,
+      scorePercent,
+      correctAnswers: correctCount,
+      totalQuestions: answers.length,
+      answersSnapshot: answers,
+      completedAt: new Date(),
+    },
+    select: { id: true },
+  });
 
   const since = new Date();
 
   const [streakResult, newAchievements] = await Promise.all([
     recordStudyActivity(userId, "sprint", 1),
     syncAndGetNewAchievements(userId, since),
+    cacheDel(
+      CACHE_KEYS.userStudyHistory(userId),
+      CACHE_KEYS.userPublicProfile(userId),
+      CACHE_KEYS.userAchievements(userId),
+      CACHE_KEYS.leaderboard(),
+    ),
   ]);
+
+  // Fire-and-forget realtime leaderboard event (same pattern as study/history).
+  void publishLeaderboardUpdatedEvent({ userId, source: "KC", gainedXp });
 
   return NextResponse.json({
     scorePercent,
     gainedXp,
     streakDays: streakResult.streakDays,
     newAchievements,
+    historyId: historyItem.id,
   });
 }
