@@ -9,6 +9,8 @@ import {
   flashcardGenerationQueue,
   kcGenerationQueue,
   mentorComputeQueue,
+  changelogFetchQueue,
+  newsFetchQueue,
 } from "../queues/index.js";
 import { config } from "../config.js";
 
@@ -196,6 +198,17 @@ async function processOneTrigger(): Promise<void> {
         } else {
           logger.warn({ triggerId: trigger.id }, "compute-mentor trigger missing userId payload");
         }
+        break;
+      }
+
+      case "changelog-fetch": {
+        await changelogFetchQueue.add("manual-changelog-fetch", { manual: true }, { priority: 1 });
+        break;
+      }
+
+      case "news-fetch": {
+        const payload = trigger.payload as { sourceId?: string } | null;
+        await newsFetchQueue.add("manual-news-fetch", { sourceId: payload?.sourceId }, { priority: 1 });
         break;
       }
 
