@@ -51,6 +51,9 @@ model User {
   flashcards              Flashcard[]
   mentorRecommendations   MentorRecommendation[]
   questChainProgress      QuestChainProgress[]
+  bossBattles             BossBattle[]
+  weeklyChallengeEntries  WeeklyChallengeEntry[]
+  dailyQuizAttempts       DailyQuizAttempt[]
 
   @@index([accessStatus, active])
   @@map("user")
@@ -765,6 +768,159 @@ model FalseBeliefSignal {
 
   @@unique([userId, awsServiceId, topic])
   @@index([userId, computedAt])
+}
+
+// ─── Phase 4: Arena (Boss Battles, Weekly Challenge, Daily Quiz) ─────────────
+
+model Boss {
+  id               String       @id @default(cuid())
+  name             String
+  code             String       @unique
+  themeService     String
+  maxHp            Int
+  damagePerCorrect Int          @default(10)
+  artworkUrl       String?
+  active           Boolean      @default(true)
+  battles          BossBattle[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([active])
+}
+
+model BossBattle {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bossId      String
+  boss        Boss      @relation(fields: [bossId], references: [id], onDelete: Cascade)
+  remainingHp Int
+  victory     Boolean   @default(false)
+  gainedXp    Int       @default(0)
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, bossId])
+  @@index([userId, victory])
+}
+
+model WeeklyChallenge {
+  id             String                 @id @default(cuid())
+  weekStart      DateTime
+  weekEnd        DateTime
+  active         Boolean                @default(true)
+  badgeImageUrl  String?
+  entries        WeeklyChallengeEntry[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([active, weekStart])
+}
+
+model WeeklyChallengeEntry {
+  id          String          @id @default(cuid())
+  challengeId String
+  challenge   WeeklyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Int             @default(0)
+  rank        Int?
+  gainedXp    Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([challengeId, userId])
+  @@index([challengeId, score])
+  @@index([userId])
+}
+
+model DailyQuiz {
+  id          String           @id @default(cuid())
+  quizDate    DateTime         @db.Date
+  questionIds Json
+  attempts    DailyQuizAttempt[]
+  createdAt   DateTime         @default(now())
+
+  @@unique([quizDate])
+  @@index([quizDate])
+}
+
+model DailyQuizAttempt {
+  id          String    @id @default(cuid())
+  quizId      String
+  quiz        DailyQuiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Int       @default(0)
+  totalCount  Int       @default(5)
+  gainedXp    Int       @default(0)
+  completedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@unique([quizId, userId])
+  @@index([userId, completedAt])
+}
+
+// ─── Phase 4: News ────────────────────────────────────────────────────────────
+
+model NewsSource {
+  id            String     @id @default(cuid())
+  name          String
+  feedUrl       String     @unique
+  category      String     @default("cloud")
+  active        Boolean    @default(true)
+  lastFetchedAt DateTime?
+  items         NewsItem[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([active])
+}
+
+model NewsItem {
+  id          String     @id @default(cuid())
+  sourceId    String
+  source      NewsSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title       String
+  url         String
+  urlHash     String     @unique
+  summary     String?    @db.Text
+  publishedAt DateTime?
+  createdAt   DateTime   @default(now())
+
+  @@index([publishedAt])
+  @@index([sourceId, publishedAt])
+}
+
+// ─── Phase 4: Changelog ───────────────────────────────────────────────────────
+
+model ChangelogRelease {
+  id           String           @id @default(cuid())
+  githubId     Int              @unique
+  tagName      String
+  name         String?
+  bodyMarkdown String?          @db.Text
+  adminSummary String?          @db.Text
+  highlight    Boolean          @default(false)
+  published    Boolean          @default(false)
+  releasedAt   DateTime?
+  entries      ChangelogEntry[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([published, releasedAt])
+}
+
+model ChangelogEntry {
+  id        String           @id @default(cuid())
+  releaseId String
+  release   ChangelogRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  category  String
+  text      String
+  createdAt DateTime         @default(now())
+
+  @@index([releaseId])
 }
 
 // ─── Phase 3: Instructor Content Library ─────────────────────────────────────

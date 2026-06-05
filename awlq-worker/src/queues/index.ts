@@ -166,3 +166,45 @@ export const mentorComputeQueue = new Queue<MentorComputeJobData, void, string>(
     backoff: { type: "fixed", delay: 5_000 },
   },
 });
+
+// ─── Phase 4: Engagement queues ───────────────────────────────────────────────
+
+export type WeeklyChallengeJobData = { mode: "open" | "close" };
+
+export const weeklyChallengeQueue = new Queue<WeeklyChallengeJobData, void, string>("weekly-challenge", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});
+
+export type NewsFetchJobData = { sourceId?: string };
+
+export const newsFetchQueue = new Queue<NewsFetchJobData, void, string>("news-fetch", {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+});
+
+export type ChangelogFetchJobData = { manual?: boolean };
+
+export const changelogFetchQueue = new Queue<ChangelogFetchJobData, void, string>("changelog-fetch", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+});
+
+export type DailyQuizSeedJobData = Record<string, never>;
+
+export const dailyQuizQueue = new Queue<DailyQuizSeedJobData, void, string>("daily-quiz", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});
