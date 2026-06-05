@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LibraryContent, LibraryContentType } from "@prisma/client";
 
 const CONTENT_TYPES: LibraryContentType[] = ["PDF", "IMAGE", "MARKDOWN", "SLIDES"];
@@ -14,6 +14,7 @@ const CATEGORIES = [
   "Database",
   "Serverless",
 ];
+const PAGE_SIZE = 10;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,13 +27,13 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ─── New Content Form ─────────────────────────────────────────────────────────
+// ─── Create Form ──────────────────────────────────────────────────────────────
 
-type NewContentFormProps = {
+type CreateFormProps = {
   onCreated: (item: LibraryContent) => void;
 };
 
-function NewContentForm({ onCreated }: NewContentFormProps) {
+function CreateForm({ onCreated }: CreateFormProps) {
   const [type, setType] = useState<LibraryContentType>("MARKDOWN");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -49,9 +50,7 @@ function NewContentForm({ onCreated }: NewContentFormProps) {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-
     try {
-      // 1. Create the row
       const created = await apiFetch<{ content: LibraryContent }>("/api/admin/library", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,7 +66,6 @@ function NewContentForm({ onCreated }: NewContentFormProps) {
         }),
       });
 
-      // 2. Upload the file if provided (PDF / IMAGE / SLIDES)
       if (file && type !== "MARKDOWN") {
         const formData = new FormData();
         formData.append("file", file);
@@ -77,7 +75,6 @@ function NewContentForm({ onCreated }: NewContentFormProps) {
         });
       }
 
-      // Reset form
       setTitle("");
       setDescription("");
       setAuthorName("");
@@ -93,238 +90,125 @@ function NewContentForm({ onCreated }: NewContentFormProps) {
     }
   };
 
-  return (
-    <form
-      onSubmit={(e) => void handleSubmit(e)}
-      className="flex flex-col gap-4 rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] p-4"
-    >
-      <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[var(--pixel-text)]">
-        Novo Conteúdo
-      </h2>
+  const inputClass =
+    "w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none focus:border-[#f97316]";
 
+  return (
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
       {error && <p className="font-mono text-xs text-red-500">{error}</p>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {/* Type */}
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-            Tipo *
-          </span>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">Tipo *</span>
           <select
             value={type}
             onChange={(e) => setType(e.target.value as LibraryContentType)}
-            className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-2 py-1.5 font-mono text-xs text-[var(--pixel-text)] focus:border-[var(--pixel-accent)] focus:outline-none"
+            className={inputClass}
           >
             {CONTENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
+              <option key={t} value={t}>{t}</option>
             ))}
           </select>
-        </label>
-
-        {/* Category */}
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-            Categoria *
-          </span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">Categoria *</span>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-2 py-1.5 font-mono text-xs text-[var(--pixel-text)] focus:border-[var(--pixel-accent)] focus:outline-none"
+            className={inputClass}
           >
             {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
+              <option key={c} value={c}>{c}</option>
             ))}
           </select>
-        </label>
+        </div>
       </div>
 
-      {/* Title */}
-      <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-          Título *
-        </span>
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-[10px] uppercase text-[#64748b]">Título *</span>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
-          className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-2 py-1.5 font-mono text-xs text-[var(--pixel-text)] focus:border-[var(--pixel-accent)] focus:outline-none"
+          className={inputClass}
         />
-      </label>
+      </div>
 
-      {/* Description */}
-      <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-          Descrição
-        </span>
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-[10px] uppercase text-[#64748b]">Descrição</span>
         <input
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-2 py-1.5 font-mono text-xs text-[var(--pixel-text)] focus:border-[var(--pixel-accent)] focus:outline-none"
+          className={inputClass}
         />
-      </label>
+      </div>
 
-      {/* Author fields */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-            Autor *
-          </span>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">Autor *</span>
           <input
             type="text"
             value={authorName}
             onChange={(e) => setAuthorName(e.target.value)}
             required
-            className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-2 py-1.5 font-mono text-xs text-[var(--pixel-text)] focus:border-[var(--pixel-accent)] focus:outline-none"
+            className={inputClass}
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-            URL do Autor
-          </span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">URL do Autor</span>
           <input
             type="url"
             value={authorUrl}
             onChange={(e) => setAuthorUrl(e.target.value)}
             placeholder="https://..."
-            className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-2 py-1.5 font-mono text-xs text-[var(--pixel-text)] focus:border-[var(--pixel-accent)] focus:outline-none"
+            className={inputClass}
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-            Contato
-          </span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">Contato</span>
           <input
             type="text"
             value={authorContact}
             onChange={(e) => setAuthorContact(e.target.value)}
-            className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-2 py-1.5 font-mono text-xs text-[var(--pixel-text)] focus:border-[var(--pixel-accent)] focus:outline-none"
+            className={inputClass}
           />
-        </label>
+        </div>
       </div>
 
-      {/* Markdown body — only shown for MARKDOWN type */}
       {type === "MARKDOWN" && (
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-            Conteúdo Markdown
-          </span>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">Conteúdo Markdown</span>
           <textarea
             value={bodyMarkdown}
             onChange={(e) => setBodyMarkdown(e.target.value)}
             rows={10}
-            className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-2 py-1.5 font-mono text-xs text-[var(--pixel-text)] focus:border-[var(--pixel-accent)] focus:outline-none"
+            className={inputClass}
           />
-        </label>
+        </div>
       )}
 
-      {/* File upload — only shown for file-backed types */}
       {type !== "MARKDOWN" && (
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-muted)]">
-            Arquivo (max 50 MB)
-          </span>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">Arquivo (max 50 MB)</span>
           <input
             type="file"
             accept={type === "PDF" || type === "SLIDES" ? ".pdf" : "image/*"}
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="font-mono text-xs text-[var(--pixel-text)]"
+            className="font-mono text-xs text-[#e2e8f0]"
           />
-        </label>
+        </div>
       )}
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="self-start rounded border border-[var(--pixel-accent)] bg-[var(--pixel-accent)] px-4 py-1.5 font-mono text-xs text-[var(--pixel-bg)] disabled:opacity-50 hover:opacity-90 transition-opacity"
+        className="border border-[#f97316] bg-[#f97316] px-4 py-2 font-mono text-xs uppercase text-[#0b1220] disabled:opacity-50 hover:opacity-90 transition-opacity"
       >
         {isSubmitting ? "Criando..." : "Criar Conteúdo"}
       </button>
     </form>
-  );
-}
-
-// ─── Content Row ──────────────────────────────────────────────────────────────
-
-type ContentRowProps = {
-  item: LibraryContent;
-  onTogglePublish: (item: LibraryContent) => void;
-  onDelete: (item: LibraryContent) => void;
-};
-
-function ContentRow({ item, onTogglePublish, onDelete }: ContentRowProps) {
-  const [isTogglingPublish, setIsTogglingPublish] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleTogglePublish = async () => {
-    setIsTogglingPublish(true);
-    try {
-      await apiFetch<unknown>(`/api/admin/library/${item.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ published: !item.published }),
-      });
-      onTogglePublish({ ...item, published: !item.published });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao atualizar.");
-    } finally {
-      setIsTogglingPublish(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirm(`Deletar "${item.title}"? Esta ação não pode ser desfeita.`)) return;
-    setIsDeleting(true);
-    try {
-      await apiFetch<unknown>(`/api/admin/library/${item.id}`, { method: "DELETE" });
-      onDelete(item);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao deletar.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-3 rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] px-3 py-2">
-      <div className="min-w-0 flex-1">
-        <p className="font-mono text-xs font-bold text-[var(--pixel-text)] truncate">{item.title}</p>
-        <p className="font-mono text-[10px] text-[var(--pixel-muted)]">
-          {item.type} · {item.category} · por {item.authorName}
-        </p>
-      </div>
-
-      <span
-        className={`flex-shrink-0 rounded px-2 py-0.5 font-mono text-[10px] uppercase ${
-          item.published
-            ? "bg-green-900/40 text-green-400"
-            : "bg-[var(--pixel-border)] text-[var(--pixel-muted)]"
-        }`}
-      >
-        {item.published ? "Publicado" : "Rascunho"}
-      </span>
-
-      <button
-        onClick={() => void handleTogglePublish()}
-        disabled={isTogglingPublish}
-        className="flex-shrink-0 font-mono text-[10px] text-[var(--pixel-accent)] underline hover:opacity-70 disabled:opacity-40"
-      >
-        {item.published ? "Despublicar" : "Publicar"}
-      </button>
-
-      <button
-        onClick={() => void handleDelete()}
-        disabled={isDeleting}
-        className="flex-shrink-0 font-mono text-[10px] text-red-400 underline hover:opacity-70 disabled:opacity-40"
-      >
-        Deletar
-      </button>
-    </div>
   );
 }
 
@@ -335,7 +219,16 @@ export function LibraryAdminScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  // Filters
+  const [searchTitle, setSearchTitle] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+
+  // Pagination
+  const [page, setPage] = useState(1);
+
+  const loadItems = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
@@ -349,57 +242,222 @@ export function LibraryAdminScreen() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadItems();
+  }, [loadItems]);
 
   const handleCreated = useCallback((item: LibraryContent) => {
     setItems((prev) => [item, ...prev]);
+    setPage(1);
   }, []);
 
-  const handleTogglePublish = useCallback((updated: LibraryContent) => {
-    setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
-  }, []);
+  // Client-side filtering
+  const filtered = useMemo(() => {
+    return items.filter((item) => {
+      if (searchTitle && !item.title.toLowerCase().includes(searchTitle.toLowerCase())) return false;
+      if (filterType && item.type !== filterType) return false;
+      if (filterCategory && item.category !== filterCategory) return false;
+      if (filterStatus === "published" && !item.published) return false;
+      if (filterStatus === "draft" && item.published) return false;
+      return true;
+    });
+  }, [items, searchTitle, filterType, filterCategory, filterStatus]);
 
-  const handleDelete = useCallback((deleted: LibraryContent) => {
-    setItems((prev) => prev.filter((i) => i.id !== deleted.id));
-  }, []);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  async function handleTogglePublish(item: LibraryContent) {
+    try {
+      await apiFetch<unknown>(`/api/admin/library/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ published: !item.published }),
+      });
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, published: !i.published } : i)),
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao atualizar.");
+    }
+  }
+
+  async function handleDelete(item: LibraryContent) {
+    if (!confirm(`Deletar "${item.title}"? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await apiFetch<unknown>(`/api/admin/library/${item.id}`, { method: "DELETE" });
+      setItems((prev) => prev.filter((i) => i.id !== item.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao deletar.");
+    }
+  }
+
+  const inputClass =
+    "w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none";
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6">
-      <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
-        Admin · Biblioteca
-      </h1>
+    <main className="space-y-5">
+      {/* Header */}
+      <header className="space-y-2">
+        <p className="font-mono text-xs uppercase text-[#f97316]">Biblioteca</p>
+        <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Gerenciar Conteúdo</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void loadItems()}
+            className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
+          >
+            Atualizar dados
+          </button>
+          <span className="font-mono text-xs text-[#64748b]">
+            {items.length} item(s)
+          </span>
+        </div>
+      </header>
 
-      <NewContentForm onCreated={handleCreated} />
-
-      <section className="flex flex-col gap-3">
-        <h2 className="font-mono text-xs uppercase tracking-wider text-[var(--pixel-muted)]">
-          Conteúdo ({items.length})
-        </h2>
-
-        {isLoading && (
-          <p className="font-mono text-xs text-[var(--pixel-muted)]">Carregando...</p>
-        )}
-
-        {loadError && (
-          <p className="font-mono text-xs text-red-500">{loadError}</p>
-        )}
-
-        {!isLoading && !loadError && items.length === 0 && (
-          <p className="font-mono text-xs text-[var(--pixel-muted)]">
-            Nenhum conteúdo cadastrado.
-          </p>
-        )}
-
-        {items.map((item) => (
-          <ContentRow
-            key={item.id}
-            item={item}
-            onTogglePublish={handleTogglePublish}
-            onDelete={handleDelete}
+      {/* Filters */}
+      <section className="border border-[#1e293b] bg-[#111827] p-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <input
+            value={searchTitle}
+            onChange={(e) => { setPage(1); setSearchTitle(e.target.value); }}
+            placeholder="Buscar por título"
+            className={inputClass}
           />
-        ))}
+          <select
+            value={filterType}
+            onChange={(e) => { setPage(1); setFilterType(e.target.value); }}
+            className={inputClass}
+          >
+            <option value="">Todos os tipos</option>
+            {CONTENT_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <select
+            value={filterCategory}
+            onChange={(e) => { setPage(1); setFilterCategory(e.target.value); }}
+            className={inputClass}
+          >
+            <option value="">Todas as categorias</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => { setPage(1); setFilterStatus(e.target.value); }}
+            className={inputClass}
+          >
+            <option value="">Todos os status</option>
+            <option value="published">Publicado</option>
+            <option value="draft">Rascunho</option>
+          </select>
+        </div>
       </section>
-    </div>
+
+      {/* Create form */}
+      <section className="border border-[#1e293b] bg-[#111827] p-4 space-y-4">
+        <p className="font-mono text-xs uppercase text-[#f97316]">Novo Conteúdo</p>
+        <CreateForm onCreated={handleCreated} />
+      </section>
+
+      {isLoading && <p className="text-sm text-[#94a3b8]">Carregando conteúdo...</p>}
+      {loadError && <p className="text-sm text-[#fca5a5]">{loadError}</p>}
+
+      {/* Table */}
+      {!isLoading && !loadError && (
+        <>
+          <section className="overflow-x-auto border border-[#1e293b] bg-[#111827]">
+            <table className="w-full min-w-[700px] text-left text-sm">
+              <thead className="border-b border-[#1e293b] bg-[#0f172a] text-xs uppercase text-[#94a3b8]">
+                <tr>
+                  <th className="px-3 py-2">Título / Autor</th>
+                  <th className="px-3 py-2">Tipo</th>
+                  <th className="px-3 py-2">Categoria</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center font-mono text-xs text-[#64748b]">
+                      Nenhum conteúdo encontrado.
+                    </td>
+                  </tr>
+                )}
+                {pageItems.map((item) => (
+                  <tr key={item.id} className="border-b border-[#1e293b] text-[#e2e8f0] hover:bg-white/[0.02]">
+                    <td className="px-3 py-2">
+                      <p className="font-mono text-xs font-semibold">{item.title}</p>
+                      <p className="font-mono text-[10px] text-[#64748b]">por {item.authorName}</p>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="border border-[#334155] px-1.5 py-0.5 font-mono text-[10px] uppercase text-[#94a3b8]">
+                        {item.type}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs text-[#94a3b8]">{item.category}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase ${
+                          item.published
+                            ? "border-[#14532d] bg-green-900/20 text-green-300"
+                            : "border-[#334155] text-[#64748b]"
+                        }`}
+                      >
+                        {item.published ? "Publicado" : "Rascunho"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleTogglePublish(item)}
+                          className="border border-[#334155] px-2 py-1 font-mono text-[10px] uppercase text-[#94a3b8] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+                        >
+                          {item.published ? "Despublicar" : "Publicar"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(item)}
+                          className="border border-[#334155] px-2 py-1 font-mono text-[10px] uppercase text-red-400 hover:border-red-600 transition-colors"
+                        >
+                          Deletar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <footer className="flex items-center justify-between border border-[#1e293b] bg-[#111827] px-4 py-3 text-sm text-[#cbd5e1]">
+            <span>
+              Página {safePage} de {totalPages} | Total: {filtered.length}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={safePage <= 1}
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                className="border border-[#334155] px-3 py-1 text-xs uppercase disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                className="border border-[#334155] px-3 py-1 text-xs uppercase disabled:opacity-40"
+              >
+                Próxima
+              </button>
+            </div>
+          </footer>
+        </>
+      )}
+    </main>
   );
 }

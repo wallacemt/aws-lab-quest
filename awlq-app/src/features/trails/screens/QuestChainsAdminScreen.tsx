@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PixelCard } from "@/components/ui/pixel-card";
-import { PixelButton } from "@/components/ui/pixel-button";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,61 +27,12 @@ type Chain = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options);
+  const res = await fetch(url, { credentials: "include", ...options });
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
 }
 
-// ─── Stage editor row ─────────────────────────────────────────────────────────
-
-type StageRowProps = {
-  stage: Stage;
-  chainId: string;
-  onDeleted: () => void;
-};
-
-function StageRow({ stage, chainId, onDeleted }: StageRowProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    if (!confirm(`Deletar estágio "${stage.title}"?`)) return;
-    setIsDeleting(true);
-    try {
-      await apiFetch(`/api/admin/trails/${chainId}/stages/${stage.id}`, { method: "DELETE" });
-      onDeleted();
-    } catch (err) {
-      alert(`Erro ao deletar: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-3 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2">
-      <span className="w-6 flex-shrink-0 font-mono text-xs text-[var(--pixel-muted)]">
-        {stage.position}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-mono text-xs font-bold text-[var(--pixel-text)]">{stage.title}</p>
-        {(stage.awsServiceId || stage.topic) && (
-          <p className="font-mono text-[10px] text-[var(--pixel-muted)]">
-            {stage.awsServiceId ?? stage.topic}
-          </p>
-        )}
-      </div>
-      <PixelButton
-        variant="ghost"
-        className="flex-shrink-0 text-xs text-red-500"
-        onClick={() => void handleDelete()}
-        disabled={isDeleting}
-      >
-        {isDeleting ? "..." : "Deletar"}
-      </PixelButton>
-    </div>
-  );
-}
-
-// ─── Add stage form ───────────────────────────────────────────────────────────
+// ─── Add Stage Form ───────────────────────────────────────────────────────────
 
 type AddStageFormProps = {
   chainId: string;
@@ -120,40 +69,48 @@ function AddStageForm({ chainId, nextPosition, onCreated }: AddStageFormProps) {
     }
   };
 
+  const inputClass =
+    "border border-[#334155] bg-[#0b1220] px-2 py-1 font-mono text-xs text-[#e2e8f0] outline-none focus:border-[#f97316]";
+
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="flex gap-2">
+    <form onSubmit={(e) => void handleSubmit(e)} className="flex gap-2 pt-2">
       <input
         type="text"
         placeholder="Título do estágio"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="min-w-0 flex-1 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 font-mono text-xs text-[var(--pixel-text)] placeholder-[var(--pixel-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--pixel-accent)]"
+        className={`min-w-0 flex-1 ${inputClass}`}
       />
       <input
         type="text"
-        placeholder="Serviço (ex: vpc)"
+        placeholder="Serviço (ex: VPC)"
         value={serviceCode}
         onChange={(e) => setServiceCode(e.target.value)}
-        className="w-32 rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 font-mono text-xs text-[var(--pixel-text)] placeholder-[var(--pixel-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--pixel-accent)]"
+        className={`w-32 ${inputClass}`}
       />
-      <PixelButton type="submit" className="text-xs" disabled={isSaving || !title.trim()}>
+      <button
+        type="submit"
+        disabled={isSaving || !title.trim()}
+        className="border border-[#334155] px-3 py-1 font-mono text-[10px] uppercase text-[#e2e8f0] hover:border-[#f97316] hover:text-[#f97316] transition-colors disabled:opacity-40"
+      >
         {isSaving ? "..." : "Adicionar"}
-      </PixelButton>
+      </button>
     </form>
   );
 }
 
-// ─── Chain card ───────────────────────────────────────────────────────────────
+// ─── Chain Row ────────────────────────────────────────────────────────────────
 
-type ChainCardProps = {
+type ChainRowProps = {
   chain: Chain;
   onUpdated: () => void;
 };
 
-function ChainCard({ chain, onUpdated }: ChainCardProps) {
+function ChainRow({ chain, onUpdated }: ChainRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isTogglingActive, setIsTogglingActive] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeletingStage, setIsDeletingStage] = useState<string | null>(null);
 
   const handleToggleActive = async () => {
     setIsTogglingActive(true);
@@ -184,71 +141,107 @@ function ChainCard({ chain, onUpdated }: ChainCardProps) {
     }
   };
 
+  const handleDeleteStage = async (stageId: string, stageTitle: string) => {
+    if (!confirm(`Deletar estágio "${stageTitle}"?`)) return;
+    setIsDeletingStage(stageId);
+    try {
+      await apiFetch(`/api/admin/trails/${chain.id}/stages/${stageId}`, { method: "DELETE" });
+      onUpdated();
+    } catch (err) {
+      alert(`Erro ao deletar: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsDeletingStage(null);
+    }
+  };
+
+  const btnBase =
+    "border border-[#334155] px-3 py-1 font-mono text-[10px] uppercase transition-colors";
+
   return (
-    <PixelCard className="p-4">
-      {/* Header */}
+    <div className="border border-[#1e293b] bg-[#111827] p-4">
+      {/* Chain header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-mono text-sm font-bold text-[var(--pixel-text)]">{chain.name}</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-mono text-sm font-bold text-[#e2e8f0]">{chain.name}</h3>
             <span
-              className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
+              className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase ${
                 chain.active
-                  ? "bg-green-500/10 text-green-400"
-                  : "bg-[var(--pixel-border)] text-[var(--pixel-muted)]"
+                  ? "border-[#14532d] bg-green-900/20 text-green-300"
+                  : "border-[#334155] text-[#64748b]"
               }`}
             >
               {chain.active ? "ativa" : "inativa"}
             </span>
           </div>
           {chain.description && (
-            <p className="mt-0.5 font-mono text-xs text-[var(--pixel-muted)]">{chain.description}</p>
+            <p className="mt-0.5 font-mono text-xs text-[#94a3b8]">{chain.description}</p>
           )}
-          <p className="mt-1 font-mono text-[10px] text-[var(--pixel-muted)]">
+          <p className="mt-1 font-mono text-[10px] text-[#64748b]">
             {chain.stages.length} estágio(s) · {chain.userCount} usuário(s) com progresso
           </p>
         </div>
 
-        <div className="flex flex-shrink-0 gap-2">
-          <PixelButton
-            variant="ghost"
-            className="text-xs"
+        <div className="flex flex-shrink-0 flex-wrap gap-2">
+          <button
+            type="button"
             onClick={() => void handleToggleActive()}
             disabled={isTogglingActive}
+            className={`${btnBase} text-[#94a3b8] hover:border-[#f97316] hover:text-[#f97316] disabled:opacity-40`}
           >
             {isTogglingActive ? "..." : chain.active ? "Desativar" : "Ativar"}
-          </PixelButton>
-          <PixelButton
-            variant="ghost"
-            className="text-xs"
+          </button>
+          <button
+            type="button"
             onClick={() => setIsExpanded((v) => !v)}
+            className={`${btnBase} text-[#94a3b8] hover:border-[#f97316] hover:text-[#f97316]`}
           >
             {isExpanded ? "Fechar" : "Estágios"}
-          </PixelButton>
-          <PixelButton
-            variant="ghost"
-            className="text-xs text-red-500"
+          </button>
+          <button
+            type="button"
             onClick={() => void handleDelete()}
             disabled={isDeleting}
+            className={`${btnBase} text-red-400 hover:border-red-600 disabled:opacity-40`}
           >
             {isDeleting ? "..." : "Deletar"}
-          </PixelButton>
+          </button>
         </div>
       </div>
 
-      {/* Stage editor */}
+      {/* Inline stage editor */}
       {isExpanded && (
-        <div className="mt-4 space-y-3 border-t border-[var(--pixel-border)] pt-4">
-          <p className="font-mono text-xs text-[var(--pixel-muted)]">Estágios</p>
-          {chain.stages.length > 0 ? (
-            <div className="space-y-2">
-              {chain.stages.map((stage) => (
-                <StageRow key={stage.id} stage={stage} chainId={chain.id} onDeleted={onUpdated} />
-              ))}
-            </div>
-          ) : (
-            <p className="font-mono text-xs text-[var(--pixel-muted)]">Nenhum estágio ainda.</p>
+        <div className="mt-4 border-t border-[#1e293b] pt-4 space-y-2">
+          <p className="font-mono text-xs uppercase text-[#64748b]">Estágios</p>
+          {chain.stages.length === 0 && (
+            <p className="font-mono text-xs text-[#64748b]">Nenhum estágio ainda.</p>
           )}
+          {chain.stages.map((stage) => (
+            <div
+              key={stage.id}
+              className="flex items-center gap-3 border border-[#1e293b] bg-[#0f172a] px-3 py-2"
+            >
+              <span className="w-6 flex-shrink-0 font-mono text-xs text-[#64748b]">
+                {stage.position}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-xs font-bold text-[#e2e8f0]">{stage.title}</p>
+                {(stage.awsServiceId ?? stage.topic) && (
+                  <p className="font-mono text-[10px] text-[#64748b]">
+                    {stage.awsServiceId ?? stage.topic}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleDeleteStage(stage.id, stage.title)}
+                disabled={isDeletingStage === stage.id}
+                className="flex-shrink-0 font-mono text-[10px] text-red-400 underline hover:opacity-70 disabled:opacity-40"
+              >
+                {isDeletingStage === stage.id ? "..." : "Deletar"}
+              </button>
+            </div>
+          ))}
           <AddStageForm
             chainId={chain.id}
             nextPosition={chain.stages.length + 1}
@@ -256,94 +249,22 @@ function ChainCard({ chain, onUpdated }: ChainCardProps) {
           />
         </div>
       )}
-    </PixelCard>
+    </div>
   );
 }
 
-// ─── New chain form ───────────────────────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
-type NewChainFormProps = {
-  onCreated: () => void;
-};
-
-function NewChainForm({ onCreated }: NewChainFormProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setIsSaving(true);
-    try {
-      await apiFetch("/api/admin/trails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() || undefined }),
-      });
-      setName("");
-      setDescription("");
-      setIsOpen(false);
-      onCreated();
-    } catch (err) {
-      alert(`Erro ao criar trilha: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  if (!isOpen) {
-    return (
-      <PixelButton onClick={() => setIsOpen(true)}>Nova Trilha</PixelButton>
-    );
-  }
-
-  return (
-    <PixelCard className="p-4">
-      <p className="mb-3 font-mono text-xs font-bold text-[var(--pixel-text)]">Nova Trilha</p>
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-        <input
-          type="text"
-          placeholder="Nome da trilha"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs text-[var(--pixel-text)] placeholder-[var(--pixel-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--pixel-accent)]"
-        />
-        <input
-          type="text"
-          placeholder="Descrição (opcional)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full rounded border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs text-[var(--pixel-text)] placeholder-[var(--pixel-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--pixel-accent)]"
-        />
-        <div className="flex gap-2">
-          <PixelButton type="submit" disabled={isSaving || !name.trim()}>
-            {isSaving ? "Salvando..." : "Criar"}
-          </PixelButton>
-          <PixelButton
-            type="button"
-            variant="ghost"
-            onClick={() => setIsOpen(false)}
-          >
-            Cancelar
-          </PixelButton>
-        </div>
-      </form>
-    </PixelCard>
-  );
-}
-
-// ─── Main screen ──────────────────────────────────────────────────────────────
-
-/**
- * Admin page for authoring Quest Chains.
- * Lists all chains with their stage editors, active toggles, and a "Nova Trilha" form.
- */
 export function QuestChainsAdminScreen() {
   const [chains, setChains] = useState<Chain[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // New chain form
+  const [formOpen, setFormOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [isSavingChain, setIsSavingChain] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -362,34 +283,104 @@ export function QuestChainsAdminScreen() {
     void load();
   }, [load]);
 
+  const handleCreateChain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setIsSavingChain(true);
+    try {
+      await apiFetch("/api/admin/trails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName.trim(),
+          description: newDescription.trim() || undefined,
+        }),
+      });
+      setNewName("");
+      setNewDescription("");
+      setFormOpen(false);
+      void load();
+    } catch (err) {
+      alert(`Erro ao criar trilha: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsSavingChain(false);
+    }
+  };
+
+  const inputClass =
+    "w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none focus:border-[#f97316]";
+
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
-          Trilhas de Aprendizagem
-        </h1>
-        <NewChainForm onCreated={() => void load()} />
-      </div>
+    <main className="space-y-5">
+      {/* Header */}
+      <header className="space-y-2">
+        <p className="font-mono text-xs uppercase text-[#f97316]">Trilhas</p>
+        <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Trilhas de Aprendizagem</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
+          >
+            Atualizar dados
+          </button>
+          <span className="font-mono text-xs text-[#64748b]">{chains.length} trilha(s)</span>
+        </div>
+      </header>
 
-      {isLoading && (
-        <p className="font-mono text-sm text-[var(--pixel-muted)]">Carregando...</p>
-      )}
+      {/* Nova Trilha section */}
+      <section className="border border-[#1e293b] bg-[#111827] p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-mono text-xs uppercase text-[#f97316]">Nova Trilha</p>
+          <button
+            type="button"
+            onClick={() => setFormOpen((v) => !v)}
+            className="border border-[#334155] px-3 py-1 font-mono text-[10px] uppercase text-[#e2e8f0] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+          >
+            {formOpen ? "Cancelar" : "Criar Trilha"}
+          </button>
+        </div>
 
-      {error && (
-        <p className="font-mono text-sm text-red-500">{error}</p>
-      )}
+        {formOpen && (
+          <form onSubmit={(e) => void handleCreateChain(e)} className="space-y-3">
+            <input
+              type="text"
+              placeholder="Nome da trilha"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              required
+              className={inputClass}
+            />
+            <input
+              type="text"
+              placeholder="Descrição (opcional)"
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              className={inputClass}
+            />
+            <button
+              type="submit"
+              disabled={isSavingChain || !newName.trim()}
+              className="border border-[#f97316] bg-[#f97316] px-4 py-2 font-mono text-xs uppercase text-[#0b1220] disabled:opacity-50 hover:opacity-90 transition-opacity"
+            >
+              {isSavingChain ? "Criando..." : "Criar"}
+            </button>
+          </form>
+        )}
+      </section>
 
-      {!isLoading && chains.length === 0 && (
-        <p className="font-mono text-sm text-[var(--pixel-muted)]">
-          Nenhuma trilha criada ainda.
-        </p>
+      {isLoading && <p className="text-sm text-[#94a3b8]">Carregando trilhas...</p>}
+      {error && <p className="text-sm text-[#fca5a5]">{error}</p>}
+
+      {!isLoading && !error && chains.length === 0 && (
+        <p className="font-mono text-sm text-[#64748b]">Nenhuma trilha criada ainda.</p>
       )}
 
       <div className="space-y-4">
         {chains.map((chain) => (
-          <ChainCard key={chain.id} chain={chain} onUpdated={() => void load()} />
+          <ChainRow key={chain.id} chain={chain} onUpdated={() => void load()} />
         ))}
       </div>
-    </div>
+    </main>
   );
 }

@@ -16,8 +16,12 @@ const ADMIN_MENU = [
   { href: "/admin/questions", label: "Banco de Questoes" },
   { href: "/admin/simulados", label: "Simulados" },
   { href: "/admin/biblioteca", label: "Biblioteca" },
+  { href: "/admin/trilhas", label: "Trilhas" },
   { href: "/admin/worker", label: "Worker / Geracao" },
   { href: "/admin/config-ia", label: "Config de IA" },
+  { href: "/admin/arena", label: "Arena" },
+  { href: "/admin/noticias", label: "Noticias" },
+  { href: "/admin/changelog", label: "Changelog" },
 ];
 
 const BREADCRUMB_MAP: Record<string, string> = {
@@ -29,8 +33,12 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/admin/questions": "Banco de Questoes",
   "/admin/simulados": "Simulados",
   "/admin/biblioteca": "Biblioteca",
+  "/admin/trilhas": "Trilhas",
   "/admin/worker": "Worker / Geracao",
   "/admin/config-ia": "Config de IA",
+  "/admin/arena": "Arena",
+  "/admin/noticias": "Noticias",
+  "/admin/changelog": "Changelog",
 };
 
 function useLiveClock(): string {

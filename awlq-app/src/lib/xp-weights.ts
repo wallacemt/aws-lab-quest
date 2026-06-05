@@ -1,6 +1,15 @@
 import { prisma } from "@/lib/prisma";
 
-export type XpActivityType = "LAB" | "KC" | "SIMULADO" | "sprint" | "flashcard" | "daily_review";
+export type XpActivityType =
+  | "LAB"
+  | "KC"
+  | "SIMULADO"
+  | "sprint"
+  | "flashcard"
+  | "daily_review"
+  | "boss_battle"
+  | "weekly_challenge"
+  | "daily_quiz";
 
 type XpWeightConfigItem = {
   activityType: string;

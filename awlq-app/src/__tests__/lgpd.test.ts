@@ -44,6 +44,16 @@ const { mockGetSession, mockPrisma } = vi.hoisted(() => {
     userAchievement: { findMany: vi.fn() },
     userBadge: { findMany: vi.fn() },
     userCertBadge: { findMany: vi.fn() },
+    // Phase 1–4 models (LGPD F-01 deletion + F-02 export)
+    flashcard: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), findMany: vi.fn().mockResolvedValue([]) },
+    flashcardReview: { findMany: vi.fn().mockResolvedValue([]) },
+    falseBeliefSignal: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), findMany: vi.fn().mockResolvedValue([]) },
+    mentorRecommendation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), findMany: vi.fn().mockResolvedValue([]) },
+    bossBattle: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), findMany: vi.fn().mockResolvedValue([]) },
+    weeklyChallengeEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), findMany: vi.fn().mockResolvedValue([]) },
+    dailyQuizAttempt: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), findMany: vi.fn().mockResolvedValue([]) },
+    userBehaviorProfile: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    questChainProgress: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   };
 
@@ -217,6 +227,14 @@ describe("TC-004: GET /api/user/data-export with auth", () => {
     mockPrisma.userAchievement.findMany.mockResolvedValue([]);
     mockPrisma.userBadge.findMany.mockResolvedValue([]);
     mockPrisma.userCertBadge.findMany.mockResolvedValue([]);
+    mockPrisma.flashcard.findMany.mockResolvedValue([]);
+    mockPrisma.flashcardReview.findMany.mockResolvedValue([]);
+    mockPrisma.falseBeliefSignal.findMany.mockResolvedValue([]);
+    mockPrisma.mentorRecommendation.findMany.mockResolvedValue([]);
+    mockPrisma.bossBattle.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyChallengeEntry.findMany.mockResolvedValue([]);
+    mockPrisma.dailyQuizAttempt.findMany.mockResolvedValue([]);
+    mockPrisma.questChainProgress.findMany.mockResolvedValue([]);
   });
 
   it("returns 200 with Content-Disposition attachment header", async () => {
@@ -408,5 +426,173 @@ describe("TC-008: data-retention — anonymize study sessions older than 3 years
     // The userId FK must never appear in the data payload — only the flag is set
     expect(callArgs.data).not.toHaveProperty("userId");
     expect(callArgs.data).toEqual({ anonymized: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TC-049: GET /api/user/data-export — response covers Phase 1–4 tables
+// ---------------------------------------------------------------------------
+
+describe("TC-049: GET /api/user/data-export — Phase 1–4 tables are included", () => {
+  beforeEach(() => {
+    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: SESSION_USER.id,
+      name: SESSION_USER.name,
+      email: SESSION_USER.email,
+      username: "testuser",
+      role: "user",
+      accessStatus: "approved",
+      createdAt: new Date(),
+      lastSeen: new Date(),
+    });
+    mockPrisma.userProfile.findUnique.mockResolvedValue({
+      certification: "SAA-C03",
+      favoriteTheme: null,
+      avatarUrl: null,
+      leaderboardVisible: true,
+      themePreset: null,
+    });
+    mockPrisma.studySessionHistory.findMany.mockResolvedValue([]);
+    mockPrisma.questHistory.findMany.mockResolvedValue([]);
+    mockPrisma.userAchievement.findMany.mockResolvedValue([]);
+    mockPrisma.userBadge.findMany.mockResolvedValue([]);
+    mockPrisma.userCertBadge.findMany.mockResolvedValue([]);
+    mockPrisma.flashcard.findMany.mockResolvedValue([]);
+    mockPrisma.flashcardReview.findMany.mockResolvedValue([]);
+    mockPrisma.falseBeliefSignal.findMany.mockResolvedValue([]);
+    mockPrisma.mentorRecommendation.findMany.mockResolvedValue([]);
+    mockPrisma.bossBattle.findMany.mockResolvedValue([]);
+    mockPrisma.weeklyChallengeEntry.findMany.mockResolvedValue([]);
+    mockPrisma.dailyQuizAttempt.findMany.mockResolvedValue([]);
+    mockPrisma.questChainProgress.findMany.mockResolvedValue([]);
+  });
+
+  it("includes Phase 1 retention keys: flashcards and flashcardReviews", async () => {
+    const req = makeRequest("GET", "http://localhost/api/user/data-export");
+    const res = await getDataExport(req);
+
+    const body = JSON.parse(await res.text()) as Record<string, unknown>;
+    expect(body).toHaveProperty("flashcards");
+    expect(body).toHaveProperty("flashcardReviews");
+  });
+
+  it("includes Phase 2 mentor keys: falseBeliefSignals and mentorRecommendations", async () => {
+    const req = makeRequest("GET", "http://localhost/api/user/data-export");
+    const res = await getDataExport(req);
+
+    const body = JSON.parse(await res.text()) as Record<string, unknown>;
+    expect(body).toHaveProperty("falseBeliefSignals");
+    expect(body).toHaveProperty("mentorRecommendations");
+  });
+
+  it("includes Phase 4 arena/challenge/quiz keys: bossBattles, weeklyEntries, quizAttempts", async () => {
+    const req = makeRequest("GET", "http://localhost/api/user/data-export");
+    const res = await getDataExport(req);
+
+    const body = JSON.parse(await res.text()) as Record<string, unknown>;
+    expect(body).toHaveProperty("bossBattles");
+    expect(body).toHaveProperty("weeklyEntries");
+    expect(body).toHaveProperty("quizAttempts");
+  });
+
+  it("includes questProgress key for quest chain data", async () => {
+    const req = makeRequest("GET", "http://localhost/api/user/data-export");
+    const res = await getDataExport(req);
+
+    const body = JSON.parse(await res.text()) as Record<string, unknown>;
+    expect(body).toHaveProperty("questProgress");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TC-050: DELETE /api/user/account — removes Phase 1–4 data
+// ---------------------------------------------------------------------------
+
+describe("TC-050: DELETE /api/user/account — Phase 1–4 deletion verified", () => {
+  const userId = SESSION_USER.id;
+
+  beforeEach(() => {
+    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    // $transaction receives an array of Prisma promises — resolve them all
+    mockPrisma.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) => {
+      return Promise.all(ops);
+    });
+    mockPrisma.user.update.mockResolvedValue({});
+    mockPrisma.userProfile.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.session.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.account.deleteMany.mockResolvedValue({ count: 0 });
+  });
+
+  it("calls flashcard.deleteMany with the user's id", async () => {
+    const req = makeRequest("DELETE", "http://localhost/api/user/account");
+    await deleteAccount(req);
+
+    expect(mockPrisma.flashcard.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId } }),
+    );
+  });
+
+  it("calls falseBeliefSignal.deleteMany with the user's id", async () => {
+    const req = makeRequest("DELETE", "http://localhost/api/user/account");
+    await deleteAccount(req);
+
+    expect(mockPrisma.falseBeliefSignal.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId } }),
+    );
+  });
+
+  it("calls mentorRecommendation.deleteMany with the user's id", async () => {
+    const req = makeRequest("DELETE", "http://localhost/api/user/account");
+    await deleteAccount(req);
+
+    expect(mockPrisma.mentorRecommendation.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId } }),
+    );
+  });
+
+  it("calls bossBattle.deleteMany with the user's id", async () => {
+    const req = makeRequest("DELETE", "http://localhost/api/user/account");
+    await deleteAccount(req);
+
+    expect(mockPrisma.bossBattle.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId } }),
+    );
+  });
+
+  it("calls weeklyChallengeEntry.deleteMany with the user's id", async () => {
+    const req = makeRequest("DELETE", "http://localhost/api/user/account");
+    await deleteAccount(req);
+
+    expect(mockPrisma.weeklyChallengeEntry.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId } }),
+    );
+  });
+
+  it("calls dailyQuizAttempt.deleteMany with the user's id", async () => {
+    const req = makeRequest("DELETE", "http://localhost/api/user/account");
+    await deleteAccount(req);
+
+    expect(mockPrisma.dailyQuizAttempt.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId } }),
+    );
+  });
+
+  it("calls userBehaviorProfile.deleteMany with the user's id", async () => {
+    const req = makeRequest("DELETE", "http://localhost/api/user/account");
+    await deleteAccount(req);
+
+    expect(mockPrisma.userBehaviorProfile.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId } }),
+    );
+  });
+
+  it("calls questChainProgress.deleteMany with the user's id", async () => {
+    const req = makeRequest("DELETE", "http://localhost/api/user/account");
+    await deleteAccount(req);
+
+    expect(mockPrisma.questChainProgress.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId } }),
+    );
   });
 });

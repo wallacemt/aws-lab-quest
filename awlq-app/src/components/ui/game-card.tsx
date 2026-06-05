@@ -1,5 +1,5 @@
 import { ElementType } from "react";
-import { FlaskConical, CheckSquare, Timer, BookOpen, Play } from "lucide-react";
+import { FlaskConical, CheckSquare, Timer, BookOpen, Play, Swords, Brain, Zap, CalendarCheck, Map, Library, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 interface GameCardProps {
@@ -16,6 +16,13 @@ const ICONS: Record<string, ElementType> = {
   kc: CheckSquare,
   simulado: Timer,
   revisao: BookOpen,
+  arena: Swords,
+  flashcards: Brain,
+  sprint: Zap,
+  "daily-review": CalendarCheck,
+  trilhas: Map,
+  biblioteca: Library,
+  mentor: Sparkles,
 };
 
 const COLORS: Record<string, string> = {
@@ -23,6 +30,13 @@ const COLORS: Record<string, string> = {
   kc: "bg-accent",
   simulado: "bg-primary",
   revisao: "bg-purple-500",
+  arena: "bg-red-500",
+  flashcards: "bg-indigo-500",
+  sprint: "bg-yellow-500",
+  "daily-review": "bg-teal-500",
+  trilhas: "bg-emerald-500",
+  biblioteca: "bg-violet-500",
+  mentor: "bg-green-600",
 };
 
 export default function GameCard({ id, title, description, cta, handleClick }: GameCardProps) {

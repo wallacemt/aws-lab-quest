@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { DailyReviewBoard } from "@/features/retention/components/DailyReviewBoard";
 
 /**
@@ -14,11 +15,13 @@ export function DailyReviewScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-6">
-      <h1 className="mb-6 font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
-        Revisão Diária
-      </h1>
-      <DailyReviewBoard onStartFlashcards={handleStartFlashcards} />
-    </div>
+    <AppLayout>
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <h1 className="mb-6 font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
+          Revisão Diária
+        </h1>
+        <DailyReviewBoard onStartFlashcards={handleStartFlashcards} />
+      </div>
+    </AppLayout>
   );
 }

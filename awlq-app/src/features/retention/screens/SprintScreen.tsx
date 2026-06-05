@@ -1,5 +1,6 @@
 "use client";
 
+import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { SprintRunner } from "@/features/retention/components/SprintRunner";
@@ -24,78 +25,86 @@ export function SprintScreen() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center gap-4 py-16">
-        <p className="font-mono text-sm text-red-500">{error}</p>
-        <PixelButton variant="ghost" onClick={() => void start("q5")}>
-          Tentar novamente
-        </PixelButton>
-      </div>
+      <AppLayout>
+        <div className="flex flex-col items-center gap-4 py-16">
+          <p className="font-mono text-sm text-red-500">{error}</p>
+          <PixelButton variant="ghost" onClick={() => void start("q5")}>
+            Tentar novamente
+          </PixelButton>
+        </div>
+      </AppLayout>
     );
   }
 
   if (isDone && result) {
     return (
-      <div className="mx-auto flex max-w-lg flex-col items-center gap-6 px-4 py-12">
-        <h1 className="font-mono text-lg uppercase tracking-wide text-[var(--pixel-accent)]">
-          Sprint Concluído!
-        </h1>
-        <PixelCard className="w-full flex flex-col gap-3 text-center">
-          <p className="font-mono text-2xl text-[var(--pixel-text)]">{result.scorePercent}%</p>
-          <p className="font-mono text-sm text-[var(--pixel-muted)]">+{result.gainedXp} XP</p>
-          <p className="font-mono text-sm text-[var(--pixel-muted)]">
-            Sequência: {result.streakDays} dia{result.streakDays !== 1 ? "s" : ""}
-          </p>
-        </PixelCard>
-        {result.newAchievements.length > 0 && (
-          <div className="flex flex-col gap-2 w-full">
-            <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-accent)]">
-              Conquistas Desbloqueadas
+      <AppLayout>
+        <div className="mx-auto flex max-w-lg flex-col items-center gap-6 px-4 py-12">
+          <h1 className="font-mono text-lg uppercase tracking-wide text-[var(--pixel-accent)]">
+            Sprint Concluído!
+          </h1>
+          <PixelCard className="w-full flex flex-col gap-3 text-center">
+            <p className="font-mono text-2xl text-[var(--pixel-text)]">{result.scorePercent}%</p>
+            <p className="font-mono text-sm text-[var(--pixel-muted)]">+{result.gainedXp} XP</p>
+            <p className="font-mono text-sm text-[var(--pixel-muted)]">
+              Sequência: {result.streakDays} dia{result.streakDays !== 1 ? "s" : ""}
             </p>
-            {result.newAchievements.map((a) => (
-              <PixelCard key={a.code} className="flex flex-col gap-1">
-                <p className="font-mono text-sm text-[var(--pixel-text)]">{a.name}</p>
-                <p className="font-mono text-xs text-[var(--pixel-muted)]">{a.description}</p>
-              </PixelCard>
+          </PixelCard>
+          {result.newAchievements.length > 0 && (
+            <div className="flex flex-col gap-2 w-full">
+              <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-accent)]">
+                Conquistas Desbloqueadas
+              </p>
+              {result.newAchievements.map((a) => (
+                <PixelCard key={a.code} className="flex flex-col gap-1">
+                  <p className="font-mono text-sm text-[var(--pixel-text)]">{a.name}</p>
+                  <p className="font-mono text-xs text-[var(--pixel-muted)]">{a.description}</p>
+                </PixelCard>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-3 flex-wrap justify-center">
+            {(Object.keys(MODE_LABELS) as SprintMode[]).map((mode) => (
+              <PixelButton key={mode} variant="ghost" onClick={() => void start(mode)}>
+                {MODE_LABELS[mode]}
+              </PixelButton>
             ))}
           </div>
-        )}
-        <div className="flex gap-3 flex-wrap justify-center">
-          {(Object.keys(MODE_LABELS) as SprintMode[]).map((mode) => (
-            <PixelButton key={mode} variant="ghost" onClick={() => void start(mode)}>
-              {MODE_LABELS[mode]}
-            </PixelButton>
-          ))}
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-16">
-        <p className="font-mono text-sm text-[var(--pixel-muted)]">Carregando sprint...</p>
-      </div>
+      <AppLayout>
+        <div className="flex justify-center py-16">
+          <p className="font-mono text-sm text-[var(--pixel-muted)]">Carregando sprint...</p>
+        </div>
+      </AppLayout>
     );
   }
 
   if (!data) {
     // Mode selection screen.
     return (
-      <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
-        <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
-          Sprint Mode
-        </h1>
-        <p className="font-mono text-xs text-[var(--pixel-muted)]">
-          Sessões ultra-rápidas para manter o ritmo. Escolha o modo:
-        </p>
-        <div className="flex flex-wrap gap-3">
-          {(Object.keys(MODE_LABELS) as SprintMode[]).map((mode) => (
-            <PixelButton key={mode} onClick={() => void start(mode)} className="min-w-[130px]">
-              {MODE_LABELS[mode]}
-            </PixelButton>
-          ))}
+      <AppLayout>
+        <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
+          <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
+            Sprint Mode
+          </h1>
+          <p className="font-mono text-xs text-[var(--pixel-muted)]">
+            Sessões ultra-rápidas para manter o ritmo. Escolha o modo:
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {(Object.keys(MODE_LABELS) as SprintMode[]).map((mode) => (
+              <PixelButton key={mode} onClick={() => void start(mode)} className="min-w-[130px]">
+                {MODE_LABELS[mode]}
+              </PixelButton>
+            ))}
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -103,16 +112,18 @@ export function SprintScreen() {
   if (!currentQuestion) return null;
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-6">
-      <SprintRunner
-        key={currentQuestion.id}
-        question={currentQuestion}
-        currentIndex={currentIndex}
-        totalQuestions={data.questions.length}
-        limitSeconds={data.limitSeconds}
-        onAnswer={recordAnswer}
-        isSubmitting={isSubmitting}
-      />
-    </div>
+    <AppLayout>
+      <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-6">
+        <SprintRunner
+          key={currentQuestion.id}
+          question={currentQuestion}
+          currentIndex={currentIndex}
+          totalQuestions={data.questions.length}
+          limitSeconds={data.limitSeconds}
+          onAnswer={recordAnswer}
+          isSubmitting={isSubmitting}
+        />
+      </div>
+    </AppLayout>
   );
 }

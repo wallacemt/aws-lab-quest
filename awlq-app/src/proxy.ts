@@ -14,7 +14,10 @@ const PUBLIC_PREFIXES = [
   "/og-image",
   "/privacidade"
 ];
-const PUBLIC_EXACT_PATHS = ["/", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest"];
+const PUBLIC_EXACT_PATHS = ["/", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/changelog"];
+
+// /api/changelog is public (RF-16) — served without session
+const PUBLIC_API_EXACT = ["/api/changelog"];
 
 // Better Auth may prefix secure cookies in production environments.
 const SESSION_COOKIE_NAMES = [
@@ -35,8 +38,12 @@ function hasSessionCookie(request: NextRequest) {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow static assets and auth API routes
-  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || PUBLIC_EXACT_PATHS.includes(pathname)) {
+  // Always allow static assets, auth API routes, and public pages/APIs
+  if (
+    PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
+    PUBLIC_EXACT_PATHS.includes(pathname) ||
+    PUBLIC_API_EXACT.includes(pathname)
+  ) {
     return NextResponse.next();
   }
 
