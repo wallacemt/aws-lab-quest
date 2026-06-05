@@ -38,6 +38,19 @@ async function anonymizeUser(userId: string, reason: string): Promise<void> {
     prisma.userProfile.deleteMany({ where: { userId } }),
     prisma.session.deleteMany({ where: { userId } }),
     prisma.account.deleteMany({ where: { userId } }),
+    // LGPD F-01: explicitly delete Phase 1–4 user data tables.
+    // The User row is updated (not hard-deleted) so onDelete: Cascade does not
+    // fire. These deletes ensure all personal data is removed as required by
+    // LGPD Art. 18 right-to-erasure obligations.
+    prisma.flashcard.deleteMany({ where: { userId } }),
+    // FlashcardReview rows cascade from Flashcard deletion above.
+    prisma.falseBeliefSignal.deleteMany({ where: { userId } }),
+    prisma.mentorRecommendation.deleteMany({ where: { userId } }),
+    prisma.bossBattle.deleteMany({ where: { userId } }),
+    prisma.weeklyChallengeEntry.deleteMany({ where: { userId } }),
+    prisma.dailyQuizAttempt.deleteMany({ where: { userId } }),
+    prisma.userBehaviorProfile.deleteMany({ where: { userId } }),
+    prisma.questChainProgress.deleteMany({ where: { userId } }),
   ]);
 
   logger.info({ userId, reason }, "data-retention: user anonymized");
