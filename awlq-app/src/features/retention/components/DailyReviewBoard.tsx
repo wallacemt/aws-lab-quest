@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { MemoryRecoveryCard } from "@/features/retention/components/MemoryRecoveryCard";
@@ -15,7 +16,9 @@ type Props = {
  * weak AWS services, and memory recovery items.
  */
 export function DailyReviewBoard({ onStartFlashcards }: Props) {
-  const { data, recoveryItems, isLoading, error, load } = useDailyReview();
+  const router = useRouter();
+  const { data, recoveryItems, streakDays, isLoading, isCompleting, error, load, complete } = useDailyReview();
+  const [completed, setCompleted] = useState(false);
 
   useEffect(() => {
     void load();
@@ -24,7 +27,7 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <p className="font-mono text-sm text-[var(--pixel-muted)]">Carregando revisão...</p>
+        <p className="font-mono text-sm text-[var(--pixel-accent)]">Carregando revisão...</p>
       </div>
     );
   }
@@ -51,9 +54,30 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
   if (!hasContent) {
     return (
       <PixelCard className="text-center">
-        <p className="font-mono text-sm text-[var(--pixel-muted)]">
+        <p className="font-mono text-sm text-[var(--pixel-accent)]">
           Tudo em dia! Nenhuma revisão pendente por agora.
         </p>
+      </PixelCard>
+    );
+  }
+
+  async function handleComplete() {
+    await complete();
+    setCompleted(true);
+  }
+
+  if (completed) {
+    return (
+      <PixelCard className="flex flex-col items-center gap-4 py-10 text-center">
+        <p className="font-mono text-2xl text-[var(--pixel-accent)]">Revisão concluída!</p>
+        {streakDays !== null && (
+          <p className="font-mono text-sm text-[var(--pixel-text)]">
+            Sequência atual: <span className="text-yellow-400 font-bold">{streakDays} dia{streakDays !== 1 ? "s" : ""}</span>
+          </p>
+        )}
+        <PixelButton variant="ghost" onClick={() => { setCompleted(false); void load(); }}>
+          Ver revisão novamente
+        </PixelButton>
       </PixelCard>
     );
   }
@@ -87,13 +111,22 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
           </h2>
           <div className="flex flex-col gap-2">
             {data.recentWrong.map((question) => (
-              <PixelCard key={question.id}>
-                <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-muted)] mb-1">
-                  {question.awsService?.name ?? question.topic}
-                </p>
-                <p className="font-mono text-sm leading-relaxed text-[var(--pixel-text)] line-clamp-2">
-                  {question.statement}
-                </p>
+              <PixelCard key={question.id} className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-subtext )] mb-1">
+                    {question.awsService?.name ?? question.topic}
+                  </p>
+                  <p className="font-mono text-sm leading-relaxed text-[var(--pixel-text)] line-clamp-2">
+                    {question.statement}
+                  </p>
+                </div>
+                <PixelButton
+                  variant="ghost"
+                  className="shrink-0 text-xs"
+                  onClick={() => router.push("/revisao")}
+                >
+                  Rever
+                </PixelButton>
               </PixelCard>
             ))}
           </div>
@@ -108,11 +141,20 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
           </h2>
           <div className="flex flex-col gap-2">
             {data.weakServices.map((service) => (
-              <PixelCard key={service.code} className="flex items-center justify-between">
-                <span className="font-mono text-sm text-[var(--pixel-text)]">{service.name}</span>
-                <span className="font-mono text-xs text-red-500">
-                  {Math.round(service.correctRate * 100)}% correto
-                </span>
+              <PixelCard key={service.code} className="flex items-center justify-between gap-4">
+                <div>
+                  <span className="font-mono text-sm text-[var(--pixel-text)]">{service.name}</span>
+                  <span className="block font-mono text-xs text-red-500">
+                    {Math.round(service.correctRate * 100)}% correto
+                  </span>
+                </div>
+                <PixelButton
+                  variant="ghost"
+                  className="shrink-0 text-xs"
+                  onClick={() => router.push("/kc")}
+                >
+                  Praticar
+                </PixelButton>
               </PixelCard>
             ))}
           </div>
@@ -132,6 +174,13 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
           </div>
         </section>
       )}
+
+      {/* Complete review */}
+      <div className="flex justify-center pt-2">
+        <PixelButton onClick={() => void handleComplete()} disabled={isCompleting}>
+          {isCompleting ? "Salvando..." : "Concluir Revisão"}
+        </PixelButton>
+      </div>
     </div>
   );
 }

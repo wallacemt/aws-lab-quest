@@ -13,6 +13,12 @@ type GameMode = {
 
 const STUDY_MODES: GameMode[] = [
   {
+    id: "simulado",
+    title: "Modo Simulado",
+    description: "Simulacao de prova com 90 minutos e bloqueio de outras acoes.",
+    cta: "Iniciar Simulado",
+  },
+  {
     id: "lab",
     title: "Modo Lab",
     description: "Gerar um quest hands-on a partir de um lab real da AWS.",
@@ -23,12 +29,6 @@ const STUDY_MODES: GameMode[] = [
     title: "Modo KC",
     description: "Knowledge Check com auditoria de respostas para fixar conceitos.",
     cta: "Abrir KC",
-  },
-  {
-    id: "simulado",
-    title: "Modo Simulado",
-    description: "Simulacao de prova com 90 minutos e bloqueio de outras acoes.",
-    cta: "Iniciar Simulado",
   },
   {
     id: "revisao",
@@ -86,6 +86,12 @@ const TOOLS_MODES: GameMode[] = [
     title: "Mentor IA",
     description: "Receba orientacao personalizada do Mestre Yoda baseada nas suas lacunas de conhecimento.",
     cta: "Consultar Mentor",
+  },
+  {
+    id: "noticias",
+    title: "Noticias AWS",
+    description: "Fique por dentro das ultimas novidades, lancamentos e atualizacoes da AWS.",
+    cta: "Ver Noticias",
   },
 ];
 

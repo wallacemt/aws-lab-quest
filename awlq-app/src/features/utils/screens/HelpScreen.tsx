@@ -142,7 +142,6 @@ export function HelpScreen() {
             </p>
           </div>
         </PixelCard>
-        <CreatorCredits compact={false} />
 
         {isOnboardingManual && (
           <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
@@ -233,16 +232,7 @@ export function HelpScreen() {
             ))}
           </div>
         </section>
-
-        {!isOnboardingManual && (
-          <PixelCard className="space-y-3">
-            <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Resumo rapido</p>
-            <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-              Perfil completo primeiro, quest bem descrita na Home, uma jornada por vez e revisao constante do
-              historico. Esse ciclo entrega a melhor experiencia dentro do app.
-            </p>
-          </PixelCard>
-        )}
+        <CreatorCredits compact={false} />
       </main>
     </AppLayout>
   );

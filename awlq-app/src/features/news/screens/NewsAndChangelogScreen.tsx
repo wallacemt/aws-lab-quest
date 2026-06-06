@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PixelCard } from "@/components/ui/pixel-card";
 import { NewsList } from "@/features/news/components/NewsList";
 import { ChangelogList } from "@/features/changelog/components/ChangelogList";
 
@@ -36,17 +37,15 @@ type ChangelogRelease = {
 type NewsCategory = "all" | "cloud" | "devto";
 type Tab = "noticias" | "changelog";
 
-// ─── Tab constants ────────────────────────────────────────────────────────────
-
 const TABS: { value: Tab; label: string }[] = [
   { value: "noticias", label: "Notícias" },
   { value: "changelog", label: "Changelog do App" },
 ];
 
-const NEWS_TABS: { value: NewsCategory; label: string }[] = [
-  { value: "all", label: "Todas" },
-  { value: "cloud", label: "AWS" },
-  { value: "devto", label: "dev.to" },
+const NEWS_TABS: { value: NewsCategory; label: string; tooltip: string }[] = [
+  { value: "all", label: "Todas", tooltip: "Mostrar todas as fontes" },
+  { value: "cloud", label: "AWS", tooltip: "Filtrar por blog AWS" },
+  { value: "devto", label: "dev.to", tooltip: "Filtrar por dev.to" },
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -54,19 +53,15 @@ const NEWS_TABS: { value: NewsCategory; label: string }[] = [
 export function NewsAndChangelogScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("noticias");
 
-  // News state
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
   const [newsError, setNewsError] = useState<string | null>(null);
   const [newsCategory, setNewsCategory] = useState<NewsCategory>("all");
 
-  // Changelog state (loaded lazily on first tab click)
   const [changelogReleases, setChangelogReleases] = useState<ChangelogRelease[] | null>(null);
   const [changelogLoading, setChangelogLoading] = useState(false);
   const [changelogError, setChangelogError] = useState<string | null>(null);
 
-  // Wrapping in an async function avoids calling setState synchronously in the
-  // effect body, which would trigger the react-hooks/set-state-in-effect rule.
   useEffect(() => {
     async function loadNews() {
       setNewsLoading(true);
@@ -86,7 +81,6 @@ export function NewsAndChangelogScreen() {
     void loadNews();
   }, [newsCategory]);
 
-  // Lazy-load changelog when tab is first activated
   function handleTabClick(tab: Tab) {
     setActiveTab(tab);
     if (tab === "changelog" && changelogReleases === null && !changelogLoading) {
@@ -112,21 +106,22 @@ export function NewsAndChangelogScreen() {
 
   const tabBtnClass = (isActive: boolean) =>
     [
-      "border px-3 py-1.5 font-mono text-xs uppercase transition-colors",
+      "border px-4 py-1.5 font-mono text-xs uppercase transition-colors",
       isActive
-        ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]"
-        : "border-[var(--pixel-border)] text-[var(--pixel-muted)] hover:border-[var(--pixel-border)]/60",
+        ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10 text-[var(--pixel-primary)]"
+        : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-accent)] hover:text-[var(--pixel-accent)]",
     ].join(" ");
 
   return (
     <AppLayout>
       <div className="mx-auto max-w-2xl px-4 py-8 space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="font-mono text-lg font-bold uppercase text-[var(--pixel-primary)]">
-            Novidades
-          </h1>
-        </div>
+        <PixelCard>
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Novidades</h1>
+          <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+            Últimas notícias da AWS e atualizações da plataforma.
+          </p>
+        </PixelCard>
 
         {/* Primary tab bar */}
         <div className="flex gap-2">
@@ -151,6 +146,7 @@ export function NewsAndChangelogScreen() {
                 <button
                   key={tab.value}
                   type="button"
+                  title={tab.tooltip}
                   onClick={() => setNewsCategory(tab.value)}
                   className={tabBtnClass(newsCategory === tab.value)}
                 >
@@ -160,25 +156,25 @@ export function NewsAndChangelogScreen() {
             </div>
 
             {newsLoading && (
-              <div className="grid place-items-center py-12">
-                <p className="font-mono text-xs uppercase text-[var(--pixel-muted)]">
+              <PixelCard className="text-center py-8">
+                <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
                   Buscando notícias...
                 </p>
-              </div>
+              </PixelCard>
             )}
 
             {newsError && !newsLoading && (
-              <div className="border border-red-500/30 bg-red-950/20 p-3">
+              <PixelCard className="border-red-500/40 bg-red-950/10">
                 <p className="font-mono text-xs text-red-400">{newsError}</p>
-              </div>
+              </PixelCard>
             )}
 
             {!newsLoading && !newsError && newsItems.length === 0 && (
-              <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-6 text-center">
-                <p className="font-mono text-xs text-[var(--pixel-muted)]">
+              <PixelCard className="text-center">
+                <p className="font-mono text-xs text-[var(--pixel-accent)]">
                   Nenhuma notícia disponível. O worker irá buscar em breve.
                 </p>
-              </div>
+              </PixelCard>
             )}
 
             {!newsLoading && !newsError && newsItems.length > 0 && (
@@ -191,26 +187,26 @@ export function NewsAndChangelogScreen() {
         {activeTab === "changelog" && (
           <div className="space-y-4">
             {changelogLoading && (
-              <div className="grid place-items-center py-12">
-                <p className="font-mono text-xs uppercase text-[var(--pixel-muted)]">
+              <PixelCard className="text-center py-8">
+                <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
                   Carregando changelog...
                 </p>
-              </div>
+              </PixelCard>
             )}
 
             {changelogError && !changelogLoading && (
-              <div className="border border-red-500/30 bg-red-950/20 p-3">
+              <PixelCard className="border-red-500/40 bg-red-950/10">
                 <p className="font-mono text-xs text-red-400">{changelogError}</p>
-              </div>
+              </PixelCard>
             )}
 
             {!changelogLoading && !changelogError && changelogReleases !== null && (
               changelogReleases.length === 0 ? (
-                <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-6 text-center">
+                <PixelCard className="text-center">
                   <p className="font-mono text-xs text-[var(--pixel-muted)]">
                     Nenhuma release publicada ainda.
                   </p>
-                </div>
+                </PixelCard>
               ) : (
                 <ChangelogList releases={changelogReleases} />
               )

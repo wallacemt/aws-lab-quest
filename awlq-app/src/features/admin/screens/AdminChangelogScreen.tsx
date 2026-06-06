@@ -25,6 +25,8 @@ export function AdminChangelogScreen() {
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [editSummary, setEditSummary] = useState<Record<string, string>>({});
+  const [editBody, setEditBody] = useState<Record<string, string>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [newEntry, setNewEntry] = useState<Record<string, { category: string; text: string }>>({});
   const [page, setPage] = useState(1);
   const [filterPublished, setFilterPublished] = useState<"" | "true" | "false">("");
@@ -38,10 +40,13 @@ export function AdminChangelogScreen() {
       const data = (await res.json()) as { releases: Release[] };
       setReleases(data.releases ?? []);
       const summaries: Record<string, string> = {};
+      const bodies: Record<string, string> = {};
       for (const r of data.releases ?? []) {
         summaries[r.id] = r.adminSummary ?? "";
+        bodies[r.id] = r.bodyMarkdown ?? "";
       }
       setEditSummary(summaries);
+      setEditBody(bodies);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao carregar.");
     } finally {
@@ -105,6 +110,19 @@ export function AdminChangelogScreen() {
     void loadReleases();
   }
 
+  async function deleteRelease(releaseId: string) {
+    if (!window.confirm("Remover esta release permanentemente?")) return;
+    await fetch(`/api/admin/changelog/${releaseId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    void loadReleases();
+  }
+
+  function toggleCollapse(releaseId: string) {
+    setCollapsed((p) => ({ ...p, [releaseId]: !p[releaseId] }));
+  }
+
   const filtered =
     filterPublished === ""
       ? releases
@@ -166,21 +184,29 @@ export function AdminChangelogScreen() {
         <>
           <div className="space-y-4">
             {paginated.map((release) => (
-              <section key={release.id} className="border border-[#1e293b] bg-[#111827] p-4 space-y-4">
-                {/* Release header */}
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-mono text-sm text-[#f97316]">{release.tagName}</p>
+              <section key={release.id} className="border border-[#1e293b] bg-[#111827]">
+                {/* Release header — always visible */}
+                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleCollapse(release.id)}
+                    className="flex items-center gap-2 text-left flex-1 min-w-0"
+                    aria-expanded={!collapsed[release.id]}
+                  >
+                    <span className="font-mono text-xs text-[#94a3b8] shrink-0">
+                      {collapsed[release.id] ? "▶" : "▼"}
+                    </span>
+                    <span className="font-mono text-sm text-[#f97316]">{release.tagName}</span>
                     {release.name && (
-                      <p className="font-mono text-xs text-[#e2e8f0]">{release.name}</p>
+                      <span className="font-mono text-xs text-[#e2e8f0] truncate">{release.name}</span>
                     )}
                     {release.releasedAt && (
-                      <p className="font-mono text-[10px] text-[#94a3b8]">
+                      <span className="font-mono text-[10px] text-[#94a3b8] shrink-0">
                         {new Date(release.releasedAt).toLocaleDateString("pt-BR")}
-                      </p>
+                      </span>
                     )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+                  </button>
+                  <div className="flex shrink-0 flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => void updateRelease(release, { highlight: !release.highlight })}
@@ -203,92 +229,132 @@ export function AdminChangelogScreen() {
                     >
                       {release.published ? "Publicado" : "Publicar"}
                     </button>
-                  </div>
-                </div>
-
-                {/* Admin summary */}
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#94a3b8] mb-1">
-                    Resumo (substitui bodyMarkdown no público)
-                  </label>
-                  <div className="flex gap-2">
-                    <textarea
-                      rows={2}
-                      className="flex-1 border border-[#334155] bg-[#0b1220] px-3 py-2 font-mono text-xs text-[#e2e8f0] focus:border-[#f97316] focus:outline-none resize-none"
-                      value={editSummary[release.id] ?? ""}
-                      onChange={(e) =>
-                        setEditSummary((p) => ({ ...p, [release.id]: e.target.value }))
-                      }
-                    />
                     <button
                       type="button"
-                      onClick={() =>
-                        void updateRelease(release, {
-                          adminSummary: editSummary[release.id] || null,
-                        })
-                      }
-                      className="border border-[#334155] px-3 font-mono text-[10px] uppercase text-[#cbd5e1] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+                      onClick={() => void deleteRelease(release.id)}
+                      className="border border-red-900 px-3 py-1.5 font-mono text-[10px] uppercase text-red-500 hover:border-red-500 transition-colors"
                     >
-                      Salvar
+                      Remover
                     </button>
                   </div>
                 </div>
 
-                {/* Entries */}
-                <div className="space-y-2">
-                  <p className="font-mono text-[10px] uppercase text-[#94a3b8]">
-                    Entradas ({release.entries.length})
-                  </p>
-                  {release.entries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="flex items-center gap-2 border border-[#1e293b] bg-[#0b1220] px-3 py-2"
-                    >
-                      <span className="font-mono text-[10px] text-[#f97316] uppercase shrink-0">
-                        [{entry.category}]
-                      </span>
-                      <span className="flex-1 font-mono text-[10px] text-[#cbd5e1]">{entry.text}</span>
-                      <button
-                        type="button"
-                        onClick={() => void deleteEntry(release.id, entry.id)}
-                        className="shrink-0 font-mono text-[10px] text-red-400 hover:text-red-300 transition-colors"
-                      >
-                        Remover
-                      </button>
+                {/* Collapsible body */}
+                {!collapsed[release.id] && (
+                  <div className="border-t border-[#1e293b] px-4 pb-4 pt-3 space-y-4">
+                    {/* Body markdown */}
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase text-[#94a3b8] mb-1">
+                        Body (markdown do GitHub)
+                      </label>
+                      <div className="flex gap-2">
+                        <textarea
+                          rows={5}
+                          className="flex-1 border border-[#334155] bg-[#0b1220] px-3 py-2 font-mono text-xs text-[#e2e8f0] focus:border-[#f97316] focus:outline-none resize-y"
+                          value={editBody[release.id] ?? ""}
+                          onChange={(e) =>
+                            setEditBody((p) => ({ ...p, [release.id]: e.target.value }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void updateRelease(release, {
+                              bodyMarkdown: editBody[release.id] || null,
+                            })
+                          }
+                          className="border border-[#334155] px-3 font-mono text-[10px] uppercase text-[#cbd5e1] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+                        >
+                          Salvar
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                  <div className="flex gap-2">
-                    <input
-                      placeholder="categoria"
-                      className="w-28 border border-[#334155] bg-[#0b1220] px-2 py-1.5 font-mono text-[10px] text-[#e2e8f0] focus:border-[#f97316] focus:outline-none"
-                      value={newEntry[release.id]?.category ?? ""}
-                      onChange={(e) =>
-                        setNewEntry((p) => ({
-                          ...p,
-                          [release.id]: { ...p[release.id], category: e.target.value },
-                        }))
-                      }
-                    />
-                    <input
-                      placeholder="texto da entrada"
-                      className="flex-1 border border-[#334155] bg-[#0b1220] px-2 py-1.5 font-mono text-[10px] text-[#e2e8f0] focus:border-[#f97316] focus:outline-none"
-                      value={newEntry[release.id]?.text ?? ""}
-                      onChange={(e) =>
-                        setNewEntry((p) => ({
-                          ...p,
-                          [release.id]: { ...p[release.id], text: e.target.value },
-                        }))
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void addEntry(release.id)}
-                      className="border border-[#334155] px-3 font-mono text-[10px] uppercase text-[#cbd5e1] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
-                    >
-                      + Adicionar
-                    </button>
+
+                    {/* Admin summary */}
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase text-[#94a3b8] mb-1">
+                        Resumo admin (exibido no público se preenchido)
+                      </label>
+                      <div className="flex gap-2">
+                        <textarea
+                          rows={2}
+                          className="flex-1 border border-[#334155] bg-[#0b1220] px-3 py-2 font-mono text-xs text-[#e2e8f0] focus:border-[#f97316] focus:outline-none resize-none"
+                          value={editSummary[release.id] ?? ""}
+                          onChange={(e) =>
+                            setEditSummary((p) => ({ ...p, [release.id]: e.target.value }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void updateRelease(release, {
+                              adminSummary: editSummary[release.id] || null,
+                            })
+                          }
+                          className="border border-[#334155] px-3 font-mono text-[10px] uppercase text-[#cbd5e1] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+                        >
+                          Salvar
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Entries */}
+                    <div className="space-y-2">
+                      <p className="font-mono text-[10px] uppercase text-[#94a3b8]">
+                        Entradas ({release.entries.length})
+                      </p>
+                      {release.entries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className="flex items-center gap-2 border border-[#1e293b] bg-[#0b1220] px-3 py-2"
+                        >
+                          <span className="font-mono text-[10px] text-[#f97316] uppercase shrink-0">
+                            [{entry.category}]
+                          </span>
+                          <span className="flex-1 font-mono text-[10px] text-[#cbd5e1]">{entry.text}</span>
+                          <button
+                            type="button"
+                            onClick={() => void deleteEntry(release.id, entry.id)}
+                            className="shrink-0 font-mono text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <input
+                          placeholder="categoria"
+                          className="w-28 border border-[#334155] bg-[#0b1220] px-2 py-1.5 font-mono text-[10px] text-[#e2e8f0] focus:border-[#f97316] focus:outline-none"
+                          value={newEntry[release.id]?.category ?? ""}
+                          onChange={(e) =>
+                            setNewEntry((p) => ({
+                              ...p,
+                              [release.id]: { ...p[release.id], category: e.target.value },
+                            }))
+                          }
+                        />
+                        <input
+                          placeholder="texto da entrada"
+                          className="flex-1 border border-[#334155] bg-[#0b1220] px-2 py-1.5 font-mono text-[10px] text-[#e2e8f0] focus:border-[#f97316] focus:outline-none"
+                          value={newEntry[release.id]?.text ?? ""}
+                          onChange={(e) =>
+                            setNewEntry((p) => ({
+                              ...p,
+                              [release.id]: { ...p[release.id], text: e.target.value },
+                            }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void addEntry(release.id)}
+                          className="border border-[#334155] px-3 font-mono text-[10px] uppercase text-[#cbd5e1] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+                        >
+                          + Adicionar
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </section>
             ))}
 

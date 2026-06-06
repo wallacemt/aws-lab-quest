@@ -136,7 +136,7 @@ export function MentorActionList({ recommendations, isLoading = false }: Props) 
   if (recommendations.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center">
-        <p className="font-mono text-sm text-[var(--pixel-muted)]">
+        <p className="font-mono text-sm text-[var(--pixel-subtext)]">
           Conclua uma sessão de estudo para receber recomendações personalizadas.
         </p>
       </div>
