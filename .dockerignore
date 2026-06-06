@@ -1,0 +1,22 @@
+.git
+*.log
+README.md
+CHANGELOG.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+docs
+simulados
+awlq-extractor
+
+# App-specific ignores
+awlq-app/.next
+awlq-app/node_modules
+awlq-app/.env
+awlq-app/.env.*
+awlq-app/dist
+
+# Worker-specific ignores
+awlq-worker/node_modules
+awlq-worker/dist
+awlq-worker/.env
+awlq-worker/.env.*
