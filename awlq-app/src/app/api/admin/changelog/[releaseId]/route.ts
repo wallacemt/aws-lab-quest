@@ -8,11 +8,12 @@ type UpdateReleaseBody = Partial<{
   published: boolean;
   adminSummary: string | null;
   highlight: boolean;
+  bodyMarkdown: string | null;
 }>;
 
 /**
  * PUT /api/admin/changelog/[releaseId]
- * Toggles published, sets adminSummary, sets highlight.
+ * Toggles published, sets adminSummary, highlight, and bodyMarkdown.
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   const auth = await requireAdmin(request);
@@ -33,4 +34,19 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   });
 
   return NextResponse.json({ release });
+}
+
+/**
+ * DELETE /api/admin/changelog/[releaseId]
+ * Permanently removes a release and its entries.
+ */
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const auth = await requireAdmin(request);
+  if (!auth.ok) return auth.response;
+
+  const { releaseId } = await params;
+
+  await prisma.changelogRelease.delete({ where: { id: releaseId } });
+
+  return NextResponse.json({ deleted: true });
 }

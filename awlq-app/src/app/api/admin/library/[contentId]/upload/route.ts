@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import type { LibraryContentType } from "@prisma/client";
 
-const LIBRARY_BUCKET = "library-content";
+const LIBRARY_BUCKET = "awslq-library-content";
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 /**
