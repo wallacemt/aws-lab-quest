@@ -7,10 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "prisma migrate dev --schema=../packages/db/prisma/schema.prisma",
     "db:seed": "bun run prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "db:generate": "prisma generate",
+    "db:studio": "prisma studio --schema=../packages/db/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema=../packages/db/prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema=../packages/db/prisma/schema.prisma",
     "test": "vitest run"
   },
   "prisma": {

@@ -18,9 +18,9 @@ const DEFAULT_XP_WEIGHTS = [
   { activityType: "KC", topic: "IAM", difficulty: "*", multiplier: 1.15, bonusXp: 10 },
   { activityType: "KC", topic: "VPC", difficulty: "*", multiplier: 1.25, bonusXp: 15 },
   // Phase 1: Retention spine activity types
-  { activityType: "flashcard",     topic: "*", difficulty: "*", multiplier: 0.5, bonusXp: 5 },
-  { activityType: "sprint",        topic: "*", difficulty: "*", multiplier: 1.0, bonusXp: 10 },
-  { activityType: "daily_review",  topic: "*", difficulty: "*", multiplier: 0.8, bonusXp: 15 },
+  { activityType: "flashcard", topic: "*", difficulty: "*", multiplier: 0.5, bonusXp: 5 },
+  { activityType: "sprint", topic: "*", difficulty: "*", multiplier: 1.0, bonusXp: 10 },
+  { activityType: "daily_review", topic: "*", difficulty: "*", multiplier: 0.8, bonusXp: 15 },
 ] as const;
 
 async function generateBadgeImage(prompt: string): Promise<{ data: Buffer; mimeType: string }> {
@@ -414,9 +414,36 @@ async function seedXpWeights() {
 // ─── Task 7a: Arena Bosses ────────────────────────────────────────────────────
 
 const ARENA_BOSSES = [
-  { name: "Guardião EC2", code: "ec2-boss", themeService: "EC2", maxHp: 1000, damagePerCorrect: 50, active: true },
-  { name: "Oráculo IAM",  code: "iam-boss", themeService: "IAM", maxHp: 800,  damagePerCorrect: 40, active: true },
-  { name: "Arquiteto S3", code: "s3-boss",  themeService: "S3",  maxHp: 600,  damagePerCorrect: 30, active: true },
+  {
+    name: "Guardião EC2",
+    code: "ec2-boss",
+    themeService: "EC2",
+    maxHp: 1000,
+    damagePerCorrect: 50,
+    active: true,
+    artworkUrl:
+      "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/orphan/default_boss.png",
+  },
+  {
+    name: "Oráculo IAM",
+    code: "iam-boss",
+    themeService: "IAM",
+    maxHp: 800,
+    damagePerCorrect: 40,
+    active: true,
+    artworkUrl:
+      "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/orphan/default_boss.png",
+  },
+  {
+    name: "Arquiteto S3",
+    code: "s3-boss",
+    themeService: "S3",
+    maxHp: 600,
+    damagePerCorrect: 30,
+    active: true,
+    artworkUrl:
+      "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/orphan/default_boss.png",
+  },
 ] as const;
 
 async function seedArenaBosses() {
@@ -433,9 +460,9 @@ async function seedArenaBosses() {
 // ─── Task 7b: News Sources ────────────────────────────────────────────────────
 
 const NEWS_SOURCES = [
-  { name: "AWS Blog",       feedUrl: "https://aws.amazon.com/blogs/aws/feed/",      category: "cloud",   active: true },
-  { name: "AWS Security",   feedUrl: "https://aws.amazon.com/blogs/security/feed/", category: "security", active: true },
-  { name: "dev.to AWS Tag", feedUrl: "https://dev.to/feed/tag/aws",                 category: "cloud",   active: true },
+  { name: "AWS Blog", feedUrl: "https://aws.amazon.com/blogs/aws/feed/", category: "cloud", active: true },
+  { name: "AWS Security", feedUrl: "https://aws.amazon.com/blogs/security/feed/", category: "security", active: true },
+  { name: "dev.to AWS Tag", feedUrl: "https://dev.to/feed/tag/aws", category: "cloud", active: true },
 ] as const;
 
 async function seedNewsSources() {
@@ -466,10 +493,10 @@ const QUEST_CHAINS: QuestChainSeed[] = [
     active: true,
     displayOrder: 1,
     stages: [
-      { title: "Usuários e Grupos",       position: 1, awsServiceCode: "IAM" },
-      { title: "Políticas e Permissões",  position: 2, awsServiceCode: "IAM" },
-      { title: "Roles e Trust Policies",  position: 3, awsServiceCode: "IAM" },
-      { title: "MFA e Boas Práticas",     position: 4, awsServiceCode: "IAM" },
+      { title: "Usuários e Grupos", position: 1, awsServiceCode: "IAM" },
+      { title: "Políticas e Permissões", position: 2, awsServiceCode: "IAM" },
+      { title: "Roles e Trust Policies", position: 3, awsServiceCode: "IAM" },
+      { title: "MFA e Boas Práticas", position: 4, awsServiceCode: "IAM" },
     ],
   },
   {
@@ -478,9 +505,9 @@ const QUEST_CHAINS: QuestChainSeed[] = [
     active: true,
     displayOrder: 2,
     stages: [
-      { title: "Criando e configurando Buckets",    position: 1, awsServiceCode: "S3" },
-      { title: "Versionamento e Ciclo de Vida",     position: 2, awsServiceCode: "S3" },
-      { title: "Bucket Policies e ACLs",            position: 3, awsServiceCode: "S3" },
+      { title: "Criando e configurando Buckets", position: 1, awsServiceCode: "S3" },
+      { title: "Versionamento e Ciclo de Vida", position: 2, awsServiceCode: "S3" },
+      { title: "Bucket Policies e ACLs", position: 3, awsServiceCode: "S3" },
       { title: "Replicação e Transfer Acceleration", position: 4, awsServiceCode: "S3" },
     ],
   },
