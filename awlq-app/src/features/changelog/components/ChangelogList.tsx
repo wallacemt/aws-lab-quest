@@ -24,8 +24,8 @@ type Props = {
 export function ChangelogList({ releases }: Props) {
   if (releases.length === 0) {
     return (
-      <div className="border border-[#1e293b] bg-[#0f172a] p-6 text-center">
-        <p className="font-mono text-xs text-[#94a3b8]">Nenhuma release publicada ainda.</p>
+      <div className="border border-[var(--pixel-border)] bg-[var(--pixel-card)] p-6 text-center">
+        <p className="font-mono text-xs text-[var(--pixel-subtext)]">Nenhuma release publicada ainda.</p>
       </div>
     );
   }
