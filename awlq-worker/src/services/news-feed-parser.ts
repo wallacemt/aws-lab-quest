@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { logger } from "../shared/logger.js";
 
 const parser = new Parser({
-  timeout: 10_000,
+  timeout: 30_000,
 });
 
 export type RawNewsItem = {

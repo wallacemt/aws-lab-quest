@@ -27,7 +27,7 @@ async function fetchGitHubReleases(): Promise<GitHubRelease[]> {
 
   const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases?per_page=50`;
 
-  const res = await fetch(url, { headers });
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
 
   if (!res.ok) {
     throw new Error(`GitHub API responded with ${res.status}: ${await res.text()}`);
