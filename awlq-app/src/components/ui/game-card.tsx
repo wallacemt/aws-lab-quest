@@ -1,6 +1,20 @@
 import { ElementType } from "react";
-import { FlaskConical, CheckSquare, Timer, BookOpen, Play, Swords, Brain, Zap, CalendarCheck, Map, Library, Sparkles } from "lucide-react";
+import {
+  FlaskConical,
+  CheckSquare,
+  Timer,
+  BookOpen,
+  Play,
+  Swords,
+  Brain,
+  Zap,
+  CalendarCheck,
+  Map,
+  Library,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface GameCardProps {
   key?: string | number;
@@ -44,7 +58,12 @@ export default function GameCard({ id, title, description, cta, handleClick }: G
   const colorClass = COLORS[id] || "bg-pixel-border";
 
   return (
-    <button className="group text-left w-full bg-pixel-card retro-border retro-shadow retro-btn flex flex-col h-full relative overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/50">
+    <button
+      className={cn(
+        "group text-left w-full bg-pixel-card  retro-shadow retro-btn flex flex-col h-full relative overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/50",
+        id === "simulado" ? "border-5 border-accent rounded-2xl" : "retro-border",
+      )}
+    >
       {/* Top "Cartridge" Ridge */}
       <div className="absolute top-0 left-4 right-4 h-2 bg-pixel-muted rounded-b-md border-x-2 border-b-2 border-pixel-border opacity-50" />
 
@@ -57,9 +76,15 @@ export default function GameCard({ id, title, description, cta, handleClick }: G
           </div>
 
           {/* Decorative dots */}
-          <div className="flex gap-1">
-            <div className="w-2 h-2 rounded-full bg-pixel-border/20" />
-            <div className="w-2 h-2 rounded-full bg-pixel-border/20" />
+          <div className="flex items-center gap-4">
+            {id === "simulado" && (
+              <span className="font-mono text-xs text-accent p-2 retro-border animate-bounce">Popular</span>
+            )}
+            <div className="flex gap-1">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <div className="w-2 h-2 rounded-full bg-yellow-500" />
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+            </div>
           </div>
         </div>
 

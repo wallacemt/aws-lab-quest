@@ -55,7 +55,7 @@ export function CreatorCredits({ compact = true }: CreatorCreditsProps) {
               GitHub
             </Link>
             <Link
-              href="https://www.linkedin.com/in/wallace-santanak0/"
+              href="https://www.linkedin.com/in/wallacedev/"
               target="_blank"
               rel="noopener noreferrer"
               className={
