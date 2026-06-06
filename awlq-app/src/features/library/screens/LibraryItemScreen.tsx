@@ -6,12 +6,15 @@ import { AuthorCredit } from "@/features/library/components/AuthorCredit";
 import { MarkdownViewer } from "@/features/library/components/MarkdownViewer";
 import type { LibraryContentWithUrl } from "@/features/library/types";
 
-// PdfViewer is loaded lazily with SSR disabled:
-//   1. react-pdf/pdfjs runs in the browser only (Canvas API, Web Workers).
-//   2. PDF.js worker setup uses import.meta.url, which is not resolvable on the server.
+// PdfViewer and ImageViewer are loaded lazily with SSR disabled (browser-only APIs).
 const PdfViewer = dynamic(
   () => import("@/features/library/components/PdfViewer").then((m) => m.PdfViewer),
   { ssr: false, loading: () => <p className="font-mono text-xs text-[var(--pixel-muted)]">Carregando visualizador...</p> },
+);
+
+const ImageViewer = dynamic(
+  () => import("@/features/library/components/ImageViewer").then((m) => m.ImageViewer),
+  { ssr: false, loading: () => <p className="font-mono text-xs text-[var(--pixel-muted)]">Carregando imagem...</p> },
 );
 
 interface LibraryItemScreenProps {
@@ -24,21 +27,21 @@ export function LibraryItemScreen({ content }: LibraryItemScreenProps) {
       {/* Back nav */}
       <Link
         href="/biblioteca"
-        className="font-mono text-xs text-[var(--pixel-muted)] hover:text-[var(--pixel-accent)] transition-colors"
+        className="font-mono text-xs text-[var(--pixel-text)] hover:text-[var(--pixel-accent)] transition-colors"
       >
         ← Voltar à Biblioteca
       </Link>
 
       {/* Title */}
       <div>
-        <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--pixel-muted)]">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--pixel-subtext)]">
           {content.category}
         </p>
         <h1 className="mt-1 font-mono text-base font-bold text-[var(--pixel-text)]">
           {content.title}
         </h1>
         {content.description && (
-          <p className="mt-1 font-mono text-xs text-[var(--pixel-muted)]">{content.description}</p>
+          <p className="mt-1 font-mono text-xs text-[var(--pixel-subtext)]">{content.description}</p>
         )}
       </div>
 
@@ -50,7 +53,7 @@ export function LibraryItemScreen({ content }: LibraryItemScreenProps) {
       />
 
       {/* Content renderer */}
-      <div className="rounded border border-[var(--pixel-border)] bg-[var(--pixel-surface)] p-4">
+      <div className="border border-[var(--pixel-border)] bg-[var(--pixel-card)] p-4">
         {content.type === "PDF" || content.type === "SLIDES" ? (
           content.signedUrl ? (
             <PdfViewer url={content.signedUrl} />
@@ -61,12 +64,7 @@ export function LibraryItemScreen({ content }: LibraryItemScreenProps) {
           )
         ) : content.type === "IMAGE" ? (
           content.signedUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={content.signedUrl}
-              alt={content.title}
-              className="mx-auto max-w-full rounded"
-            />
+            <ImageViewer src={content.signedUrl} alt={content.title} />
           ) : (
             <p className="font-mono text-xs text-red-500">
               Imagem não disponível. Tente novamente mais tarde.
