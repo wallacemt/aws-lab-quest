@@ -84,7 +84,7 @@ const TOOLS_MODES: GameMode[] = [
   {
     id: "mentor",
     title: "Mentor IA",
-    description: "Receba orientacao personalizada do Mestre Yoda baseada nas suas lacunas de conhecimento.",
+    description: "Receba orientacao personalizada do Mestre AWS baseada nas suas lacunas de conhecimento.",
     cta: "Consultar Mentor",
   },
   {

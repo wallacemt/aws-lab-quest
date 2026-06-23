@@ -50,8 +50,8 @@ export function BattleScreen() {
     <AppLayout>
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
         <PixelCard>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Arena de Batalha</h1>
-          <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+          <h1 className="font-mono text-sm uppercase text-primary">Arena de Batalha</h1>
+          <p className="mt-1 font-[var(--font-body)] text-sm text-pixel-subtext">
             Escolha um boss para enfrentar e responda questões para reduzir seu HP.
           </p>
         </PixelCard>

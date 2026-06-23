@@ -94,7 +94,7 @@ export function MentorScreen() {
             </div>
             <div>
               <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)] tracking-widest mb-1">
-                Mestre Yoda — IA Mentor
+                Mestre AWS — IA Mentor
               </p>
               <h1 className="font-mono text-md font-bold uppercase text-[var(--pixel-text)]">Guia do Jedi AWS</h1>
               <p className="font-mono text-[11px] text-[var(--pixel-subtext)] mt-1 italic">
