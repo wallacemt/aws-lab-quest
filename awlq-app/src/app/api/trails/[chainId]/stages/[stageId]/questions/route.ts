@@ -1,0 +1,119 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { getAiModelForContext, extractJsonObject } from "@/lib/ai";
+
+type RouteContext = { params: Promise<{ chainId: string; stageId: string }> };
+
+type RawQuestion = {
+  statement: string;
+  options: { key: string; text: string }[];
+  correctKey: string;
+  explanation: string;
+};
+
+/**
+ * POST /api/trails/[chainId]/stages/[stageId]/questions
+ *
+ * Generates 10 temporary quiz questions for a trail stage.
+ * Questions are NOT persisted — they are ephemeral per session.
+ *
+ * Returns: { questions: TrailQuestion[] }
+ */
+export async function POST(request: NextRequest, context: RouteContext) {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { chainId, stageId } = await context.params;
+
+  const stage = await prisma.questChainStage.findFirst({
+    where: { id: stageId, chainId },
+    select: {
+      title: true,
+      awsServiceId: true,
+      topic: true,
+      chain: { select: { name: true, certificationPresetId: true } },
+    },
+  });
+
+  if (!stage) return NextResponse.json({ error: "Stage not found" }, { status: 404 });
+
+  const profile = await prisma.userProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { certificationPreset: { select: { name: true } } },
+  });
+
+  const subject = stage.awsServiceId ?? stage.topic ?? stage.title;
+  const certName = profile?.certificationPreset?.name ?? "AWS";
+
+  const prompt = `Você é um especialista em certificações AWS. Gere EXATAMENTE 10 questões de múltipla escolha sobre: **${stage.title}**${subject !== stage.title ? ` (${subject})` : ""}.
+
+Contexto: certificação ${certName}.
+
+Distribuição:
+- 3 questões conceituais (o que é, como funciona)
+- 4 questões de aplicação prática (cenários reais)
+- 3 questões de troubleshooting / escolha entre serviços
+
+Requisitos:
+- 4 alternativas por questão (A, B, C, D)
+- Questões diferentes entre si, cobrindo aspectos variados
+- Dificuldade intermediária a avançada
+- Inclua uma explicação curta e direta da resposta correta
+
+Responda APENAS com JSON válido, sem texto antes ou depois:
+{
+  "questions": [
+    {
+      "statement": "Texto completo da questão?",
+      "options": [
+        {"key": "A", "text": "alternativa A"},
+        {"key": "B", "text": "alternativa B"},
+        {"key": "C", "text": "alternativa C"},
+        {"key": "D", "text": "alternativa D"}
+      ],
+      "correctKey": "A",
+      "explanation": "Explicação concisa de por que A está correta."
+    }
+  ]
+}`;
+
+  let rawText: string;
+  try {
+    const aiModel = await getAiModelForContext("QUESTION_GENERATION");
+    const result = await aiModel.generateContent(prompt);
+    rawText = result.response.text().trim();
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Falha ao gerar questões: ${err instanceof Error ? err.message : "Erro desconhecido"}` },
+      { status: 500 },
+    );
+  }
+
+  const jsonStr = extractJsonObject(rawText);
+  if (!jsonStr) {
+    return NextResponse.json({ error: "Resposta da IA não é JSON válido." }, { status: 500 });
+  }
+
+  let parsed: { questions?: RawQuestion[] };
+  try {
+    parsed = JSON.parse(jsonStr) as { questions?: RawQuestion[] };
+  } catch {
+    return NextResponse.json({ error: "JSON inválido retornado pela IA." }, { status: 500 });
+  }
+
+  if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+    return NextResponse.json({ error: "Nenhuma questão gerada." }, { status: 500 });
+  }
+
+  // Normalize and assign ephemeral IDs
+  const questions = parsed.questions.slice(0, 10).map((q, i) => ({
+    id: `trail-q-${stageId}-${Date.now()}-${i}`,
+    statement: q.statement ?? "",
+    options: Array.isArray(q.options) ? q.options : [],
+    correctKey: (q.correctKey ?? "A").toUpperCase(),
+    explanation: q.explanation ?? "",
+  }));
+
+  return NextResponse.json({ questions });
+}

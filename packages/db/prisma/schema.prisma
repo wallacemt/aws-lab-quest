@@ -1059,6 +1059,7 @@ model QuestChainStage {
   // e.g. { minScorePercent: 70, sessionType: "KC" }
   unlockRule   Json?
   progress     QuestChainProgress[]
+  explain      TrailStageExplain?
 
   @@unique([chainId, position])
 }
@@ -1074,4 +1075,15 @@ model QuestChainProgress {
 
   @@unique([userId, stageId])
   @@index([userId, completed])
+}
+
+// Cached AI explanation per stage — generated once, shared across all users.
+model TrailStageExplain {
+  id        String          @id @default(cuid())
+  stageId   String          @unique
+  stage     QuestChainStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  markdown  String          @db.Text
+  createdAt DateTime        @default(now())
+
+  @@index([stageId])
 }
