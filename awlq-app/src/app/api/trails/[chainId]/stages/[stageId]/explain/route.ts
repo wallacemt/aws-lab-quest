@@ -105,9 +105,11 @@ Regras:
     );
   }
 
-  // Persist explanation for future reuse
-  await prisma.trailStageExplain.create({
-    data: { stageId, markdown },
+  // Persist explanation for future reuse — upsert handles concurrent requests
+  await prisma.trailStageExplain.upsert({
+    where: { stageId },
+    create: { stageId, markdown },
+    update: {},
   });
 
   return NextResponse.json({ markdown, cached: false });

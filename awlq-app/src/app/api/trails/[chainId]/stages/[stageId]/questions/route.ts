@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAiModelForContext, extractJsonObject } from "@/lib/ai";
+import { cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 
 type RouteContext = { params: Promise<{ chainId: string; stageId: string }> };
 
@@ -78,42 +79,47 @@ Responda APENAS com JSON válido, sem texto antes ou depois:
   ]
 }`;
 
-  let rawText: string;
+  type TrailQuestion = {
+    id: string;
+    statement: string;
+    options: { key: string; text: string }[];
+    correctKey: string;
+    explanation: string;
+  };
+
+  let questions: TrailQuestion[];
   try {
-    const aiModel = await getAiModelForContext("QUESTION_GENERATION");
-    const result = await aiModel.generateContent(prompt);
-    rawText = result.response.text().trim();
+    questions = await cacheGetOrSet<TrailQuestion[]>(
+      CACHE_KEYS.trailQuestions(stageId),
+      async () => {
+        const aiModel = await getAiModelForContext("QUESTION_GENERATION");
+        const result = await aiModel.generateContent(prompt);
+        const rawText = result.response.text().trim();
+
+        const jsonStr = extractJsonObject(rawText);
+        if (!jsonStr) throw new Error("Resposta da IA não é JSON válido.");
+
+        const parsed = JSON.parse(jsonStr) as { questions?: RawQuestion[] };
+        if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+          throw new Error("Nenhuma questão gerada.");
+        }
+
+        return parsed.questions.slice(0, 10).map((q, i) => ({
+          id: `trail-q-${stageId}-${i}`,
+          statement: q.statement ?? "",
+          options: Array.isArray(q.options) ? q.options : [],
+          correctKey: (q.correctKey ?? "A").toUpperCase(),
+          explanation: q.explanation ?? "",
+        }));
+      },
+      CACHE_TTL.TRAIL_QUESTIONS,
+    );
   } catch (err) {
     return NextResponse.json(
-      { error: `Falha ao gerar questões: ${err instanceof Error ? err.message : "Erro desconhecido"}` },
+      { error: err instanceof Error ? err.message : "Erro desconhecido" },
       { status: 500 },
     );
   }
-
-  const jsonStr = extractJsonObject(rawText);
-  if (!jsonStr) {
-    return NextResponse.json({ error: "Resposta da IA não é JSON válido." }, { status: 500 });
-  }
-
-  let parsed: { questions?: RawQuestion[] };
-  try {
-    parsed = JSON.parse(jsonStr) as { questions?: RawQuestion[] };
-  } catch {
-    return NextResponse.json({ error: "JSON inválido retornado pela IA." }, { status: 500 });
-  }
-
-  if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
-    return NextResponse.json({ error: "Nenhuma questão gerada." }, { status: 500 });
-  }
-
-  // Normalize and assign ephemeral IDs
-  const questions = parsed.questions.slice(0, 10).map((q, i) => ({
-    id: `trail-q-${stageId}-${Date.now()}-${i}`,
-    statement: q.statement ?? "",
-    options: Array.isArray(q.options) ? q.options : [],
-    correctKey: (q.correctKey ?? "A").toUpperCase(),
-    explanation: q.explanation ?? "",
-  }));
 
   return NextResponse.json({ questions });
 }
