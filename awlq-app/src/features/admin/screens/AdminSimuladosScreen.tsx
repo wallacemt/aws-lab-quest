@@ -9,92 +9,16 @@ import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/component
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
 import { AiArtworkGenerator } from "@/features/admin/components/AiArtworkGenerator";
 import { SimuladoPackCard } from "@/features/admin/components/SimuladoPackCard";
-import { CertificationOption } from "@/features/admin/types";
-
-type PackQuestion = {
-  packQuestionId: string;
-  id: string;
-  position: number;
-  statement: string;
-  topic: string | null;
-  difficulty: string;
-  questionType: string;
-};
-
-type JourneyNarrative = {
-  stageName: string;
-  storyText: string;
-  awsContext: string;
-};
-
-type PackDetail = {
-  id: string;
-  name: string;
-  active: boolean;
-  questionCount: number;
-  difficultyScore: number;
-  artworkUrl: string | null;
-  journeyNarrative: JourneyNarrative | null;
-  certificationPreset: { id: string; code: string; name: string } | null;
-  questions: PackQuestion[];
-};
-
-type AvailableQuestion = {
-  id: string;
-  statement: string;
-  topic: string | null;
-  difficulty: string;
-  questionType: string;
-  createdAt: string;
-};
-
-type SimuladoPackItem = {
-  id: string;
-  name: string;
-  certificationCode: string | null;
-  certificationName: string | null;
-  questionCount: number;
-  difficultyScore: number;
-  active: boolean;
-  artworkUrl: string | null;
-  createdAt: string;
-  createdByName: string | null;
-  sessionCount: number;
-};
-
-type PacksPayload = {
-  items: SimuladoPackItem[];
-  total: number;
-  page: number;
-  pageSize: number;
-};
-
-type GenerateStats = {
-  available: number;
-  packsPossible: number;
-  packSize: number;
-} | null;
-
-type AutoGenCertStat = {
-  code: string;
-  name: string;
-  available: number;
-  packsPossible: number;
-};
-
-type AutoGenStats = {
-  certifications: AutoGenCertStat[];
-  totalPacksPossible: number;
-  packSize: number;
-  defaultImagePromptTemplate: string;
-  defaultNarrativePrompt: string;
-};
-
-type AutoGenResult = {
-  created: number;
-  packs: Array<{ id: string; name: string; certCode: string; hasArtwork: boolean; hasNarrative: boolean }>;
-  errors: string[];
-};
+import {
+  CertificationOption,
+  GenerateStats,
+  PackDetail,
+  AvailableQuestion,
+  SimuladoPackItem,
+  PacksPayload,
+  AutoGenStats,
+  AutoGenResult,
+} from "@/features/admin/types";
 
 export function AdminSimuladosScreen() {
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
@@ -206,7 +130,18 @@ export function AdminSimuladosScreen() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, filterCert, filterActive, filterSearch, filterSortBy, filterSortOrder, filterMinDiff, filterMaxDiff, filterHasSessions]);
+  }, [
+    page,
+    pageSize,
+    filterCert,
+    filterActive,
+    filterSearch,
+    filterSortBy,
+    filterSortOrder,
+    filterMinDiff,
+    filterMaxDiff,
+    filterHasSessions,
+  ]);
 
   useEffect(() => {
     void loadPacks();
@@ -267,10 +202,9 @@ export function AdminSimuladosScreen() {
     }
     setGenerateStatsLoading(true);
     try {
-      const res = await fetch(
-        `/api/admin/simulado-packs/generate?certificationCode=${encodeURIComponent(code)}`,
-        { credentials: "include" },
-      );
+      const res = await fetch(`/api/admin/simulado-packs/generate?certificationCode=${encodeURIComponent(code)}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error();
       const json = (await res.json()) as GenerateStats;
       setGenerateStats(json);
@@ -476,7 +410,9 @@ export function AdminSimuladosScreen() {
       }
     }
     if (editPack.certificationPreset?.code) void loadAvail();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [editPack, editAvailPage, editAvailSearch, editAvailDiff]);
 
   async function handleSaveEdit() {
@@ -494,9 +430,7 @@ export function AdminSimuladosScreen() {
         const stageName = editJourneyStageName.trim();
         const storyText = editJourneyStoryText.trim();
         const awsContext = editJourneyAwsContext.trim();
-        body.journeyNarrative = stageName || storyText || awsContext
-          ? { stageName, storyText, awsContext }
-          : null;
+        body.journeyNarrative = stageName || storyText || awsContext ? { stageName, storyText, awsContext } : null;
       }
 
       const res = await fetch(`/api/admin/simulado-packs/${editPack.id}`, {
@@ -521,26 +455,29 @@ export function AdminSimuladosScreen() {
     if (existingIds.has(q.id)) return;
     setEditAddedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(q.id)) { next.delete(q.id); setEditAddedQuestions((qs) => qs.filter((x) => x.id !== q.id)); }
-      else { next.add(q.id); setEditAddedQuestions((qs) => [...qs, q]); }
+      if (next.has(q.id)) {
+        next.delete(q.id);
+        setEditAddedQuestions((qs) => qs.filter((x) => x.id !== q.id));
+      } else {
+        next.add(q.id);
+        setEditAddedQuestions((qs) => [...qs, q]);
+      }
       return next;
     });
   }
 
-  const currentQuestionCount = editPack
-    ? editPack.questions.length - editRemovedIds.size + editAddedIds.size
-    : 0;
+  const currentQuestionCount = editPack ? editPack.questions.length - editRemovedIds.size + editAddedIds.size : 0;
 
-  const pageAllSelected =
-    editAvailItems.length > 0 && editAvailItems.every((q) => editAddedIds.has(q.id));
-  const pagePartialSelected =
-    !pageAllSelected && editAvailItems.some((q) => editAddedIds.has(q.id));
+  const pageAllSelected = editAvailItems.length > 0 && editAvailItems.every((q) => editAddedIds.has(q.id));
+  const pagePartialSelected = !pageAllSelected && editAvailItems.some((q) => editAddedIds.has(q.id));
 
   function editToggleSelectPage() {
     if (pageAllSelected) {
       setEditAddedIds((prev) => {
         const next = new Set(prev);
-        editAvailItems.forEach((q) => { next.delete(q.id); });
+        editAvailItems.forEach((q) => {
+          next.delete(q.id);
+        });
         return next;
       });
       setEditAddedQuestions((qs) => qs.filter((q) => !editAvailItems.some((a) => a.id === q.id)));
@@ -549,7 +486,11 @@ export function AdminSimuladosScreen() {
       const toAdd = editAvailItems.filter((q) => !existingPackIds.has(q.id) && !editAddedIds.has(q.id));
       const slots = 65 - currentQuestionCount;
       const canAdd = toAdd.slice(0, Math.max(0, slots));
-      setEditAddedIds((prev) => { const next = new Set(prev); canAdd.forEach((q) => next.add(q.id)); return next; });
+      setEditAddedIds((prev) => {
+        const next = new Set(prev);
+        canAdd.forEach((q) => next.add(q.id));
+        return next;
+      });
       setEditAddedQuestions((qs) => [...qs, ...canAdd]);
     }
   }
@@ -561,9 +502,7 @@ export function AdminSimuladosScreen() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-mono text-sm uppercase text-[#f97316]">Simulados / Packs</h1>
-          <p className="mt-1 text-xs text-[#94a3b8]">
-            Gerencie os packs de questoes para simulados.
-          </p>
+          <p className="mt-1 text-xs text-[#94a3b8]">Gerencie os packs de questoes para simulados.</p>
         </div>
         <div className="flex gap-2">
           <Link
@@ -598,9 +537,7 @@ export function AdminSimuladosScreen() {
 
       {artworkMigrationPending > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border border-yellow-700/60 bg-yellow-900/10 px-4 py-3 text-xs text-yellow-200">
-          <span>
-            {artworkMigrationPending} pack(s) com arte armazenada em base64 no banco. Migre para o Supabase.
-          </span>
+          <span>{artworkMigrationPending} pack(s) com arte armazenada em base64 no banco. Migre para o Supabase.</span>
           <button
             onClick={() => void handleMigrateArtworks()}
             disabled={artworkMigrating}
@@ -611,11 +548,7 @@ export function AdminSimuladosScreen() {
         </div>
       )}
 
-      {error && (
-        <div className="border border-red-700 bg-red-900/20 px-4 py-3 text-xs text-red-300">
-          {error}
-        </div>
-      )}
+      {error && <div className="border border-red-700 bg-red-900/20 px-4 py-3 text-xs text-red-300">{error}</div>}
 
       {/* Filters */}
       <div className="border border-[#1e293b] bg-[#080e1a] px-4 py-3 space-y-3">
@@ -624,7 +557,10 @@ export function AdminSimuladosScreen() {
             <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Buscar por nome</span>
             <input
               value={filterSearch}
-              onChange={(e) => { setFilterSearch(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setFilterSearch(e.target.value);
+                setPage(1);
+              }}
               placeholder="Nome do pack..."
               className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569] w-48"
             />
@@ -634,12 +570,17 @@ export function AdminSimuladosScreen() {
             <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Certificação</span>
             <select
               value={filterCert}
-              onChange={(e) => { setFilterCert(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setFilterCert(e.target.value);
+                setPage(1);
+              }}
               className="border max-w-32 border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
             >
               <option value="">Todas</option>
               {certifications.map((c) => (
-                <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
+                <option key={c.id} value={c.code}>
+                  {c.code} — {c.name}
+                </option>
               ))}
             </select>
           </div>
@@ -648,7 +589,10 @@ export function AdminSimuladosScreen() {
             <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Status</span>
             <select
               value={filterActive}
-              onChange={(e) => { setFilterActive(e.target.value as "" | "true" | "false"); setPage(1); }}
+              onChange={(e) => {
+                setFilterActive(e.target.value as "" | "true" | "false");
+                setPage(1);
+              }}
               className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
             >
               <option value="">Todos</option>
@@ -661,7 +605,10 @@ export function AdminSimuladosScreen() {
             <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Sessoes</span>
             <select
               value={filterHasSessions}
-              onChange={(e) => { setFilterHasSessions(e.target.value as "" | "true" | "false"); setPage(1); }}
+              onChange={(e) => {
+                setFilterHasSessions(e.target.value as "" | "true" | "false");
+                setPage(1);
+              }}
               className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
             >
               <option value="">Todos</option>
@@ -677,7 +624,10 @@ export function AdminSimuladosScreen() {
             <div className="flex gap-1">
               <select
                 value={filterSortBy}
-                onChange={(e) => { setFilterSortBy(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setFilterSortBy(e.target.value);
+                  setPage(1);
+                }}
                 className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
               >
                 <option value="createdAt">Criacao</option>
@@ -687,7 +637,10 @@ export function AdminSimuladosScreen() {
               </select>
               <select
                 value={filterSortOrder}
-                onChange={(e) => { setFilterSortOrder(e.target.value as "asc" | "desc"); setPage(1); }}
+                onChange={(e) => {
+                  setFilterSortOrder(e.target.value as "asc" | "desc");
+                  setPage(1);
+                }}
                 className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#475569]"
               >
                 <option value="desc">Desc</option>
@@ -704,7 +657,10 @@ export function AdminSimuladosScreen() {
                 min={1}
                 max={10}
                 value={filterMinDiff}
-                onChange={(e) => { setFilterMinDiff(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setFilterMinDiff(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Min"
                 className="w-14 border border-[#334155] bg-[#0f172a] px-2 py-1.5 text-xs text-[#e2e8f0] outline-none"
               />
@@ -714,7 +670,10 @@ export function AdminSimuladosScreen() {
                 min={1}
                 max={10}
                 value={filterMaxDiff}
-                onChange={(e) => { setFilterMaxDiff(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setFilterMaxDiff(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Max"
                 className="w-14 border border-[#334155] bg-[#0f172a] px-2 py-1.5 text-xs text-[#e2e8f0] outline-none"
               />
@@ -727,11 +686,16 @@ export function AdminSimuladosScreen() {
               <span className="font-mono text-[9px] uppercase tracking-wider text-[#475569]">Por pagina</span>
               <select
                 value={pageSize}
-                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
                 className="border border-[#334155] bg-[#0f172a] px-2 py-1.5 text-xs text-[#e2e8f0] outline-none"
               >
                 {[10, 20, 30, 50].map((n) => (
-                  <option key={n} value={n}>{n}</option>
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
                 ))}
               </select>
             </div>
@@ -754,7 +718,13 @@ export function AdminSimuladosScreen() {
               </button>
             </div>
 
-            {(filterCert || filterActive || filterSearch || filterMinDiff || filterMaxDiff || filterHasSessions || filterSortBy !== "createdAt") && (
+            {(filterCert ||
+              filterActive ||
+              filterSearch ||
+              filterMinDiff ||
+              filterMaxDiff ||
+              filterHasSessions ||
+              filterSortBy !== "createdAt") && (
               <button
                 onClick={() => {
                   setFilterCert("");
@@ -798,124 +768,114 @@ export function AdminSimuladosScreen() {
       {viewMode === "grid" && !loading && result?.items.length === 0 && (
         <p className="py-8 text-center text-xs text-[#64748b]">Nenhum pack encontrado.</p>
       )}
-      {viewMode === "grid" && loading && (
-        <p className="py-8 text-center text-xs text-[#64748b]">Carregando...</p>
-      )}
+      {viewMode === "grid" && loading && <p className="py-8 text-center text-xs text-[#64748b]">Carregando...</p>}
 
       {/* Table view */}
       {viewMode === "table" && (
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-[#1e293b]">
-              <th className="w-12 px-2 py-2 font-mono text-[10px] uppercase text-[#64748b]">Arte</th>
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Nome</th>
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Cert</th>
-              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Qtd</th>
-              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Score</th>
-              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Sessoes</th>
-              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Status</th>
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Criado em</th>
-              <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-[#64748b]">
-                  Carregando...
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-[#1e293b]">
+                <th className="w-12 px-2 py-2 font-mono text-[10px] uppercase text-[#64748b]">Arte</th>
+                <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Nome</th>
+                <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Cert</th>
+                <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Qtd</th>
+                <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Score</th>
+                <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Sessoes</th>
+                <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Status</th>
+                <th className="px-3 py-2 text-left font-mono text-[10px] uppercase text-[#64748b]">Criado em</th>
+                <th className="px-3 py-2 text-center font-mono text-[10px] uppercase text-[#64748b]">Acoes</th>
               </tr>
-            )}
-            {!loading && result?.items.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-[#64748b]">
-                  Nenhum pack encontrado.
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              result?.items.map((pack) => (
-                <tr
-                  key={pack.id}
-                  className={`border-b border-[#1e293b] hover:bg-[#0b111e] ${!pack.active ? "opacity-40" : ""}`}
-                >
-                  <td className="px-2 py-1.5">
-                    <div className="relative mx-auto h-10 w-10 overflow-hidden border border-[#1e293b]">
-                      {pack.artworkUrl ? (
-                        pack.artworkUrl.startsWith("data:") ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={pack.artworkUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <Image
-                            src={pack.artworkUrl}
-                            alt={pack.name}
-                            fill
-                            sizes="40px"
-                            className="object-cover"
-                          />
-                        )
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[#111827]">
-                          <span className="font-mono text-[10px] font-bold text-[#334155]">
-                            {pack.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs text-[#e2e8f0]">{pack.name}</td>
-                  <td className="px-3 py-2">
-                    <span className="border border-[#334155] px-2 py-0.5 font-mono text-[10px] uppercase text-[#94a3b8]">
-                      {pack.certificationCode ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-center font-mono text-xs text-[#cbd5e1]">{pack.questionCount}</td>
-                  <td className="px-3 py-2 text-center font-mono text-xs text-[#f97316]">
-                    {pack.difficultyScore === 10 ? "BOSS⚡" : `${pack.difficultyScore}/10`}
-                  </td>
-                  <td className="px-3 py-2 text-center font-mono text-xs text-[#94a3b8]">{pack.sessionCount}</td>
-                  <td className="px-3 py-2 text-center">
-                    <span
-                      className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${
-                        pack.active
-                          ? "border-green-700 text-green-400"
-                          : "border-[#334155] text-[#64748b]"
-                      }`}
-                    >
-                      {pack.active ? "Ativo" : "Inativo"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-[10px] text-[#64748b]">
-                    {new Date(pack.createdAt).toLocaleDateString("pt-BR")}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={() => void handleOpenEdit(pack.id)}
-                        className="border border-[#1e3a5f] px-2 py-1 text-[10px] uppercase text-[#38bdf8] hover:border-[#38bdf8]/50"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => void handleToggleActive(pack)}
-                        className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:border-[#475569]"
-                      >
-                        {pack.active ? "Desativar" : "Ativar"}
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(pack.id)}
-                        className="border border-red-800/60 px-2 py-1 text-[10px] uppercase text-red-400 hover:border-red-600"
-                      >
-                        Excluir
-                      </button>
-                    </div>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-8 text-center text-[#64748b]">
+                    Carregando...
                   </td>
                 </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+              )}
+              {!loading && result?.items.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-8 text-center text-[#64748b]">
+                    Nenhum pack encontrado.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                result?.items.map((pack) => (
+                  <tr
+                    key={pack.id}
+                    className={`border-b border-[#1e293b] hover:bg-[#0b111e] ${!pack.active ? "opacity-40" : ""}`}
+                  >
+                    <td className="px-2 py-1.5">
+                      <div className="relative mx-auto h-10 w-10 overflow-hidden border border-[#1e293b]">
+                        {pack.artworkUrl ? (
+                          pack.artworkUrl.startsWith("data:") ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={pack.artworkUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <Image src={pack.artworkUrl} alt={pack.name} fill sizes="40px" className="object-cover" />
+                          )
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-[#111827]">
+                            <span className="font-mono text-[10px] font-bold text-[#334155]">
+                              {pack.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs text-[#e2e8f0]">{pack.name}</td>
+                    <td className="px-3 py-2">
+                      <span className="border border-[#334155] px-2 py-0.5 font-mono text-[10px] uppercase text-[#94a3b8]">
+                        {pack.certificationCode ?? "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center font-mono text-xs text-[#cbd5e1]">{pack.questionCount}</td>
+                    <td className="px-3 py-2 text-center font-mono text-xs text-[#f97316]">
+                      {pack.difficultyScore === 10 ? "BOSS⚡" : `${pack.difficultyScore}/10`}
+                    </td>
+                    <td className="px-3 py-2 text-center font-mono text-xs text-[#94a3b8]">{pack.sessionCount}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span
+                        className={`border px-2 py-0.5 font-mono text-[10px] uppercase ${
+                          pack.active ? "border-green-700 text-green-400" : "border-[#334155] text-[#64748b]"
+                        }`}
+                      >
+                        {pack.active ? "Ativo" : "Inativo"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-[10px] text-[#64748b]">
+                      {new Date(pack.createdAt).toLocaleDateString("pt-BR")}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => void handleOpenEdit(pack.id)}
+                          className="border border-[#1e3a5f] px-2 py-1 text-[10px] uppercase text-[#38bdf8] hover:border-[#38bdf8]/50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => void handleToggleActive(pack)}
+                          className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#94a3b8] hover:border-[#475569]"
+                        >
+                          {pack.active ? "Desativar" : "Ativar"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(pack.id)}
+                          className="border border-red-800/60 px-2 py-1 text-[10px] uppercase text-red-400 hover:border-red-600"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Pagination */}
@@ -956,13 +916,12 @@ export function AdminSimuladosScreen() {
             </div>
 
             <p className="text-xs text-[#94a3b8]">
-              Os packs sao gerados automaticamente com {65} questoes cada, distribuidas por dificuldade (30% facil, 50% medio, 20% dificil). Apenas questoes sem pack ativo sao utilizadas.
+              Os packs sao gerados automaticamente com {65} questoes cada, distribuidas por dificuldade (30% facil, 50%
+              medio, 20% dificil). Apenas questoes sem pack ativo sao utilizadas.
             </p>
 
             <div className="space-y-2">
-              <label className="block font-mono text-[10px] uppercase text-[#64748b]">
-                Certificacao
-              </label>
+              <label className="block font-mono text-[10px] uppercase text-[#64748b]">Certificacao</label>
               <select
                 value={generateCert}
                 onChange={(e) => {
@@ -973,7 +932,9 @@ export function AdminSimuladosScreen() {
               >
                 <option value="">Selecionar...</option>
                 {certifications.map((c) => (
-                  <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
+                  <option key={c.id} value={c.code}>
+                    {c.code} — {c.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1004,19 +965,12 @@ export function AdminSimuladosScreen() {
               </div>
             )}
 
-            {generateError && (
-              <p className="text-xs text-red-400">{generateError}</p>
-            )}
+            {generateError && <p className="text-xs text-red-400">{generateError}</p>}
 
             <div className="flex gap-3">
               <button
                 onClick={() => void handleGenerate()}
-                disabled={
-                  generating ||
-                  !generateCert ||
-                  !generateStats ||
-                  generateStats.packsPossible === 0
-                }
+                disabled={generating || !generateCert || !generateStats || generateStats.packsPossible === 0}
                 className="flex-1 border border-[#f97316] py-2 text-xs uppercase text-[#f97316] hover:bg-[#f97316]/10 disabled:opacity-40"
               >
                 {generating ? "Gerando..." : "Gerar"}
@@ -1065,9 +1019,7 @@ export function AdminSimuladosScreen() {
                 }`}
               >
                 ⚔ Jornada do Heroi
-                {editJourneyChanged && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#f97316]" />
-                )}
+                {editJourneyChanged && <span className="h-1.5 w-1.5 rounded-full bg-[#f97316]" />}
               </button>
             </div>
 
@@ -1086,23 +1038,32 @@ export function AdminSimuladosScreen() {
 
                   <ArtworkUploadField
                     value={editArtworkUrl}
-                    onChange={(url) => { setEditArtworkUrl(url); setEditArtworkChanged(true); }}
+                    onChange={(url) => {
+                      setEditArtworkUrl(url);
+                      setEditArtworkChanged(true);
+                    }}
                     label="Arte do pack"
                   />
 
                   <AiArtworkGenerator
                     simuladoName={editName}
-                    onConfirm={(dataUrl) => { setEditArtworkUrl(dataUrl); setEditArtworkChanged(true); }}
+                    onConfirm={(dataUrl) => {
+                      setEditArtworkUrl(dataUrl);
+                      setEditArtworkChanged(true);
+                    }}
                   />
 
                   <label className="block space-y-1">
                     <span className="text-xs uppercase text-[#64748b]">
                       Score de Dificuldade —{" "}
                       <span className="text-[#f97316]">
-                        {editDifficultyScore === 10 ? "10 · BOSS ⚡" :
-                         editDifficultyScore <= 3 ? `${editDifficultyScore} · Fácil` :
-                         editDifficultyScore <= 6 ? `${editDifficultyScore} · Intermediário` :
-                         `${editDifficultyScore} · Difícil`}
+                        {editDifficultyScore === 10
+                          ? "10 · BOSS ⚡"
+                          : editDifficultyScore <= 3
+                            ? `${editDifficultyScore} · Fácil`
+                            : editDifficultyScore <= 6
+                              ? `${editDifficultyScore} · Intermediário`
+                              : `${editDifficultyScore} · Difícil`}
                       </span>
                     </span>
                     <input
@@ -1124,9 +1085,7 @@ export function AdminSimuladosScreen() {
                   {/* Current questions */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase text-[#64748b]">
-                        Questoes atuais ({currentQuestionCount})
-                      </p>
+                      <p className="text-xs uppercase text-[#64748b]">Questoes atuais ({currentQuestionCount})</p>
                       <button
                         onClick={() => setShowNewQuestionModal(true)}
                         className="border border-[#14532d] bg-green-900/10 px-3 py-1 text-[10px] uppercase text-green-300 hover:bg-green-900/20"
@@ -1140,7 +1099,9 @@ export function AdminSimuladosScreen() {
                         .map((pq) => (
                           <div key={pq.id} className="flex items-start gap-3 px-3 py-2 text-xs">
                             <p className="flex-1 truncate text-[#cbd5e1]">{pq.statement}</p>
-                            <span className={`shrink-0 font-mono text-[10px] ${pq.difficulty === "easy" ? "text-green-400" : pq.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}>
+                            <span
+                              className={`shrink-0 font-mono text-[10px] ${pq.difficulty === "easy" ? "text-green-400" : pq.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}
+                            >
                               {pq.difficulty}
                             </span>
                             <button
@@ -1151,21 +1112,27 @@ export function AdminSimuladosScreen() {
                             </button>
                           </div>
                         ))}
-                      {editAddedQuestions.filter((q) => !editRemovedIds.has(q.id)).map((q) => (
-                        <div key={q.id} className="flex items-start gap-3 bg-green-900/10 px-3 py-2 text-xs">
-                          <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
-                          <span className="shrink-0 font-mono text-[10px] text-green-400">+novo</span>
-                          <button
-                            onClick={() => {
-                              setEditAddedIds((prev) => { const next = new Set(prev); next.delete(q.id); return next; });
-                              setEditAddedQuestions((qs) => qs.filter((x) => x.id !== q.id));
-                            }}
-                            className="shrink-0 text-[10px] text-[#64748b] hover:text-red-400"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                      {editAddedQuestions
+                        .filter((q) => !editRemovedIds.has(q.id))
+                        .map((q) => (
+                          <div key={q.id} className="flex items-start gap-3 bg-green-900/10 px-3 py-2 text-xs">
+                            <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
+                            <span className="shrink-0 font-mono text-[10px] text-green-400">+novo</span>
+                            <button
+                              onClick={() => {
+                                setEditAddedIds((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(q.id);
+                                  return next;
+                                });
+                                setEditAddedQuestions((qs) => qs.filter((x) => x.id !== q.id));
+                              }}
+                              className="shrink-0 text-[10px] text-[#64748b] hover:text-red-400"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
                     </div>
                   </div>
 
@@ -1176,7 +1143,9 @@ export function AdminSimuladosScreen() {
                         <input
                           type="checkbox"
                           checked={pageAllSelected}
-                          ref={(el) => { if (el) el.indeterminate = pagePartialSelected; }}
+                          ref={(el) => {
+                            if (el) el.indeterminate = pagePartialSelected;
+                          }}
                           onChange={editToggleSelectPage}
                           disabled={editAvailItems.length === 0 || currentQuestionCount >= 65}
                           className="accent-[#38bdf8] disabled:opacity-40"
@@ -1192,13 +1161,19 @@ export function AdminSimuladosScreen() {
                       <div className="flex flex-wrap gap-2">
                         <input
                           value={editAvailSearch}
-                          onChange={(e) => { setEditAvailSearch(e.target.value); setEditAvailPage(1); }}
+                          onChange={(e) => {
+                            setEditAvailSearch(e.target.value);
+                            setEditAvailPage(1);
+                          }}
                           placeholder="Buscar enunciado..."
                           className="border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none"
                         />
                         <select
                           value={editAvailDiff}
-                          onChange={(e) => { setEditAvailDiff(e.target.value); setEditAvailPage(1); }}
+                          onChange={(e) => {
+                            setEditAvailDiff(e.target.value);
+                            setEditAvailPage(1);
+                          }}
                           className="border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0]"
                         >
                           <option value="">Todas dificuldades</option>
@@ -1214,22 +1189,30 @@ export function AdminSimuladosScreen() {
                         {!editAvailLoading && editAvailItems.length === 0 && (
                           <p className="px-3 py-4 text-center text-xs text-[#64748b]">Nenhuma questao disponivel.</p>
                         )}
-                        {!editAvailLoading && editAvailItems.map((q) => {
-                          const added = editAddedIds.has(q.id);
-                          return (
-                            <div
-                              key={q.id}
-                              onClick={() => editToggleAdd(q)}
-                              className={`flex cursor-pointer items-start gap-2 px-3 py-2 text-xs hover:bg-white/[0.02] ${added ? "bg-green-900/10" : ""}`}
-                            >
-                              <input type="checkbox" checked={added} readOnly className="mt-0.5 shrink-0 accent-[#38bdf8]" />
-                              <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
-                              <span className={`shrink-0 font-mono text-[10px] ${q.difficulty === "easy" ? "text-green-400" : q.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}>
-                                {q.difficulty}
-                              </span>
-                            </div>
-                          );
-                        })}
+                        {!editAvailLoading &&
+                          editAvailItems.map((q) => {
+                            const added = editAddedIds.has(q.id);
+                            return (
+                              <div
+                                key={q.id}
+                                onClick={() => editToggleAdd(q)}
+                                className={`flex cursor-pointer items-start gap-2 px-3 py-2 text-xs hover:bg-white/[0.02] ${added ? "bg-green-900/10" : ""}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={added}
+                                  readOnly
+                                  className="mt-0.5 shrink-0 accent-[#38bdf8]"
+                                />
+                                <p className="flex-1 truncate text-[#cbd5e1]">{q.statement}</p>
+                                <span
+                                  className={`shrink-0 font-mono text-[10px] ${q.difficulty === "easy" ? "text-green-400" : q.difficulty === "hard" ? "text-red-400" : "text-yellow-400"}`}
+                                >
+                                  {q.difficulty}
+                                </span>
+                              </div>
+                            );
+                          })}
                       </div>
                       {editAvailTotal > 20 && (
                         <div className="flex items-center gap-3 text-xs">
@@ -1240,7 +1223,9 @@ export function AdminSimuladosScreen() {
                           >
                             ←
                           </button>
-                          <span className="text-[#64748b]">{editAvailPage} / {Math.ceil(editAvailTotal / 20)}</span>
+                          <span className="text-[#64748b]">
+                            {editAvailPage} / {Math.ceil(editAvailTotal / 20)}
+                          </span>
                           <button
                             onClick={() => setEditAvailPage((p) => p + 1)}
                             disabled={editAvailPage >= Math.ceil(editAvailTotal / 20)}
@@ -1260,15 +1245,21 @@ export function AdminSimuladosScreen() {
                 <div className="space-y-5">
                   <div className="border border-[#f97316]/20 bg-[#f97316]/5 px-4 py-3 text-xs text-[#94a3b8]">
                     <p className="font-mono text-[10px] uppercase text-[#f97316] mb-1">Modo Jornada do Herói</p>
-                    Personalize como esta fase aparece no mapa da jornada. Deixe os campos vazios para usar narrativa gerada automaticamente pela IA.
+                    Personalize como esta fase aparece no mapa da jornada. Deixe os campos vazios para usar narrativa
+                    gerada automaticamente pela IA.
                   </div>
 
                   <label className="block space-y-1">
                     <span className="text-xs uppercase text-[#64748b]">Título da fase</span>
-                    <p className="text-[10px] text-[#475569]">Nome épico exibido no mapa (ex: &quot;A Forja do Conhecimento&quot;)</p>
+                    <p className="text-[10px] text-[#475569]">
+                      Nome épico exibido no mapa (ex: &quot;A Forja do Conhecimento&quot;)
+                    </p>
                     <input
                       value={editJourneyStageName}
-                      onChange={(e) => { setEditJourneyStageName(e.target.value); setEditJourneyChanged(true); }}
+                      onChange={(e) => {
+                        setEditJourneyStageName(e.target.value);
+                        setEditJourneyChanged(true);
+                      }}
                       placeholder="Nome épico da fase..."
                       className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none placeholder:text-[#334155]"
                     />
@@ -1276,10 +1267,15 @@ export function AdminSimuladosScreen() {
 
                   <label className="block space-y-1">
                     <span className="text-xs uppercase text-[#64748b]">Roteiro / Narrativa</span>
-                    <p className="text-[10px] text-[#475569]">Texto de flavour exibido ao iniciar a fase (2-3 frases)</p>
+                    <p className="text-[10px] text-[#475569]">
+                      Texto de flavour exibido ao iniciar a fase (2-3 frases)
+                    </p>
                     <textarea
                       value={editJourneyStoryText}
-                      onChange={(e) => { setEditJourneyStoryText(e.target.value); setEditJourneyChanged(true); }}
+                      onChange={(e) => {
+                        setEditJourneyStoryText(e.target.value);
+                        setEditJourneyChanged(true);
+                      }}
                       placeholder="Narrativa épica da fase..."
                       rows={4}
                       className="w-full resize-none border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none placeholder:text-[#334155]"
@@ -1288,10 +1284,15 @@ export function AdminSimuladosScreen() {
 
                   <label className="block space-y-1">
                     <span className="text-xs uppercase text-[#64748b]">Contexto AWS</span>
-                    <p className="text-[10px] text-[#475569]">Serviço AWS principal desta fase (ex: &quot;Amazon S3&quot;, &quot;AWS Lambda&quot;)</p>
+                    <p className="text-[10px] text-[#475569]">
+                      Serviço AWS principal desta fase (ex: &quot;Amazon S3&quot;, &quot;AWS Lambda&quot;)
+                    </p>
                     <input
                       value={editJourneyAwsContext}
-                      onChange={(e) => { setEditJourneyAwsContext(e.target.value); setEditJourneyChanged(true); }}
+                      onChange={(e) => {
+                        setEditJourneyAwsContext(e.target.value);
+                        setEditJourneyChanged(true);
+                      }}
                       placeholder="ex: Amazon S3"
                       className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0] outline-none placeholder:text-[#334155]"
                     />
@@ -1332,7 +1333,10 @@ export function AdminSimuladosScreen() {
               {editError && <p className="text-xs text-red-400">{editError}</p>}
 
               <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-3">
-                <button onClick={() => setEditPack(null)} className="border border-[#334155] px-4 py-2 text-xs uppercase text-[#94a3b8]">
+                <button
+                  onClick={() => setEditPack(null)}
+                  className="border border-[#334155] px-4 py-2 text-xs uppercase text-[#94a3b8]"
+                >
                   Cancelar
                 </button>
                 <button
@@ -1405,7 +1409,13 @@ export function AdminSimuladosScreen() {
               <div>
                 <p className="font-mono text-[10px] uppercase text-[#a855f7]">Geracao automatica</p>
                 <h2 className="font-mono text-sm uppercase text-[#f8fafc]">
-                  {autoGenResult ? "Resultado" : autoGenRunning ? "Gerando..." : autoGenStep === 1 ? "Configurar geracao" : "Confirmar geracao"}
+                  {autoGenResult
+                    ? "Resultado"
+                    : autoGenRunning
+                      ? "Gerando..."
+                      : autoGenStep === 1
+                        ? "Configurar geracao"
+                        : "Confirmar geracao"}
                 </h2>
               </div>
               {!autoGenRunning && (
@@ -1420,11 +1430,12 @@ export function AdminSimuladosScreen() {
             </div>
 
             <div className="px-5 py-5 space-y-5">
-
               {/* RESULT STATE */}
               {autoGenResult && (
                 <div className="space-y-4">
-                  <div className={`border px-4 py-3 text-sm ${autoGenResult.created > 0 ? "border-green-700 bg-green-900/20 text-green-300" : "border-yellow-700 bg-yellow-900/10 text-yellow-300"}`}>
+                  <div
+                    className={`border px-4 py-3 text-sm ${autoGenResult.created > 0 ? "border-green-700 bg-green-900/20 text-green-300" : "border-yellow-700 bg-yellow-900/10 text-yellow-300"}`}
+                  >
                     {autoGenResult.created > 0
                       ? `${autoGenResult.created} simulado(s) gerado(s) com sucesso!`
                       : "Nenhum simulado foi criado. Questoes insuficientes ou certificacao sem dados."}
@@ -1432,12 +1443,19 @@ export function AdminSimuladosScreen() {
                   {autoGenResult.packs.length > 0 && (
                     <div className="space-y-1 max-h-64 overflow-y-auto">
                       {autoGenResult.packs.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between border border-[#1e293b] bg-[#080e1a] px-3 py-2 text-xs">
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between border border-[#1e293b] bg-[#080e1a] px-3 py-2 text-xs"
+                        >
                           <span className="font-mono text-[#f8fafc]">{p.name}</span>
                           <div className="flex gap-2">
                             <span className="font-mono text-[10px] text-[#64748b] uppercase">{p.certCode}</span>
-                            {p.hasArtwork && <span className="font-mono text-[10px] text-[#a855f7] uppercase">arte</span>}
-                            {p.hasNarrative && <span className="font-mono text-[10px] text-[#38bdf8] uppercase">jornada</span>}
+                            {p.hasArtwork && (
+                              <span className="font-mono text-[10px] text-[#a855f7] uppercase">arte</span>
+                            )}
+                            {p.hasNarrative && (
+                              <span className="font-mono text-[10px] text-[#38bdf8] uppercase">jornada</span>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1446,7 +1464,9 @@ export function AdminSimuladosScreen() {
                   {autoGenResult.errors.length > 0 && (
                     <div className="border border-red-800 bg-red-900/10 px-3 py-2 space-y-1">
                       {autoGenResult.errors.map((e, i) => (
-                        <p key={i} className="text-xs text-red-300">{e}</p>
+                        <p key={i} className="text-xs text-red-300">
+                          {e}
+                        </p>
                       ))}
                     </div>
                   )}
@@ -1485,7 +1505,9 @@ export function AdminSimuladosScreen() {
                     >
                       <option value="">Todas as certificacoes</option>
                       {certifications.map((c) => (
-                        <option key={c.id} value={c.code}>{c.code} — {c.name}</option>
+                        <option key={c.id} value={c.code}>
+                          {c.code} — {c.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -1496,13 +1518,17 @@ export function AdminSimuladosScreen() {
                       Questoes por pack: <span className="text-[#f97316]">{autoGenPackSize}</span>
                     </label>
                     <input
-                      type="range" min={20} max={65} step={1}
+                      type="range"
+                      min={20}
+                      max={65}
+                      step={1}
                       value={autoGenPackSize}
                       onChange={(e) => setAutoGenPackSize(Number(e.target.value))}
                       className="w-full accent-[#f97316]"
                     />
                     <div className="flex justify-between font-mono text-[9px] text-[#475569]">
-                      <span>20</span><span>65</span>
+                      <span>20</span>
+                      <span>65</span>
                     </div>
                   </div>
 
@@ -1515,7 +1541,9 @@ export function AdminSimuladosScreen() {
                         onChange={(e) => setAutoGenArtwork(e.target.checked)}
                         className="accent-[#a855f7]"
                       />
-                      <span className="font-mono text-xs uppercase text-[#e2e8f0]">Gerar arte automaticamente (Pollinations)</span>
+                      <span className="font-mono text-xs uppercase text-[#e2e8f0]">
+                        Gerar arte automaticamente (Pollinations)
+                      </span>
                     </label>
                     {autoGenArtwork && (
                       <div className="space-y-3 pl-5">
@@ -1563,7 +1591,9 @@ export function AdminSimuladosScreen() {
                         onChange={(e) => setAutoGenNarrative(e.target.checked)}
                         className="accent-[#38bdf8]"
                       />
-                      <span className="font-mono text-xs uppercase text-[#e2e8f0]">Gerar narrativa Jornada do Heroi (IA)</span>
+                      <span className="font-mono text-xs uppercase text-[#e2e8f0]">
+                        Gerar narrativa Jornada do Heroi (IA)
+                      </span>
                     </label>
                     {autoGenNarrative && (
                       <div className="pl-5 space-y-1">
@@ -1581,9 +1611,7 @@ export function AdminSimuladosScreen() {
                     )}
                   </div>
 
-                  {autoGenError && (
-                    <p className="text-xs text-red-400">{autoGenError}</p>
-                  )}
+                  {autoGenError && <p className="text-xs text-red-400">{autoGenError}</p>}
 
                   <div className="flex justify-end gap-2 border-t border-[#1e293b] pt-4">
                     <button
@@ -1609,20 +1637,30 @@ export function AdminSimuladosScreen() {
               {!autoGenResult && !autoGenRunning && autoGenStep === 2 && autoGenStats && (
                 <div className="space-y-4">
                   <div className="border border-[#1e293b] bg-[#080e1a] p-4 space-y-3">
-                    <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Packs a serem criados por certificacao</p>
+                    <p className="font-mono text-[10px] uppercase text-[#94a3b8]">
+                      Packs a serem criados por certificacao
+                    </p>
                     {autoGenStats.certifications.filter((c) => c.packsPossible > 0).length === 0 ? (
-                      <p className="text-xs text-yellow-300">Nenhuma certificacao tem questoes suficientes para gerar novos packs com {autoGenStats.packSize} questoes por pack.</p>
+                      <p className="text-xs text-yellow-300">
+                        Nenhuma certificacao tem questoes suficientes para gerar novos packs com {autoGenStats.packSize}{" "}
+                        questoes por pack.
+                      </p>
                     ) : (
                       <div className="space-y-1">
                         {autoGenStats.certifications.map((c) => (
-                          <div key={c.code} className={`flex items-center justify-between px-3 py-2 text-xs ${c.packsPossible > 0 ? "border border-[#1e293b]" : "opacity-40"}`}>
+                          <div
+                            key={c.code}
+                            className={`flex items-center justify-between px-3 py-2 text-xs ${c.packsPossible > 0 ? "border border-[#1e293b]" : "opacity-40"}`}
+                          >
                             <div>
                               <span className="font-mono text-[#f97316] mr-2">{c.code}</span>
                               <span className="text-[#94a3b8]">{c.name}</span>
                             </div>
                             <div className="flex gap-4 text-right">
                               <span className="text-[#64748b]">{c.available} questoes livres</span>
-                              <span className={`font-mono font-bold ${c.packsPossible > 0 ? "text-green-400" : "text-red-400"}`}>
+                              <span
+                                className={`font-mono font-bold ${c.packsPossible > 0 ? "text-green-400" : "text-red-400"}`}
+                              >
                                 {c.packsPossible} pack{c.packsPossible !== 1 ? "s" : ""}
                               </span>
                             </div>
@@ -1632,14 +1670,26 @@ export function AdminSimuladosScreen() {
                     )}
                     <div className="flex items-center justify-between border-t border-[#1e293b] pt-3">
                       <span className="font-mono text-[10px] uppercase text-[#94a3b8]">Total</span>
-                      <span className="font-mono text-sm text-[#f8fafc]">{autoGenStats.totalPacksPossible} simulado{autoGenStats.totalPacksPossible !== 1 ? "s" : ""}</span>
+                      <span className="font-mono text-sm text-[#f8fafc]">
+                        {autoGenStats.totalPacksPossible} simulado{autoGenStats.totalPacksPossible !== 1 ? "s" : ""}
+                      </span>
                     </div>
                   </div>
 
                   <div className="space-y-2 text-xs text-[#64748b]">
-                    <p>• Questoes por pack: <span className="text-[#e2e8f0]">{autoGenStats.packSize}</span></p>
-                    <p>• Arte automatica: <span className="text-[#e2e8f0]">{autoGenArtwork ? `Sim (${autoGenPollinationsModel})` : "Nao"}</span></p>
-                    <p>• Narrativa Jornada: <span className="text-[#e2e8f0]">{autoGenNarrative ? "Sim (IA)" : "Nao"}</span></p>
+                    <p>
+                      • Questoes por pack: <span className="text-[#e2e8f0]">{autoGenStats.packSize}</span>
+                    </p>
+                    <p>
+                      • Arte automatica:{" "}
+                      <span className="text-[#e2e8f0]">
+                        {autoGenArtwork ? `Sim (${autoGenPollinationsModel})` : "Nao"}
+                      </span>
+                    </p>
+                    <p>
+                      • Narrativa Jornada:{" "}
+                      <span className="text-[#e2e8f0]">{autoGenNarrative ? "Sim (IA)" : "Nao"}</span>
+                    </p>
                     {(autoGenArtwork || autoGenNarrative) && (
                       <p className="text-yellow-400 border border-yellow-800 bg-yellow-900/10 px-2 py-1">
                         ⚠ Com arte e/ou narrativa, cada pack pode levar 10-30s. Nao feche a aba durante a geracao.
@@ -1647,9 +1697,7 @@ export function AdminSimuladosScreen() {
                     )}
                   </div>
 
-                  {autoGenError && (
-                    <p className="text-xs text-red-400">{autoGenError}</p>
-                  )}
+                  {autoGenError && <p className="text-xs text-red-400">{autoGenError}</p>}
 
                   <div className="flex justify-between gap-2 border-t border-[#1e293b] pt-4">
                     <button
@@ -1665,12 +1713,12 @@ export function AdminSimuladosScreen() {
                       onClick={() => void handleAutoGenConfirm()}
                       className="border border-green-700 bg-green-900/20 px-4 py-2 text-xs uppercase text-green-300 disabled:opacity-40"
                     >
-                      Confirmar e gerar {autoGenStats.totalPacksPossible} simulado{autoGenStats.totalPacksPossible !== 1 ? "s" : ""}
+                      Confirmar e gerar {autoGenStats.totalPacksPossible} simulado
+                      {autoGenStats.totalPacksPossible !== 1 ? "s" : ""}
                     </button>
                   </div>
                 </div>
               )}
-
             </div>
           </div>
         </div>

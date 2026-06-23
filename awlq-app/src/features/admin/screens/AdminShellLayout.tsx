@@ -123,8 +123,8 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen  bg-[#0b1220] text-[#e2e8f0]">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#1e293b] bg-[#0f172a]/95 px-4 py-3 backdrop-blur lg:hidden">
+    <div className="min-h-screen  bg-[#0b1220] text-[#e2e8f0] ">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b  border-[#1e293b] bg-[#0f172a]/95 px-4 py-3 backdrop-blur lg:hidden">
         <div className="flex flex-col">
           <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>
           <p className="font-mono text-[10px] uppercase text-[#94a3b8]">{breadcrumb}</p>
@@ -143,7 +143,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-screen">
+      <div className="mx-auto flex min-h-screen  ">
         {mobileMenuOpen && (
           <button
             type="button"
@@ -155,11 +155,11 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
 
         <aside
           className={[
-            "fixed inset-y-0 left-0 z-50 w-72 border-r border-[#1e293b] bg-[#0f172a] transition-transform duration-200 lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:translate-x-0",
+            "fixed inset-y-0  left-0 z-50 w-72 border-r border-[#1e293b] bg-[#0f172a] transition-transform duration-200 lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:translate-x-0",
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           ].join(" ")}
         >
-          <div className="flex h-full flex-col p-6">
+          <div className="flex h-full flex-col p-6 ">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>
@@ -175,7 +175,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
               </button>
             </div>
 
-            <nav className="mt-6 flex-1 space-y-2 overflow-y-auto pr-1">
+            <nav className="mt-6 flex-1 space-y-2 overflow-y-auto pr-4" style={{ scrollbarWidth: "thin", scrollbarColor: "#334155 transparent" }}>
               {ADMIN_MENU.map((item) => {
                 const active = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
 

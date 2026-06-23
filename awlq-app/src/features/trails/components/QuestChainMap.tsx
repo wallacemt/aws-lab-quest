@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { completeStage, type QuestChain, type QuestStage } from "@/features/trails/services/trails-api";
+import { AnimatePresence } from "framer-motion";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { TrailStudyFlow } from "@/features/trails/components/TrailStudyFlow";
+import { type QuestChain, type QuestStage } from "@/features/trails/services/trails-api";
 
-// ─── Stage state derivation ───────────────────────────────────────────────────
+// ─── Stage state ──────────────────────────────────────────────────────────────
 
 type StageState = "locked" | "unlocked" | "completed";
 
@@ -14,120 +16,124 @@ function getStageState(stage: QuestStage): StageState {
   return "locked";
 }
 
-// ─── Stage node ───────────────────────────────────────────────────────────────
+// ─── Dotted path connector ────────────────────────────────────────────────────
 
-const STATE_STYLES: Record<StageState, string> = {
-  locked: "border-[var(--pixel-border)] bg-[var(--pixel-surface)] text-[var(--pixel-muted)] cursor-not-allowed opacity-60",
-  unlocked: "border-[var(--pixel-accent)] bg-[var(--pixel-surface)] text-[var(--pixel-accent)] cursor-pointer hover:bg-[var(--pixel-accent)]/10",
-  completed: "border-[var(--pixel-accent)] bg-[var(--pixel-accent)] text-[var(--pixel-bg)] cursor-default",
+type ConnectorProps = {
+  direction: "right" | "left";
+  active: boolean;
 };
 
-type StageNodeProps = {
-  stage: QuestStage;
-  chainId: string;
-  onNavigate: (href: string) => void;
-  onTooltip: (message: string) => void;
-  onStageCompleted: (stageId: string, unlockedNextId: string | undefined) => void;
-};
-
-function StageNode({ stage, chainId, onNavigate, onTooltip, onStageCompleted }: StageNodeProps) {
-  const state = getStageState(stage);
-  const [isCompleting, setIsCompleting] = useState(false);
-
-  const studyHref = (() => {
-    const target = stage.awsServiceId ?? stage.topic;
-    return target ? `/kc?service=${encodeURIComponent(target)}` : "/kc";
-  })();
-
-  const handleLocked = () => {
-    onTooltip(`Complete o estágio anterior para desbloquear "${stage.title}"`);
-  };
-
-  const handleMarkComplete = async () => {
-    setIsCompleting(true);
-    try {
-      const result = await completeStage(chainId, stage.id);
-      onStageCompleted(stage.id, result.unlockedNext);
-    } catch (err) {
-      onTooltip(err instanceof Error ? err.message : "Erro ao marcar estágio como concluído.");
-    } finally {
-      setIsCompleting(false);
-    }
-  };
+/**
+ * CSS-only curved dotted connector between stages.
+ * direction="right" → curves from left to right (bottom-right arc)
+ * direction="left"  → curves from right to left (bottom-left arc)
+ */
+function PathConnector({ direction, active }: ConnectorProps) {
+  const color = active ? "border-[var(--pixel-accent)]" : "border-[var(--pixel-border)]";
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      {/* Circle indicator — clickable only when locked (shows tooltip) */}
-      {state === "locked" ? (
-        <button
-          type="button"
-          onClick={handleLocked}
-          className={`flex h-14 w-14 items-center justify-center rounded-full border-2 font-mono text-xs font-bold transition-colors ${STATE_STYLES.locked}`}
-          aria-label={`${stage.title} — bloqueado`}
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        </button>
+    <div className="relative h-14 w-full mx-2 my-1">
+      {direction === "right" ? (
+        <div
+          className={`absolute inset-x-[20%] top-0 bottom-0 border-r-2 border-b-2 border-dashed ${color}`}
+          style={{ borderRadius: "0 0 40px 0" }}
+        />
       ) : (
         <div
-          className={`flex h-14 w-14 items-center justify-center rounded-full border-2 font-mono text-xs font-bold ${STATE_STYLES[state]}`}
-          aria-label={`${stage.title} — ${state === "completed" ? "concluído" : "desbloqueado"}`}
-        >
-          {state === "completed" ? (
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          ) : (
-            stage.position.toString()
-          )}
-        </div>
-      )}
-
-      {/* Stage title */}
-      <span className="max-w-[4.5rem] text-center font-mono text-[10px] leading-tight text-[var(--pixel-muted)]">
-        {stage.title}
-      </span>
-
-      {/* Action buttons — only shown for unlocked (not yet completed) stages */}
-      {state === "unlocked" && (
-        <div className="flex flex-col items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onNavigate(studyHref)}
-            className="rounded border border-[var(--pixel-accent)] px-2 py-0.5 font-mono text-[9px] text-[var(--pixel-accent)] hover:bg-[var(--pixel-accent)]/10"
-          >
-            Estudar
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleMarkComplete()}
-            disabled={isCompleting}
-            className="rounded border border-[var(--pixel-muted)] px-2 py-0.5 font-mono text-[9px] text-[var(--pixel-muted)] hover:bg-[var(--pixel-muted)]/10 disabled:opacity-50"
-          >
-            {isCompleting ? "..." : "Concluído"}
-          </button>
-        </div>
-      )}
-
-      {/* Completed badge — no action buttons */}
-      {state === "completed" && (
-        <span className="font-mono text-[9px] text-[var(--pixel-accent)]">Concluído</span>
+          className={`absolute inset-x-[20%] top-0 bottom-0 border-l-2 border-b-2 border-dashed ${color}`}
+          style={{ borderRadius: "0 0 0 40px" }}
+        />
       )}
     </div>
   );
 }
 
-// ─── Connector arrow ─────────────────────────────────────────────────────────
+// ─── Stage node ───────────────────────────────────────────────────────────────
 
-function StageConnector({ unlocked }: { unlocked: boolean }) {
+type StageNodeProps = {
+  stage: QuestStage;
+  chainId: string;
+  align: "left" | "right";
+  onTooltip: (msg: string) => void;
+  onStudy: (stage: QuestStage) => void;
+  onStageCompleted: (stageId: string, unlockedNextId: string | undefined) => void;
+};
+
+const CIRCLE_STYLES: Record<StageState, string> = {
+  locked:
+    "border-[var(--pixel-border)] bg-[var(--pixel-card)] text-[var(--pixel-muted)] opacity-60",
+  unlocked:
+    "border-[var(--pixel-accent)] bg-[var(--pixel-card)] text-[var(--pixel-accent)] shadow-[0_0_12px_rgba(var(--pixel-accent-rgb),0.3)]",
+  completed:
+    "border-[var(--pixel-accent)] bg-[var(--pixel-accent)] text-[var(--pixel-bg)]",
+};
+
+function StageNode({ stage, chainId, align, onTooltip, onStudy, onStageCompleted }: StageNodeProps) {
+  const state = getStageState(stage);
+  const isLeft = align === "left";
+
   return (
-    <div className="flex flex-1 items-center px-1">
+    <div className={`flex items-center gap-3 w-full ${isLeft ? "flex-row" : "flex-row-reverse"}`}>
+      {/* Circle */}
       <div
-        className={`h-0.5 w-full ${
-          unlocked ? "bg-[var(--pixel-accent)]" : "bg-[var(--pixel-border)]"
+        className={`flex h-14 w-14 shrink-0 items-center justify-center border-2 font-mono text-sm font-bold transition-all ${CIRCLE_STYLES[state]}`}
+        style={{ clipPath: "none" }}
+      >
+        {state === "completed" ? (
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : state === "locked" ? (
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        ) : (
+          <span>{stage.position}</span>
+        )}
+      </div>
+
+      {/* Info card */}
+      <div
+        className={`flex-1 border border-[var(--pixel-border)] bg-[var(--pixel-card)] p-3 ${
+          state === "locked" ? "opacity-60" : ""
         }`}
-      />
+      >
+        <p className="font-mono text-xs font-bold text-[var(--pixel-text)] leading-tight">{stage.title}</p>
+        {stage.awsServiceId && (
+          <p className="font-mono text-[10px] text-[var(--pixel-muted)] uppercase mt-0.5">
+            {stage.awsServiceId}
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className={`mt-2 flex gap-2 ${isLeft ? "" : "flex-row-reverse"}`}>
+          {state === "locked" && (
+            <button
+              type="button"
+              onClick={() => onTooltip(`Complete o estágio anterior para desbloquear "${stage.title}"`)}
+              className="font-mono text-[10px] text-[var(--pixel-muted)] underline"
+            >
+              Bloqueado
+            </button>
+          )}
+
+          {state === "unlocked" && (
+            <PixelButton className="text-[10px] py-1 px-2" onClick={() => onStudy(stage)}>
+              Estudar
+            </PixelButton>
+          )}
+
+          {state === "completed" && (
+            <PixelButton
+              variant="ghost"
+              className="text-[10px] py-1 px-2 text-[var(--pixel-accent)]"
+              onClick={() => onStudy(stage)}
+            >
+              Revisar
+            </PixelButton>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -142,21 +148,14 @@ type Props = {
 };
 
 /**
- * Renders a QuestChain as a linear stage map.
+ * Renders a QuestChain as a vertical zigzag game-world path.
  *
- * Each stage is a circle showing its state: locked (grey + lock icon),
- * unlocked (accent outline + number), or completed (filled + checkmark).
- *
- * Unlocked stages expose two buttons:
- *   - "Estudar" — navigates to the KC page for the stage's AWS service.
- *   - "Concluído" — POSTs to /api/trails/[chainId]/progress and notifies the
- *     parent via onStageCompleted so it can update state optimistically.
- *
- * Completed stages show only a "Concluído" badge; locked stages show a tooltip
- * explaining what needs to be done first.
+ * Stages alternate left/right alignment, connected by CSS-curved dashed lines.
+ * Unlocked stages open TrailStudyFlow (AI explanation + 10-question quiz).
+ * Completed stages show "Revisar" to re-read the explanation.
  */
 export function QuestChainMap({ chain, tooltip, onShowTooltip, onStageCompleted }: Props) {
-  const router = useRouter();
+  const [studyStage, setStudyStage] = useState<QuestStage | null>(null);
 
   if (chain.stages.length === 0) {
     return (
@@ -166,30 +165,58 @@ export function QuestChainMap({ chain, tooltip, onShowTooltip, onStageCompleted 
     );
   }
 
+  function handleStudyCompleted(stageId: string, unlockedNextId: string | undefined) {
+    onStageCompleted(stageId, unlockedNextId);
+  }
+
   return (
-    <div className="space-y-3">
-      {/* Stage map row */}
-      <div className="flex items-start overflow-x-auto pb-2">
-        {chain.stages.map((stage, idx) => (
-          <div key={stage.id} className="flex items-center">
-            <StageNode
-              stage={stage}
-              chainId={chain.id}
-              onNavigate={(href) => router.push(href)}
-              onTooltip={onShowTooltip}
-              onStageCompleted={onStageCompleted}
-            />
-            {idx < chain.stages.length - 1 && (
-              <StageConnector unlocked={chain.stages[idx + 1]?.unlocked ?? false} />
-            )}
-          </div>
-        ))}
+    <>
+      <div className="space-y-1 py-2">
+        {chain.stages.map((stage, idx) => {
+          const align: "left" | "right" = idx % 2 === 0 ? "left" : "right";
+          const nextStage = chain.stages[idx + 1];
+          const connectorActive = nextStage?.unlocked ?? false;
+          const connectorDirection: "right" | "left" = align === "left" ? "right" : "left";
+
+          return (
+            <div key={stage.id}>
+              <StageNode
+                stage={stage}
+                chainId={chain.id}
+                align={align}
+                onTooltip={onShowTooltip}
+                onStudy={setStudyStage}
+                onStageCompleted={onStageCompleted}
+              />
+              {idx < chain.stages.length - 1 && (
+                <PathConnector
+                  direction={connectorDirection}
+                  active={connectorActive}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Tooltip / hint message */}
       {tooltip && (
-        <p className="font-mono text-xs text-[var(--pixel-muted)]">{tooltip}</p>
+        <p className="mt-2 font-mono text-xs text-[var(--pixel-muted)]">{tooltip}</p>
       )}
-    </div>
+
+      {/* Study flow modal */}
+      <AnimatePresence>
+        {studyStage && (
+          <TrailStudyFlow
+            chainId={chain.id}
+            stage={studyStage}
+            onClose={() => setStudyStage(null)}
+            onCompleted={(stageId, unlockedNextId) => {
+              setStudyStage(null);
+              handleStudyCompleted(stageId, unlockedNextId);
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }

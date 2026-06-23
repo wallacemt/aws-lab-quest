@@ -32,6 +32,14 @@ export type TrailsData = {
   chains: QuestChain[];
 };
 
+export type TrailQuestion = {
+  id: string;
+  statement: string;
+  options: { key: string; text: string }[];
+  correctKey: string;
+  explanation: string;
+};
+
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -54,4 +62,18 @@ export async function completeStage(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ stageId }),
   });
+}
+
+export async function fetchStageExplain(
+  chainId: string,
+  stageId: string,
+): Promise<{ markdown: string; cached: boolean }> {
+  return apiFetch(`/api/trails/${chainId}/stages/${stageId}/explain`, { method: "POST" });
+}
+
+export async function fetchStageQuestions(
+  chainId: string,
+  stageId: string,
+): Promise<{ questions: TrailQuestion[] }> {
+  return apiFetch(`/api/trails/${chainId}/stages/${stageId}/questions`, { method: "POST" });
 }
