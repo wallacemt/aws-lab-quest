@@ -17,9 +17,6 @@ export function DailyReviewScreen() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <h1 className="mb-6 font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
-          Revisão Diária
-        </h1>
         <DailyReviewBoard onStartFlashcards={handleStartFlashcards} />
       </div>
     </AppLayout>

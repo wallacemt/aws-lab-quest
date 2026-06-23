@@ -21,14 +21,7 @@ type OptionKey = (typeof OPTION_KEYS)[number];
  * Renders a single sprint question with optional countdown timer.
  * Timed modes (t3, t5) show a countdown bar at the top.
  */
-export function SprintRunner({
-  question,
-  currentIndex,
-  totalQuestions,
-  limitSeconds,
-  onAnswer,
-  isSubmitting,
-}: Props) {
+export function SprintRunner({ question, currentIndex, totalQuestions, limitSeconds, onAnswer, isSubmitting }: Props) {
   // Key the entire component on question.id so React unmounts/remounts on question change.
   // This avoids setState-in-effect for the reset pattern.
   const [selected, setSelected] = useState<OptionKey | null>(null);
@@ -53,7 +46,7 @@ export function SprintRunner({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSelect(option: OptionKey) {
@@ -77,11 +70,11 @@ export function SprintRunner({
     <div className="flex flex-col gap-4">
       {/* Progress + timer */}
       <div className="flex items-center justify-between">
-        <p className="font-mono text-xs text-[var(--pixel-muted)]">
+        <p className="font-mono text-xs text-pixel-text">
           Questão {currentIndex + 1} / {totalQuestions}
         </p>
         {limitSeconds && (
-          <p className={`font-mono text-xs ${timeLeft < 30 ? "text-red-500" : "text-[var(--pixel-muted)]"}`}>
+          <p className={`font-mono text-xs ${timeLeft < 30 ? "text-red-500" : "text-pixel-subtext"}`}>
             {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
           </p>
         )}
@@ -89,7 +82,7 @@ export function SprintRunner({
 
       {/* Question card */}
       <PixelCard>
-        <p className="font-mono text-sm leading-relaxed text-[var(--pixel-text)]">{question.statement}</p>
+        <p className="font-sans text-lg leading-relaxed text-pixel-text">{question.statement}</p>
       </PixelCard>
 
       {/* Options */}
@@ -97,7 +90,7 @@ export function SprintRunner({
         {options.map(({ key, text }) => (
           <PixelButton
             key={key}
-            variant={selected === key ? "primary" : "ghost"}
+            variant={selected === key ? "primary" : "default"}
             onClick={() => handleSelect(key)}
             disabled={submitted || isSubmitting}
             className="w-full justify-start text-left"
@@ -110,11 +103,7 @@ export function SprintRunner({
 
       {/* Confirm button */}
       {!submitted && (
-        <PixelButton
-          onClick={handleSubmit}
-          disabled={!selected || isSubmitting}
-          className="w-full"
-        >
+        <PixelButton onClick={handleSubmit} disabled={!selected || isSubmitting} className="w-full">
           Confirmar
         </PixelButton>
       )}

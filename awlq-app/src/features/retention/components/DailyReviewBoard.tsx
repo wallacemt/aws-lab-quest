@@ -6,6 +6,9 @@ import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { MemoryRecoveryCard } from "@/features/retention/components/MemoryRecoveryCard";
 import { useDailyReview } from "@/features/retention/hooks/useDailyReview";
+import { LoadingForScreens } from "@/components/ui/loading-screens";
+import { ErrorForScreens } from "@/components/ui/error-screens";
+import { EmptyForScreens } from "@/components/ui/empty-screens";
 
 type Props = {
   onStartFlashcards?: () => void;
@@ -25,25 +28,21 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
   }, [load]);
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-12">
-        <p className="font-mono text-sm text-[var(--pixel-accent)]">Carregando revisão...</p>
-      </div>
-    );
+    return <LoadingForScreens text="Carregando revisão diária..." />;
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center gap-4 py-12">
-        <p className="font-mono text-sm text-red-500">{error}</p>
-        <PixelButton variant="ghost" onClick={() => void load()}>
-          Tentar novamente
-        </PixelButton>
-      </div>
+      <ErrorForScreens
+        error={error}
+        load={() => {
+          void load();
+        }}
+      />
     );
   }
 
-  if (!data) return null;
+  if (!data) return <EmptyForScreens text={"Nenhuma review Diaria..."} />;
 
   const hasContent =
     data.dueFlashcards.length > 0 ||
@@ -54,9 +53,7 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
   if (!hasContent) {
     return (
       <PixelCard className="text-center">
-        <p className="font-mono text-sm text-[var(--pixel-accent)]">
-          Tudo em dia! Nenhuma revisão pendente por agora.
-        </p>
+        <p className="font-mono text-sm text-accent">Tudo em dia! Nenhuma revisão pendente por agora.</p>
       </PixelCard>
     );
   }
@@ -72,10 +69,19 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
         <p className="font-mono text-2xl text-[var(--pixel-accent)]">Revisão concluída!</p>
         {streakDays !== null && (
           <p className="font-mono text-sm text-[var(--pixel-text)]">
-            Sequência atual: <span className="text-yellow-400 font-bold">{streakDays} dia{streakDays !== 1 ? "s" : ""}</span>
+            Sequência atual:{" "}
+            <span className="text-yellow-400 font-bold">
+              {streakDays} dia{streakDays !== 1 ? "s" : ""}
+            </span>
           </p>
         )}
-        <PixelButton variant="ghost" onClick={() => { setCompleted(false); void load(); }}>
+        <PixelButton
+          variant="ghost"
+          onClick={() => {
+            setCompleted(false);
+            void load();
+          }}
+        >
           Ver revisão novamente
         </PixelButton>
       </PixelCard>
@@ -84,6 +90,7 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      <h1 className="mb-6 font-mono text-sm uppercase tracking-wide text-pixel-text">Revisão Diária</h1>
       {/* Flashcards due */}
       {data.dueFlashcards.length > 0 && (
         <section className="flex flex-col gap-3">
@@ -120,11 +127,7 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
                     {question.statement}
                   </p>
                 </div>
-                <PixelButton
-                  variant="ghost"
-                  className="shrink-0 text-xs"
-                  onClick={() => router.push("/revisao")}
-                >
+                <PixelButton variant="ghost" className="shrink-0 text-xs" onClick={() => router.push("/revisao")}>
                   Rever
                 </PixelButton>
               </PixelCard>
@@ -136,9 +139,7 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
       {/* Weak AWS services */}
       {data.weakServices.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-accent)]">
-            Serviços Fracos
-          </h2>
+          <h2 className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-accent)]">Serviços Fracos</h2>
           <div className="flex flex-col gap-2">
             {data.weakServices.map((service) => (
               <PixelCard key={service.code} className="flex items-center justify-between gap-4">
@@ -148,11 +149,7 @@ export function DailyReviewBoard({ onStartFlashcards }: Props) {
                     {Math.round(service.correctRate * 100)}% correto
                   </span>
                 </div>
-                <PixelButton
-                  variant="ghost"
-                  className="shrink-0 text-xs"
-                  onClick={() => router.push("/kc")}
-                >
+                <PixelButton variant="ghost" className="shrink-0 text-xs" onClick={() => router.push("/kc")}>
                   Praticar
                 </PixelButton>
               </PixelCard>

@@ -1,18 +1,21 @@
 "use client";
 
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ErrorForScreens } from "@/components/ui/error-screens";
+import { LoadingForScreens } from "@/components/ui/loading-screens";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { SprintRunner } from "@/features/retention/components/SprintRunner";
 import { useSprint } from "@/features/retention/hooks/useSprint";
+import { SparklesIcon } from "lucide-react";
 
 type SprintMode = "q5" | "q10" | "t3" | "t5";
 
 const MODE_LABELS: Record<SprintMode, string> = {
-  q5:  "5 questões",
+  q5: "5 questões",
   q10: "10 questões",
-  t3:  "3 minutos",
-  t5:  "5 minutos",
+  t3: "3 minutos",
+  t5: "5 minutos",
 };
 
 /**
@@ -24,25 +27,14 @@ export function SprintScreen() {
   const { data, currentIndex, result, isLoading, isSubmitting, isDone, error, start, recordAnswer } = useSprint();
 
   if (error) {
-    return (
-      <AppLayout>
-        <div className="flex flex-col items-center gap-4 py-16">
-          <p className="font-mono text-sm text-red-500">{error}</p>
-          <PixelButton variant="ghost" onClick={() => void start("q5")}>
-            Tentar novamente
-          </PixelButton>
-        </div>
-      </AppLayout>
-    );
+    return <ErrorForScreens error={"Tentar novamente..."} load={() => void start("q5")} />;
   }
 
   if (isDone && result) {
     return (
       <AppLayout>
         <div className="mx-auto flex max-w-lg flex-col items-center gap-6 px-4 py-12">
-          <h1 className="font-mono text-lg uppercase tracking-wide text-[var(--pixel-accent)]">
-            Sprint Concluído!
-          </h1>
+          <h1 className="font-mono text-lg uppercase tracking-wide text-[var(--pixel-accent)]">Sprint Concluído!</h1>
           <PixelCard className="w-full flex flex-col gap-3 text-center">
             <p className="font-mono text-2xl text-[var(--pixel-text)]">{result.scorePercent}%</p>
             <p className="font-mono text-sm text-[var(--pixel-muted)]">+{result.gainedXp} XP</p>
@@ -76,34 +68,31 @@ export function SprintScreen() {
   }
 
   if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="flex justify-center py-16">
-          <p className="font-mono text-sm text-[var(--pixel-muted)]">Carregando sprint...</p>
-        </div>
-      </AppLayout>
-    );
+    return <LoadingForScreens text="Carregando Sprint..." />;
   }
 
   if (!data) {
     // Mode selection screen.
     return (
       <AppLayout>
-        <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
-          <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
-            Sprint Mode
-          </h1>
-          <p className="font-mono text-xs text-[var(--pixel-muted)]">
-            Sessões ultra-rápidas para manter o ritmo. Escolha o modo:
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {(Object.keys(MODE_LABELS) as SprintMode[]).map((mode) => (
-              <PixelButton key={mode} onClick={() => void start(mode)} className="min-w-[130px]">
-                {MODE_LABELS[mode]}
-              </PixelButton>
-            ))}
+        <PixelCard className="mx-auto mt-4 max-w-lg px-2 py-3">
+          <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
+            <div className="flex items-center gap-2">
+              <SparklesIcon size={36} />
+              <h1 className="font-mono text-sm uppercase tracking-wide text-pixel-text">Sprint Mode</h1>
+            </div>
+            <p className="font-mono text-xs text-pixel-subtext">
+              Sessões ultra-rápidas para manter o ritmo. Escolha o modo:
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {(Object.keys(MODE_LABELS) as SprintMode[]).map((mode) => (
+                <PixelButton key={mode} onClick={() => void start(mode)} className="min-w-[130px]">
+                  {MODE_LABELS[mode]}
+                </PixelButton>
+              ))}
+            </div>
           </div>
-        </div>
+        </PixelCard>
       </AppLayout>
     );
   }
