@@ -7,6 +7,10 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { QuestChainMap } from "@/features/trails/components/QuestChainMap";
 import { fetchTrails, type QuestChain, type QuestStage } from "@/features/trails/services/trails-api";
 
+import { LoadingForScreens } from "@/components/ui/loading-screens";
+import { ErrorForScreens } from "@/components/ui/error-screens";
+import { EmptyForScreens } from "@/components/ui/empty-screens";
+
 /**
  * Lists all active Quest Chains with per-chain progress and an expandable
  * stage map for each chain.
@@ -25,28 +29,25 @@ export function QuestChainScreen() {
    * unlockedNext id, flips that stage's unlocked flag to true — so the UI
    * responds immediately without a full refetch.
    */
-  const handleStageCompleted = useCallback(
-    (chainId: string, stageId: string, unlockedNextId: string | undefined) => {
-      setChains((prev) =>
-        prev.map((chain) => {
-          if (chain.id !== chainId) return chain;
+  const handleStageCompleted = useCallback((chainId: string, stageId: string, unlockedNextId: string | undefined) => {
+    setChains((prev) =>
+      prev.map((chain) => {
+        if (chain.id !== chainId) return chain;
 
-          const updatedStages: QuestStage[] = chain.stages.map((stage) => {
-            if (stage.id === stageId) {
-              return { ...stage, completed: true, completedAt: new Date().toISOString() };
-            }
-            if (unlockedNextId && stage.id === unlockedNextId) {
-              return { ...stage, unlocked: true };
-            }
-            return stage;
-          });
+        const updatedStages: QuestStage[] = chain.stages.map((stage) => {
+          if (stage.id === stageId) {
+            return { ...stage, completed: true, completedAt: new Date().toISOString() };
+          }
+          if (unlockedNextId && stage.id === unlockedNextId) {
+            return { ...stage, unlocked: true };
+          }
+          return stage;
+        });
 
-          return { ...chain, stages: updatedStages };
-        }),
-      );
-    },
-    [],
-  );
+        return { ...chain, stages: updatedStages };
+      }),
+    );
+  }, []);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -67,49 +68,33 @@ export function QuestChainScreen() {
   }, [load]);
 
   if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="flex justify-center py-16">
-          <p className="font-mono text-sm text-[var(--pixel-muted)]">Carregando trilhas...</p>
-        </div>
-      </AppLayout>
-    );
+    return <LoadingForScreens text="Carregando trilhas..." />;
   }
 
   if (error) {
     return (
-      <AppLayout>
-        <div className="flex flex-col items-center gap-4 py-16">
-          <p className="font-mono text-sm text-red-500">{error}</p>
-          <PixelButton variant="ghost" onClick={() => void load()}>
-            Tentar novamente
-          </PixelButton>
-        </div>
-      </AppLayout>
+      <ErrorForScreens
+        error={error}
+        load={() => {
+          void load();
+        }}
+      />
     );
   }
 
   if (chains.length === 0) {
     return (
-      <AppLayout>
-        <div className="mx-auto max-w-5xl px-4 py-8">
-          <div className="flex flex-col items-center gap-2 py-16 text-center">
-            <p className="font-mono text-sm text-[var(--pixel-muted)]">
-              Nenhuma trilha disponível ainda. As trilhas de aprendizagem são criadas pelos
-              instrutores e liberadas conforme o conteúdo é organizado.
-            </p>
-          </div>
-        </div>
-      </AppLayout>
+      <EmptyForScreens
+        text="Nenhuma trilha disponível ainda. As trilhas de aprendizagem são criadas pelos instrutores e liberadas
+                conforme o conteúdo é organizado."
+      />
     );
   }
 
   return (
     <AppLayout>
       <div className="mx-auto max-w-5xl px-4 py-8 flex flex-col gap-6">
-        <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
-          Trilhas de Aprendizagem
-        </h1>
+        <h1 className="font-mono text-sm uppercase tracking-wide text-primary">Trilhas de Aprendizagem</h1>
 
         <div className="space-y-4">
           {chains.map((chain) => {
@@ -122,15 +107,11 @@ export function QuestChainScreen() {
                 {/* Chain header */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <h2 className="font-mono text-sm font-bold text-[var(--pixel-text)]">
-                      {chain.name}
-                    </h2>
+                    <h2 className="font-mono text-sm font-bold text-primary">{chain.name}</h2>
                     {chain.description && (
-                      <p className="mt-0.5 font-mono text-xs text-[var(--pixel-muted)]">
-                        {chain.description}
-                      </p>
+                      <p className="mt-0.5 font-mono text-xs text-pixel-subtext">{chain.description}</p>
                     )}
-                    <p className="mt-1 font-mono text-xs text-[var(--pixel-accent)]">
+                    <p className="mt-1 font-mono text-xs text-pixel-subtext">
                       {completedCount}/{totalCount} estágios completos
                     </p>
                   </div>
@@ -148,9 +129,9 @@ export function QuestChainScreen() {
 
                 {/* Progress bar */}
                 {totalCount > 0 && (
-                  <div className="mt-3 h-1.5 w-full rounded-full bg-[var(--pixel-border)]">
+                  <div className="mt-3 h-1.5 w-full rounded-full bg-pixel-border">
                     <div
-                      className="h-full rounded-full bg-[var(--pixel-accent)] transition-all"
+                      className="h-full rounded-full bg-accent transition-all"
                       style={{ width: `${Math.round((completedCount / totalCount) * 100)}%` }}
                     />
                   </div>
@@ -158,7 +139,7 @@ export function QuestChainScreen() {
 
                 {/* Expanded stage map */}
                 {isExpanded && (
-                  <div className="mt-4 border-t border-[var(--pixel-border)] pt-4">
+                  <div className="mt-4 border-t border-pixel-border pt-4">
                     <QuestChainMap
                       chain={chain}
                       tooltip={tooltip}

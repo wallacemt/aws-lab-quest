@@ -61,11 +61,11 @@ type StageNodeProps = {
 
 const CIRCLE_STYLES: Record<StageState, string> = {
   locked:
-    "border-[var(--pixel-border)] bg-[var(--pixel-card)] text-[var(--pixel-muted)] opacity-60",
+    "border-[var(--pixel-border)] bg-[var(--pixel-card)] text-pixel-subtext opacity-60",
   unlocked:
-    "border-[var(--pixel-accent)] bg-[var(--pixel-card)] text-[var(--pixel-accent)] shadow-[0_0_12px_rgba(var(--pixel-accent-rgb),0.3)]",
+    "border-[var(--pixel-accent)] bg-pixel-card text-pixel-subtext shadow-[0_0_12px_rgba(var(--pixel-accent-rgb),0.3)]",
   completed:
-    "border-[var(--pixel-accent)] bg-[var(--pixel-accent)] text-[var(--pixel-bg)]",
+    "border-[var(--pixel-accent)] bg-accent text-[var(--pixel-bg)]",
 };
 
 function StageNode({ stage, chainId, align, onTooltip, onStudy, onStageCompleted }: StageNodeProps) {
@@ -98,9 +98,9 @@ function StageNode({ stage, chainId, align, onTooltip, onStudy, onStageCompleted
           state === "locked" ? "opacity-60" : ""
         }`}
       >
-        <p className="font-mono text-xs font-bold text-[var(--pixel-text)] leading-tight">{stage.title}</p>
+        <p className="font-mono text-xs font-bold text-primary leading-tight">{stage.title}</p>
         {stage.awsServiceId && (
-          <p className="font-mono text-[10px] text-[var(--pixel-muted)] uppercase mt-0.5">
+          <p className="font-mono text-[10px] text-pixel-subtext uppercase mt-0.5">
             {stage.awsServiceId}
           </p>
         )}

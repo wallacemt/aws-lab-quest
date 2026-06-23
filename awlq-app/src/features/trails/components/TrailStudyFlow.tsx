@@ -6,7 +6,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
-import { fetchStageExplain, fetchStageQuestions, completeStage, type TrailQuestion } from "@/features/trails/services/trails-api";
+import {
+  fetchStageExplain,
+  fetchStageQuestions,
+  completeStage,
+  type TrailQuestion,
+} from "@/features/trails/services/trails-api";
+import { RetroIcon } from "@/components/ui/retro-loading";
 
 // ─── State machine ────────────────────────────────────────────────────────────
 
@@ -56,9 +62,7 @@ function VictoryScreen({ onClose }: { onClose: () => void }) {
         transition={{ delay: 0.4 }}
         className="space-y-2"
       >
-        <p className="font-mono text-xl font-bold uppercase text-[var(--pixel-accent)]">
-          Estágio Concluído!
-        </p>
+        <p className="font-mono text-xl font-bold uppercase text-[var(--pixel-accent)]">Estágio Concluído!</p>
         <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
           Você acertou todas as questões e avançou na trilha.
         </p>
@@ -96,7 +100,11 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
             <div
               key={i}
               className={`h-1.5 w-1.5 ${
-                i < idx ? "bg-[var(--pixel-accent)]" : i === idx ? "bg-[var(--pixel-primary)]" : "bg-[var(--pixel-border)]"
+                i < idx
+                  ? "bg-[var(--pixel-accent)]"
+                  : i === idx
+                    ? "bg-[var(--pixel-primary)]"
+                    : "bg-[var(--pixel-border)]"
               }`}
             />
           ))}
@@ -104,14 +112,13 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
       </div>
 
       <PixelCard>
-        <p className="font-[var(--font-body)] text-sm leading-relaxed text-[var(--pixel-text)]">
-          {question.statement}
-        </p>
+        <p className="font-[var(--font-body)] text-sm leading-relaxed text-[var(--pixel-text)]">{question.statement}</p>
       </PixelCard>
 
       <div className="flex flex-col gap-2">
         {question.options.map((opt) => {
-          let optClass = "border border-[var(--pixel-border)] bg-[var(--pixel-card)] hover:border-[var(--pixel-accent)] cursor-pointer";
+          let optClass =
+            "border border-[var(--pixel-border)] bg-[var(--pixel-card)] hover:border-[var(--pixel-accent)] cursor-pointer";
           if (selected === opt.key && !revealed) {
             optClass = "border-2 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10 cursor-pointer";
           }
@@ -133,12 +140,8 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
               onClick={() => onSelect(opt.key)}
               className={`flex items-start gap-3 p-3 text-left transition-colors ${optClass}`}
             >
-              <span className="shrink-0 font-mono text-xs font-bold text-[var(--pixel-muted)]">
-                {opt.key}
-              </span>
-              <span className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
-                {opt.text}
-              </span>
+              <span className="shrink-0 font-mono text-xs font-bold text-[var(--pixel-muted)]">{opt.key}</span>
+              <span className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">{opt.text}</span>
             </button>
           );
         })}
@@ -149,9 +152,7 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-muted)] mb-1">
             {isCorrect ? "✓ Correto!" : `✗ Incorreto — Resposta: ${question.correctKey}`}
           </p>
-          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-            {question.explanation}
-          </p>
+          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{question.explanation}</p>
         </PixelCard>
       )}
 
@@ -201,7 +202,10 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
       setPhase({ tag: "quiz", questions, idx: 0, selected: null, revealed: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao gerar questões.");
-      setPhase({ tag: "explain", markdown: phase.tag === "loading_questions" ? "" : (phase as { markdown?: string }).markdown ?? "" });
+      setPhase({
+        tag: "explain",
+        markdown: phase.tag === "loading_questions" ? "" : ((phase as { markdown?: string }).markdown ?? ""),
+      });
     }
   }
 
@@ -249,13 +253,13 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="relative w-full h-full overflow-y-auto"
       >
-        <PixelCard className="space-y-4">
+        <PixelCard className="space-y-4 overflow-auto h-full">
           {/* Header */}
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)] tracking-widest">
+              <p className="font-mono text-[10px] uppercase text-accent tracking-widest">
                 {phase.tag === "explain" || phase.tag === "loading_explain"
                   ? "Explicação da IA"
                   : phase.tag === "loading_questions"
@@ -266,15 +270,13 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                         ? "Tente novamente"
                         : "Vitória!"}
               </p>
-              <h2 className="font-mono text-base font-bold uppercase text-[var(--pixel-text)] mt-0.5">
-                {stage.title}
-              </h2>
+              <h2 className="font-mono text-base font-bold uppercase text-primary mt-0.5">{stage.title}</h2>
             </div>
             {phase.tag !== "victory" && (
               <button
                 type="button"
                 onClick={onClose}
-                className="font-mono text-xs text-[var(--pixel-muted)] hover:text-[var(--pixel-text)] transition-colors shrink-0"
+                className="font-mono text-xs text-pixel-subtext hover:text-primary transition-colors shrink-0"
               >
                 ✕ Fechar
               </button>
@@ -289,31 +291,41 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
 
           {/* Loading explain */}
           {phase.tag === "loading_explain" && (
-            <div className="flex flex-col items-center gap-3 py-10">
-              <div className="h-6 w-6 animate-spin border-2 border-[var(--pixel-accent)] border-t-transparent" />
-              <p className="font-mono text-xs text-[var(--pixel-muted)]">
-                Gerando explicação personalizada...
-              </p>
+            <div className="flex flex-col items-center gap-2 py-4">
+              <RetroIcon />
+              <p className="font-mono text-xs text-pixel-subtext">Gerando explicação personalizada...</p>
             </div>
           )}
 
           {/* Explanation */}
           {phase.tag === "explain" && phase.markdown && (
             <>
-              <div className="max-h-[50vh] overflow-y-auto border border-[var(--pixel-border)] bg-[var(--pixel-card)] p-4">
+              <div className="max-h-[70vh] text-wrap overflow-y-auto border border-pixel-border bg-pixel-card p-4">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    h1: ({ children }) => <h1 className="mb-2 font-mono text-sm uppercase text-[var(--pixel-primary)]">{children}</h1>,
-                    h2: ({ children }) => <h2 className="mb-2 mt-4 font-mono text-xs uppercase text-[var(--pixel-accent)]">{children}</h2>,
-                    h3: ({ children }) => <h3 className="mb-1 mt-3 font-mono text-[11px] uppercase text-[var(--pixel-subtext)]">{children}</h3>,
-                    p: ({ children }) => <p className="mb-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-subtext)]">{children}</p>,
-                    li: ({ children }) => <li className="mb-1 ml-4 list-disc font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{children}</li>,
+                    h1: ({ children }) => <h1 className="mb-2 font-mono text-sm uppercase text-primary">{children}</h1>,
+                    h2: ({ children }) => (
+                      <h2 className="mb-2 mt-4 font-mono text-xs uppercase text-accent">{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="mb-1 mt-3 font-mono text-[11px] uppercase text-accent">{children}</h3>
+                    ),
+                    p: ({ children }) => (
+                      <p className="mb-2 font-sans text-sm leading-6 text-pixel-subtext">{children}</p>
+                    ),
+                    li: ({ children }) => (
+                      <li className="mb-1 ml-4 list-disc font-sans text-sm text-pixel-subtext">{children}</li>
+                    ),
                     ul: ({ children }) => <ul className="mb-2 space-y-0.5">{children}</ul>,
                     ol: ({ children }) => <ol className="mb-2 list-decimal ml-4 space-y-0.5">{children}</ol>,
-                    strong: ({ children }) => <strong className="font-semibold text-[var(--pixel-text)]">{children}</strong>,
-                    code: ({ children }) => <code className="bg-[var(--pixel-border)]/30 px-1 py-0.5 font-mono text-xs text-[var(--pixel-accent)]">{children}</code>,
-                    hr: () => <hr className="my-3 border-[var(--pixel-border)]" />,
+                    strong: ({ children }) => <strong className="font-semibold text-pixel-text">{children}</strong>,
+                    code: ({ children }) => (
+                      <code className="bg-pixel-border/10 rounded-md px-1 py-0.5 font-mono text-xs text-accent">
+                        {children}
+                      </code>
+                    ),
+                    hr: () => <hr className="my-3 border-pixel-border" />,
                   }}
                 >
                   {phase.markdown}
@@ -332,11 +344,9 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
 
           {/* Loading questions */}
           {phase.tag === "loading_questions" && (
-            <div className="flex flex-col items-center gap-3 py-10">
-              <div className="h-6 w-6 animate-spin border-2 border-[var(--pixel-primary)] border-t-transparent" />
-              <p className="font-mono text-xs text-[var(--pixel-muted)]">
-                Gerando 10 questões sobre {stage.title}...
-              </p>
+            <div className="flex flex-col items-center gap-2 py-4">
+              <RetroIcon />
+              <p className="font-mono text-xs text-pixel-subtext">Gerando 10 questões sobre {stage.title}...</p>
             </div>
           )}
 
@@ -365,19 +375,16 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
             <div className="flex flex-col items-center gap-4 py-6 text-center">
               <p className="text-4xl">😓</p>
               <div>
-                <p className="font-mono text-base font-bold text-[var(--pixel-text)]">
+                <p className="font-mono text-base font-bold text-pixel-text">
                   {phase.correct}/{phase.total} corretas
                 </p>
-                <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                  Você precisa acertar todas as {phase.total} questões para avançar.
-                  Revise a explicação e tente novamente!
+                <p className="mt-1 font-sans text-sm text-pixel-subtext">
+                  Você precisa acertar todas as {phase.total} questões para avançar. Revise a explicação e tente
+                  novamente!
                 </p>
               </div>
               <div className="flex gap-3">
-                <PixelButton
-                  onClick={() => setPhase({ tag: "explain", markdown: "" })}
-                  className="flex-1"
-                >
+                <PixelButton onClick={() => setPhase({ tag: "explain", markdown: "" })} className="flex-1">
                   Reler explicação
                 </PixelButton>
                 <PixelButton variant="ghost" onClick={() => void startQuiz()}>
