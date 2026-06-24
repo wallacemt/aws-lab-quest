@@ -7,6 +7,46 @@ versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [2.1.0] — 2026-06-23
+
+### Features
+
+#### Trilhas — Expansão de Estudo (Phase 2+)
+- feat(trails): API `/api/trails/[chainId]/stages/[stageId]/explain` — explicação de estágio gerada por IA (Gemini), com seções estruturadas (O que é · Como funciona · Casos de uso · Dicas de certificação · Armadilhas comuns · Resumo), personalizada por tema favorito e certificação-alvo do usuário; resultado cacheado em `TrailStageExplain` para evitar re-geração
+- feat(trails): API `/api/trails/[chainId]/stages/[stageId]/questions` — busca questões associadas a um estágio com cache Redis de 24 h (TTL 86 400 s)
+- feat(trails): `TrailStudyFlow` — componente de fluxo de estudo por estágio: seleção de questões pendentes, confirmação e inicialização da sessão diretamente da tela de trilha
+
+#### Cache
+- feat(cache): chave `TRAIL_QUESTIONS` com TTL 86 400 s adicionada ao mapa de cache
+- feat(cache): `cacheInvalidatePattern()` — invalidação por padrão via SCAN + DEL (evita `KEYS` em produção)
+- feat(cache): `cacheGetOrSet()` — utilitário cache-aside: busca no Redis; se ausente, executa `fn()`, grava o resultado e retorna
+
+#### Componentes UI Reutilizáveis
+- feat(ui): `LoadingForScreens` — estado de loading com ícone retro animado e texto customizável
+- feat(ui): `EmptyForScreens` — estado vazio com ilustração bounce e mensagem customizável
+- feat(ui): `ErrorForScreens` — estado de erro padrão com callback de retry
+
+#### Biblioteca (Phase 3+)
+- feat(library): `ImageViewer` — visualizador interativo de imagens: zoom via scroll / botões (+25% por passo, clamp 0.5×–4×), arraste com pointer capture, duplo clique para reset; integrado à `LibraryItemScreen`
+
+#### Admin — Simulados
+- feat(admin): geração automática de packs de simulado via wizard 2 etapas: configuração de tamanho (padrão 65 questões), geração de artwork por IA (modelo Flux) e criação de narrativa de jornada com prompt customizável
+- feat(admin): filtros avançados na tela de simulados — ordenação por múltiplos critérios, toggle ASC/DESC, controle de tamanho de página, alternância entre layout tabela e grade
+- feat(admin): edição inline de narrativa por estágio — nome da etapa, texto da história e contexto AWS editáveis diretamente na listagem
+
+#### Infraestrutura / Workspace
+- feat(workspace): pacote `packages/db` centralizado — `prisma/schema.prisma` e todas as migrations unificados; `awlq-app` e `awlq-worker` agora consomem o schema a partir do pacote compartilhado
+- feat(workspace): `packages/db/prisma.config.ts` — configuração Prisma centralizada para o monorepo
+
+#### Seed
+- feat(seed): `seed-mock-user.ts` — usuário mock pré-configurado para ambiente de desenvolvimento
+
+### Database
+
+- migration `20260605040000_add_trail_stage_explain` — tabela `TrailStageExplain` com `stageId` (FK), `content` (Markdown), índice em `stageId` para busca O(1)
+
+---
+
 ## [2.0.0] — 2026-06-05
 
 ### Features

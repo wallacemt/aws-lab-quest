@@ -78,7 +78,7 @@ export function AdminChangelogScreen() {
 
   async function updateRelease(
     release: Release,
-    patch: Partial<Pick<Release, "published" | "highlight" | "adminSummary">>,
+    patch: Partial<Pick<Release, "published" | "highlight" | "adminSummary" | "bodyMarkdown">>,
   ) {
     await fetch(`/api/admin/changelog/${release.id}`, {
       method: "PUT",
@@ -123,10 +123,7 @@ export function AdminChangelogScreen() {
     setCollapsed((p) => ({ ...p, [releaseId]: !p[releaseId] }));
   }
 
-  const filtered =
-    filterPublished === ""
-      ? releases
-      : releases.filter((r) => String(r.published) === filterPublished);
+  const filtered = filterPublished === "" ? releases : releases.filter((r) => String(r.published) === filterPublished);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -167,7 +164,10 @@ export function AdminChangelogScreen() {
         <div className="flex flex-wrap gap-3">
           <select
             value={filterPublished}
-            onChange={(e) => { setFilterPublished(e.target.value as "" | "true" | "false"); setPage(1); }}
+            onChange={(e) => {
+              setFilterPublished(e.target.value as "" | "true" | "false");
+              setPage(1);
+            }}
             className="border border-[#334155] bg-[#0b1220] px-3 py-2 text-xs text-[#e2e8f0] focus:outline-none"
           >
             <option value="">Todas</option>
@@ -197,9 +197,7 @@ export function AdminChangelogScreen() {
                       {collapsed[release.id] ? "▶" : "▼"}
                     </span>
                     <span className="font-mono text-sm text-[#f97316]">{release.tagName}</span>
-                    {release.name && (
-                      <span className="font-mono text-xs text-[#e2e8f0] truncate">{release.name}</span>
-                    )}
+                    {release.name && <span className="font-mono text-xs text-[#e2e8f0] truncate">{release.name}</span>}
                     {release.releasedAt && (
                       <span className="font-mono text-[10px] text-[#94a3b8] shrink-0">
                         {new Date(release.releasedAt).toLocaleDateString("pt-BR")}
@@ -211,9 +209,7 @@ export function AdminChangelogScreen() {
                       type="button"
                       onClick={() => void updateRelease(release, { highlight: !release.highlight })}
                       className={`border px-3 py-1.5 font-mono text-[10px] uppercase ${
-                        release.highlight
-                          ? "border-[#f97316] text-[#f97316]"
-                          : "border-[#334155] text-[#94a3b8]"
+                        release.highlight ? "border-[#f97316] text-[#f97316]" : "border-[#334155] text-[#94a3b8]"
                       }`}
                     >
                       Destaque
@@ -252,17 +248,11 @@ export function AdminChangelogScreen() {
                           rows={5}
                           className="flex-1 border border-[#334155] bg-[#0b1220] px-3 py-2 font-mono text-xs text-[#e2e8f0] focus:border-[#f97316] focus:outline-none resize-y"
                           value={editBody[release.id] ?? ""}
-                          onChange={(e) =>
-                            setEditBody((p) => ({ ...p, [release.id]: e.target.value }))
-                          }
+                          onChange={(e) => setEditBody((p) => ({ ...p, [release.id]: e.target.value }))}
                         />
                         <button
                           type="button"
-                          onClick={() =>
-                            void updateRelease(release, {
-                              bodyMarkdown: editBody[release.id] || null,
-                            })
-                          }
+                          onClick={() => void updateRelease(release, { bodyMarkdown: editBody[release.id] || null })}
                           className="border border-[#334155] px-3 font-mono text-[10px] uppercase text-[#cbd5e1] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
                         >
                           Salvar
@@ -280,9 +270,7 @@ export function AdminChangelogScreen() {
                           rows={2}
                           className="flex-1 border border-[#334155] bg-[#0b1220] px-3 py-2 font-mono text-xs text-[#e2e8f0] focus:border-[#f97316] focus:outline-none resize-none"
                           value={editSummary[release.id] ?? ""}
-                          onChange={(e) =>
-                            setEditSummary((p) => ({ ...p, [release.id]: e.target.value }))
-                          }
+                          onChange={(e) => setEditSummary((p) => ({ ...p, [release.id]: e.target.value }))}
                         />
                         <button
                           type="button"

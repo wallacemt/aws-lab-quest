@@ -1,17 +1,14 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
+import { Document, Page } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
 // Configure PDF.js worker. Must live in the same module that renders
 // <Document> / <Page>. Uses import.meta.url so bundlers can resolve the
 // correct path without hard-coding a CDN URL.
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
+
 
 interface PdfViewerProps {
   url: string;
