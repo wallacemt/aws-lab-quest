@@ -68,7 +68,7 @@ const CIRCLE_STYLES: Record<StageState, string> = {
     "border-[var(--pixel-accent)] bg-accent text-[var(--pixel-bg)]",
 };
 
-function StageNode({ stage, chainId, align, onTooltip, onStudy, onStageCompleted }: StageNodeProps) {
+function StageNode({ stage, chainId: _chainId, align, onTooltip, onStudy, onStageCompleted: _onStageCompleted }: StageNodeProps) {
   const state = getStageState(stage);
   const isLeft = align === "left";
 
