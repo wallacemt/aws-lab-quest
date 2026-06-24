@@ -13,7 +13,24 @@ export async function GET(request: NextRequest) {
 
   const userId = session.user.id;
 
-  const [user, profile, studySessions, questHistory, achievements, badges, certBadges] = await Promise.all([
+  const [
+    user,
+    profile,
+    studySessions,
+    questHistory,
+    achievements,
+    badges,
+    certBadges,
+    // LGPD F-02: Phase 1–4 personal data tables
+    flashcards,
+    flashcardReviews,
+    falseBeliefSignals,
+    mentorRecommendations,
+    bossBattles,
+    weeklyEntries,
+    quizAttempts,
+    questProgress,
+  ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -86,6 +103,58 @@ export async function GET(request: NextRequest) {
         certificationPreset: { select: { code: true, name: true } },
       },
     }),
+    // Phase 1 — Retention spine
+    prisma.flashcard.findMany({
+      where: { userId },
+      select: {
+        front: true,
+        back: true,
+        hint: true,
+        dueAt: true,
+        easeFactor: true,
+        intervalDays: true,
+        repetitions: true,
+        createdAt: true,
+      },
+    }),
+    prisma.flashcardReview.findMany({
+      where: { flashcard: { userId } },
+      select: { grade: true, prevInterval: true, newInterval: true, reviewedAt: true },
+    }),
+    // Phase 2 — Mentor
+    prisma.falseBeliefSignal.findMany({
+      where: { userId },
+      select: {
+        awsServiceId: true,
+        topic: true,
+        falseBeliefCount: true,
+        knownGapCount: true,
+        masteryCount: true,
+        computedAt: true,
+      },
+    }),
+    prisma.mentorRecommendation.findMany({
+      where: { userId },
+      select: { rank: true, actionType: true, title: true, rationale: true, generatedAt: true },
+    }),
+    // Phase 4 — Arena / Weekly / Daily Quiz
+    prisma.bossBattle.findMany({
+      where: { userId },
+      select: { bossId: true, remainingHp: true, victory: true, gainedXp: true, finishedAt: true, createdAt: true },
+    }),
+    prisma.weeklyChallengeEntry.findMany({
+      where: { userId },
+      select: { score: true, rank: true },
+    }),
+    prisma.dailyQuizAttempt.findMany({
+      where: { userId },
+      select: { score: true, totalCount: true, gainedXp: true, completedAt: true },
+    }),
+    // Quest Chains
+    prisma.questChainProgress.findMany({
+      where: { userId },
+      select: { stageId: true, completed: true, completedAt: true },
+    }),
   ]);
 
   const exportPayload = {
@@ -110,6 +179,15 @@ export async function GET(request: NextRequest) {
       earnedAt: b.earnedAt,
     })),
     certificationBadges: certBadges,
+    // LGPD F-02: Phase 1–4 personal data
+    flashcards,
+    flashcardReviews,
+    falseBeliefSignals,
+    mentorRecommendations,
+    bossBattles,
+    weeklyEntries,
+    quizAttempts,
+    questProgress,
   };
 
   const json = JSON.stringify(exportPayload, null, 2);

@@ -694,3 +694,88 @@ export type BehavioralEmailStatus = {
     sentAt: string;
   }>;
 };
+
+type PackQuestion = {
+  packQuestionId: string;
+  id: string;
+  position: number;
+  statement: string;
+  topic: string | null;
+  difficulty: string;
+  questionType: string;
+};
+
+type JourneyNarrative = {
+  stageName: string;
+  storyText: string;
+  awsContext: string;
+};
+
+export type PackDetail = {
+  id: string;
+  name: string;
+  active: boolean;
+  questionCount: number;
+  difficultyScore: number;
+  artworkUrl: string | null;
+  journeyNarrative: JourneyNarrative | null;
+  certificationPreset: { id: string; code: string; name: string } | null;
+  questions: PackQuestion[];
+};
+
+export type AvailableQuestion = {
+  id: string;
+  statement: string;
+  topic: string | null;
+  difficulty: string;
+  questionType: string;
+  createdAt: string;
+};
+
+export type SimuladoPackItem = {
+  id: string;
+  name: string;
+  certificationCode: string | null;
+  certificationName: string | null;
+  questionCount: number;
+  difficultyScore: number;
+  active: boolean;
+  artworkUrl: string | null;
+  createdAt: string;
+  createdByName: string | null;
+  sessionCount: number;
+};
+
+export type PacksPayload = {
+  items: SimuladoPackItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export type GenerateStats = {
+  available: number;
+  packsPossible: number;
+  packSize: number;
+} | null;
+
+export type AutoGenCertStat = {
+  code: string;
+  name: string;
+  available: number;
+  packsPossible: number;
+};
+
+export type AutoGenStats = {
+  certifications: AutoGenCertStat[];
+  totalPacksPossible: number;
+  packSize: number;
+  defaultImagePromptTemplate: string;
+  defaultNarrativePrompt: string;
+};
+
+export type AutoGenResult = {
+  created: number;
+  packs: Array<{ id: string; name: string; certCode: string; hasArtwork: boolean; hasNarrative: boolean }>;
+  errors: string[];
+};

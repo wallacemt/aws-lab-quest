@@ -1,16 +1,18 @@
 {
   "name": "aws-lab-quest-next",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "prisma migrate dev --schema=../packages/db/prisma/schema.prisma",
     "db:seed": "bun run prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "db:generate": "prisma generate",
+    "db:seed:mock": "bun run prisma/seed-mock-user.ts",
+    "db:studio": "prisma studio --schema=../packages/db/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema=../packages/db/prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema=../packages/db/prisma/schema.prisma",
     "test": "vitest run"
   },
   "prisma": {
@@ -41,6 +43,7 @@
     "react-day-picker": "^10.0.1",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
+    "react-pdf": "^10.4.1",
     "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",

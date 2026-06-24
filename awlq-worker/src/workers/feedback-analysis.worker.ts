@@ -2,6 +2,7 @@ import { Worker } from "bullmq";
 import { redis, FeedbackAnalysisJobData, questionGenerationQueue } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { analyzeWeakAreas } from "../services/weak-area-analyzer.js";
+import { aggregateFalseBeliefs } from "../services/false-belief-aggregator.js";
 import { logger } from "../shared/logger.js";
 
 export function createFeedbackAnalysisWorker(): Worker {
@@ -89,6 +90,21 @@ export function createFeedbackAnalysisWorker(): Worker {
         { certificationCode, weakAreas: analysis.weakAreas.length },
         "feedback-analysis: generation jobs enqueued"
       );
+
+      // Aggregate false-belief signals for users who studied this cert in the window.
+      const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+      const uniqueUsers = await prisma.studySessionHistory.findMany({
+        where: { certificationCode, completedAt: { gte: since }, anonymized: false },
+        select: { userId: true },
+        distinct: ["userId"],
+        take: 200,
+      });
+
+      for (const { userId } of uniqueUsers) {
+        await aggregateFalseBeliefs(userId, windowDays).catch((err) =>
+          logger.error({ userId, err }, "feedback-analysis: false-belief aggregation failed")
+        );
+      }
     },
     { connection: redis, concurrency: 5 }
   );

@@ -120,3 +120,91 @@ export const behavioralEmailQueue = new Queue<BehavioralEmailJobData, void, stri
     backoff: { type: "fixed", delay: 10_000 },
   },
 });
+
+// ─── Phase 1: Retention queues ────────────────────────────────────────────────
+
+export type FlashcardGenerationJobData = {
+  userId: string;
+  sinceSessionId?: string;
+};
+
+export const flashcardGenerationQueue = new Queue<FlashcardGenerationJobData, void, string>("flashcard-generation", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});
+
+// ─── Phase 1.5: KC generation queue ──────────────────────────────────────────
+
+export type KcGenerationJobData = {
+  requestId: string;
+  userId: string;
+  serviceCode?: string;
+  topic?: string;
+  difficulty: "easy" | "medium" | "hard" | "nightmare";
+  count: number;
+};
+
+export const kcGenerationQueue = new Queue<KcGenerationJobData, void, string>("kc-generation", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+});
+
+// ─── Phase 2: Mentor compute queue ───────────────────────────────────────────
+
+export type MentorComputeJobData = { userId: string };
+
+export const mentorComputeQueue = new Queue<MentorComputeJobData, void, string>("mentor-compute", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});
+
+// ─── Phase 4: Engagement queues ───────────────────────────────────────────────
+
+export type WeeklyChallengeJobData = { mode: "open" | "close" };
+
+export const weeklyChallengeQueue = new Queue<WeeklyChallengeJobData, void, string>("weekly-challenge", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});
+
+export type NewsFetchJobData = { sourceId?: string };
+
+export const newsFetchQueue = new Queue<NewsFetchJobData, void, string>("news-fetch", {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+});
+
+export type ChangelogFetchJobData = { manual?: boolean };
+
+export const changelogFetchQueue = new Queue<ChangelogFetchJobData, void, string>("changelog-fetch", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+});
+
+export type DailyQuizSeedJobData = Record<string, never>;
+
+export const dailyQuizQueue = new Queue<DailyQuizSeedJobData, void, string>("daily-quiz", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});

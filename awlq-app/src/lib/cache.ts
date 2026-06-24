@@ -10,6 +10,7 @@ export const CACHE_TTL = {
   USER_PROFILE: 600,
   USER_HISTORY: 300,
   USER_ACHIEVEMENTS: 300,
+  TRAIL_QUESTIONS: 86_400,
 } as const;
 
 export const CACHE_KEYS = {
@@ -24,6 +25,7 @@ export const CACHE_KEYS = {
   userQuestHistory:  (userId: string): string => `user:quest-history:${userId}`,
   userStudyHistory:  (userId: string): string => `user:study-history:${userId}`,
   userAchievements:  (userId: string): string => `user:achievements:${userId}`,
+  trailQuestions:    (stageId: string): string => `trail:questions:${stageId}`,
 };
 
 export async function cacheGet<T>(key: string): Promise<T | null> {

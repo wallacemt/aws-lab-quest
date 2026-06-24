@@ -4,6 +4,7 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
 import { ReportQuestionModal } from "@/features/study/components/ReportQuestionModal";
+import { ConfidenceSelector, AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
 import { StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import { normalizeAnswerValue, normalizeCorrectOptions } from "@/features/study/services";
 import { ReportQuestionReason } from "@/features/study/services/study-api";
@@ -42,6 +43,8 @@ type Props = {
   reportMessage: string | null;
   reportModalOpen: boolean;
   reportSubmitting: boolean;
+  /** Confidence already selected for the current question, or undefined if not yet chosen. */
+  currentConfidence: AnswerConfidence | undefined;
   onAnswerChange: (questionId: string, value: QuestionOption | QuestionOption[]) => void;
   onSubmitAnswer: () => void;
   onNextQuestion: () => void;
@@ -50,6 +53,8 @@ type Props = {
   onOpenReport: () => void;
   onCloseReport: () => void;
   onSubmitReport: (input: { reason: ReportQuestionReason; description: string }) => Promise<void>;
+  /** Called when the user selects a confidence level after answering. */
+  onConfidenceSelect: (confidence: AnswerConfidence) => void;
 };
 
 const OPTIONS = STUDY_OPTIONS;
@@ -75,6 +80,7 @@ export function KCQuestionFlow({
   reportMessage,
   reportModalOpen,
   reportSubmitting,
+  currentConfidence,
   onAnswerChange,
   onSubmitAnswer,
   onNextQuestion,
@@ -83,6 +89,7 @@ export function KCQuestionFlow({
   onOpenReport,
   onCloseReport,
   onSubmitReport,
+  onConfidenceSelect,
 }: Props) {
   return (
     <>
@@ -164,6 +171,20 @@ export function KCQuestionFlow({
             loadingText="Gerando auditoria detalhada com IA..."
             options={currentReviewOptions}
           />
+        )}
+
+        {/* Confidence capture (RF-09, ADR-05): shown after answer is submitted,
+            before advancing. Once selected, the selector is replaced by the chosen label. */}
+        {submittedCurrent && !loadingExplanation && (
+          currentConfidence ? (
+            <p className="text-center font-mono text-[10px] text-[var(--pixel-subtext)]">
+              Confiança registrada: <span className="text-[var(--pixel-accent)]">
+                {currentConfidence === "high" ? "Muito confiante" : currentConfidence === "medium" ? "Mais ou menos" : "Chutei"}
+              </span>
+            </p>
+          ) : (
+            <ConfidenceSelector onSelect={onConfidenceSelect} />
+          )
         )}
 
         {flowError && <p className="font-sans text-sm text-red-300">{flowError}</p>}

@@ -1,13 +1,13 @@
 {
   "name": "aws-quest-worker",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate --schema=../packages/db/prisma/schema.prisma"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -20,7 +20,8 @@
     "pdf-parse": "1.1.1",
     "pg": "^8.20.0",
     "pino": "^9.7.0",
-    "pino-pretty": "^13.0.0"
+    "pino-pretty": "^13.0.0",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

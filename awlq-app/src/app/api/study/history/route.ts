@@ -8,6 +8,7 @@ import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOptionMapping } from "@/lib/types";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight, XpActivityType } from "@/lib/xp-weights";
+import { recordStudyActivity } from "@/lib/streak";
 
 type StudyHistoryItem = {
   questionId: string;
@@ -192,6 +193,26 @@ export async function POST(request: NextRequest) {
       CACHE_KEYS.userAchievements(session.user.id),
       CACHE_KEYS.leaderboard(),
     ),
+    // Enqueue flashcard generation for wrong/slow/flagged answers in this session.
+    // Fire-and-forget via WorkerTrigger — never blocks the response.
+    prisma.workerTrigger.create({
+      data: {
+        action: "generate-flashcards",
+        source: "session_save",
+        payload: { userId: session.user.id, sinceSessionId: item.id },
+      },
+    }),
+    // Enqueue mentor recompute so recommendations are fresh after each session.
+    // Fire-and-forget via WorkerTrigger — never blocks the response.
+    prisma.workerTrigger.create({
+      data: {
+        action: "compute-mentor",
+        source: "session_save",
+        payload: { userId: session.user.id },
+      },
+    }),
+    // Record streak for questions activity.
+    recordStudyActivity(session.user.id, "questions", item.totalQuestions),
   ]);
 
   return NextResponse.json({ item, prevXp, newXp, newAchievements }, { status: 201 });

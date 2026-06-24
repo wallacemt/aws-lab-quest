@@ -2,7 +2,7 @@
 
 import { ButtonHTMLAttributes } from "react";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "default";
 
 type PixelButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -15,6 +15,8 @@ const variantClassMap: Record<Variant, string> = {
     "bg-[var(--pixel-accent)] text-black border-black shadow-[4px_4px_0_0_#000] hover:translate-y-[-1px] active:translate-y-[2px]",
   ghost:
     "bg-transparent text-[var(--pixel-text)] border-[var(--pixel-border)] shadow-[4px_4px_0_0_var(--pixel-border)] hover:bg-[var(--pixel-muted)] active:translate-y-[2px]",
+  default:
+    "bg-pixel-card text-pixel-text/90 border-black shadow-[4px_4px_0_0_#000] hover:translate-y-[-1px] active:translate-y-[2px]",
 };
 
 export function PixelButton({ className = "", variant = "primary", ...props }: PixelButtonProps) {

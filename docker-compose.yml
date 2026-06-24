@@ -1,8 +1,8 @@
 services:
   rt-awslq-worker:
     build:
-      context: ./awlq-worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: awlq-worker/Dockerfile
     container_name: rt-awslq-worker
     restart: unless-stopped
     environment:
@@ -23,8 +23,8 @@ services:
      - rt-network
   rt-awslq-app:
     build:
-      context: ./awlq-app
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: awlq-app/Dockerfile
     container_name: rt-awslq-app
     restart: unless-stopped
     environment:

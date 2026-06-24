@@ -5,13 +5,19 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import GameCard from "../../../components/ui/game-card";
 
 type GameMode = {
-  id: "lab" | "kc" | "simulado" | "revisao";
+  id: string;
   title: string;
   description: string;
   cta: string;
 };
 
-const GAME_MODES: GameMode[] = [
+const STUDY_MODES: GameMode[] = [
+  {
+    id: "simulado",
+    title: "Modo Simulado",
+    description: "Simulacao de prova com 90 minutos e bloqueio de outras acoes.",
+    cta: "Iniciar Simulado",
+  },
   {
     id: "lab",
     title: "Modo Lab",
@@ -25,18 +31,80 @@ const GAME_MODES: GameMode[] = [
     cta: "Abrir KC",
   },
   {
-    id: "simulado",
-    title: "Modo Simulado",
-    description: "Simulacao de prova com 90 minutos e bloqueio de outras acoes.",
-    cta: "Iniciar Simulado",
-  },
-  {
     id: "revisao",
     title: "Modo Revisao",
     description: "Revisao guiada por lacunas de conhecimento.",
     cta: "Abrir Revisao",
   },
 ];
+
+const RETENTION_MODES: GameMode[] = [
+  {
+    id: "flashcards",
+    title: "Flashcards",
+    description: "Revisao espacada com SM-2. Mantenha o conhecimento ativo no longo prazo.",
+    cta: "Revisar Cards",
+  },
+  {
+    id: "sprint",
+    title: "Sprint Mode",
+    description: "Sessoes ultra-rapidas de 3 a 10 questoes para manter o ritmo diario.",
+    cta: "Iniciar Sprint",
+  },
+  {
+    id: "daily-review",
+    title: "Revisao Diaria",
+    description: "Painel de itens pendentes para hoje com base no seu historico de erros.",
+    cta: "Ver Revisao",
+  },
+];
+
+const ADVENTURE_MODES: GameMode[] = [
+  {
+    id: "arena",
+    title: "Arena de Batalha",
+    description: "Enfrente bosses respondendo questoes e reduza o HP do inimigo.",
+    cta: "Entrar na Arena",
+  },
+  {
+    id: "trilhas",
+    title: "Trilhas",
+    description: "Percursos de aprendizagem por servico AWS com estagio a estagio.",
+    cta: "Ver Trilhas",
+  },
+];
+
+const TOOLS_MODES: GameMode[] = [
+  {
+    id: "biblioteca",
+    title: "Biblioteca",
+    description: "Acesse materiais de estudo, PDFs e artigos selecionados pelos instrutores.",
+    cta: "Abrir Biblioteca",
+  },
+  {
+    id: "mentor",
+    title: "Mentor IA",
+    description: "Receba orientacao personalizada do Mestre AWS baseada nas suas lacunas de conhecimento.",
+    cta: "Consultar Mentor",
+  },
+  {
+    id: "noticias",
+    title: "Noticias AWS",
+    description: "Fique por dentro das ultimas novidades, lancamentos e atualizacoes da AWS.",
+    cta: "Ver Noticias",
+  },
+];
+
+function SectionDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-6">
+      <h3 className="font-mono text-xl md:text-2xl font-bold text-pixel-text uppercase tracking-widest whitespace-nowrap">
+        {title}
+      </h3>
+      <div className="flex-1 h-1 bg-pixel-border/10 rounded-full" />
+    </div>
+  );
+}
 
 function JornadaCard({ onClick }: { onClick: () => void }) {
   return (
@@ -45,7 +113,6 @@ function JornadaCard({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="group text-left w-full col-span-full bg-pixel-card border-4 border-yellow-600 retro-shadow relative overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/50 hover:border-yellow-400 transition-colors"
     >
-      {/* Decorative glow */}
       <div className="absolute -right-8 -top-8 w-32 h-32 bg-yellow-500/10 rounded-full blur-2xl" />
       <div className="absolute left-20 bottom-0 w-20 h-20 bg-yellow-400/5 rounded-full blur-xl" />
 
@@ -92,6 +159,12 @@ export function HomeScreen() {
       .catch(() => undefined);
   }, []);
 
+  function handleClick(id: string) {
+    if (id !== "simulado") {
+      router.push(`/${id}`);
+    }
+  }
+
   return (
     <AppLayout credits>
       <main className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 xl:px-8">
@@ -101,7 +174,7 @@ export function HomeScreen() {
           <div className="absolute right-20 bottom-10 w-20 h-20 bg-accent/10 rounded-full blur-2xl" />
 
           <div className="relative z-10">
-            <div className="inline-block px-3 py-1 border-2 border-green-900 bg-green-800/20 retro-shadow text-accent font-mono font-bold text-xs md:text-sm rounded-full mb-4 uppercase tracking-wider ">
+            <div className="inline-block px-3 py-1 border-2 border-green-900 bg-green-800/20 retro-shadow text-accent font-mono font-bold text-xs md:text-sm rounded-full mb-4 uppercase tracking-wider">
               Subindo de level ate a certificação AWS
             </div>
             <h2 className="font-mono text-3xl md:text-4xl font-bold text-pixel-text mb-4 uppercase tracking-tight">
@@ -114,29 +187,61 @@ export function HomeScreen() {
           </div>
         </section>
 
-        {/* Game Modes Grid */}
-        <section className="mb-12">
-          <div className="flex items-center gap-3 mb-6">
-            <h3 className="font-mono text-xl md:text-2xl font-bold text-pixel-text uppercase tracking-widest">
-              Modos Disponiveis
-            </h3>
-            <div className="flex-1 h-1 bg-pixel-border/10 rounded-full" />
-          </div>
-
+        {/* Core study modes */}
+        <section>
+          <SectionDivider title="Modos de Estudo" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            {GAME_MODES.map((mode) => (
+            {STUDY_MODES.map((mode) => (
               <GameCard
                 key={mode.id}
                 {...mode}
-                handleClick={() => {
-                  if (mode.id !== "simulado") {
-                    router.push(`/${mode.id}`);
-                  }
-                }}
+                handleClick={() => handleClick(mode.id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Retention modes */}
+        <section>
+          <SectionDivider title="Retencao de Conhecimento" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            {RETENTION_MODES.map((mode) => (
+              <GameCard
+                key={mode.id}
+                {...mode}
+                handleClick={() => handleClick(mode.id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Adventure / challenge modes */}
+        <section>
+          <SectionDivider title="Aventura e Desafios" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            {ADVENTURE_MODES.map((mode) => (
+              <GameCard
+                key={mode.id}
+                {...mode}
+                handleClick={() => handleClick(mode.id)}
               />
             ))}
 
             {showJornada && <JornadaCard onClick={() => router.push("/jornada")} />}
+          </div>
+        </section>
+
+        {/* Tools */}
+        <section className="mb-12">
+          <SectionDivider title="Ferramentas" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            {TOOLS_MODES.map((mode) => (
+              <GameCard
+                key={mode.id}
+                {...mode}
+                handleClick={() => handleClick(mode.id)}
+              />
+            ))}
           </div>
         </section>
       </main>

@@ -17,6 +17,10 @@ const DEFAULT_XP_WEIGHTS = [
   { activityType: "KC", topic: "EC2", difficulty: "*", multiplier: 1.4, bonusXp: 20 },
   { activityType: "KC", topic: "IAM", difficulty: "*", multiplier: 1.15, bonusXp: 10 },
   { activityType: "KC", topic: "VPC", difficulty: "*", multiplier: 1.25, bonusXp: 15 },
+  // Phase 1: Retention spine activity types
+  { activityType: "flashcard", topic: "*", difficulty: "*", multiplier: 0.5, bonusXp: 5 },
+  { activityType: "sprint", topic: "*", difficulty: "*", multiplier: 1.0, bonusXp: 10 },
+  { activityType: "daily_review", topic: "*", difficulty: "*", multiplier: 0.8, bonusXp: 15 },
 ] as const;
 
 async function generateBadgeImage(prompt: string): Promise<{ data: Buffer; mimeType: string }> {
@@ -407,6 +411,187 @@ async function seedXpWeights() {
   }
 }
 
+// ─── Task 7a: Arena Bosses ────────────────────────────────────────────────────
+
+const ARENA_BOSSES = [
+  {
+    name: "Guardião EC2",
+    code: "ec2-boss",
+    themeService: "EC2",
+    maxHp: 1000,
+    damagePerCorrect: 50,
+    active: true,
+    artworkUrl:
+      "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/orphan/default_boss.png",
+  },
+  {
+    name: "Oráculo IAM",
+    code: "iam-boss",
+    themeService: "IAM",
+    maxHp: 800,
+    damagePerCorrect: 40,
+    active: true,
+    artworkUrl:
+      "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/orphan/default_boss.png",
+  },
+  {
+    name: "Arquiteto S3",
+    code: "s3-boss",
+    themeService: "S3",
+    maxHp: 600,
+    damagePerCorrect: 30,
+    active: true,
+    artworkUrl:
+      "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/orphan/default_boss.png",
+  },
+] as const;
+
+async function seedArenaBosses() {
+  console.log("Seeding arena bosses...");
+  for (const boss of ARENA_BOSSES) {
+    await prisma.boss.upsert({
+      where: { code: boss.code },
+      create: boss,
+      update: {},
+    });
+  }
+}
+
+// ─── Task 7b: News Sources ────────────────────────────────────────────────────
+
+const NEWS_SOURCES = [
+  { name: "AWS Blog", feedUrl: "https://aws.amazon.com/blogs/aws/feed/", category: "cloud", active: true },
+  { name: "AWS Security", feedUrl: "https://aws.amazon.com/blogs/security/feed/", category: "security", active: true },
+  { name: "dev.to AWS Tag", feedUrl: "https://dev.to/feed/tag/aws", category: "cloud", active: true },
+] as const;
+
+async function seedNewsSources() {
+  console.log("Seeding news sources...");
+  for (const source of NEWS_SOURCES) {
+    await prisma.newsSource.upsert({
+      where: { feedUrl: source.feedUrl },
+      create: source,
+      update: {},
+    });
+  }
+}
+
+// ─── Task 7c: Quest Chains ────────────────────────────────────────────────────
+
+type QuestChainSeed = {
+  name: string;
+  description: string;
+  active: boolean;
+  displayOrder: number;
+  stages: { title: string; position: number; awsServiceCode: string }[];
+};
+
+const QUEST_CHAINS: QuestChainSeed[] = [
+  {
+    name: "Fundamentos IAM",
+    description: "Do zero ao herói em Identity and Access Management da AWS.",
+    active: true,
+    displayOrder: 1,
+    stages: [
+      { title: "Usuários e Grupos", position: 1, awsServiceCode: "IAM" },
+      { title: "Políticas e Permissões", position: 2, awsServiceCode: "IAM" },
+      { title: "Roles e Trust Policies", position: 3, awsServiceCode: "IAM" },
+      { title: "MFA e Boas Práticas", position: 4, awsServiceCode: "IAM" },
+    ],
+  },
+  {
+    name: "S3 do Básico ao Avançado",
+    description: "Armazenamento de objetos: de buckets simples a replicação cross-region.",
+    active: true,
+    displayOrder: 2,
+    stages: [
+      { title: "Criando e configurando Buckets", position: 1, awsServiceCode: "S3" },
+      { title: "Versionamento e Ciclo de Vida", position: 2, awsServiceCode: "S3" },
+      { title: "Bucket Policies e ACLs", position: 3, awsServiceCode: "S3" },
+      { title: "Replicação e Transfer Acceleration", position: 4, awsServiceCode: "S3" },
+    ],
+  },
+];
+
+async function seedQuestChains() {
+  console.log("Seeding quest chains...");
+  for (const chainData of QUEST_CHAINS) {
+    // QuestChain has no @@unique on name — use findFirst + create pattern.
+    let chain = await prisma.questChain.findFirst({ where: { name: chainData.name } });
+    if (!chain) {
+      chain = await prisma.questChain.create({
+        data: {
+          name: chainData.name,
+          description: chainData.description,
+          active: chainData.active,
+          displayOrder: chainData.displayOrder,
+        },
+      });
+    }
+
+    for (const stage of chainData.stages) {
+      await prisma.questChainStage.upsert({
+        where: { chainId_position: { chainId: chain.id, position: stage.position } },
+        create: {
+          chainId: chain.id,
+          title: stage.title,
+          position: stage.position,
+          awsServiceId: stage.awsServiceCode,
+        },
+        update: {},
+      });
+    }
+  }
+}
+
+// ─── Task 7d: Changelog ───────────────────────────────────────────────────────
+
+const CHANGELOG_ENTRIES = [
+  { category: "novo", text: "Modo Lab com geração de quests por IA" },
+  { category: "novo", text: "Modo KC com Knowledge Check por serviço AWS" },
+  { category: "novo", text: "Simulado com timer de 90 minutos" },
+  { category: "novo", text: "Arena de Batalha com bosses por serviço AWS" },
+  { category: "novo", text: "Flashcards com revisão espacada SM-2" },
+  { category: "novo", text: "Sprint Mode para sessões rápidas" },
+  { category: "novo", text: "Trilhas de aprendizagem sequenciais" },
+  { category: "novo", text: "Mentor IA com recomendações personalizadas" },
+  { category: "novo", text: "Biblioteca de conteúdo com PDFs e artigos" },
+  { category: "novo", text: "Jornada do Herói com boss final de certificação" },
+] as const;
+
+// Negative githubId is used as a synthetic seed-only identifier that won't
+// conflict with real GitHub release integer ids (always positive).
+const SEED_GITHUB_ID = -1;
+
+async function seedChangelog() {
+  console.log("Seeding changelog...");
+
+  const release = await prisma.changelogRelease.upsert({
+    where: { githubId: SEED_GITHUB_ID },
+    create: {
+      githubId: SEED_GITHUB_ID,
+      tagName: "v1.0.0",
+      name: "Lançamento Inicial — AWS Lab Quest",
+      published: true,
+      highlight: true,
+      releasedAt: new Date("2026-01-01"),
+      adminSummary:
+        "Primeira versão pública da plataforma com Lab, KC, Simulado, Arena, Flashcards, Trilhas e Mentor IA.",
+    },
+    update: {},
+  });
+
+  // Only create entries when none exist for this release (idempotent).
+  const existingCount = await prisma.changelogEntry.count({ where: { releaseId: release.id } });
+  if (existingCount === 0) {
+    await prisma.changelogEntry.createMany({
+      data: CHANGELOG_ENTRIES.map((entry) => ({ ...entry, releaseId: release.id })),
+    });
+  }
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
 async function main() {
   await seedAdminIfConfigured();
   await seedCertifications();
@@ -414,6 +599,10 @@ async function main() {
   await seedXpWeights();
   await seedBadgesIfConfigured();
   await seedAchievementsIfConfigured();
+  await seedArenaBosses();
+  await seedNewsSources();
+  await seedQuestChains();
+  await seedChangelog();
   console.log("Seed completed.");
 }
 

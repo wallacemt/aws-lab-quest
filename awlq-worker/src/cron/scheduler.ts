@@ -6,6 +6,10 @@ import {
   performanceComputeQueue,
   dataRetentionQueue,
   behavioralEmailQueue,
+  weeklyChallengeQueue,
+  newsFetchQueue,
+  changelogFetchQueue,
+  dailyQuizQueue,
 } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { config } from "../config.js";
@@ -97,6 +101,47 @@ const DEFAULT_JOBS = [
     cronPattern: "0 23 * * *",
     payload: { mode: "analyze" },
   },
+  // ─── Phase 4 crons ───────────────────────────────────────────────────────────
+  {
+    jobId: "cron-weekly-challenge-open",
+    name: "Desafio Semanal — Abrir (Segunda-feira)",
+    description: "Abre novo desafio semanal toda segunda-feira a 00:00 UTC",
+    queue: "weekly-challenge",
+    cronPattern: "0 0 * * 1",
+    payload: { mode: "open" },
+  },
+  {
+    jobId: "cron-weekly-challenge-close",
+    name: "Desafio Semanal — Fechar (Domingo)",
+    description: "Encerra o desafio semanal e computa ranking todo domingo a 23:55 UTC",
+    queue: "weekly-challenge",
+    cronPattern: "55 23 * * 0",
+    payload: { mode: "close" },
+  },
+  {
+    jobId: "cron-news-fetch",
+    name: "Busca de Noticias (a cada 6h)",
+    description: "Busca feeds RSS de noticias AWS e dev.to",
+    queue: "news-fetch",
+    cronPattern: "0 */6 * * *",
+    payload: {},
+  },
+  {
+    jobId: "cron-changelog-fetch",
+    name: "Sync Changelog do GitHub (a cada 6h)",
+    description: "Sincroniza releases do GitHub com a tabela ChangelogRelease",
+    queue: "changelog-fetch",
+    cronPattern: "0 */6 * * *",
+    payload: {},
+  },
+  {
+    jobId: "cron-daily-quiz-seed",
+    name: "Seed Quiz Diario (00:05 UTC)",
+    description: "Sorteia 5 questoes para o quiz diario do dia",
+    queue: "daily-quiz",
+    cronPattern: "5 0 * * *",
+    payload: {},
+  },
 ] as const;
 
 function getQueueByName(queue: string): Queue | null {
@@ -107,6 +152,10 @@ function getQueueByName(queue: string): Queue | null {
     case "performance-compute": return performanceComputeQueue;
     case "data-retention": return dataRetentionQueue;
     case "behavioral-email": return behavioralEmailQueue;
+    case "weekly-challenge": return weeklyChallengeQueue;
+    case "news-fetch": return newsFetchQueue;
+    case "changelog-fetch": return changelogFetchQueue;
+    case "daily-quiz": return dailyQuizQueue;
     default: return null;
   }
 }
@@ -119,6 +168,10 @@ function getJobNameForQueue(queue: string, jobId: string): string {
     case "performance-compute": return "performance-compute-hourly";
     case "data-retention": return "data-retention-daily";
     case "behavioral-email": return "behavioral-email-daily";
+    case "weekly-challenge": return jobId === "cron-weekly-challenge-open" ? "weekly-challenge-open" : "weekly-challenge-close";
+    case "news-fetch": return "news-fetch-cron";
+    case "changelog-fetch": return "changelog-fetch-cron";
+    case "daily-quiz": return "daily-quiz-seed";
     default: return jobId;
   }
 }
