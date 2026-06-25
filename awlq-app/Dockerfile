@@ -30,7 +30,7 @@ ENV DATABASE_URL=$DATABASE_URL \
     SUPABASE_URL=$SUPABASE_URL \
     SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
 
-RUN cd awlq-app && bunx prisma generate --schema=../packages/db/prisma/schema.prisma
+RUN cd awlq-app && bunx prisma generate
 RUN cd awlq-app && bun run build
 
 

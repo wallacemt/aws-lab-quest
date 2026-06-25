@@ -20,3 +20,8 @@ awlq-worker/node_modules
 awlq-worker/dist
 awlq-worker/.env
 awlq-worker/.env.*
+
+# Shared packages
+packages/db/node_modules
+packages/db/.env
+packages/db/.env.*
