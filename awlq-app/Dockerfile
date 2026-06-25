@@ -1,16 +1,17 @@
 # Build context: aws-lab-quest/ (monorepo root)
 FROM oven/bun:1-alpine AS deps
 WORKDIR /app
-# Install app dependencies using workspace root
-COPY package.json ./
-COPY awlq-app/package.json awlq-app/bun.lock ./awlq-app/
+# Install all workspace deps using the root lock file (kept current by workspace bun install)
+COPY package.json bun.lock ./
+COPY awlq-app/package.json ./awlq-app/
+COPY awlq-worker/package.json ./awlq-worker/
 COPY packages/db/package.json ./packages/db/
-RUN cd awlq-app && bun install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
-COPY --from=deps /app/awlq-app/node_modules ./awlq-app/node_modules
+COPY --from=deps /app/node_modules ./node_modules
 # Copy shared Prisma schema (source of truth)
 COPY packages/db/prisma/ ./packages/db/prisma/
 # Copy app source
@@ -44,8 +45,8 @@ COPY --from=builder /app/awlq-app/.next/standalone ./
 COPY --from=builder /app/awlq-app/.next/static ./.next/static
 COPY --from=builder /app/awlq-app/public ./public
 
-COPY --from=builder /app/awlq-app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/awlq-app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
 EXPOSE 3000
 CMD ["node", "server.js"]
