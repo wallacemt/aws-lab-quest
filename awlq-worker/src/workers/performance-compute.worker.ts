@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, PerformanceComputeJobData, qualityReviewQueue } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, PerformanceComputeJobData, qualityReviewQueue } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import {
   computePerformanceForCert,
@@ -85,6 +85,6 @@ export function createPerformanceComputeWorker(): Worker {
         "performance-compute: done"
       );
     },
-    { connection: redis, concurrency: 3 }
+    { connection, concurrency: 3 }
   );
 }

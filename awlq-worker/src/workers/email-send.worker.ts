@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, EmailSendJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, EmailSendJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { config } from "../config.js";
 import { sendEmail, buildEmailContent } from "../services/email.js";
@@ -88,7 +88,7 @@ export function createEmailSendWorker(): Worker {
       );
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
     }
   );

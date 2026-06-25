@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, SourceFetchJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, SourceFetchJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { fetchAndExtractText } from "../services/pdf-fetcher.js";
 import { parseBlueprintDomains } from "../services/blueprint-parser.js";
@@ -95,7 +95,7 @@ export function createSourceFetchWorker(): Worker {
       logger.info({ ingestionSourceId, parsedDomainCount }, "source-fetch: done");
     },
     {
-      connection: redis,
+      connection,
       concurrency: 2,
       limiter: { max: 5, duration: 60_000 },
     }

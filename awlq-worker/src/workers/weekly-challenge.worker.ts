@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, WeeklyChallengeJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, WeeklyChallengeJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
 
@@ -107,7 +107,7 @@ export function createWeeklyChallengeWorker(): Worker {
       }
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
     },
   );

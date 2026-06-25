@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, FeedbackAnalysisJobData, questionGenerationQueue } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, FeedbackAnalysisJobData, questionGenerationQueue } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { analyzeWeakAreas } from "../services/weak-area-analyzer.js";
 import { aggregateFalseBeliefs } from "../services/false-belief-aggregator.js";
@@ -106,6 +106,6 @@ export function createFeedbackAnalysisWorker(): Worker {
         );
       }
     },
-    { connection: redis, concurrency: 5 }
+    { connection, concurrency: 5 }
   );
 }

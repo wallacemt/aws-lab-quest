@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, KcGenerationJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, KcGenerationJobData } from "../queues/index.js";
 import { buildKcQuestions } from "../services/kc-question-builder.js";
 import { logger } from "../shared/logger.js";
 
@@ -16,7 +16,7 @@ export function createKcGenerationWorker(): Worker {
       logger.info({ requestId, ...result }, "kc-generation: complete");
     },
     {
-      connection: redis,
+      connection,
       // Low concurrency — each job makes a Gemini call; the rate limiter in ai.ts
       // serializes them, but cap concurrency to avoid memory pressure.
       concurrency: 2,

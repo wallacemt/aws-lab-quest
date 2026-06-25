@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, FlashcardGenerationJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, FlashcardGenerationJobData } from "../queues/index.js";
 import { generateFlashcardsForUser } from "../services/flashcard-generator.js";
 import { logger } from "../shared/logger.js";
 
@@ -16,7 +16,7 @@ export function createFlashcardGenerationWorker(): Worker {
       logger.info({ userId, created }, "flashcard-generation: complete");
     },
     {
-      connection: redis,
+      connection,
       concurrency: 5,
     },
   );

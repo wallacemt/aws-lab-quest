@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, ChangelogFetchJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, ChangelogFetchJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
 
@@ -69,7 +69,7 @@ export function createChangelogFetchWorker(): Worker {
       logger.info({ releaseCount: releases.length }, "changelog-fetch: upserted releases");
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
     },
   );

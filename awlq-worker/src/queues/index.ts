@@ -1,10 +1,12 @@
-import { Queue } from "bullmq";
+import { Queue, type ConnectionOptions } from "bullmq";
 import { Redis } from "ioredis";
 import { config } from "../config.js";
 
 export const redis = new Redis(config.redis.url, { maxRetriesPerRequest: null });
 
-const connection = redis;
+// Cast needed: bun resolves bullmq's pinned ioredis@5.10.1 separately from workspace
+// ioredis@5.11.1, making the types structurally incompatible despite being identical at runtime.
+export const connection: ConnectionOptions = redis as unknown as ConnectionOptions;
 
 // ─── Job data types ───────────────────────────────────────────────────────────
 

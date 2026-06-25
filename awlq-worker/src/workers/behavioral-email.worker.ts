@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, BehavioralEmailJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, BehavioralEmailJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
 import { analyzeAndScheduleBehavioralEmails } from "../services/behavior-analyzer.js";
@@ -109,7 +109,7 @@ export function createBehavioralEmailWorker(): Worker<BehavioralEmailJobData> {
       logger.info({ userId, triggerCode, subject }, "behavioral-email: email sent successfully");
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
     }
   );

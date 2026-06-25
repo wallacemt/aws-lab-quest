@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, QualityReviewJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, QualityReviewJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { callGemini } from "../ai.js";
 import { extractJsonObject } from "../shared/ingestion-pipeline.js";
@@ -175,7 +175,7 @@ export function createQualityReviewWorker(): Worker {
       }
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
       limiter: { max: 5, duration: 60_000 },
     }

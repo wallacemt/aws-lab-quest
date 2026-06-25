@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, QuestionGenerationJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, QuestionGenerationJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { generateAndPersistQuestions } from "../services/question-builder.js";
 import { logger } from "../shared/logger.js";
@@ -52,7 +52,7 @@ export function createQuestionGenerationWorker(): Worker {
       );
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
       limiter: { max: 3, duration: 60_000 },
     }

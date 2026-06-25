@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, MentorComputeJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, MentorComputeJobData } from "../queues/index.js";
 import { computeMentorRecommendations } from "../services/mentor-recommender.js";
 import { logger } from "../shared/logger.js";
 
@@ -16,7 +16,7 @@ export function createMentorComputeWorker(): Worker {
       logger.info({ userId }, "mentor-compute: complete");
     },
     {
-      connection: redis,
+      connection,
       concurrency: 10,
     },
   );

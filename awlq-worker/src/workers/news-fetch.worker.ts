@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, NewsFetchJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, NewsFetchJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { parseFeed } from "../services/news-feed-parser.js";
 import { logger } from "../shared/logger.js";
@@ -87,7 +87,7 @@ export function createNewsFetchWorker(): Worker {
       logger.info({ count: sources.length }, "news-fetch: all sources fetched");
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
     },
   );

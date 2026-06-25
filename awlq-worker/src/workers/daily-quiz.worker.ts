@@ -1,5 +1,5 @@
-import { Worker } from "bullmq";
-import { redis, DailyQuizSeedJobData } from "../queues/index.js";
+﻿import { Worker } from "bullmq";
+import { connection, DailyQuizSeedJobData } from "../queues/index.js";
 import { seedDailyQuiz } from "../services/daily-quiz-seeder.js";
 import { logger } from "../shared/logger.js";
 
@@ -12,7 +12,7 @@ export function createDailyQuizWorker(): Worker {
       logger.info("daily-quiz: complete");
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
     },
   );

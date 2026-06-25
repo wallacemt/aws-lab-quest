@@ -1,5 +1,5 @@
-import { Worker, Job } from "bullmq";
-import { redis } from "../queues/index.js";
+﻿import { Worker, Job } from "bullmq";
+import { connection } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
 import { randomUUID } from "crypto";
@@ -134,7 +134,7 @@ export function createDataRetentionWorker(): Worker {
       await runRetention();
     },
     {
-      connection: redis,
+      connection,
       concurrency: 1,
     },
   );
