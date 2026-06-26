@@ -85,6 +85,7 @@
         "rss-parser": "^3.13.0",
       },
       "devDependencies": {
+        "@awlq/db": "workspace:*",
         "@types/bun": "latest",
         "@types/node": "^22.0.0",
         "@types/pdf-parse": "^1.1.5",
