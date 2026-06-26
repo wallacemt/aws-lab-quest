@@ -1,0 +1,4 @@
+[install]
+# WSL2 on Windows filesystem (NTFS) cannot create symlinks reliably.
+# "copyfiles" physically copies packages, making module resolution work correctly.
+backend = "copyfiles"

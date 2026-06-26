@@ -2,6 +2,14 @@
   "name": "@awlq/db",
   "version": "1.0.0",
   "private": true,
+  "main": "./generated/client/index.js",
+  "types": "./generated/client/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./generated/client/index.d.ts",
+      "default": "./generated/client/index.js"
+    }
+  },
   "scripts": {
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
@@ -13,6 +21,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
+    "@prisma/client-runtime-utils": "^7.1.0",
     "dotenv": "^17.4.2"
   },
   "devDependencies": {

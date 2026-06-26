@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider      = "prisma-client-js"
+  provider = "prisma-client-js"
+  output   = "../generated/client"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -44,8 +45,8 @@ model User {
   achievements            UserAchievement[]
   uploadedFiles           AdminUploadedFile[]
   ingestionJobs           AdminIngestionJob[]
-  questionReports         QuestionReport[]      @relation("QuestionReportAuthor")
-  reviewedQuestionReports QuestionReport[]      @relation("QuestionReportReviewer")
+  questionReports         QuestionReport[]       @relation("QuestionReportAuthor")
+  reviewedQuestionReports QuestionReport[]       @relation("QuestionReportReviewer")
   certBadges              UserCertBadge[]
   simuladoPacks           SimuladoPack[]
   emailEvents             UserEmailEvent[]
@@ -324,26 +325,26 @@ model QuestionTopic {
 }
 
 model StudySessionHistory {
-  id                String        @id @default(cuid())
+  id                String           @id @default(cuid())
   userId            String
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionType       StudySessionType
   title             String
   certificationCode String?
-  gainedXp          Int           @default(0)
+  gainedXp          Int              @default(0)
   scorePercent      Int
   correctAnswers    Int
   totalQuestions    Int
   durationSeconds   Int?
   answersSnapshot   Json
   completedAt       DateTime
-  createdAt         DateTime      @default(now())
+  createdAt         DateTime         @default(now())
   // LGPD retention: set to true when session is older than the retention window.
   // userId is preserved (FK cannot be nulled) but the record is excluded from
   // any user-facing queries so no PII is exposed post-anonymization.
-  anonymized        Boolean       @default(false)
+  anonymized        Boolean          @default(false)
   packId            String?
-  pack              SimuladoPack? @relation(fields: [packId], references: [id], onDelete: SetNull)
+  pack              SimuladoPack?    @relation(fields: [packId], references: [id], onDelete: SetNull)
 
   @@index([userId, completedAt])
   @@index([sessionType])
@@ -669,22 +670,22 @@ model UserCertBadge {
 // ─── Simulado Pack models ─────────────────────────────────────────────────────
 
 model SimuladoPack {
-  id                    String                 @id @default(cuid())
+  id                    String               @id @default(cuid())
   name                  String
   certificationPresetId String?
-  certificationPreset   CertificationPreset?   @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
+  certificationPreset   CertificationPreset? @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
   createdByUserId       String?
-  createdBy             User?                  @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
-  questionCount         Int                    @default(65)
-  difficultyScore       Int                    @default(1)
-  active                Boolean                @default(true)
+  createdBy             User?                @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  questionCount         Int                  @default(65)
+  difficultyScore       Int                  @default(1)
+  active                Boolean              @default(true)
   artworkUrl            String?
   journeyNarrative      Json?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
-  questions             SimuladoPackQuestion[]
-  sessions              StudySessionHistory[]
+  questions SimuladoPackQuestion[]
+  sessions  StudySessionHistory[]
 
   @@index([certificationPresetId, active])
   @@index([createdByUserId])
@@ -762,11 +763,11 @@ enum AnswerConfidence {
 }
 
 model Flashcard {
-  id               String          @id @default(cuid())
+  id               String            @id @default(cuid())
   userId           String
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   sourceQuestionId String?
-  sourceQuestion   StudyQuestion?  @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
+  sourceQuestion   StudyQuestion?    @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
   awsServiceId     String?
   topic            String?
   front            String
@@ -774,20 +775,20 @@ model Flashcard {
   hint             String?
   source           FlashcardSource
   // SM-2 scheduling state
-  easeFactor       Float           @default(2.5)
-  intervalDays     Int             @default(0)
-  repetitions      Int             @default(0)
-  dueAt            DateTime        @default(now())
+  easeFactor       Float             @default(2.5)
+  intervalDays     Int               @default(0)
+  repetitions      Int               @default(0)
+  dueAt            DateTime          @default(now())
   lastReviewedAt   DateTime?
-  suspended        Boolean         @default(false)
+  suspended        Boolean           @default(false)
   reviews          FlashcardReview[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
+  @@unique([userId, sourceQuestionId, source])
   @@index([userId, dueAt])
   @@index([userId, suspended, dueAt])
   @@index([sourceQuestionId])
-  @@unique([userId, sourceQuestionId, source])
 }
 
 model FlashcardReview {
@@ -826,7 +827,7 @@ model Boss {
   id               String       @id @default(cuid())
   name             String
   code             String       @unique
-  themeService     String       // AwsService.code used to source questions
+  themeService     String // AwsService.code used to source questions
   maxHp            Int
   damagePerCorrect Int          @default(10)
   artworkUrl       String?
@@ -856,14 +857,14 @@ model BossBattle {
 }
 
 model WeeklyChallenge {
-  id             String                 @id @default(cuid())
-  weekStart      DateTime
-  weekEnd        DateTime
-  active         Boolean                @default(true)
-  badgeImageUrl  String?
-  entries        WeeklyChallengeEntry[]
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  id            String                 @id @default(cuid())
+  weekStart     DateTime
+  weekEnd       DateTime
+  active        Boolean                @default(true)
+  badgeImageUrl String?
+  entries       WeeklyChallengeEntry[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 
   @@index([active, weekStart])
 }
@@ -886,11 +887,11 @@ model WeeklyChallengeEntry {
 }
 
 model DailyQuiz {
-  id          String           @id @default(cuid())
-  quizDate    DateTime         @db.Date
-  questionIds Json             // String[] of StudyQuestion.id
+  id          String             @id @default(cuid())
+  quizDate    DateTime           @db.Date
+  questionIds Json // String[] of StudyQuestion.id
   attempts    DailyQuizAttempt[]
-  createdAt   DateTime         @default(now())
+  createdAt   DateTime           @default(now())
 
   @@unique([quizDate])
   @@index([quizDate])
@@ -956,7 +957,7 @@ model NewsItem {
 model ChangelogRelease {
   id           String           @id @default(cuid())
   githubId     Int              @unique // GitHub release integer id — primary dedup key
-  tagName      String           // Not @unique: see DEF-025 comment above
+  tagName      String // Not @unique: see DEF-025 comment above
   name         String?
   bodyMarkdown String?          @db.Text
   adminSummary String?          @db.Text
@@ -974,7 +975,7 @@ model ChangelogEntry {
   id        String           @id @default(cuid())
   releaseId String
   release   ChangelogRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  category  String           // "fix" | "feature" | "improvement" | "breaking"
+  category  String // "fix" | "feature" | "improvement" | "breaking"
   text      String
   createdAt DateTime         @default(now())
 

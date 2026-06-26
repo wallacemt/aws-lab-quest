@@ -9,10 +9,13 @@ node_modules
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+.serena
+.claude
 # testing
 /coverage
 
+
+generated
 # next.js
 .next
 .next/**
