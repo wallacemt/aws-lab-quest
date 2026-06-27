@@ -121,6 +121,8 @@ jobs:
   push-images:
     name: Push to Docker Hub
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-images
     environment: production
 
     steps:
