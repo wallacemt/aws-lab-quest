@@ -2,6 +2,11 @@ import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Expose public Supabase vars to the browser (URL and anon key are not secrets).
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+  },
   output: "standalone",
   turbopack: {
     // In Docker, next build runs from /app/awlq-app. The monorepo root (/app)
