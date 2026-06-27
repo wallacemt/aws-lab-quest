@@ -45,7 +45,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/awlq-worker/dist ./dist
-COPY --from=builder /app/awlq-worker/node_modules ./node_modules
 COPY --from=builder /app/awlq-worker/package.json ./package.json
+# Root node_modules has all hoisted bun workspace packages (dotenv, bullmq, etc.)
+COPY --from=builder /app/node_modules ./node_modules
+# Generated Prisma client overwrites the stub
+COPY --from=builder /app/awlq-worker/node_modules/@prisma/client ./node_modules/@prisma/client
 
 CMD ["node", "dist/index.js"]

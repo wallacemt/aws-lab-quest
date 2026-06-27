@@ -34,11 +34,13 @@ ARG BETTER_AUTH_SECRET=build-time-placeholder-minimum-32-chars-x
 ARG BETTER_AUTH_URL=http://localhost:3000
 ARG SUPABASE_URL=https://placeholder.supabase.co
 ARG SUPABASE_SERVICE_ROLE_KEY=build-time-placeholder-supabase-service-key
+ARG SUPABASE_ANON_KEY=build-time-placeholder-supabase-anon-key
 ENV DATABASE_URL=$DATABASE_URL \
     BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET \
     BETTER_AUTH_URL=$BETTER_AUTH_URL \
     SUPABASE_URL=$SUPABASE_URL \
-    SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
+    SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY \
+    SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
 
 # Turbopack detects /app/ as the monorepo workspace root (highest node_modules/ dir)
 # and requires next/package.json to exist there. The bun store has it; expose it.
@@ -65,13 +67,14 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000
 
+# With turbopack root set to the monorepo root (..), Next.js standalone output
+# places server.js at awlq-app/server.js inside the standalone dir.
 COPY --from=builder /app/awlq-app/.next/standalone ./
-COPY --from=builder /app/awlq-app/.next/static ./.next/static
-COPY --from=builder /app/awlq-app/public ./public
+COPY --from=builder /app/awlq-app/.next/static ./awlq-app/.next/static
+COPY --from=builder /app/awlq-app/public ./awlq-app/public
 
-# The standalone's bundled @prisma/client is a pre-generate stub.
-# Overwrite with the generated client (model types + WASM runtime, self-contained).
-COPY --from=builder /app/awlq-app/node_modules/@prisma/client ./node_modules/@prisma/client
+# Overwrite stub @prisma/client with the generated client in the right subdirectory.
+COPY --from=builder /app/awlq-app/node_modules/@prisma/client ./awlq-app/node_modules/@prisma/client
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "awlq-app/server.js"]
