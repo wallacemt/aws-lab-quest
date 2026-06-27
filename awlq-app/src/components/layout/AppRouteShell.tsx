@@ -1,12 +1,13 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
 import { useAdminModeStore } from "@/stores/adminModeStore";
 
+import type { HomeConfig } from "@/app/api/admin/home-config/route";
 import BottomNav from "../ui/bottom-nav";
 import RetroLoading from "../ui/retro-loading";
 import { Header } from "@/components/layout/header";
@@ -24,6 +25,8 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   const { hydrated, isProfileComplete, profile } = useUserProfile();
   const { mode: adminMode, hydrated: adminModeHydrated, hydrate: hydrateAdminMode, setMode } = useAdminModeStore();
   const isAdmin = profile.role === "admin";
+  const [disabledRoutes, setDisabledRoutes] = useState<Set<string>>(new Set());
+
   const {
     hydrated: simHydrated,
     isActive: simulatedExamActive,
@@ -46,6 +49,26 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   useEffect(() => {
     hydrateAdminMode();
   }, [hydrateAdminMode]);
+
+  // Fetch home config once on mount; build a set of disabled route ids for fast lookup
+  useEffect(() => {
+    void fetch("/api/admin/home-config")
+      .then((r) => r.json())
+      .then((data: HomeConfig) => {
+        const disabled = new Set(data.apps.filter((a) => !a.enabled).map((a) => a.id));
+        setDisabledRoutes(disabled);
+      })
+      .catch(() => undefined); // fail open — never block navigation on config errors
+  }, []);
+
+  // Redirect to /home if the user navigates directly to a disabled app route
+  useEffect(() => {
+    if (!pathname || disabledRoutes.size === 0) return;
+    const segment = pathname.slice(1).split("/")[0];
+    if (segment && disabledRoutes.has(segment)) {
+      router.replace("/home");
+    }
+  }, [pathname, disabledRoutes, router]);
 
   useEffect(() => {
     if (!isAdmin || !adminModeHydrated || adminMode !== "admin") return;

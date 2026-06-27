@@ -23,6 +23,7 @@ interface GameCardProps {
   description: string;
   cta: string;
   handleClick: () => void;
+  highlighted?: boolean;
 }
 
 const ICONS: Record<string, ElementType> = {
@@ -53,7 +54,7 @@ const COLORS: Record<string, string> = {
   mentor: "bg-green-600",
 };
 
-export default function GameCard({ id, title, description, cta, handleClick }: GameCardProps) {
+export default function GameCard({ id, title, description, cta, handleClick, highlighted }: GameCardProps) {
   const Icon = ICONS[id] || Play;
   const colorClass = COLORS[id] || "bg-pixel-border";
 
@@ -62,6 +63,7 @@ export default function GameCard({ id, title, description, cta, handleClick }: G
       className={cn(
         "group text-left w-full bg-pixel-card  retro-shadow retro-btn flex flex-col h-full relative overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/50",
         id === "simulado" ? "border-5 border-accent rounded-2xl" : "retro-border",
+        highlighted && "ring-2 ring-yellow-400 ring-offset-2 ring-offset-pixel-card",
       )}
     >
       {/* Top "Cartridge" Ridge */}
@@ -77,7 +79,10 @@ export default function GameCard({ id, title, description, cta, handleClick }: G
 
           {/* Decorative dots */}
           <div className="flex items-center gap-4">
-            {id === "simulado" && (
+            {highlighted && (
+              <span className="font-mono text-xs text-yellow-400 p-2 retro-border">Destaque</span>
+            )}
+            {!highlighted && id === "simulado" && (
               <span className="font-mono text-xs text-accent p-2 retro-border animate-bounce">Popular</span>
             )}
             <div className="flex gap-1">
