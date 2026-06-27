@@ -1,99 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import GameCard from "../../../components/ui/game-card";
-
-type GameMode = {
-  id: string;
-  title: string;
-  description: string;
-  cta: string;
-};
-
-const STUDY_MODES: GameMode[] = [
-  {
-    id: "simulado",
-    title: "Modo Simulado",
-    description: "Simulacao de prova com 90 minutos e bloqueio de outras acoes.",
-    cta: "Iniciar Simulado",
-  },
-  {
-    id: "lab",
-    title: "Modo Lab",
-    description: "Gerar um quest hands-on a partir de um lab real da AWS.",
-    cta: "Jogar Lab",
-  },
-  {
-    id: "kc",
-    title: "Modo KC",
-    description: "Knowledge Check com auditoria de respostas para fixar conceitos.",
-    cta: "Abrir KC",
-  },
-  {
-    id: "revisao",
-    title: "Modo Revisao",
-    description: "Revisao guiada por lacunas de conhecimento.",
-    cta: "Abrir Revisao",
-  },
-];
-
-const RETENTION_MODES: GameMode[] = [
-  {
-    id: "flashcards",
-    title: "Flashcards",
-    description: "Revisao espacada com SM-2. Mantenha o conhecimento ativo no longo prazo.",
-    cta: "Revisar Cards",
-  },
-  {
-    id: "sprint",
-    title: "Sprint Mode",
-    description: "Sessoes ultra-rapidas de 3 a 10 questoes para manter o ritmo diario.",
-    cta: "Iniciar Sprint",
-  },
-  {
-    id: "daily-review",
-    title: "Revisao Diaria",
-    description: "Painel de itens pendentes para hoje com base no seu historico de erros.",
-    cta: "Ver Revisao",
-  },
-];
-
-const ADVENTURE_MODES: GameMode[] = [
-  {
-    id: "arena",
-    title: "Arena de Batalha",
-    description: "Enfrente bosses respondendo questoes e reduza o HP do inimigo.",
-    cta: "Entrar na Arena",
-  },
-  {
-    id: "trilhas",
-    title: "Trilhas",
-    description: "Percursos de aprendizagem por servico AWS com estagio a estagio.",
-    cta: "Ver Trilhas",
-  },
-];
-
-const TOOLS_MODES: GameMode[] = [
-  {
-    id: "biblioteca",
-    title: "Biblioteca",
-    description: "Acesse materiais de estudo, PDFs e artigos selecionados pelos instrutores.",
-    cta: "Abrir Biblioteca",
-  },
-  {
-    id: "mentor",
-    title: "Mentor IA",
-    description: "Receba orientacao personalizada do Mestre AWS baseada nas suas lacunas de conhecimento.",
-    cta: "Consultar Mentor",
-  },
-  {
-    id: "noticias",
-    title: "Noticias AWS",
-    description: "Fique por dentro das ultimas novidades, lancamentos e atualizacoes da AWS.",
-    cta: "Ver Noticias",
-  },
-];
+import {
+  STUDY_MODES,
+  RETENTION_MODES,
+  ADVENTURE_MODES,
+  TOOLS_MODES,
+  type GameMode,
+} from "@/features/utils/home-apps";
+import type { AppEntry, HomeConfig } from "@/app/api/admin/home-config/route";
 
 function SectionDivider({ title }: { title: string }) {
   return (
@@ -144,9 +61,42 @@ function JornadaCard({ onClick }: { onClick: () => void }) {
   );
 }
 
+type VisibleCard = { mode: GameMode; highlighted: boolean };
+
+// Returns modes that are enabled, sorted by admin-assigned order.
+// Falls back to original order when no config is loaded yet.
+function getVisible(modes: GameMode[], config: AppEntry[]): VisibleCard[] {
+  if (config.length === 0) {
+    return modes.map((m) => ({ mode: m, highlighted: false }));
+  }
+  const entryMap = new Map(config.map((e) => [e.id, e]));
+  return modes
+    .filter((m) => entryMap.get(m.id)?.enabled !== false)
+    .sort((a, b) => (entryMap.get(a.id)?.order ?? 999) - (entryMap.get(b.id)?.order ?? 999))
+    .map((m) => ({ mode: m, highlighted: entryMap.get(m.id)?.highlighted ?? false }));
+}
+
 export function HomeScreen() {
   const router = useRouter();
   const [showJornada, setShowJornada] = useState(false);
+  const [config, setConfig] = useState<AppEntry[]>([]);
+
+  const fetchConfig = useCallback(() => {
+    void fetch("/api/admin/home-config")
+      .then((r) => r.json())
+      .then((data: HomeConfig) => setConfig(data.apps))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    fetchConfig();
+    const interval = window.setInterval(fetchConfig, 10_000);
+    window.addEventListener("focus", fetchConfig);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", fetchConfig);
+    };
+  }, [fetchConfig]);
 
   useEffect(() => {
     void fetch("/api/study/jornada?count=true", { credentials: "include" })
@@ -164,6 +114,11 @@ export function HomeScreen() {
       router.push(`/${id}`);
     }
   }
+
+  const studyCards = getVisible(STUDY_MODES, config);
+  const retentionCards = getVisible(RETENTION_MODES, config);
+  const adventureCards = getVisible(ADVENTURE_MODES, config);
+  const toolCards = getVisible(TOOLS_MODES, config);
 
   return (
     <AppLayout credits>
@@ -188,62 +143,74 @@ export function HomeScreen() {
         </section>
 
         {/* Core study modes */}
-        <section>
-          <SectionDivider title="Modos de Estudo" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            {STUDY_MODES.map((mode) => (
-              <GameCard
-                key={mode.id}
-                {...mode}
-                handleClick={() => handleClick(mode.id)}
-              />
-            ))}
-          </div>
-        </section>
+        {studyCards.length > 0 && (
+          <section>
+            <SectionDivider title="Modos de Estudo" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              {studyCards.map(({ mode, highlighted }) => (
+                <GameCard
+                  key={mode.id}
+                  {...mode}
+                  highlighted={highlighted}
+                  handleClick={() => handleClick(mode.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Retention modes */}
-        <section>
-          <SectionDivider title="Retencao de Conhecimento" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-            {RETENTION_MODES.map((mode) => (
-              <GameCard
-                key={mode.id}
-                {...mode}
-                handleClick={() => handleClick(mode.id)}
-              />
-            ))}
-          </div>
-        </section>
+        {retentionCards.length > 0 && (
+          <section>
+            <SectionDivider title="Retencao de Conhecimento" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+              {retentionCards.map(({ mode, highlighted }) => (
+                <GameCard
+                  key={mode.id}
+                  {...mode}
+                  highlighted={highlighted}
+                  handleClick={() => handleClick(mode.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Adventure / challenge modes */}
-        <section>
-          <SectionDivider title="Aventura e Desafios" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            {ADVENTURE_MODES.map((mode) => (
-              <GameCard
-                key={mode.id}
-                {...mode}
-                handleClick={() => handleClick(mode.id)}
-              />
-            ))}
+        {(adventureCards.length > 0 || showJornada) && (
+          <section>
+            <SectionDivider title="Aventura e Desafios" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              {adventureCards.map(({ mode, highlighted }) => (
+                <GameCard
+                  key={mode.id}
+                  {...mode}
+                  highlighted={highlighted}
+                  handleClick={() => handleClick(mode.id)}
+                />
+              ))}
 
-            {showJornada && <JornadaCard onClick={() => router.push("/jornada")} />}
-          </div>
-        </section>
+              {showJornada && <JornadaCard onClick={() => router.push("/jornada")} />}
+            </div>
+          </section>
+        )}
 
         {/* Tools */}
-        <section className="mb-12">
-          <SectionDivider title="Ferramentas" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            {TOOLS_MODES.map((mode) => (
-              <GameCard
-                key={mode.id}
-                {...mode}
-                handleClick={() => handleClick(mode.id)}
-              />
-            ))}
-          </div>
-        </section>
+        {toolCards.length > 0 && (
+          <section className="mb-12">
+            <SectionDivider title="Ferramentas" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              {toolCards.map(({ mode, highlighted }) => (
+                <GameCard
+                  key={mode.id}
+                  {...mode}
+                  highlighted={highlighted}
+                  handleClick={() => handleClick(mode.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
     </AppLayout>
   );

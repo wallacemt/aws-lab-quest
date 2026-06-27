@@ -22,6 +22,7 @@ const ADMIN_MENU = [
   { href: "/admin/arena", label: "Arena" },
   { href: "/admin/noticias", label: "Noticias" },
   { href: "/admin/changelog", label: "Changelog" },
+  { href: "/admin/home-config", label: "Home Config" },
 ];
 
 const BREADCRUMB_MAP: Record<string, string> = {

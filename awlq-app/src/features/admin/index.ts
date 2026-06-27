@@ -7,6 +7,7 @@ export { AdminUsersScreen } from "@/features/admin/screens/AdminUsersScreen";
 export { AdminUploadsScreen } from "@/features/admin/screens/AdminUploadsScreen";
 export { AdminEmailScreen } from "@/features/admin/screens/AdminEmailScreen";
 export { AdminAiConfigScreen } from "@/features/admin/screens/AdminAiConfigScreen";
+export { AdminHomeConfigScreen } from "@/features/admin/screens/AdminHomeConfigScreen";
 export type {
   AdminApiError,
   AdminUploadType,
