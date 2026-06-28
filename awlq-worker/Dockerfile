@@ -43,7 +43,8 @@ RUN bun build src/index.ts \
     --outfile dist/index.js \
     --target bun \
     --bundle \
-    --external @prisma/client
+    --external @prisma/client \
+    --define 'process.env.NODE_ENV="production"'
 
 FROM oven/bun:1-alpine AS runner
 WORKDIR /app
@@ -53,5 +54,6 @@ ENV NODE_ENV=production
 # Bundle is one file; only @prisma/client must live in node_modules.
 COPY --from=builder /app/awlq-worker/dist/index.js ./dist/index.js
 COPY --from=builder /app/awlq-worker/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=builder /app/packages/db/node_modules/@prisma/client-runtime-utils ./node_modules/@prisma/client-runtime-utils
 
 CMD ["bun", "dist/index.js"]
