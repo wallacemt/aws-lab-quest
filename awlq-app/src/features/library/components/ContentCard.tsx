@@ -55,8 +55,16 @@ export function ContentCard({
       title={`${title} — ${TYPE_LABELS[type]}`}
     >
       {/* Preview banner */}
-      <div className={`flex items-center justify-center h-14 ${TYPE_BANNER[type]}`}>
-        <span className="text-4xl" aria-hidden="true">{TYPE_ICONS[type]}</span>
+      {/* ponytail: no thumbnail image — list endpoints only return LibraryContentLite
+          (no storage URL) because file URLs are presigned per-item on the detail
+          route. Rendering real thumbnails here would mean one presigned-URL call
+          per card per page load (N+1). Upgrade path: a public thumbnail bucket or
+          a batch-presign endpoint, if real previews are needed. */}
+      <div className={`flex flex-col items-center justify-center gap-1 h-24 ${TYPE_BANNER[type]}`}>
+        <span className="text-5xl" aria-hidden="true">{TYPE_ICONS[type]}</span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--pixel-subtext)]">
+          {TYPE_LABELS[type]}
+        </span>
       </div>
 
       {/* Card body */}
