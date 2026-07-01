@@ -27,64 +27,125 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ─── Create Form ──────────────────────────────────────────────────────────────
+// ─── Modal shell ────────────────────────────────────────────────────────────
+// ponytail: no shadcn Dialog in this project yet — a fixed+backdrop div is the
+// whole feature for one consumer. Swap for shadcn Dialog if a second modal
+// shows up elsewhere and the duplication starts to hurt.
 
-type CreateFormProps = {
-  onCreated: (item: LibraryContent) => void;
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 py-10">
+      <div className="w-full max-w-2xl border border-[#1e293b] bg-[#111827] p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-xs uppercase text-[#f97316]">{title}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="font-mono text-xs text-[#64748b] hover:text-[#e2e8f0]"
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Content Form (create + edit) ──────────────────────────────────────────
+
+type ContentFormProps = {
+  initial?: LibraryContent;
+  onSaved: (item: LibraryContent) => void;
+  onCancel: () => void;
 };
 
-function CreateForm({ onCreated }: CreateFormProps) {
-  const [type, setType] = useState<LibraryContentType>("MARKDOWN");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState(CATEGORIES[0]);
-  const [authorName, setAuthorName] = useState("");
-  const [authorUrl, setAuthorUrl] = useState("");
-  const [authorContact, setAuthorContact] = useState("");
-  const [bodyMarkdown, setBodyMarkdown] = useState("");
+function ContentForm({ initial, onSaved, onCancel }: ContentFormProps) {
+  const isEditing = !!initial;
+  const [type, setType] = useState<LibraryContentType>(initial?.type ?? "MARKDOWN");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [category, setCategory] = useState(initial?.category ?? CATEGORIES[0]);
+  const [authorName, setAuthorName] = useState(initial?.authorName ?? "");
+  const [authorUrl, setAuthorUrl] = useState(initial?.authorUrl ?? "");
+  const [authorContact, setAuthorContact] = useState(initial?.authorContact ?? "");
+  const [bodyMarkdown, setBodyMarkdown] = useState(initial?.bodyMarkdown ?? "");
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Revoke the object URL whenever it's replaced or the form unmounts.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = e.target.files?.[0] ?? null;
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(selected);
+    setPreviewUrl(selected ? URL.createObjectURL(selected) : null);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
     try {
-      const created = await apiFetch<{ content: LibraryContent }>("/api/admin/library", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          title: title.trim(),
-          description: description.trim() || undefined,
-          category,
-          authorName: authorName.trim(),
-          authorUrl: authorUrl.trim() || undefined,
-          authorContact: authorContact.trim() || undefined,
-          bodyMarkdown: type === "MARKDOWN" ? bodyMarkdown : undefined,
-        }),
-      });
+      const payload = {
+        type,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        category,
+        authorName: authorName.trim(),
+        authorUrl: authorUrl.trim() || undefined,
+        authorContact: authorContact.trim() || undefined,
+        bodyMarkdown: type === "MARKDOWN" ? bodyMarkdown : undefined,
+      };
 
-      if (file && type !== "MARKDOWN") {
-        const formData = new FormData();
-        formData.append("file", file);
-        await apiFetch<unknown>(`/api/admin/library/${created.content.id}/upload`, {
+      let saved: LibraryContent;
+      if (isEditing) {
+        const updated = await apiFetch<{ content: LibraryContent }>(
+          `/api/admin/library/${initial.id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        );
+        saved = updated.content;
+      } else {
+        const created = await apiFetch<{ content: LibraryContent }>("/api/admin/library", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
+        saved = created.content;
+
+        if (file && type !== "MARKDOWN") {
+          const formData = new FormData();
+          formData.append("file", file);
+          await apiFetch<unknown>(`/api/admin/library/${created.content.id}/upload`, {
+            method: "POST",
+            body: formData,
+          });
+        }
       }
 
-      setTitle("");
-      setDescription("");
-      setAuthorName("");
-      setAuthorUrl("");
-      setAuthorContact("");
-      setBodyMarkdown("");
-      setFile(null);
-      onCreated(created.content);
+      onSaved(saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao criar conteúdo.");
+      setError(err instanceof Error ? err.message : "Erro ao salvar conteúdo.");
     } finally {
       setIsSubmitting(false);
     }
@@ -103,7 +164,8 @@ function CreateForm({ onCreated }: CreateFormProps) {
           <select
             value={type}
             onChange={(e) => setType(e.target.value as LibraryContentType)}
-            className={inputClass}
+            disabled={isEditing}
+            className={`${inputClass} disabled:opacity-50`}
           >
             {CONTENT_TYPES.map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -139,7 +201,7 @@ function CreateForm({ onCreated }: CreateFormProps) {
         <span className="font-mono text-[10px] uppercase text-[#64748b]">Descrição</span>
         <input
           type="text"
-          value={description}
+          value={description ?? ""}
           onChange={(e) => setDescription(e.target.value)}
           className={inputClass}
         />
@@ -160,7 +222,7 @@ function CreateForm({ onCreated }: CreateFormProps) {
           <span className="font-mono text-[10px] uppercase text-[#64748b]">URL do Autor</span>
           <input
             type="url"
-            value={authorUrl}
+            value={authorUrl ?? ""}
             onChange={(e) => setAuthorUrl(e.target.value)}
             placeholder="https://..."
             className={inputClass}
@@ -170,7 +232,7 @@ function CreateForm({ onCreated }: CreateFormProps) {
           <span className="font-mono text-[10px] uppercase text-[#64748b]">Contato</span>
           <input
             type="text"
-            value={authorContact}
+            value={authorContact ?? ""}
             onChange={(e) => setAuthorContact(e.target.value)}
             className={inputClass}
           />
@@ -181,7 +243,7 @@ function CreateForm({ onCreated }: CreateFormProps) {
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[10px] uppercase text-[#64748b]">Conteúdo Markdown</span>
           <textarea
-            value={bodyMarkdown}
+            value={bodyMarkdown ?? ""}
             onChange={(e) => setBodyMarkdown(e.target.value)}
             rows={10}
             className={inputClass}
@@ -189,25 +251,50 @@ function CreateForm({ onCreated }: CreateFormProps) {
         </div>
       )}
 
-      {type !== "MARKDOWN" && (
-        <div className="flex flex-col gap-1">
+      {!isEditing && type !== "MARKDOWN" && (
+        <div className="flex flex-col gap-2">
           <span className="font-mono text-[10px] uppercase text-[#64748b]">Arquivo (max 50 MB)</span>
           <input
             type="file"
             accept={type === "PDF" || type === "SLIDES" ? ".pdf" : "image/*"}
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={handleFileChange}
             className="font-mono text-xs text-[#e2e8f0]"
           />
+          {previewUrl && (
+            <div className="border border-[#334155] bg-[#0b1220] p-2">
+              {type === "IMAGE" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={previewUrl} alt="Pré-visualização" className="max-h-64 w-auto" />
+              ) : (
+                <iframe src={previewUrl} title="Pré-visualização" className="h-64 w-full" />
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="border border-[#f97316] bg-[#f97316] px-4 py-2 font-mono text-xs uppercase text-[#0b1220] disabled:opacity-50 hover:opacity-90 transition-opacity"
-      >
-        {isSubmitting ? "Criando..." : "Criar Conteúdo"}
-      </button>
+      {isEditing && type !== "MARKDOWN" && (
+        <p className="font-mono text-[10px] text-[#64748b]">
+          O arquivo não pode ser alterado na edição — apenas no momento da criação.
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="border border-[#f97316] bg-[#f97316] px-4 py-2 font-mono text-xs uppercase text-[#0b1220] disabled:opacity-50 hover:opacity-90 transition-opacity"
+        >
+          {isSubmitting ? "Salvando..." : isEditing ? "Salvar Alterações" : "Criar Conteúdo"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="border border-[#334155] px-4 py-2 font-mono text-xs uppercase text-[#e2e8f0] hover:border-[#64748b] transition-colors"
+        >
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 }
@@ -228,6 +315,9 @@ export function LibraryAdminScreen() {
   // Pagination
   const [page, setPage] = useState(1);
 
+  // Modal: undefined = closed, null = create mode, item = edit mode
+  const [editingItem, setEditingItem] = useState<LibraryContent | null | undefined>(undefined);
+
   const loadItems = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -245,9 +335,13 @@ export function LibraryAdminScreen() {
     void loadItems();
   }, [loadItems]);
 
-  const handleCreated = useCallback((item: LibraryContent) => {
-    setItems((prev) => [item, ...prev]);
+  const handleSaved = useCallback((item: LibraryContent) => {
+    setItems((prev) => {
+      const exists = prev.some((i) => i.id === item.id);
+      return exists ? prev.map((i) => (i.id === item.id ? item : i)) : [item, ...prev];
+    });
     setPage(1);
+    setEditingItem(undefined);
   }, []);
 
   // Client-side filtering
@@ -303,6 +397,13 @@ export function LibraryAdminScreen() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
+            onClick={() => setEditingItem(null)}
+            className="border border-[#f97316] bg-[#f97316] px-3 py-1 text-xs uppercase text-[#0b1220] hover:opacity-90 transition-opacity"
+          >
+            Novo Conteúdo
+          </button>
+          <button
+            type="button"
             onClick={() => void loadItems()}
             className="border border-[#334155] px-3 py-1 text-xs uppercase text-[#e2e8f0]"
           >
@@ -355,12 +456,6 @@ export function LibraryAdminScreen() {
         </div>
       </section>
 
-      {/* Create form */}
-      <section className="border border-[#1e293b] bg-[#111827] p-4 space-y-4">
-        <p className="font-mono text-xs uppercase text-[#f97316]">Novo Conteúdo</p>
-        <CreateForm onCreated={handleCreated} />
-      </section>
-
       {isLoading && <p className="text-sm text-[#94a3b8]">Carregando conteúdo...</p>}
       {loadError && <p className="text-sm text-[#fca5a5]">{loadError}</p>}
 
@@ -410,7 +505,14 @@ export function LibraryAdminScreen() {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingItem(item)}
+                          className="border border-[#334155] px-2 py-1 font-mono text-[10px] uppercase text-[#94a3b8] hover:border-[#60a5fa] hover:text-[#60a5fa] transition-colors"
+                        >
+                          Editar
+                        </button>
                         <button
                           type="button"
                           onClick={() => void handleTogglePublish(item)}
@@ -457,6 +559,20 @@ export function LibraryAdminScreen() {
             </div>
           </footer>
         </>
+      )}
+
+      {/* Create / Edit modal */}
+      {editingItem !== undefined && (
+        <Modal
+          title={editingItem ? "Editar Conteúdo" : "Novo Conteúdo"}
+          onClose={() => setEditingItem(undefined)}
+        >
+          <ContentForm
+            initial={editingItem ?? undefined}
+            onSaved={handleSaved}
+            onCancel={() => setEditingItem(undefined)}
+          />
+        </Modal>
       )}
     </main>
   );

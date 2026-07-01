@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface ImageViewerProps {
   src: string;
@@ -11,8 +11,25 @@ export function ImageViewer({ src, alt }: ImageViewerProps) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const dragStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    }
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement === containerRef.current) {
+      void document.exitFullscreen();
+    } else if (!document.fullscreenElement) {
+      void containerRef.current?.requestFullscreen();
+    }
+  }
 
   function clampScale(s: number) {
     return Math.min(4, Math.max(0.5, s));
@@ -82,6 +99,14 @@ export function ImageViewer({ src, alt }: ImageViewerProps) {
         >
           Reset
         </button>
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          className="border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-0.5 font-mono text-[10px] text-[var(--pixel-text)] hover:border-[var(--pixel-accent)] hover:text-[var(--pixel-accent)] transition-colors"
+        >
+          {isFullscreen ? "⛶ Sair" : "⛶ Tela Cheia"}
+        </button>
       </div>
 
       {/* Viewer container */}
@@ -90,7 +115,8 @@ export function ImageViewer({ src, alt }: ImageViewerProps) {
         className="overflow-hidden border border-[var(--pixel-border)] bg-[var(--pixel-border)]/10"
         style={{
           minHeight: "300px",
-          maxHeight: "70vh",
+          maxHeight: isFullscreen ? "100vh" : "70vh",
+          height: isFullscreen ? "100vh" : undefined,
           cursor: isDragging ? "grabbing" : "grab",
           userSelect: "none",
         }}
@@ -114,7 +140,7 @@ export function ImageViewer({ src, alt }: ImageViewerProps) {
               transform,
               transition: isDragging ? "none" : "transform 0.15s ease",
               maxWidth: "100%",
-              maxHeight: "70vh",
+              maxHeight: isFullscreen ? "100vh" : "70vh",
               display: "block",
             }}
           />
