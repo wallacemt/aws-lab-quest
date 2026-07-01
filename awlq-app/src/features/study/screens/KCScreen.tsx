@@ -65,6 +65,8 @@ export function KCScreen() {
   const [generationTimedOut, setGenerationTimedOut] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const generationDeadlineRef = useRef<number | null>(null);
+  // DEF-006a: prevents a slow tick from racing with the next one.
+  const pollingInFlightRef = useRef(false);
 
   // Flow state
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
@@ -241,10 +243,14 @@ export function KCScreen() {
       setGeneratingQuestions(true);
       setGenerationTimedOut(false);
       generationDeadlineRef.current = Date.now() + GENERATION_TIMEOUT_MS;
+      pollingInFlightRef.current = false;
 
       if (pollTimerRef.current !== null) clearInterval(pollTimerRef.current);
 
       pollTimerRef.current = setInterval(() => {
+        // DEF-006a: skip this tick if the previous one hasn't completed yet.
+        if (pollingInFlightRef.current) return;
+
         const timedOut = (generationDeadlineRef.current ?? 0) < Date.now();
 
         if (timedOut) {
@@ -260,20 +266,43 @@ export function KCScreen() {
           return;
         }
 
+        pollingInFlightRef.current = true;
+
         pollKcGenerationStatus({ requestId, topics })
           .then(({ count }) => {
-            if (count >= needed) {
-              clearInterval(pollTimerRef.current!);
-              pollTimerRef.current = null;
-              // Pool is now sufficient: re-fetch the full set.
-              return createKcQuestions({ topics, count: needed }).then(({ questions: fresh }) => {
+            if (count < needed) return;
+
+            // Pool is now sufficient: re-fetch the full set.
+            return createKcQuestions({ topics, count: needed })
+              .then((result) => {
+                // DEF-006b: if re-fetch still sees insufficient, keep the interval
+                // running — do not resolve with an incomplete pool.
+                if (result.insufficient) return;
+
+                clearInterval(pollTimerRef.current!);
+                pollTimerRef.current = null;
                 setGeneratingQuestions(false);
-                setQuestions(fresh);
+                setQuestions(result.questions);
+              })
+              .catch(() => {
+                // DEF-004: re-fetch failed → don't leave generatingQuestions=true forever.
+                // Fall back to whatever questions we already had (mirrors the timeout branch).
+                clearInterval(pollTimerRef.current!);
+                pollTimerRef.current = null;
+                setGeneratingQuestions(false);
+                setQuestions(existingQuestions);
+                setFlowError(
+                  existingQuestions.length > 0
+                    ? `Erro ao carregar questoes. Iniciando com ${existingQuestions.length} questoes disponíveis.`
+                    : "Erro ao carregar questoes. Tente novamente.",
+                );
               });
-            }
           })
           .catch(() => {
             // Transient poll failure: keep retrying until timeout.
+          })
+          .finally(() => {
+            pollingInFlightRef.current = false;
           });
       }, GENERATION_POLL_INTERVAL_MS);
     },
