@@ -123,7 +123,7 @@ export function LibraryScreen({ initialContent }: LibraryScreenProps) {
 
         {/* Type filter */}
         <div>
-          <p className="mb-2 font-mono text-[10px] text-[var(--pixel-muted)] uppercase">Tipo</p>
+          <p className="mb-2 font-mono text-[10px] text-accent uppercase">Tipo</p>
           <div className="flex flex-wrap gap-2">
             {TYPE_OPTIONS.map((opt) => (
               <button

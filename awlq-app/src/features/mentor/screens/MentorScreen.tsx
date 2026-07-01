@@ -7,9 +7,56 @@ import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { MentorActionList } from "@/features/mentor/components/MentorActionList";
-import { fetchMentorRecommendations, type MentorRecommendation } from "@/features/mentor/services/mentor-api";
+import {
+  fetchMentorRecommendations,
+  fetchAskStatus,
+  askMentorQuestion,
+  DailyLimitError,
+  type MentorRecommendation,
+  type AskStatus,
+} from "@/features/mentor/services/mentor-api";
 import Image from "next/image";
+
+function MentorAnswer({
+  question,
+  answer,
+  isHistory = false,
+}: {
+  question: string | null;
+  answer: string;
+  isHistory?: boolean;
+}) {
+  return (
+    <div className={`border rounded-sm ${isHistory ? "border-green-700/20 bg-green-900/5" : "border-green-700/40 bg-green-900/10"}`}>
+      {isHistory && (
+        <p className="font-mono text-[9px] uppercase text-green-600 tracking-widest px-5 pt-3">Última consulta</p>
+      )}
+      {question && (
+        <p className="font-mono text-[11px] text-[var(--pixel-subtext)] px-5 pt-3 pb-2 italic border-b border-green-700/20">
+          &ldquo;{question}&rdquo;
+        </p>
+      )}
+      {!isHistory && (
+        <p className="font-mono text-[9px] uppercase text-green-400 tracking-widest px-5 pt-3 pb-1">
+          Resposta do Mestre
+        </p>
+      )}
+      {/* prose-invert + font-sans: readable serif-free body text; code stays mono */}
+      <div className="px-5 py-4 prose prose-sm prose-invert max-w-none
+        prose-p:font-sans prose-p:leading-relaxed prose-p:text-[var(--pixel-text)]
+        prose-li:font-sans prose-li:leading-relaxed prose-li:text-[var(--pixel-text)]
+        prose-headings:font-sans prose-headings:text-[var(--pixel-text)]
+        prose-strong:text-green-300
+        prose-code:font-mono prose-code:text-xs
+        prose-ul:my-2 prose-li:my-0.5">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+      </div>
+    </div>
+  );
+}
 
 const SMOKE_PARTICLES = [
   { left: "20%", delay: 0, size: "w-20 h-20" },
@@ -31,13 +78,26 @@ export function MentorScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Ask-the-mentor state
+  const [askStatus, setAskStatus] = useState<AskStatus | null>(null);
+  const [question, setQuestion] = useState("");
+  const [isAsking, setIsAsking] = useState(false);
+  // answer/askedQuestion hold the in-session response; on load they're seeded from lastAnswer/lastQuestion
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [askedQuestion, setAskedQuestion] = useState<string | null>(null);
+  const [askError, setAskError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchMentorRecommendations();
+      const [data, status] = await Promise.all([fetchMentorRecommendations(), fetchAskStatus()]);
       setRecommendations(data.recommendations);
       setGeneratedAt(data.generatedAt);
+      setAskStatus(status);
+      // Seed the last Q&A from DB so the user sees it immediately on page load
+      if (status.lastAnswer) setAnswer(status.lastAnswer);
+      if (status.lastQuestion) setAskedQuestion(status.lastQuestion);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar recomendações.");
     } finally {
@@ -49,13 +109,47 @@ export function MentorScreen() {
     void load();
   }, [load]);
 
+  const handleAsk = useCallback(async () => {
+    if (!question.trim() || isAsking) return;
+    setIsAsking(true);
+    setAskError(null);
+    setAnswer(null);
+    setAskedQuestion(null);
+    try {
+      const result = await askMentorQuestion(question.trim());
+      setAnswer(result.answer);
+      setAskedQuestion(question.trim());
+      setAskStatus((prev) => ({
+        ...(prev ?? { lastQuestion: null, lastAnswer: null }),
+        canAsk: false,
+        resetsAt: result.resetsAt,
+      }));
+    } catch (err) {
+      if (err instanceof DailyLimitError) {
+        setAskStatus((prev) => ({
+          ...(prev ?? { lastQuestion: null, lastAnswer: null }),
+          canAsk: false,
+          resetsAt: err.resetsAt,
+        }));
+      } else {
+        setAskError(err instanceof Error ? err.message : "Erro ao contatar o Mestre.");
+      }
+    } finally {
+      setIsAsking(false);
+    }
+  }, [question, isAsking]);
+
   const updatedLabel = generatedAt
     ? `Atualizado ${formatDistanceToNow(new Date(generatedAt), { addSuffix: true, locale: ptBR })}`
     : null;
 
+  const resetLabel = askStatus?.resetsAt
+    ? formatDistanceToNow(new Date(askStatus.resetsAt), { addSuffix: true, locale: ptBR })
+    : null;
+
   return (
     <AppLayout>
-      <div className="mx-auto max-w-lg px-4 py-8 space-y-6">
+      <div className="mx-auto max-w-lg px-4 pt-8 pb-4 space-y-6">
         {/* Yoda avatar card with smoke effect */}
         <PixelCard className="relative overflow-hidden border-green-700/60">
           {/* Smoke particles (behind content) */}
@@ -130,6 +224,59 @@ export function MentorScreen() {
             Suas prioridades de hoje
           </p>
           <MentorActionList recommendations={isLoading ? null : (recommendations ?? [])} isLoading={isLoading} />
+        </PixelCard>
+
+      </div>
+
+      {/* Pergunta ao Mestre — container mais largo para melhor leitura */}
+      <div className="mx-auto max-w-2xl px-4 pb-8">
+        <PixelCard className="space-y-4">
+          <p className="font-mono text-xs uppercase text-pixel-text tracking-widest">Pergunta ao Mestre</p>
+
+          {/* Loading: waiting for status check */}
+          {askStatus === null && (
+            <p className="font-mono text-xs text-pixel-subtext italic">Verificando disponibilidade do Mestre...</p>
+          )}
+
+          {/* Locked: daily limit reached */}
+          {askStatus !== null && !askStatus.canAsk && (
+            <div className="space-y-3">
+              <p className="font-mono text-xs text-pixel-subtext italic">
+                &ldquo;Sua pergunta diária já foi usada. O Mestre responderá novamente {resetLabel}.&rdquo;
+              </p>
+              {answer && <MentorAnswer question={askedQuestion} answer={answer} />}
+            </div>
+          )}
+
+          {/* Available: can ask */}
+          {askStatus !== null && askStatus.canAsk && (
+            <div className="space-y-3">
+              {/* Show last session's Q&A if it exists and user hasn't asked yet this session */}
+              {answer && !isAsking && <MentorAnswer question={askedQuestion} answer={answer} isHistory />}
+
+              <textarea
+                className="w-full bg-transparent border border-pixel-border font-mono text-xs text-pixel-text p-2 resize-none focus:outline-none focus:border-green-500 placeholder:text-pixel-subtext"
+                rows={4}
+                maxLength={500}
+                placeholder="Qual é sua dúvida sobre AWS, jovem Padawan?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                disabled={isAsking}
+              />
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] text-pixel-subtext">{question.length}/500</span>
+                <PixelButton
+                  onClick={() => void handleAsk()}
+                  disabled={isAsking || !question.trim()}
+                  className="text-xs"
+                >
+                  {isAsking ? "Consultando o Mestre..." : "Perguntar"}
+                </PixelButton>
+              </div>
+
+              {askError && <p className="font-mono text-xs text-red-400">&ldquo;{askError}&rdquo;</p>}
+            </div>
+          )}
         </PixelCard>
       </div>
     </AppLayout>
