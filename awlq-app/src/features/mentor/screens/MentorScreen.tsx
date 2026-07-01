@@ -8,7 +8,14 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { MentorActionList } from "@/features/mentor/components/MentorActionList";
-import { fetchMentorRecommendations, type MentorRecommendation } from "@/features/mentor/services/mentor-api";
+import {
+  fetchMentorRecommendations,
+  fetchAskStatus,
+  askMentorQuestion,
+  DailyLimitError,
+  type MentorRecommendation,
+  type AskStatus,
+} from "@/features/mentor/services/mentor-api";
 import Image from "next/image";
 
 const SMOKE_PARTICLES = [
@@ -31,13 +38,21 @@ export function MentorScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Ask-the-mentor state
+  const [askStatus, setAskStatus] = useState<AskStatus | null>(null);
+  const [question, setQuestion] = useState("");
+  const [isAsking, setIsAsking] = useState(false);
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [askError, setAskError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchMentorRecommendations();
+      const [data, status] = await Promise.all([fetchMentorRecommendations(), fetchAskStatus()]);
       setRecommendations(data.recommendations);
       setGeneratedAt(data.generatedAt);
+      setAskStatus(status);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar recomendações.");
     } finally {
@@ -48,6 +63,26 @@ export function MentorScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const handleAsk = useCallback(async () => {
+    if (!question.trim() || isAsking) return;
+    setIsAsking(true);
+    setAskError(null);
+    setAnswer(null);
+    try {
+      const result = await askMentorQuestion(question.trim());
+      setAnswer(result.answer);
+      setAskStatus({ canAsk: false, resetsAt: result.resetsAt });
+    } catch (err) {
+      if (err instanceof DailyLimitError) {
+        setAskStatus({ canAsk: false, resetsAt: err.resetsAt });
+      } else {
+        setAskError(err instanceof Error ? err.message : "Erro ao contatar o Mestre.");
+      }
+    } finally {
+      setIsAsking(false);
+    }
+  }, [question, isAsking]);
 
   const updatedLabel = generatedAt
     ? `Atualizado ${formatDistanceToNow(new Date(generatedAt), { addSuffix: true, locale: ptBR })}`
@@ -130,6 +165,68 @@ export function MentorScreen() {
             Suas prioridades de hoje
           </p>
           <MentorActionList recommendations={isLoading ? null : (recommendations ?? [])} isLoading={isLoading} />
+        </PixelCard>
+
+        {/* Pergunta ao Mestre */}
+        <PixelCard className="space-y-4">
+          <p className="font-mono text-xs uppercase text-[var(--pixel-text)] tracking-widest">
+            Pergunta ao Mestre
+          </p>
+
+          {/* Locked: daily limit reached */}
+          {askStatus && !askStatus.canAsk && (
+            <div className="space-y-2">
+              <p className="font-mono text-xs text-[var(--pixel-subtext)] italic">
+                &ldquo;Sua pergunta diária já foi usada. O Mestre responderá novamente amanhã às 00:00 UTC.&rdquo;
+              </p>
+              {answer && (
+                <div className="border border-green-700/40 bg-green-900/10 p-3 space-y-1">
+                  <p className="font-mono text-[10px] uppercase text-green-400 tracking-widest">Resposta do Mestre</p>
+                  <p className="font-mono text-xs text-[var(--pixel-text)] whitespace-pre-wrap">{answer}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Available: can ask */}
+          {(!askStatus || askStatus.canAsk) && (
+            <div className="space-y-3">
+              <textarea
+                className="w-full bg-transparent border border-[var(--pixel-border)] font-mono text-xs text-[var(--pixel-text)] p-2 resize-none focus:outline-none focus:border-green-500 placeholder:text-[var(--pixel-subtext)]"
+                rows={3}
+                maxLength={500}
+                placeholder="Qual é sua dúvida sobre AWS, jovem Padawan?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                disabled={isAsking}
+              />
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+                  {question.length}/500
+                </span>
+                <PixelButton
+                  onClick={() => void handleAsk()}
+                  disabled={isAsking || !question.trim()}
+                  className="text-xs"
+                >
+                  {isAsking ? "Consultando o Mestre..." : "Perguntar"}
+                </PixelButton>
+              </div>
+
+              {askError && (
+                <p className="font-mono text-xs text-red-400">
+                  &ldquo;{askError}&rdquo;
+                </p>
+              )}
+
+              {answer && (
+                <div className="border border-green-700/40 bg-green-900/10 p-3 space-y-1">
+                  <p className="font-mono text-[10px] uppercase text-green-400 tracking-widest">Resposta do Mestre</p>
+                  <p className="font-mono text-xs text-[var(--pixel-text)] whitespace-pre-wrap">{answer}</p>
+                </div>
+              )}
+            </div>
+          )}
         </PixelCard>
       </div>
     </AppLayout>

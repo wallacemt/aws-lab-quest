@@ -58,6 +58,7 @@ model User {
   bossBattles             BossBattle[]
   weeklyChallengeEntries  WeeklyChallengeEntry[]
   dailyQuizAttempts       DailyQuizAttempt[]
+  lastMentorQuestionAt    DateTime?
 
   @@index([accessStatus, active])
   @@map("user")
