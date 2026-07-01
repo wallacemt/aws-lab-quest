@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { fetchGapServiceCodes, buildDifficultyAwareWhere } from "../_kc-helpers";
 
 /**
  * GET /api/study/kc/generate-status
  *
  * Polls the status of a background KC generation job.
  * Returns the current pool count so the client can determine readiness.
+ *
+ * The count uses the same difficulty-aware WHERE as the question selector
+ * so poll readiness and the actual fetch always agree (DEF-001).
  *
  * Query params:
  *   requestId  — the generation request id returned by POST /questions
@@ -41,24 +46,22 @@ export async function GET(request: NextRequest) {
     select: { certificationPresetId: true },
   });
 
-  // Count how many KC questions are now available for the requested topics.
-  const whereClause = {
+  // Build the same difficulty-aware WHERE that the question selector uses (DEF-001).
+  const baseWhere: Prisma.StudyQuestionWhereInput = {
     active: true,
     usage: { in: ["KC", "BOTH"] as Array<"KC" | "BOTH"> },
     ...(profile?.certificationPresetId
       ? { certificationPresetId: profile.certificationPresetId }
       : {}),
-    ...(topics.length > 0
-      ? {
-          OR: [
-            { awsService: { code: { in: topics } } },
-            { questionAwsServices: { some: { service: { code: { in: topics } } } } },
-          ],
-        }
-      : {}),
   };
 
-  const count = await prisma.studyQuestion.count({ where: whereClause });
+  const gapCodes = profile?.certificationPresetId
+    ? await fetchGapServiceCodes(profile.certificationPresetId)
+    : new Set<string>();
+
+  const difficultyAwareWhere = buildDifficultyAwareWhere(topics, gapCodes, baseWhere);
+
+  const count = await prisma.studyQuestion.count({ where: difficultyAwareWhere });
 
   return NextResponse.json({ count, jobProcessed });
 }

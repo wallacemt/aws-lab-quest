@@ -169,12 +169,19 @@ export async function createKcQuestions(params: {
     error?: string;
   }>(response);
 
-  if (!response.ok || !data.questions?.length) {
+  if (!response.ok) {
+    throw new Error(data.error ?? "Nao foi possivel iniciar o KC.");
+  }
+
+  // When the pool is empty and generation was enqueued, the route returns 200
+  // with questions:[] and insufficient:true — do NOT throw so the caller can
+  // enter the polling flow (DEF-003).
+  if (!data.questions?.length && !data.insufficient) {
     throw new Error(data.error ?? "Nao foi possivel iniciar o KC.");
   }
 
   return {
-    questions: data.questions,
+    questions: data.questions ?? [],
     generationRequestId: data.generationRequestId ?? null,
     insufficient: data.insufficient ?? false,
   };
