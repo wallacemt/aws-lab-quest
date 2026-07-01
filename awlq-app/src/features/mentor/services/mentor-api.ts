@@ -61,8 +61,13 @@ export async function askMentorQuestion(question: string): Promise<AskAnswer> {
   });
 
   if (response.status === 429) {
-    const data = (await response.json()) as { resetsAt: string };
-    throw new DailyLimitError(data.resetsAt);
+    const text = await response.text();
+    let resetsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    try {
+      const data = JSON.parse(text) as { resetsAt?: string };
+      if (data.resetsAt) resetsAt = data.resetsAt;
+    } catch {}
+    throw new DailyLimitError(resetsAt);
   }
 
   if (!response.ok) {
