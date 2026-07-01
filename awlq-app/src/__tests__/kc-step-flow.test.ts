@@ -43,12 +43,6 @@ const { mockGetSession, mockPrisma } = vi.hoisted(() => {
 
 vi.mock("@/lib/auth", () => ({ auth: { api: { getSession: mockGetSession } } }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
-// Prevent real Gemini client initialization (generateAndPersistFallbackQuestions
-// is still in the module even though DEF-005 removed inline calls).
-vi.mock("@/lib/ai", () => ({
-  extractJsonObject: vi.fn(),
-  getAiModel: vi.fn(),
-}));
 vi.mock("@/lib/study-questions", () => ({
   mapDbQuestionToStudyQuestion: vi.fn((q: unknown) => q),
   pickRandomItems: vi.fn((arr: unknown[]) => arr),
