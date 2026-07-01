@@ -30,6 +30,8 @@ export async function fetchMentorRecommendations(): Promise<MentorData> {
 export type AskStatus = {
   canAsk: boolean;
   resetsAt: string | null;
+  lastQuestion: string | null;
+  lastAnswer: string | null;
 };
 
 export type AskAnswer = {
