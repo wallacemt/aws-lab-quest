@@ -18,7 +18,7 @@ import { NextRequest } from "next/server";
 // Hoisted mocks — declared before any vi.mock calls
 // ---------------------------------------------------------------------------
 
-const { mockAuth, mockPrisma, mockModel, mockGetAiModel } = vi.hoisted(() => {
+const { mockAuth, mockPrisma, mockModel, mockGetAiModelWithSystem } = vi.hoisted(() => {
   const mockAuth = {
     api: { getSession: vi.fn() },
   };
@@ -27,6 +27,7 @@ const { mockAuth, mockPrisma, mockModel, mockGetAiModel } = vi.hoisted(() => {
     user: {
       updateMany: vi.fn(),
       findUnique: vi.fn(),
+      update: vi.fn(),
     },
   };
 
@@ -35,14 +36,14 @@ const { mockAuth, mockPrisma, mockModel, mockGetAiModel } = vi.hoisted(() => {
     generateContent: vi.fn(),
   };
 
-  const mockGetAiModel = vi.fn().mockReturnValue(mockModel);
+  const mockGetAiModelWithSystem = vi.fn().mockReturnValue(mockModel);
 
-  return { mockAuth, mockPrisma, mockModel, mockGetAiModel };
+  return { mockAuth, mockPrisma, mockModel, mockGetAiModelWithSystem };
 });
 
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
-vi.mock("@/lib/ai", () => ({ getAiModel: mockGetAiModel }));
+vi.mock("@/lib/ai", () => ({ getAiModelWithSystem: mockGetAiModelWithSystem }));
 
 // ---------------------------------------------------------------------------
 // Route handlers imported AFTER mocks are registered
@@ -81,9 +82,12 @@ beforeEach(() => {
   });
   // Default: slot available (updateMany finds the user and updates)
   mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
+  mockPrisma.user.update.mockResolvedValue({});
   // Default: last question was 25h ago — outside the rolling window
   mockPrisma.user.findUnique.mockResolvedValue({
     lastMentorQuestionAt: new Date(Date.now() - 25 * HOUR_MS),
+    lastMentorQuestion: null,
+    lastMentorAnswer: null,
   });
 });
 
@@ -183,12 +187,14 @@ describe("TC-003: Request after 24h window has expired → 200", () => {
 });
 
 // ---------------------------------------------------------------------------
-// TC-004: Gemini failure after slot reserved → 502; slot is consumed
+// TC-004: Gemini failure after slot reserved → 502; slot is RELEASED (restored)
 // ---------------------------------------------------------------------------
 
 describe("TC-004: AI failure after slot reserved", () => {
   it("returns 502 when Gemini throws after the slot was reserved", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ lastMentorQuestionAt: null });
     mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.user.update.mockResolvedValue({});
     mockModel.generateContent.mockRejectedValueOnce(new Error("Gemini overloaded"));
 
     const res = await POST(makePostRequest({ question: "Pergunta que vai falhar?" }));
@@ -198,23 +204,39 @@ describe("TC-004: AI failure after slot reserved", () => {
     expect(body.error).toContain("Falha ao contatar o Mestre");
   });
 
-  it("GET shows canAsk:false after a failed POST (slot consumed)", async () => {
+  it("restores the previous slot value after an AI failure so the user can retry", async () => {
+    const previousValue = null;
+    mockPrisma.user.findUnique.mockResolvedValue({ lastMentorQuestionAt: previousValue });
     mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.user.update.mockResolvedValue({});
     mockModel.generateContent.mockRejectedValueOnce(new Error("Gemini overloaded"));
 
     await POST(makePostRequest({ question: "Pergunta que vai falhar?" }));
 
-    // After the failed POST, the DB reflects a recent lastMentorQuestionAt
-    // (the updateMany already wrote it). Simulate GET reading that state.
-    mockPrisma.user.findUnique.mockResolvedValue({
-      lastMentorQuestionAt: new Date(), // just reserved — inside the 24h window
-    });
+    // The restore call must have been made with the previous value
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { lastMentorQuestionAt: previousValue },
+      }),
+    );
+  });
+
+  it("GET shows canAsk:true after a failed POST (slot restored)", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ lastMentorQuestionAt: null });
+    mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.user.update.mockResolvedValue({});
+    mockModel.generateContent.mockRejectedValueOnce(new Error("Gemini overloaded"));
+
+    await POST(makePostRequest({ question: "Pergunta que vai falhar?" }));
+
+    // After the failed POST the slot was restored to null — user can ask again.
+    mockPrisma.user.findUnique.mockResolvedValue({ lastMentorQuestionAt: null });
 
     const getRes = await GET(makeGetRequest());
     expect(getRes.status).toBe(200);
-    const body = (await getRes.json()) as { canAsk: boolean; resetsAt: string };
-    expect(body.canAsk).toBe(false);
-    expect(typeof body.resetsAt).toBe("string");
+    const body = (await getRes.json()) as { canAsk: boolean; resetsAt: string | null };
+    expect(body.canAsk).toBe(true);
+    expect(body.resetsAt).toBeNull();
   });
 });
 
@@ -342,7 +364,7 @@ describe("TC-008: Client askMentorQuestion error mapping", () => {
       vi.fn().mockResolvedValue({
         status: 429,
         ok: false,
-        json: async () => ({ resetsAt }),
+        text: async () => JSON.stringify({ resetsAt }),
       }),
     );
 

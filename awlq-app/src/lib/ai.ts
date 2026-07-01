@@ -37,6 +37,13 @@ export function getAiModel() {
   return buildGeminiClient(apiKey).getGenerativeModel({ model: preferredModel });
 }
 
+export function getAiModelWithSystem(systemInstruction: string) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY nao configurada.");
+  const preferredModel = process.env.GEMINI_MODEL ?? "gemma-3-4b-it";
+  return buildGeminiClient(apiKey).getGenerativeModel({ model: preferredModel, systemInstruction });
+}
+
 export function extractJsonObject(text: string): string | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
