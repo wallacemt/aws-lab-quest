@@ -24,9 +24,9 @@ export function ImageViewer({ src, alt }: ImageViewerProps) {
   }, []);
 
   function toggleFullscreen() {
-    if (document.fullscreenElement) {
+    if (document.fullscreenElement === containerRef.current) {
       void document.exitFullscreen();
-    } else {
+    } else if (!document.fullscreenElement) {
       void containerRef.current?.requestFullscreen();
     }
   }
