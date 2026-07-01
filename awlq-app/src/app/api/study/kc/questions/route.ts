@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { extractJsonObject, getAiModel } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
-import { fetchGapServiceCodes, buildDifficultyAwareWhere } from "./_kc-helpers";
+import { fetchGapServiceCodes, buildDifficultyAwareWhere } from "../_kc-helpers";
 
 const OPTION_LABELS = ["A", "B", "C", "D", "E"] as const;
 
