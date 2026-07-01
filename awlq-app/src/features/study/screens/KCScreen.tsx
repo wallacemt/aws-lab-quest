@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -18,6 +18,7 @@ import {
   listStudyServices,
   normalizeAnswerValue,
   normalizeCorrectOptions,
+  pollKcGenerationStatus,
   reportStudyQuestion,
   saveStudyHistory,
   suggestStudyQuestion,
@@ -28,11 +29,13 @@ import { AnswerConfidence } from "@/features/retention/components/ConfidenceSele
 import { useProgressNotifications } from "@/features/study/components/notifications/useProgressNotifications";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
-import { QuestionOption, StudyQuestion, TaskDifficulty } from "@/lib/types";
+import { QuestionOption, StudyQuestion } from "@/lib/types";
 import { STUDY_OPTIONS } from "@/features/study/constants";
 
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const SERVICES_PAGE_SIZE = 12;
+const GENERATION_POLL_INTERVAL_MS = 4_000;
+const GENERATION_TIMEOUT_MS = 90_000;
 
 function maxTopicsForCount(count: number): number {
   return Math.max(1, Math.floor(count / 5));
@@ -49,13 +52,19 @@ export function KCScreen() {
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState<string | null>(null);
 
-  // Setup state
+  // Wizard state (Issue #16)
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<TaskDifficulty>("easy");
   const [questionCount, setQuestionCount] = useState(10);
   const [searchTopic, setSearchTopic] = useState("");
   const [servicesPage, setServicesPage] = useState(1);
   const [suggestionSent, setSuggestionSent] = useState<string | null>(null);
+
+  // On-demand generation state (Issue #18)
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [generationTimedOut, setGenerationTimedOut] = useState(false);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const generationDeadlineRef = useRef<number | null>(null);
 
   // Flow state
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
@@ -81,21 +90,20 @@ export function KCScreen() {
   const [reportMessage, setReportMessage] = useState<string | null>(null);
 
   // Per-question confidence captured via ConfidenceSelector (RF-09, ADR-05).
-  // Keys are question IDs; values are the confidence selected after submission.
   const [confidenceByQuestion, setConfidenceByQuestion] = useState<Record<string, AnswerConfidence>>({});
 
   // Gaps state
   const [weakServices, setWeakServices] = useState<WeakServiceItem[]>([]);
   const [loadingWeakServices, setLoadingWeakServices] = useState(false);
-  const [gapQuestionCount, setGapQuestionCount] = useState(10);
 
   useEffect(() => {
     setServicesLoading(true);
-    listStudyServices({ withCount: true, difficulty: selectedDifficulty })
+    // Difficulty is gap-based; load services without a fixed difficulty filter.
+    listStudyServices({ withCount: true })
       .then((items) => setServices(items))
       .catch((error) => setServicesError(error instanceof Error ? error.message : "Falha ao carregar serviços AWS."))
       .finally(() => setServicesLoading(false));
-  }, [selectedDifficulty]);
+  }, []);
 
   useEffect(() => {
     if (questions.length > 0) return;
@@ -106,6 +114,7 @@ export function KCScreen() {
       .finally(() => setLoadingWeakServices(false));
   }, [questions.length]);
 
+  // Pre-select topics from query string (e.g., deep-link from jornada).
   useEffect(() => {
     const topicsRaw = searchParams.get("topics");
     if (!topicsRaw || services.length === 0) return;
@@ -114,8 +123,18 @@ export function KCScreen() {
     const maxTopics = maxTopicsForCount(questionCount);
     const availableCodes = new Set(services.map((s) => s.code.toUpperCase()));
     const preselected = Array.from(new Set(requested)).filter((c) => availableCodes.has(c)).slice(0, maxTopics);
-    if (preselected.length > 0) setSelectedTopics(preselected);
+    if (preselected.length > 0) {
+      setSelectedTopics(preselected);
+      setActiveStep(3); // jump to summary when topics are pre-selected via URL
+    }
   }, [searchParams, services, questionCount]);
+
+  // Cleanup polling on unmount.
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current !== null) clearInterval(pollTimerRef.current);
+    };
+  }, []);
 
   const inProgress = questions.length > 0;
   const currentQuestion = questions[currentIndex] ?? null;
@@ -190,60 +209,111 @@ export function KCScreen() {
     setFlowError(null);
   }
 
+  function handleStepNext() {
+    if (activeStep === 1) {
+      setActiveStep(2);
+    } else if (activeStep === 2) {
+      if (selectedTopics.length === 0) {
+        setFlowError("Selecione pelo menos um assunto para continuar.");
+        return;
+      }
+      setFlowError(null);
+      setActiveStep(3);
+    }
+  }
+
+  function handleStepBack() {
+    if (activeStep === 2) setActiveStep(1);
+    else if (activeStep === 3) setActiveStep(2);
+  }
+
   async function handleSuggestQuestion(service: StudyServiceItem) {
     try {
-      await suggestStudyQuestion({ serviceCode: service.code, serviceName: service.name, difficulty: selectedDifficulty });
+      await suggestStudyQuestion({ serviceCode: service.code, serviceName: service.name, difficulty: "hard" });
       setSuggestionSent(service.code);
       setTimeout(() => setSuggestionSent(null), 4000);
     } catch { /* silently ignore */ }
   }
 
-  async function startKCFromGaps() {
-    const maxTopics = maxTopicsForCount(gapQuestionCount);
-    const availableCodes = new Set(services.map((s) => s.code.toUpperCase()));
-    const gapCodes = weakServices
-      .map((item) => (item.serviceCode || item.topic).toUpperCase())
-      .filter((code) => availableCodes.has(code))
-      .slice(0, maxTopics);
+  // Polls generate-status until the pool reaches the needed count or timeout fires (Issue #18).
+  const startGenerationPolling = useCallback(
+    (requestId: string, topics: string[], needed: number, existingQuestions: StudyQuestion[]) => {
+      setGeneratingQuestions(true);
+      setGenerationTimedOut(false);
+      generationDeadlineRef.current = Date.now() + GENERATION_TIMEOUT_MS;
 
-    if (gapCodes.length === 0) {
-      setFlowError("Nenhum gap encontrado corresponde aos servicos disponiveis. Selecione manualmente.");
-      return;
-    }
+      if (pollTimerRef.current !== null) clearInterval(pollTimerRef.current);
 
-    setFlowError(null);
-    setCompletionMessage(null);
-    setLoadingQuestions(true);
-    try {
-      const nextQuestions = await createKcQuestions({ topics: gapCodes, difficulty: selectedDifficulty, count: gapQuestionCount });
-      setQuestions(nextQuestions);
-      setAnswers({});
-      setCurrentIndex(0);
-      setExplanationByQuestion({});
-      setSubmittedCurrent(false);
-      setSelectedTopics(gapCodes);
-      setQuestionCount(gapQuestionCount);
-    } catch (error) {
-      setFlowError(error instanceof Error ? error.message : "Erro ao iniciar KC dos gaps.");
-    } finally {
-      setLoadingQuestions(false);
-    }
-  }
+      pollTimerRef.current = setInterval(() => {
+        const timedOut = (generationDeadlineRef.current ?? 0) < Date.now();
+
+        if (timedOut) {
+          clearInterval(pollTimerRef.current!);
+          pollTimerRef.current = null;
+          setGeneratingQuestions(false);
+          setGenerationTimedOut(true);
+          // Fall back to what we have; the flow error explains the situation.
+          setQuestions(existingQuestions);
+          setFlowError(
+            `Geracao demorou mais que o esperado. Iniciando com ${existingQuestions.length} questoes disponíveis.`,
+          );
+          return;
+        }
+
+        pollKcGenerationStatus({ requestId, topics })
+          .then(({ count }) => {
+            if (count >= needed) {
+              clearInterval(pollTimerRef.current!);
+              pollTimerRef.current = null;
+              // Pool is now sufficient: re-fetch the full set.
+              return createKcQuestions({ topics, count: needed }).then(({ questions: fresh }) => {
+                setGeneratingQuestions(false);
+                setQuestions(fresh);
+              });
+            }
+          })
+          .catch(() => {
+            // Transient poll failure: keep retrying until timeout.
+          });
+      }, GENERATION_POLL_INTERVAL_MS);
+    },
+    [],
+  );
 
   async function startKC() {
     setFlowError(null);
     setCompletionMessage(null);
+
     const maxTopics = maxTopicsForCount(questionCount);
-    if (selectedTopics.length === 0) { setFlowError("Selecione pelo menos um assunto para iniciar o KC."); return; }
-    if (selectedTopics.length > maxTopics) { setFlowError(`Com ${questionCount} questoes, selecione no maximo ${maxTopics} servico(s).`); return; }
+    if (selectedTopics.length === 0) {
+      setFlowError("Selecione pelo menos um assunto para iniciar o KC.");
+      return;
+    }
+    if (selectedTopics.length > maxTopics) {
+      setFlowError(`Com ${questionCount} questoes, selecione no maximo ${maxTopics} servico(s).`);
+      return;
+    }
+
     setLoadingQuestions(true);
     try {
-      const nextQuestions = await createKcQuestions({ topics: selectedTopics, difficulty: selectedDifficulty, count: questionCount });
-      setQuestions(nextQuestions);
+      const result = await createKcQuestions({ topics: selectedTopics, count: questionCount });
+
       setAnswers({});
       setCurrentIndex(0);
       setExplanationByQuestion({});
       setSubmittedCurrent(false);
+
+      if (result.insufficient && result.generationRequestId) {
+        // Pool had fewer questions than requested: show thematic loading and poll (Issue #18).
+        startGenerationPolling(
+          result.generationRequestId,
+          selectedTopics,
+          questionCount,
+          result.questions,
+        );
+      } else {
+        setQuestions(result.questions);
+      }
     } catch (error) {
       setFlowError(error instanceof Error ? error.message : "Erro ao iniciar KC.");
     } finally {
@@ -297,6 +367,13 @@ export function KCScreen() {
     setSubmittedCurrent(false);
     setFlowError(null);
     setReportMessage(null);
+    setGeneratingQuestions(false);
+    setGenerationTimedOut(false);
+    setActiveStep(1);
+    if (pollTimerRef.current !== null) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
   }
 
   async function rerollKC() { restartKC(); await startKC(); }
@@ -307,7 +384,8 @@ export function KCScreen() {
       isAnswerCorrect({ questionType: q.questionType, answer: answers[q.id], correctOption: q.correctOption, correctOptions: q.correctOptions }),
     ).length;
     const scorePercent = Math.round((correctAnswers / questions.length) * 100);
-    const xpPerCorrect = Math.max(20, Math.round(getTaskXpByDifficulty(selectedDifficulty) / 4));
+    // Difficulty is auto-detected per-service; use hard as the scoring anchor for XP.
+    const xpPerCorrect = Math.max(20, Math.round(getTaskXpByDifficulty("hard") / 4));
     const gainedXp = correctAnswers * xpPerCorrect;
     const selectedTopicNames = services.filter((s) => selectedTopics.includes(s.code)).map((s) => s.name).slice(0, 4);
     const titleTopics = selectedTopicNames.length > 0 ? selectedTopicNames.join(", ") : selectedTopics.join(", ");
@@ -343,8 +421,7 @@ export function KCScreen() {
             optionMapping: q.optionMapping,
             explanationSummary: explanationByQuestion[q.id]?.summary,
             explanations: mergedExplanations,
-            // Confidence captured via ConfidenceSelector (RF-09, ADR-05).
-            // Written to the snapshot so feedback-analysis.worker can derive FalseBeliefSignal.
+            // Confidence snapshot for feedback-analysis.worker (RF-09, ADR-05).
             confidence: confidenceByQuestion[q.id] ?? null,
           };
         }),
@@ -408,79 +485,34 @@ export function KCScreen() {
         <PixelCard>
           <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">KC - Knowledge Check</h1>
           <p className="mt-2 font-sans text-sm text-[var(--pixel-subtext)]">
-            Escolha assunto e dificuldade antes de iniciar. O fluxo de resposta e por questao, com auditoria completa
-            quando houver erro.
+            Configure a sessao e inicie. A dificuldade e ajustada automaticamente com base nos seus gaps de aprendizado.
           </p>
         </PixelCard>
 
-        {!inProgress && !kcSummary && (weakServices.length > 0 || loadingWeakServices) && (
-          <PixelCard className="space-y-3 border-[var(--pixel-accent)]/50 bg-[var(--pixel-accent)]/5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                Gaps de Revisao
+        {/* Thematic loading screen while on-demand generation runs (Issue #18) */}
+        {generatingQuestions && !inProgress && (
+          <PixelCard className="space-y-3 border-[var(--pixel-primary)]/50 bg-[var(--pixel-primary)]/5">
+            <div className="flex items-center gap-3">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--pixel-primary)] border-r-transparent" />
+              <p className="font-mono text-xs text-[var(--pixel-primary)]">
+                Chamando o mestre da AWS para checar as questoes...
               </p>
-              {loadingWeakServices && (
-                <span className="font-mono text-[10px] text-[var(--pixel-subtext)]">Carregando...</span>
-              )}
             </div>
-
-            {weakServices.length > 0 && (
-              <>
-                <div className="space-y-1.5">
-                  {weakServices.slice(0, 5).map((item) => (
-                    <div key={`${item.serviceCode}-${item.topic}`} className="flex items-center justify-between gap-2">
-                      <p className="font-mono text-xs text-[var(--pixel-text)]">
-                        {item.serviceName || item.topic}
-                      </p>
-                      <span className="font-mono text-[10px] text-red-400">
-                        {item.errorRate}% erro · {item.errors}/{item.attempts}
-                      </span>
-                    </div>
-                  ))}
-                  {weakServices.length > 5 && (
-                    <p className="font-mono text-[9px] text-[var(--pixel-subtext)]">
-                      +{weakServices.length - 5} outros gaps
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 border-t border-[var(--pixel-border)] pt-3">
-                  <div className="flex items-center gap-2">
-                    <label className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Questoes</label>
-                    <select
-                      value={gapQuestionCount}
-                      onChange={(e) => setGapQuestionCount(Number(e.target.value))}
-                      className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-2 py-1 font-mono text-[10px] text-[var(--pixel-text)] outline-none"
-                    >
-                      {[5, 10, 15, 20, 30].map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void startKCFromGaps()}
-                    disabled={loadingQuestions || servicesLoading}
-                    className="border border-[var(--pixel-accent)] px-3 py-2 font-mono text-[10px] uppercase text-[var(--pixel-accent)] hover:bg-[var(--pixel-accent)]/10 disabled:opacity-50"
-                  >
-                    {loadingQuestions ? "Gerando KC..." : "Fazer KC dos gaps"}
-                  </button>
-                </div>
-              </>
-            )}
+            <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
+              O banco de questoes esta sendo preparado. Isso pode levar ate 90 segundos.
+            </p>
           </PixelCard>
         )}
 
-        {!inProgress && !kcSummary && (
+        {!inProgress && !kcSummary && !generatingQuestions && (
           <KCSetupPanel
+            activeStep={activeStep}
             services={services}
             servicesLoading={servicesLoading}
             servicesError={servicesError}
             selectedTopics={selectedTopics}
-            selectedDifficulty={selectedDifficulty}
             questionCount={questionCount}
             searchTopic={searchTopic}
-            servicesPage={servicesPage}
             filteredServices={filteredServices}
             pagedServices={pagedServices}
             servicePageCount={servicePageCount}
@@ -489,13 +521,15 @@ export function KCScreen() {
             flowError={flowError}
             completionMessage={completionMessage}
             suggestionSent={suggestionSent}
+            weakServices={weakServices}
             onSearchTopicChange={(v) => { setSearchTopic(v); setServicesPage(1); }}
             onServicesPageChange={setServicesPage}
             onToggleTopic={handleToggleTopic}
-            onDifficultyChange={setSelectedDifficulty}
             onQuestionCountChange={handleQuestionCountChange}
             onStart={() => void startKC()}
             onSuggestQuestion={(s) => void handleSuggestQuestion(s)}
+            onStepNext={handleStepNext}
+            onStepBack={handleStepBack}
           />
         )}
 
@@ -508,33 +542,44 @@ export function KCScreen() {
         )}
 
         {inProgress && currentQuestion && (
-          <KCQuestionFlow
-            questions={questions}
-            currentIndex={currentIndex}
-            currentQuestion={currentQuestion}
-            answers={answers}
-            stats={stats}
-            submittedCurrent={submittedCurrent}
-            submittingAnswer={submittingAnswer}
-            loadingExplanation={loadingExplanation}
-            isCurrentCorrect={isCurrentCorrect}
-            currentExplanation={currentExplanation}
-            currentReviewOptions={currentReviewOptions}
-            flowError={flowError}
-            reportMessage={reportMessage}
-            reportModalOpen={reportModalOpen}
-            reportSubmitting={reportSubmitting}
-            currentConfidence={currentQuestion ? confidenceByQuestion[currentQuestion.id] : undefined}
-            onAnswerChange={(id, value) => setAnswers((prev) => ({ ...prev, [id]: value }))}
-            onSubmitAnswer={() => void submitCurrentAnswer()}
-            onNextQuestion={goToNextQuestion}
-            onFinishKC={() => void finishKC()}
-            onReroll={() => void rerollKC()}
-            onOpenReport={() => setReportModalOpen(true)}
-            onCloseReport={() => setReportModalOpen(false)}
-            onSubmitReport={(input) => submitQuestionReport(input)}
-            onConfidenceSelect={handleConfidenceSelect}
-          />
+          <>
+            {/* Timeout warning: shown after polling gives up (Issue #18) */}
+            {generationTimedOut && (
+              <PixelCard className="border-yellow-500/50 bg-yellow-900/10">
+                <p className="font-[var(--font-body)] text-sm text-yellow-300">
+                  Geracao de questoes demorou mais que o esperado. Iniciando com {questions.length} questoes disponíveis.
+                </p>
+              </PixelCard>
+            )}
+
+            <KCQuestionFlow
+              questions={questions}
+              currentIndex={currentIndex}
+              currentQuestion={currentQuestion}
+              answers={answers}
+              stats={stats}
+              submittedCurrent={submittedCurrent}
+              submittingAnswer={submittingAnswer}
+              loadingExplanation={loadingExplanation}
+              isCurrentCorrect={isCurrentCorrect}
+              currentExplanation={currentExplanation}
+              currentReviewOptions={currentReviewOptions}
+              flowError={flowError}
+              reportMessage={reportMessage}
+              reportModalOpen={reportModalOpen}
+              reportSubmitting={reportSubmitting}
+              currentConfidence={currentQuestion ? confidenceByQuestion[currentQuestion.id] : undefined}
+              onAnswerChange={(id, value) => setAnswers((prev) => ({ ...prev, [id]: value }))}
+              onSubmitAnswer={() => void submitCurrentAnswer()}
+              onNextQuestion={goToNextQuestion}
+              onFinishKC={() => void finishKC()}
+              onReroll={() => void rerollKC()}
+              onOpenReport={() => setReportModalOpen(true)}
+              onCloseReport={() => setReportModalOpen(false)}
+              onSubmitReport={(input) => submitQuestionReport(input)}
+              onConfidenceSelect={handleConfidenceSelect}
+            />
+          </>
         )}
       </main>
     </AppLayout>

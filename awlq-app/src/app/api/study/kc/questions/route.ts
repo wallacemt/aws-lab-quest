@@ -6,13 +6,18 @@ import { extractJsonObject, getAiModel } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
 
-const VALID_DIFFICULTIES = new Set(["easy", "medium", "hard", "nightmare"]);
 const OPTION_LABELS = ["A", "B", "C", "D", "E"] as const;
 
 type Body = {
   topics?: string[];
-  difficulty?: string;
   count?: number;
+};
+
+// Shape written by feedback-analysis.worker (WeakAreaReport.weakAreas JSON field).
+type WeakAreaEntry = {
+  dimension: "service" | "topic";
+  dimensionId: string;
+  correctRate: number;
 };
 
 type ParsedAiOption = {
@@ -27,7 +32,6 @@ type ParsedAiQuestion = {
   questionType: "single" | "multi";
   options: ParsedAiOption[];
 };
-
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -377,6 +381,67 @@ async function generateAndPersistFallbackQuestions(params: {
   };
 }
 
+// Returns the set of service codes identified as gaps in the user's latest WeakAreaReport.
+// A gap is defined as correctRate < 60% with enough attempts (as computed by the worker).
+async function fetchGapServiceCodes(certificationPresetId: string): Promise<Set<string>> {
+  const report = await prisma.weakAreaReport.findFirst({
+    where: { certificationPresetId },
+    orderBy: { analyzedAt: "desc" },
+    select: { weakAreas: true },
+  });
+
+  if (!report) return new Set();
+
+  const entries = report.weakAreas as WeakAreaEntry[];
+  if (!Array.isArray(entries)) return new Set();
+
+  return new Set(
+    entries
+      .filter((e) => e.dimension === "service" && e.correctRate < 0.6)
+      .map((e) => e.dimensionId.toUpperCase()),
+  );
+}
+
+// Builds a Prisma where clause with difficulty scaled per topic:
+// - Gap services  → hard / nightmare (close the knowledge gap)
+// - Other services → hard / medium  (challenging but not punishing)
+// When no topics are selected, falls back to a mixed hard/medium distribution.
+function buildDifficultyAwareWhere(
+  topics: string[],
+  gapCodes: Set<string>,
+  baseWhere: Prisma.StudyQuestionWhereInput,
+): Prisma.StudyQuestionWhereInput {
+  if (topics.length === 0) {
+    return { ...baseWhere, difficulty: { in: ["hard", "medium"] } };
+  }
+
+  const gapTopics = topics.filter((t) => gapCodes.has(t.toUpperCase()));
+  const normalTopics = topics.filter((t) => !gapCodes.has(t.toUpperCase()));
+
+  const serviceFilter = (codes: string[]): Prisma.StudyQuestionWhereInput => ({
+    OR: [
+      { awsService: { code: { in: codes } } },
+      { questionAwsServices: { some: { service: { code: { in: codes } } } } },
+    ],
+  });
+
+  const orClauses: Prisma.StudyQuestionWhereInput[] = [];
+
+  if (gapTopics.length > 0) {
+    orClauses.push({ difficulty: { in: ["hard", "nightmare"] }, ...serviceFilter(gapTopics) });
+  }
+
+  if (normalTopics.length > 0) {
+    orClauses.push({ difficulty: { in: ["hard", "medium"] }, ...serviceFilter(normalTopics) });
+  }
+
+  // Strip the top-level service OR that baseWhere might already carry;
+  // per-clause service filters above replace it.
+  const { OR: _unused, ...baseWithoutServiceFilter } = baseWhere as { OR?: unknown } & Prisma.StudyQuestionWhereInput;
+
+  return { ...baseWithoutServiceFilter, OR: orClauses };
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
@@ -385,9 +450,6 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json()) as Body;
   const topics = (body.topics ?? []).map((topic) => topic.trim()).filter(Boolean);
-  const difficulty = VALID_DIFFICULTIES.has(String(body.difficulty ?? "easy"))
-    ? (body.difficulty as "easy" | "medium" | "hard" | "nightmare")
-    : "easy";
   const count = Math.max(5, Math.min(30, Number(body.count ?? 10)));
   const maxTopics = Math.max(1, Math.floor(count / 5));
 
@@ -413,46 +475,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Identify gap services to scale difficulty (Issue #17).
+  const gapCodes = await fetchGapServiceCodes(profile.certificationPresetId);
+
   const baseWhere: Prisma.StudyQuestionWhereInput = {
     active: true,
     certificationPresetId: profile.certificationPresetId,
     usage: { in: ["KC", "BOTH"] as Array<"KC" | "BOTH"> },
-    ...(topics.length > 0
-      ? {
-          OR: [
-            { awsService: { code: { in: topics } } },
-            { questionAwsServices: { some: { service: { code: { in: topics } } } } },
-          ],
-        }
-      : {}),
-    difficulty,
   };
 
-  const questions = await prisma.studyQuestion.findMany({
-    where: baseWhere,
-    include: {
-      certificationPreset: { select: { code: true } },
-      awsService: { select: { code: true, name: true } },
-      questionOptions: {
-        select: {
-          order: true,
-          content: true,
-          isCorrect: true,
-          explanation: true,
-        },
-        orderBy: { order: "asc" },
-      },
-      questionAwsServices: {
-        select: {
-          service: {
-            select: {
-              code: true,
-              name: true,
-            },
-          },
-        },
-      },
+  const difficultyAwareWhere = buildDifficultyAwareWhere(topics, gapCodes, baseWhere);
+
+  const questionInclude = {
+    certificationPreset: { select: { code: true } },
+    awsService: { select: { code: true, name: true } },
+    questionOptions: {
+      select: { order: true, content: true, isCorrect: true, explanation: true },
+      orderBy: { order: "asc" },
     },
+    questionAwsServices: {
+      select: { service: { select: { code: true, name: true } } },
+    },
+  } satisfies Prisma.StudyQuestionInclude;
+
+  const questions = await prisma.studyQuestion.findMany({
+    where: difficultyAwareWhere,
+    include: questionInclude,
     take: 200,
   });
 
@@ -462,6 +510,10 @@ export async function POST(request: NextRequest) {
 
   const gap = count - questionPool.length;
 
+  // Fallback difficulty for generated questions: match the gap-aware selection above.
+  const hasGapTopic = topics.some((t) => gapCodes.has(t.toUpperCase()));
+  const fallbackDifficulty = hasGapTopic ? "hard" : "medium";
+
   if (gap > 0) {
     if (gap <= 2) {
       // Small gap (≤2): inline generation is fast enough; keep existing path.
@@ -470,26 +522,19 @@ export async function POST(request: NextRequest) {
         certificationCode: profile.certificationPreset.code,
         certificationName: profile.certificationPreset.name,
         topicCodes: topics,
-        difficulty,
+        difficulty: fallbackDifficulty,
         neededCount: gap,
       });
 
       questionPool = await prisma.studyQuestion.findMany({
-        where: baseWhere,
-        include: {
-          certificationPreset: { select: { code: true } },
-          awsService: { select: { code: true, name: true } },
-          questionOptions: {
-            select: { order: true, content: true, isCorrect: true, explanation: true },
-            orderBy: { order: "asc" },
-          },
-          questionAwsServices: { select: { service: { select: { code: true, name: true } } } },
-        },
+        where: difficultyAwareWhere,
+        include: questionInclude,
         take: 200,
       });
     } else {
       // Large gap (>2): enqueue background generation via WorkerTrigger (ADR-03, CA-08).
-      // Return existing questions immediately; client polls generate-status to backfill.
+      // Worker adds to kcGenerationQueue with priority 1 — user-facing, runs ahead of
+      // scheduled background jobs (ADR-KC-02). Client polls generate-status to backfill.
       generationRequestId = randomBytes(16).toString("hex");
 
       await prisma.workerTrigger.create({
@@ -501,7 +546,7 @@ export async function POST(request: NextRequest) {
             userId: session.user.id,
             serviceCode: topics[0] ?? null,
             topic: topics[0] ? null : "AWS General",
-            difficulty,
+            difficulty: fallbackDifficulty,
             count: gap,
           },
         },
@@ -526,5 +571,6 @@ export async function POST(request: NextRequest) {
     questions: selected,
     generationRequestId, // non-null when background generation was enqueued
     aiFallback: aiFallbackMeta,
+    insufficient: generationRequestId !== null, // pool had fewer questions than requested
   });
 }

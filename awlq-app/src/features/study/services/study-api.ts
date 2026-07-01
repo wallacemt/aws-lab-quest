@@ -144,23 +144,51 @@ export async function listStudyServices(params?: { withCount?: boolean; difficul
   return data.services ?? [];
 }
 
+export type CreateKcQuestionsResult = {
+  questions: StudyQuestion[];
+  /** Present when the pool was insufficient and background generation was enqueued. */
+  generationRequestId: string | null;
+  /** True when the questions returned are fewer than the requested count. */
+  insufficient: boolean;
+};
+
 export async function createKcQuestions(params: {
   topics: string[];
-  difficulty: TaskDifficulty;
   count: number;
-}): Promise<StudyQuestion[]> {
+}): Promise<CreateKcQuestionsResult> {
   const response = await fetch("/api/study/kc/questions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
 
-  const data = await parseJson<{ questions?: StudyQuestion[]; error?: string }>(response);
+  const data = await parseJson<{
+    questions?: StudyQuestion[];
+    generationRequestId?: string | null;
+    insufficient?: boolean;
+    error?: string;
+  }>(response);
+
   if (!response.ok || !data.questions?.length) {
     throw new Error(data.error ?? "Nao foi possivel iniciar o KC.");
   }
 
-  return data.questions;
+  return {
+    questions: data.questions,
+    generationRequestId: data.generationRequestId ?? null,
+    insufficient: data.insufficient ?? false,
+  };
+}
+
+/** Polls the generation status endpoint once. Returns current pool count and job state. */
+export async function pollKcGenerationStatus(params: {
+  requestId: string;
+  topics: string[];
+}): Promise<{ count: number; jobProcessed: boolean }> {
+  const qs = new URLSearchParams({ requestId: params.requestId, topics: params.topics.join(",") });
+  const response = await fetch(`/api/study/kc/generate-status?${qs.toString()}`);
+  const data = await parseJson<{ count?: number; jobProcessed?: boolean; error?: string }>(response);
+  return { count: data.count ?? 0, jobProcessed: data.jobProcessed ?? false };
 }
 
 export async function createSimuladoQuestions(params: { count: number; difficulties: TaskDifficulty[] }): Promise<{
