@@ -88,6 +88,10 @@ export function MentorScreen() {
     ? `Atualizado ${formatDistanceToNow(new Date(generatedAt), { addSuffix: true, locale: ptBR })}`
     : null;
 
+  const resetLabel = askStatus?.resetsAt
+    ? formatDistanceToNow(new Date(askStatus.resetsAt), { addSuffix: true, locale: ptBR })
+    : null;
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-lg px-4 py-8 space-y-6">
@@ -173,11 +177,18 @@ export function MentorScreen() {
             Pergunta ao Mestre
           </p>
 
+          {/* Loading: waiting for status check */}
+          {askStatus === null && (
+            <p className="font-mono text-xs text-[var(--pixel-subtext)]">
+              Verificando disponibilidade do Mestre...
+            </p>
+          )}
+
           {/* Locked: daily limit reached */}
-          {askStatus && !askStatus.canAsk && (
+          {askStatus !== null && !askStatus.canAsk && (
             <div className="space-y-2">
               <p className="font-mono text-xs text-[var(--pixel-subtext)] italic">
-                &ldquo;Sua pergunta diária já foi usada. O Mestre responderá novamente amanhã às 00:00 UTC.&rdquo;
+                &ldquo;Sua pergunta diária já foi usada. O Mestre responderá novamente {resetLabel}.&rdquo;
               </p>
               {answer && (
                 <div className="border border-green-700/40 bg-green-900/10 p-3 space-y-1">
@@ -189,7 +200,7 @@ export function MentorScreen() {
           )}
 
           {/* Available: can ask */}
-          {(!askStatus || askStatus.canAsk) && (
+          {askStatus !== null && askStatus.canAsk && (
             <div className="space-y-3">
               <textarea
                 className="w-full bg-transparent border border-[var(--pixel-border)] font-mono text-xs text-[var(--pixel-text)] p-2 resize-none focus:outline-none focus:border-green-500 placeholder:text-[var(--pixel-subtext)]"

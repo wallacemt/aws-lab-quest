@@ -66,8 +66,17 @@ export async function askMentorQuestion(question: string): Promise<AskAnswer> {
   }
 
   if (!response.ok) {
-    const data = (await response.json()) as { error?: string };
-    throw new Error(data.error ?? `Erro ${response.status}`);
+    // Read as text first so a non-JSON body (e.g. 500 HTML) never causes a
+    // parse crash — the error is surfaced as a plain message instead.
+    const text = await response.text();
+    let errorMsg = `Erro ${response.status}`;
+    try {
+      const data = JSON.parse(text) as { error?: string };
+      errorMsg = data.error ?? errorMsg;
+    } catch {
+      // ponytail: non-JSON body — generic message is fine
+    }
+    throw new Error(errorMsg);
   }
 
   return response.json() as Promise<AskAnswer>;
