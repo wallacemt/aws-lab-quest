@@ -14,9 +14,9 @@ const CONFIDENCE_OPTIONS: {
   label: string;
   variant: "primary" | "secondary" | "ghost";
 }[] = [
-  { value: "high",   label: "Muito confiante",  variant: "primary" },
-  { value: "medium", label: "Mais ou menos",    variant: "secondary" },
-  { value: "low",    label: "Chutei",           variant: "ghost" },
+  { value: "high",   label: "Muito confiante🤩",  variant: "primary" },
+  { value: "medium", label: "Mais ou menos🥹",    variant: "secondary" },
+  { value: "low",    label: "Chutei💀",           variant: "ghost" },
 ];
 
 /**
@@ -26,7 +26,7 @@ const CONFIDENCE_OPTIONS: {
 export function ConfidenceSelector({ onSelect, disabled = false }: Props) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-center font-mono text-xs text-[var(--pixel-muted)]">
+      <p className="text-center font-mono text-xs text-accent">
         Quão confiante você estava?
       </p>
       <div className="flex flex-wrap justify-center gap-2">
