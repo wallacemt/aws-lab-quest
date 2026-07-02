@@ -181,9 +181,11 @@ async function processOneTrigger(): Promise<void> {
               userId: payload.userId,
               serviceCode: payload.serviceCode,
               topic: payload.topic,
-              difficulty: (payload.difficulty ?? "medium") as "easy" | "medium" | "hard" | "nightmare",
+              difficulty: (payload.difficulty ?? "hard") as "easy" | "medium" | "hard" | "nightmare",
               count: payload.count ?? 10,
             },
+            // On-demand KC generation is user-facing: run before scheduled background jobs (ADR-KC-02).
+            { priority: 1 },
           );
         } else {
           logger.warn({ triggerId: trigger.id }, "generate-kc trigger missing requestId or userId");

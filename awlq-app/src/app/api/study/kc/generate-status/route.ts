@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { fetchGapServiceCodes, buildDifficultyAwareWhere } from "../_kc-helpers";
 
 /**
- * GET /api/study/kc/generate-status?requestId=&serviceCode=&topic=&difficulty=&count=
+ * GET /api/study/kc/generate-status
  *
  * Polls the status of a background KC generation job.
- * Returns the current question count so the client can decide when to backfill.
+ * Returns the current pool count so the client can determine readiness.
+ *
+ * The count uses the same difficulty-aware WHERE as the question selector
+ * so poll readiness and the actual fetch always agree (DEF-001).
+ *
+ * Query params:
+ *   requestId  — the generation request id returned by POST /questions
+ *   topics     — comma-separated service codes (e.g. "EC2,S3")
  */
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -15,16 +24,14 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl;
-  const serviceCode = searchParams.get("serviceCode");
-  const topic = searchParams.get("topic");
-  const difficulty = searchParams.get("difficulty") ?? "medium";
-
-  if (!serviceCode && !topic) {
-    return NextResponse.json({ error: "serviceCode or topic is required." }, { status: 400 });
-  }
-
-  // Check whether the trigger for this request has been processed.
   const requestId = searchParams.get("requestId");
+  const topicsRaw = searchParams.get("topics") ?? "";
+  const topics = topicsRaw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  // Check whether the trigger for this request has been processed by the worker.
   let jobProcessed = false;
   if (requestId) {
     const trigger = await prisma.workerTrigger.findFirst({
@@ -34,32 +41,27 @@ export async function GET(request: NextRequest) {
     jobProcessed = trigger?.processed ?? false;
   }
 
-  // Count available questions matching the criteria.
   const profile = await prisma.userProfile.findUnique({
     where: { userId: session.user.id },
     select: { certificationPresetId: true },
   });
 
-  const whereClause = {
+  // Build the same difficulty-aware WHERE that the question selector uses (DEF-001).
+  const baseWhere: Prisma.StudyQuestionWhereInput = {
     active: true,
     usage: { in: ["KC", "BOTH"] as Array<"KC" | "BOTH"> },
-    difficulty: difficulty as "easy" | "medium" | "hard" | "nightmare",
     ...(profile?.certificationPresetId
       ? { certificationPresetId: profile.certificationPresetId }
       : {}),
-    ...(serviceCode
-      ? {
-          OR: [
-            { awsService: { code: serviceCode } },
-            { questionAwsServices: { some: { service: { code: serviceCode } } } },
-          ],
-        }
-      : topic
-        ? { topic }
-        : {}),
   };
 
-  const count = await prisma.studyQuestion.count({ where: whereClause });
+  const gapCodes = profile?.certificationPresetId
+    ? await fetchGapServiceCodes(profile.certificationPresetId)
+    : new Set<string>();
+
+  const difficultyAwareWhere = buildDifficultyAwareWhere(topics, gapCodes, baseWhere);
+
+  const count = await prisma.studyQuestion.count({ where: difficultyAwareWhere });
 
   return NextResponse.json({ count, jobProcessed });
 }
