@@ -38,6 +38,23 @@ export async function fetchGapServiceCodes(certificationPresetId: string): Promi
   );
 }
 
+// Expand a service code to include its "Amazon X" / "AWS X" prefixed variant and vice versa,
+// so that questions seeded with either form are found regardless of which name the deduped
+// service list resolved to (e.g. user selects "AMAZON_EC2" but questions are tagged "EC2").
+function expandCodes(codes: string[]): string[] {
+  const result = new Set(codes);
+  for (const code of codes) {
+    // Strip prefix: "AMAZON_EC2" or "AMAZON-EC2" → "EC2"
+    result.add(code.replace(/^(AMAZON|AWS)[_-]/i, ""));
+    // Add prefix: "EC2" → "AMAZON_EC2"
+    if (!/^(AMAZON|AWS)[_-]/i.test(code)) {
+      result.add(`AMAZON_${code}`);
+      result.add(`AWS_${code}`);
+    }
+  }
+  return Array.from(result);
+}
+
 /**
  * Builds a Prisma WHERE clause with difficulty scaled per topic:
  * - Gap services  → hard / nightmare (close the knowledge gap)
@@ -59,12 +76,15 @@ export function buildDifficultyAwareWhere(
   const gapTopics = topics.filter((t) => gapCodes.has(t.toUpperCase()));
   const normalTopics = topics.filter((t) => !gapCodes.has(t.toUpperCase()));
 
-  const serviceFilter = (codes: string[]): Prisma.StudyQuestionWhereInput => ({
-    OR: [
-      { awsService: { code: { in: codes } } },
-      { questionAwsServices: { some: { service: { code: { in: codes } } } } },
-    ],
-  });
+  const serviceFilter = (codes: string[]): Prisma.StudyQuestionWhereInput => {
+    const expanded = expandCodes(codes);
+    return {
+      OR: [
+        { awsService: { code: { in: expanded } } },
+        { questionAwsServices: { some: { service: { code: { in: expanded } } } } },
+      ],
+    };
+  };
 
   const orClauses: Prisma.StudyQuestionWhereInput[] = [];
 

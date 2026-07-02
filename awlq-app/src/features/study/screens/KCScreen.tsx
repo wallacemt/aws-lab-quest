@@ -21,7 +21,6 @@ import {
   pollKcGenerationStatus,
   reportStudyQuestion,
   saveStudyHistory,
-  suggestStudyQuestion,
   StudyServiceItem,
   WeakServiceItem,
 } from "@/features/study/services";
@@ -58,8 +57,6 @@ export function KCScreen() {
   const [questionCount, setQuestionCount] = useState(10);
   const [searchTopic, setSearchTopic] = useState("");
   const [servicesPage, setServicesPage] = useState(1);
-  const [suggestionSent, setSuggestionSent] = useState<string | null>(null);
-
   // On-demand generation state (Issue #18)
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
   const [generationTimedOut, setGenerationTimedOut] = useState(false);
@@ -96,7 +93,6 @@ export function KCScreen() {
 
   // Gaps state
   const [weakServices, setWeakServices] = useState<WeakServiceItem[]>([]);
-  const [loadingWeakServices, setLoadingWeakServices] = useState(false);
 
   useEffect(() => {
     setServicesLoading(true);
@@ -109,11 +105,9 @@ export function KCScreen() {
 
   useEffect(() => {
     if (questions.length > 0) return;
-    setLoadingWeakServices(true);
     fetchWeakServices({ take: 8, sample: 35 })
       .then((items) => setWeakServices(items))
-      .catch(() => setWeakServices([]))
-      .finally(() => setLoadingWeakServices(false));
+      .catch(() => setWeakServices([]));
   }, [questions.length]);
 
   // Pre-select topics from query string (e.g., deep-link from jornada).
@@ -227,14 +221,6 @@ export function KCScreen() {
   function handleStepBack() {
     if (activeStep === 2) setActiveStep(1);
     else if (activeStep === 3) setActiveStep(2);
-  }
-
-  async function handleSuggestQuestion(service: StudyServiceItem) {
-    try {
-      await suggestStudyQuestion({ serviceCode: service.code, serviceName: service.name, difficulty: "hard" });
-      setSuggestionSent(service.code);
-      setTimeout(() => setSuggestionSent(null), 4000);
-    } catch { /* silently ignore */ }
   }
 
   // Polls generate-status until the pool reaches the needed count or timeout fires (Issue #18).
@@ -549,14 +535,12 @@ export function KCScreen() {
             loadingQuestions={loadingQuestions}
             flowError={flowError}
             completionMessage={completionMessage}
-            suggestionSent={suggestionSent}
             weakServices={weakServices}
             onSearchTopicChange={(v) => { setSearchTopic(v); setServicesPage(1); }}
             onServicesPageChange={setServicesPage}
             onToggleTopic={handleToggleTopic}
             onQuestionCountChange={handleQuestionCountChange}
             onStart={() => void startKC()}
-            onSuggestQuestion={(s) => void handleSuggestQuestion(s)}
             onStepNext={handleStepNext}
             onStepBack={handleStepBack}
           />

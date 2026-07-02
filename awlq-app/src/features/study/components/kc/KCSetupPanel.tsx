@@ -3,6 +3,7 @@
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { StudyServiceItem, WeakServiceItem } from "@/features/study/services";
+import { cn } from "@/lib/utils";
 
 function maxTopicsForCount(count: number): number {
   return Math.max(1, Math.floor(count / 5));
@@ -24,14 +25,12 @@ type Props = {
   loadingQuestions: boolean;
   flowError: string | null;
   completionMessage: string | null;
-  suggestionSent: string | null;
   weakServices: WeakServiceItem[];
   onSearchTopicChange: (value: string) => void;
   onServicesPageChange: (page: number) => void;
   onToggleTopic: (code: string) => void;
   onQuestionCountChange: (n: number) => void;
   onStart: () => void;
-  onSuggestQuestion: (service: StudyServiceItem) => void;
   onStepNext: () => void;
   onStepBack: () => void;
 };
@@ -50,14 +49,12 @@ export function KCSetupPanel({
   loadingQuestions,
   flowError,
   completionMessage,
-  suggestionSent,
   weakServices,
   onSearchTopicChange,
   onServicesPageChange,
   onToggleTopic,
   onQuestionCountChange,
   onStart,
-  onSuggestQuestion,
   onStepNext,
   onStepBack,
 }: Props) {
@@ -70,16 +67,12 @@ export function KCSetupPanel({
         {([1, 2, 3] as const).map((step) => (
           <span
             key={step}
-            className={`font-mono text-[10px] uppercase ${
-              activeStep === step
-                ? "text-[var(--pixel-primary)]"
-                : activeStep > step
-                  ? "text-[var(--pixel-subtext)]"
-                  : "text-[var(--pixel-border)]"
-            }`}
+            className={cn(
+              `font-mono text-[10px] uppercase` + (activeStep === step ? "text-primary" : " text-pixel-subtext"),
+            )}
           >
             {step === 1 ? "1. Quantidade" : step === 2 ? "2. Servicos" : "3. Resumo"}
-            {step < 3 && <span className="ml-2 text-[var(--pixel-border)]">›</span>}
+            {step < 3 && <span className="ml-2 text-pixel-border">›</span>}
           </span>
         ))}
       </div>
@@ -129,9 +122,7 @@ export function KCSetupPanel({
           )}
 
           <div className="flex justify-end">
-            <PixelButton onClick={onStepNext}>
-              Proximo
-            </PixelButton>
+            <PixelButton onClick={onStepNext}>Proximo</PixelButton>
           </div>
         </div>
       )}
@@ -139,13 +130,13 @@ export function KCSetupPanel({
       {/* ── Step 2: Services ─────────────────────────────────────── */}
       {activeStep === 2 && (
         <div className="space-y-4">
-          <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Quais servicos?</h2>
-          <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+          <h2 className="font-mono text-xs uppercase text-primary">Quais servicos?</h2>
+          <p className="font-mono text-[10px] text-pixel-subtext">
             Selecionados: {selectedTopics.length}/{maxTopics}
           </p>
 
-          {servicesLoading && <p className="font-[var(--font-body)] text-sm">Carregando servicos...</p>}
-          {servicesError && <p className="font-[var(--font-body)] text-sm text-red-300">{servicesError}</p>}
+          {servicesLoading && <p className="font-mono text-sm">Carregando servicos...</p>}
+          {servicesError && <p className="font-mono text-sm text-red-300">{servicesError}</p>}
 
           {!servicesLoading && !servicesError && (
             <div className="space-y-3">
@@ -154,7 +145,7 @@ export function KCSetupPanel({
                 value={searchTopic}
                 onChange={(e) => onSearchTopicChange(e.target.value)}
                 placeholder="Buscar por nome ou codigo do servico"
-                className="w-full border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] text-sm"
+                className="w-full border border-pixel-border bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] text-sm"
               />
 
               <div className="grid gap-2 sm:grid-cols-2">
@@ -162,42 +153,29 @@ export function KCSetupPanel({
                   const selected = selectedTopics.includes(service.code);
                   const blockedByLimit = !selected && selectedTopics.length >= maxTopics;
                   const count = service.questionCount ?? 0;
-                  const hasQuestions = count > 0;
                   const barMax = Math.max(count, 10);
                   const barFill = Math.round((count / barMax) * 8);
                   return (
-                    <div key={service.id} className="relative">
-                      <button
-                        type="button"
-                        onClick={() => (hasQuestions ? onToggleTopic(service.code) : undefined)}
-                        disabled={blockedByLimit || !hasQuestions}
-                        className={`w-full border px-3 py-2 text-left font-[var(--font-body)] text-sm ${
-                          selected
-                            ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
-                            : hasQuestions
-                              ? "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)] opacity-50"
-                        } ${blockedByLimit ? "cursor-not-allowed opacity-45" : ""}`}
-                      >
-                        <p className="font-sans text-sm">{service.name}</p>
-                        <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">{service.code}</p>
-                        <div className="mt-1 flex items-center gap-1">
-                          <span className="font-mono text-[8px] text-[var(--pixel-subtext)]">
-                            {"█".repeat(barFill)}{"░".repeat(8 - barFill)}
-                          </span>
-                          <span className="font-mono text-[8px] text-[var(--pixel-subtext)]">{count}q</span>
-                        </div>
-                      </button>
-                      {!hasQuestions && (
-                        <button
-                          type="button"
-                          onClick={() => onSuggestQuestion(service)}
-                          className="absolute right-1 top-1 border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 py-0.5 font-mono text-[8px] uppercase hover:bg-[var(--pixel-muted)]"
-                        >
-                          {suggestionSent === service.code ? "Enviado!" : "Sugerir"}
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      key={service.id}
+                      type="button"
+                      onClick={() => onToggleTopic(service.code)}
+                      disabled={blockedByLimit}
+                      className={`w-full border px-3 py-2 text-left font-[var(--font-body)] text-sm ${
+                        selected
+                          ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
+                          : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
+                      } ${blockedByLimit ? "cursor-not-allowed opacity-45" : ""}`}
+                    >
+                      <p className="font-sans text-sm">{service.name}</p>
+                      <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">{service.code}</p>
+                      <div className="mt-1 flex items-center gap-1">
+                        <span className="font-mono text-[8px] text-[var(--pixel-subtext)]">
+                          {"█".repeat(barFill)}
+                          {"░".repeat(8 - barFill)}
+                        </span>
+                      </div>
+                    </button>
                   );
                 })}
               </div>

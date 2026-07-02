@@ -61,5 +61,23 @@ export async function GET(request: NextRequest) {
     questionCount: countMap.get(service.id) ?? 0,
   }));
 
-  return NextResponse.json({ services: servicesWithCount });
+  // Deduplicate entries that differ only by "Amazon " / "AWS " prefix
+  // (e.g. "Amazon EC2" and "EC2" are the same service in the DB seeded inconsistently).
+  // Keep the entry with the canonical "Amazon X" / "AWS X" name when available, sum counts.
+  const canonical = (name: string) => name.replace(/^(Amazon|AWS)\s+/i, "").toLowerCase();
+  const seen = new Map<string, (typeof servicesWithCount)[0]>();
+  for (const svc of servicesWithCount) {
+    const key = canonical(svc.name);
+    const existing = seen.get(key);
+    if (!existing) { seen.set(key, svc); continue; }
+    // Prefer prefixed name ("Amazon EC2" over "EC2"); merge counts.
+    const preferCurrent = /^(Amazon|AWS)\s+/i.test(svc.name) || svc.questionCount > existing.questionCount;
+    seen.set(key, {
+      ...(preferCurrent ? svc : existing),
+      questionCount: (existing.questionCount ?? 0) + (svc.questionCount ?? 0),
+    });
+  }
+  const deduped = Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+  return NextResponse.json({ services: deduped });
 }
