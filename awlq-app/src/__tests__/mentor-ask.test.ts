@@ -4,7 +4,7 @@
  * TC-001: concurrent POSTs — only one 200, rest 429
  * TC-002: sequential second request within 24h → 429
  * TC-003: request after 24h window expires → 200
- * TC-004: Gemini failure after slot reserved → 502; slot consumed (GET shows canAsk:false)
+ * TC-004: AI failure after slot reserved → 502; slot consumed (GET shows canAsk:false)
  * TC-005: rolling 24h boundary — 23h blocked, 25h allowed
  * TC-006: input validation — empty, whitespace, 501 chars, missing key, bad JSON → 400, no AI call
  * TC-007: unauthenticated GET + POST → 401
@@ -18,7 +18,7 @@ import { NextRequest } from "next/server";
 // Hoisted mocks — declared before any vi.mock calls
 // ---------------------------------------------------------------------------
 
-const { mockAuth, mockPrisma, mockModel, mockGetAiModelWithSystem } = vi.hoisted(() => {
+const { mockAuth, mockPrisma, mockCallAIWithSystem } = vi.hoisted(() => {
   const mockAuth = {
     api: { getSession: vi.fn() },
   };
@@ -31,19 +31,15 @@ const { mockAuth, mockPrisma, mockModel, mockGetAiModelWithSystem } = vi.hoisted
     },
   };
 
-  // mockModel is shared so TC-004 can override generateContent
-  const mockModel = {
-    generateContent: vi.fn(),
-  };
+  // callAIWithSystem returns a string directly (no .response.text() wrapper)
+  const mockCallAIWithSystem = vi.fn().mockResolvedValue("AWS é incrível!");
 
-  const mockGetAiModelWithSystem = vi.fn().mockReturnValue(mockModel);
-
-  return { mockAuth, mockPrisma, mockModel, mockGetAiModelWithSystem };
+  return { mockAuth, mockPrisma, mockCallAIWithSystem };
 });
 
 vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
-vi.mock("@/lib/ai", () => ({ getAiModelWithSystem: mockGetAiModelWithSystem }));
+vi.mock("@/lib/ai", () => ({ callAIWithSystem: mockCallAIWithSystem, AiNotConfiguredError: class AiNotConfiguredError extends Error {} }));
 
 // ---------------------------------------------------------------------------
 // Route handlers imported AFTER mocks are registered
@@ -77,9 +73,7 @@ beforeEach(() => {
 
   // Default happy path
   mockAuth.api.getSession.mockResolvedValue({ user: SESSION_USER });
-  mockModel.generateContent.mockResolvedValue({
-    response: { text: () => "AWS é incrível!" },
-  });
+  mockCallAIWithSystem.mockResolvedValue("AWS é incrível!");
   // Default: slot available (updateMany finds the user and updates)
   mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.user.update.mockResolvedValue({});
@@ -187,15 +181,15 @@ describe("TC-003: Request after 24h window has expired → 200", () => {
 });
 
 // ---------------------------------------------------------------------------
-// TC-004: Gemini failure after slot reserved → 502; slot is RELEASED (restored)
+// TC-004: AI failure after slot reserved → 502; slot is RELEASED (restored)
 // ---------------------------------------------------------------------------
 
 describe("TC-004: AI failure after slot reserved", () => {
-  it("returns 502 when Gemini throws after the slot was reserved", async () => {
+  it("returns 502 when AI throws after the slot was reserved", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({ lastMentorQuestionAt: null });
     mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.user.update.mockResolvedValue({});
-    mockModel.generateContent.mockRejectedValueOnce(new Error("Gemini overloaded"));
+    mockCallAIWithSystem.mockRejectedValueOnce(new Error("OpenRouter overloaded"));
 
     const res = await POST(makePostRequest({ question: "Pergunta que vai falhar?" }));
 
@@ -209,7 +203,7 @@ describe("TC-004: AI failure after slot reserved", () => {
     mockPrisma.user.findUnique.mockResolvedValue({ lastMentorQuestionAt: previousValue });
     mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.user.update.mockResolvedValue({});
-    mockModel.generateContent.mockRejectedValueOnce(new Error("Gemini overloaded"));
+    mockCallAIWithSystem.mockRejectedValueOnce(new Error("OpenRouter overloaded"));
 
     await POST(makePostRequest({ question: "Pergunta que vai falhar?" }));
 
@@ -225,7 +219,7 @@ describe("TC-004: AI failure after slot reserved", () => {
     mockPrisma.user.findUnique.mockResolvedValue({ lastMentorQuestionAt: null });
     mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.user.update.mockResolvedValue({});
-    mockModel.generateContent.mockRejectedValueOnce(new Error("Gemini overloaded"));
+    mockCallAIWithSystem.mockRejectedValueOnce(new Error("OpenRouter overloaded"));
 
     await POST(makePostRequest({ question: "Pergunta que vai falhar?" }));
 
@@ -284,32 +278,32 @@ describe("TC-005: Rolling 24h boundary via GET endpoint", () => {
 // TC-006: Input validation — 400 for all invalid inputs; no AI or DB slot call
 // ---------------------------------------------------------------------------
 
-describe("TC-006: Input validation → 400, no Gemini call, no slot consumed", () => {
+describe("TC-006: Input validation → 400, no AI call, no slot consumed", () => {
   it("returns 400 for empty question string", async () => {
     const res = await POST(makePostRequest({ question: "" }));
     expect(res.status).toBe(400);
-    expect(mockModel.generateContent).not.toHaveBeenCalled();
+    expect(mockCallAIWithSystem).not.toHaveBeenCalled();
     expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
   });
 
   it("returns 400 for whitespace-only question", async () => {
     const res = await POST(makePostRequest({ question: "   " }));
     expect(res.status).toBe(400);
-    expect(mockModel.generateContent).not.toHaveBeenCalled();
+    expect(mockCallAIWithSystem).not.toHaveBeenCalled();
     expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
   });
 
   it("returns 400 for question longer than 500 characters", async () => {
     const res = await POST(makePostRequest({ question: "a".repeat(501) }));
     expect(res.status).toBe(400);
-    expect(mockModel.generateContent).not.toHaveBeenCalled();
+    expect(mockCallAIWithSystem).not.toHaveBeenCalled();
     expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
   });
 
   it("returns 400 when question key is missing from body", async () => {
     const res = await POST(makePostRequest({}));
     expect(res.status).toBe(400);
-    expect(mockModel.generateContent).not.toHaveBeenCalled();
+    expect(mockCallAIWithSystem).not.toHaveBeenCalled();
     expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
   });
 
@@ -321,7 +315,7 @@ describe("TC-006: Input validation → 400, no Gemini call, no slot consumed", (
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
-    expect(mockModel.generateContent).not.toHaveBeenCalled();
+    expect(mockCallAIWithSystem).not.toHaveBeenCalled();
     expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
   });
 
@@ -348,7 +342,7 @@ describe("TC-007: Unauthenticated requests → 401", () => {
     expect(res.status).toBe(401);
     // No DB or AI should be touched
     expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
-    expect(mockModel.generateContent).not.toHaveBeenCalled();
+    expect(mockCallAIWithSystem).not.toHaveBeenCalled();
   });
 });
 
