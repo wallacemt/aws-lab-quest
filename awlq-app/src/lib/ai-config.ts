@@ -1,110 +1,182 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 
-export type AiContext = "QUESTION_GENERATION" | "QUESTION_EXPLAIN" | "SIMULADO_MESSAGE" | "LAB_GENERATION";
+export type AiContext =
+  // App contexts
+  | "QUESTION_EXPLAIN"           // explain + mentor/ask
+  | "SIMULADO_MESSAGE"           // simulado message + artwork
+  | "LAB_GENERATION"             // jornada/lab
+  | "TRAIL_QUESTION_GENERATION"  // trails questions (formerly QUESTION_GENERATION)
+  // Worker contexts
+  | "WORKER_KC_QUESTION"            // kc-question-builder
+  | "WORKER_QUESTION_GENERATION"    // question-builder (PDF/blueprint)
+  | "WORKER_QUALITY_REVIEW"         // quality-review.worker
+  | "WORKER_BLUEPRINT_PARSER"       // blueprint-parser
+  | "WORKER_EXAM_GUIDE"             // exam-guide-reviewer
+  | "WORKER_EMAIL";                 // personalized-email-generator
 
 export const AI_CONTEXTS: AiContext[] = [
-  "QUESTION_GENERATION",
   "QUESTION_EXPLAIN",
   "SIMULADO_MESSAGE",
   "LAB_GENERATION",
+  "TRAIL_QUESTION_GENERATION",
+  "WORKER_KC_QUESTION",
+  "WORKER_QUESTION_GENERATION",
+  "WORKER_QUALITY_REVIEW",
+  "WORKER_BLUEPRINT_PARSER",
+  "WORKER_EXAM_GUIDE",
+  "WORKER_EMAIL",
 ];
 
+// Kept for backward-compat references that might be compiled in; not used in the new flow.
 export const AI_CONTEXT_LABELS: Record<AiContext, string> = {
-  QUESTION_GENERATION: "Geracao de questoes",
-  QUESTION_EXPLAIN: "Explicacao de questoes",
-  SIMULADO_MESSAGE: "Mensagem motivacional",
-  LAB_GENERATION: "Geracao de labs",
+  QUESTION_EXPLAIN:            "Explicacao de questoes",
+  SIMULADO_MESSAGE:            "Mensagem motivacional",
+  LAB_GENERATION:              "Geracao de labs",
+  TRAIL_QUESTION_GENERATION:   "Questoes de trilhas",
+  WORKER_KC_QUESTION:          "KC: Geracao de questoes",
+  WORKER_QUESTION_GENERATION:  "Geracao via PDF/Blueprint",
+  WORKER_QUALITY_REVIEW:       "Revisao de qualidade",
+  WORKER_BLUEPRINT_PARSER:     "Parser de blueprint",
+  WORKER_EXAM_GUIDE:           "Revisor de guia de exame",
+  WORKER_EMAIL:                "Emails personalizados",
 };
 
-type StoredAiConfig = {
-  model: string;
-  encryptedKey: string;
-  iv: string;
-  authTag: string;
-};
+// ─── Encryption helpers (AES-256-GCM) ──────────────────────────────────────
+
+type EncryptedBlob = { encryptedKey: string; iv: string; authTag: string };
 
 function getEncryptionKey(): Buffer {
   const raw = process.env.ENCRYPTION_KEY ?? "";
   if (!raw) throw new Error("ENCRYPTION_KEY nao configurada");
-  const hash = crypto.createHash("sha256").update(raw).digest();
-  return hash;
+  return crypto.createHash("sha256").update(raw).digest();
 }
 
-export function encryptApiKey(plaintext: string): Pick<StoredAiConfig, "encryptedKey" | "iv" | "authTag"> {
+export function encryptApiKey(plaintext: string): EncryptedBlob {
   const key = getEncryptionKey();
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
   return {
     encryptedKey: encrypted.toString("hex"),
     iv: iv.toString("hex"),
-    authTag: authTag.toString("hex"),
+    authTag: cipher.getAuthTag().toString("hex"),
   };
 }
 
-export function decryptApiKey(stored: Pick<StoredAiConfig, "encryptedKey" | "iv" | "authTag">): string {
+export function decryptApiKey(stored: EncryptedBlob): string {
   const key = getEncryptionKey();
-  const iv = Buffer.from(stored.iv, "hex");
-  const authTag = Buffer.from(stored.authTag, "hex");
-  const encryptedBuf = Buffer.from(stored.encryptedKey, "hex");
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(authTag);
-  return decipher.update(encryptedBuf).toString("utf8") + decipher.final("utf8");
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    key,
+    Buffer.from(stored.iv, "hex"),
+  );
+  decipher.setAuthTag(Buffer.from(stored.authTag, "hex"));
+  const buf = Buffer.from(stored.encryptedKey, "hex");
+  return decipher.update(buf).toString("utf8") + decipher.final("utf8");
 }
 
-function configKey(context: AiContext): string {
-  return `ai_config:${context}`;
+function maskKey(plain: string): string {
+  if (plain.length <= 8) return "***";
+  return `${plain.slice(0, 4)}${"*".repeat(Math.max(4, plain.length - 8))}${plain.slice(-4)}`;
 }
 
-export async function loadAiConfig(context: AiContext): Promise<{ model: string; apiKey: string } | null> {
-  const row = await prisma.systemConfig.findUnique({ where: { key: configKey(context) } });
+// ─── Global OpenRouter key ──────────────────────────────────────────────────
+
+const GLOBAL_KEY_ROW = "openrouter_api_key";
+
+export async function saveOpenRouterKey(plainApiKey: string): Promise<void> {
+  const blob = encryptApiKey(plainApiKey);
+  await prisma.systemConfig.upsert({
+    where: { key: GLOBAL_KEY_ROW },
+    create: { key: GLOBAL_KEY_ROW, value: JSON.stringify(blob) },
+    update: { value: JSON.stringify(blob) },
+  });
+}
+
+export async function loadOpenRouterKey(): Promise<string | null> {
+  const row = await prisma.systemConfig.findUnique({ where: { key: GLOBAL_KEY_ROW } });
   if (!row) return null;
   try {
-    const stored = JSON.parse(row.value) as StoredAiConfig;
-    const apiKey = decryptApiKey(stored);
-    return { model: stored.model, apiKey };
+    return decryptApiKey(JSON.parse(row.value) as EncryptedBlob);
   } catch {
     return null;
   }
 }
 
-export async function saveAiConfig(context: AiContext, model: string, plainApiKey: string): Promise<void> {
-  const encrypted = encryptApiKey(plainApiKey);
-  const stored: StoredAiConfig = { model, ...encrypted };
+export async function maskedOpenRouterKey(): Promise<string | null> {
+  const plain = await loadOpenRouterKey();
+  return plain ? maskKey(plain) : null;
+}
+
+// ─── Per-context model config ───────────────────────────────────────────────
+
+function configKey(context: AiContext): string {
+  return `ai_config:${context}`;
+}
+
+/** Loads the resolved config for a context: model from DB (or env fallback) + global API key. */
+export async function loadAiConfig(
+  context: AiContext,
+): Promise<{ model: string; apiKey: string } | null> {
+  const [modelRow, apiKey] = await Promise.all([
+    prisma.systemConfig.findUnique({ where: { key: configKey(context) } }),
+    loadOpenRouterKey(),
+  ]);
+
+  const resolvedKey = apiKey ?? process.env.OPENROUTER_API_KEY ?? null;
+  if (!resolvedKey) return null;
+
+  let model: string | undefined;
+  if (modelRow) {
+    try {
+      const parsed = JSON.parse(modelRow.value) as { model?: string };
+      model = parsed.model?.trim() || undefined;
+    } catch {
+      // fall through
+    }
+  }
+  model ??= process.env.AI_MODEL ?? "openrouter/free";
+
+  return { model, apiKey: resolvedKey };
+}
+
+/** Saves only the model for a context. The API key is global, not per-context. */
+export async function saveAiConfig(context: AiContext, model: string): Promise<void> {
+  const value = JSON.stringify({ model });
   await prisma.systemConfig.upsert({
     where: { key: configKey(context) },
-    create: { key: configKey(context), value: JSON.stringify(stored) },
-    update: { value: JSON.stringify(stored) },
+    create: { key: configKey(context), value },
+    update: { value },
   });
 }
 
-export async function loadAllAiConfigs(): Promise<
-  Record<AiContext, { model: string; maskedKey: string } | null>
-> {
+export async function loadAllAiConfigs(): Promise<{
+  configs: Record<AiContext, { model: string } | null>;
+  maskedKey: string | null;
+}> {
   const keys = AI_CONTEXTS.map(configKey);
-  const rows = await prisma.systemConfig.findMany({ where: { key: { in: keys } } });
-  const map = new Map(rows.map((r) => [r.key, r.value]));
+  const [rows, maskedKey] = await Promise.all([
+    prisma.systemConfig.findMany({ where: { key: { in: keys } } }),
+    maskedOpenRouterKey(),
+  ]);
 
-  const result = {} as Record<AiContext, { model: string; maskedKey: string } | null>;
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+  const configs = {} as Record<AiContext, { model: string } | null>;
+
   for (const ctx of AI_CONTEXTS) {
     const raw = map.get(configKey(ctx));
     if (!raw) {
-      result[ctx] = null;
+      configs[ctx] = null;
       continue;
     }
     try {
-      const stored = JSON.parse(raw) as StoredAiConfig;
-      const plainKey = decryptApiKey(stored);
-      const masked =
-        plainKey.length <= 8
-          ? "***"
-          : `${plainKey.slice(0, 4)}${"*".repeat(Math.max(4, plainKey.length - 8))}${plainKey.slice(-4)}`;
-      result[ctx] = { model: stored.model, maskedKey: masked };
+      const parsed = JSON.parse(raw) as { model?: string };
+      configs[ctx] = parsed.model ? { model: parsed.model } : null;
     } catch {
-      result[ctx] = null;
+      configs[ctx] = null;
     }
   }
-  return result;
+
+  return { configs, maskedKey };
 }

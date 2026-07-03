@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { StudyQuestionDifficulty, StudyQuestionUsage } from "@prisma/client";
-import { getAiModel, extractJsonObject } from "@/lib/ai";
+import { callAI, extractJsonObject } from "@/lib/ai";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
 
@@ -382,8 +382,6 @@ export async function parseQuestionWithLLM(block: DetectedQuestionBlock): Promis
     return markdownParsed;
   }
 
-  const model = getAiModel();
-
   const prompt = [
     "You receive exactly one question block extracted from a study document.",
     "Extract it as strict JSON. Do not invent data.",
@@ -407,8 +405,8 @@ export async function parseQuestionWithLLM(block: DetectedQuestionBlock): Promis
     block.rawText,
   ].join("\n");
 
-  const response = await model.generateContent(prompt);
-  return parseLlmJson(response.response.text());
+  const text = await callAI(prompt, "TRAIL_QUESTION_GENERATION");
+  return parseLlmJson(text);
 }
 
 export function validateQuestion(question: ParsedQuestion): { valid: true } | { valid: false; reason: string } {

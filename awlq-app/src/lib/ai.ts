@@ -1,49 +1,79 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { type AiContext, loadAiConfig } from "@/lib/ai-config";
 
-function buildGeminiClient(apiKey: string) {
-  return new GoogleGenerativeAI(apiKey);
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+// ponytail: openrouter/free delegates model selection to the router — avoids hardcoded slugs that go stale
+const DEFAULT_MODEL = "openrouter/free";
+const DEFAULT_MAX_TOKENS = 2048;
+
+export class AiNotConfiguredError extends Error {
+  constructor() {
+    super("IA nao configurada. Configure a chave OpenRouter no painel admin.");
+    this.name = "AiNotConfiguredError";
+  }
 }
 
-export async function getAiModelForContext(context: AiContext) {
-  let apiKey: string | undefined;
-  let model: string | undefined;
+type OpenRouterMessage = { role: "system" | "user" | "assistant"; content: string };
 
-  try {
-    const dbConfig = await loadAiConfig(context);
-    if (dbConfig) {
-      apiKey = dbConfig.apiKey;
-      model = dbConfig.model;
-    }
-  } catch {
-    // fall through to env vars
+type OpenRouterResponse = {
+  choices: Array<{ message: { content: string } }>;
+  usage?: { prompt_tokens: number; completion_tokens: number };
+};
+
+async function resolveConfig(context: AiContext): Promise<{ model: string; apiKey: string }> {
+  const dbConfig = await loadAiConfig(context).catch(() => null);
+  if (dbConfig) return dbConfig;
+
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new AiNotConfiguredError();
+
+  const model = process.env.AI_MODEL ?? DEFAULT_MODEL;
+  return { apiKey, model };
+}
+
+async function fetchOpenRouter(
+  messages: OpenRouterMessage[],
+  model: string,
+  apiKey: string,
+): Promise<string> {
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.APP_URL ?? "https://awslabquest.com",
+      "X-Title": "AWS Lab Quest",
+    },
+    body: JSON.stringify({ model, messages, max_tokens: DEFAULT_MAX_TOKENS }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`OpenRouter error ${res.status}: ${detail}`);
   }
 
-  apiKey ??= process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Chave de API de IA nao configurada.");
-
-  model ??= process.env.GEMINI_MODEL ?? "gemma-3-4b-it";
-
-  const client = buildGeminiClient(apiKey);
-  return client.getGenerativeModel({ model });
+  const data = (await res.json()) as OpenRouterResponse;
+  return data.choices[0]?.message?.content ?? "";
 }
 
-export function getAiModel() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY nao configurada.");
-  }
-  const preferredModel = process.env.GEMINI_MODEL ?? "gemma-3-4b-it";
-  return buildGeminiClient(apiKey).getGenerativeModel({ model: preferredModel });
+export async function callAI(prompt: string, context: AiContext): Promise<string> {
+  const { model, apiKey } = await resolveConfig(context);
+  return fetchOpenRouter([{ role: "user", content: prompt }], model, apiKey);
 }
 
-export function getAiModelWithSystem(systemInstruction: string) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY nao configurada.");
-  const preferredModel = process.env.GEMINI_MODEL ?? "gemma-3-4b-it";
-  return buildGeminiClient(apiKey).getGenerativeModel({ model: preferredModel, systemInstruction });
+export async function callAIWithSystem(
+  prompt: string,
+  context: AiContext,
+  systemInstruction: string,
+): Promise<string> {
+  const { model, apiKey } = await resolveConfig(context);
+  const messages: OpenRouterMessage[] = [
+    { role: "system", content: systemInstruction },
+    { role: "user", content: prompt },
+  ];
+  return fetchOpenRouter(messages, model, apiKey);
 }
 
+/** Extracts the first JSON object found in a text string. */
 export function extractJsonObject(text: string): string | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
