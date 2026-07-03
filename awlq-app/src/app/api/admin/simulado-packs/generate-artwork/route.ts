@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { getAiModelForContext } from "@/lib/ai";
+import { callAI, AiNotConfiguredError } from "@/lib/ai";
 
 type GenerateBody = {
   simuladoName?: string;
@@ -28,9 +28,7 @@ async function generateImagePromptFromName(simuladoName: string): Promise<string
     "Responda SOMENTE com o prompt final, sem aspas, sem prefixos, sem explicacao.",
   ].join("\n");
 
-  const model = await getAiModelForContext("SIMULADO_MESSAGE");
-  const result = await model.generateContent(aiPrompt);
-  const text = result.response.text().trim();
+  const text = (await callAI(aiPrompt, "SIMULADO_MESSAGE")).trim();
 
   const cleaned = text
     .replace(/^["'`]+|["'`]+$/g, "")
@@ -97,7 +95,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ prompt, dataUrl, seed });
   } catch (err) {
+    const status = err instanceof AiNotConfiguredError ? 503 : 502;
     const message = err instanceof Error ? err.message : "Erro ao gerar arte do simulado.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json({ error: message }, { status });
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { getAiModel } from "@/lib/ai";
+import { callAI, AiNotConfiguredError } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
 
 const DEFAULT_CHUNK_SIZE = 10;
@@ -357,15 +357,13 @@ export async function POST(request: NextRequest) {
     let suggestions: AiSuggestion[] = [];
     try {
       aiRequests += 1;
-      const model = getAiModel();
-      const raw = await model.generateContent(prompt);
-      suggestions = parseAiSuggestions(raw.response.text());
+      const raw = await callAI(prompt, "TRAIL_QUESTION_GENERATION");
+      suggestions = parseAiSuggestions(raw);
     } catch (error) {
+      const status = error instanceof AiNotConfiguredError ? 503 : 502;
       return NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : "Falha ao consultar modelo de IA.",
-        },
-        { status: 502 },
+        { error: error instanceof Error ? error.message : "Falha ao consultar modelo de IA." },
+        { status },
       );
     }
 
