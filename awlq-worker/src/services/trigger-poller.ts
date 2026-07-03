@@ -168,6 +168,7 @@ async function processOneTrigger(): Promise<void> {
         const payload = trigger.payload as {
           requestId?: string;
           userId?: string;
+          certificationPresetId?: string;
           serviceCode?: string;
           topic?: string;
           difficulty?: string;
@@ -179,6 +180,7 @@ async function processOneTrigger(): Promise<void> {
             {
               requestId: payload.requestId,
               userId: payload.userId,
+              certificationPresetId: payload.certificationPresetId,
               serviceCode: payload.serviceCode,
               topic: payload.topic,
               difficulty: (payload.difficulty ?? "hard") as "easy" | "medium" | "hard" | "nightmare",

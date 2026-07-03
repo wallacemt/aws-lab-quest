@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAiModelForContext } from "@/lib/ai";
+import { callAI, AiNotConfiguredError } from "@/lib/ai";
 
 type RouteContext = { params: Promise<{ chainId: string; stageId: string }> };
 
@@ -94,14 +94,13 @@ Regras:
 
   let markdown: string;
   try {
-    const aiModel = await getAiModelForContext("QUESTION_EXPLAIN");
-    const result = await aiModel.generateContent(prompt);
-    markdown = result.response.text().trim();
+    markdown = (await callAI(prompt, "QUESTION_EXPLAIN")).trim();
     if (!markdown) throw new Error("Empty AI response");
   } catch (err) {
+    const status = err instanceof AiNotConfiguredError ? 503 : 500;
     return NextResponse.json(
       { error: `Falha ao gerar explicação: ${err instanceof Error ? err.message : "Erro desconhecido"}` },
-      { status: 500 },
+      { status },
     );
   }
 

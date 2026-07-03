@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { getAiModelForContext } from "@/lib/ai";
+import { callAI } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
 import { getPackNameByIndex } from "@/lib/simulado-pack-names";
 import { uploadArtworkDataUrl } from "@/lib/simulado-pack-artwork";
@@ -62,9 +62,7 @@ async function generateNarrative(
 ): Promise<{ stageName: string; storyText: string; awsContext: string } | null> {
   try {
     const prompt = renderTemplate(promptTemplate, { packName, certCode, certName });
-    const model = await getAiModelForContext("SIMULADO_MESSAGE");
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = (await callAI(prompt, "SIMULADO_MESSAGE")).trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;

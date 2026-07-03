@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
           payload: {
             requestId: generationRequestId,
             userId: session.user.id,
+            certificationPresetId: profile.certificationPresetId,
             serviceCode,
             topic,
             difficulty: fallbackDifficulty,

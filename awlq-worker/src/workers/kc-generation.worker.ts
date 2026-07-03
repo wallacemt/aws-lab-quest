@@ -7,11 +7,11 @@ export function createKcGenerationWorker(): Worker {
   return new Worker<KcGenerationJobData>(
     "kc-generation",
     async (job) => {
-      const { requestId, userId, serviceCode, topic, difficulty, count } = job.data;
+      const { requestId, userId, certificationPresetId, serviceCode, topic, difficulty, count } = job.data;
 
       logger.info({ requestId, userId, serviceCode, topic, difficulty, count }, "kc-generation: starting");
 
-      const result = await buildKcQuestions({ requestId, userId, serviceCode, topic, difficulty, count });
+      const result = await buildKcQuestions({ requestId, userId, certificationPresetId, serviceCode, topic, difficulty, count });
 
       logger.info({ requestId, ...result }, "kc-generation: complete");
     },

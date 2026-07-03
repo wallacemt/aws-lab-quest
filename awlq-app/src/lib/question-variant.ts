@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { StudyQuestionDifficulty, StudyQuestionUsage } from "@prisma/client";
-import { extractJsonObject, getAiModel } from "@/lib/ai";
+import { callAI, extractJsonObject } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
 
 type ParsedOption = {
@@ -144,9 +144,7 @@ export async function generateAndSaveVariant(source: SourceQuestion): Promise<st
 
   let raw = "";
   try {
-    const model = getAiModel();
-    const response = await model.generateContent(prompt);
-    raw = response.response.text();
+    raw = await callAI(prompt, "TRAIL_QUESTION_GENERATION");
   } catch {
     return null;
   }

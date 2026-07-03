@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAiModelWithSystem } from "@/lib/ai";
+import { callAIWithSystem, AiNotConfiguredError } from "@/lib/ai";
 
 const MAX_QUESTION_LENGTH = 500;
 const WINDOW_MS = 24 * 60 * 60 * 1000; // rolling 24-hour window
@@ -17,7 +17,8 @@ const MENTOR_SYSTEM_INSTRUCTION =
   "Não use notação LaTeX ($...$) — use o símbolo Unicode diretamente (ex: →, ≥, ≤). " +
   "Limite: 300 palavras.";
 
-const getMentorModel = () => getAiModelWithSystem(MENTOR_SYSTEM_INSTRUCTION);
+// ponytail: inlined — no reason to keep a wrapper around a single call site
+
 
 // Fallback: replace residual LaTeX arrow notation the model may still emit.
 function sanitizeAnswer(text: string): string {
@@ -135,16 +136,17 @@ export async function POST(request: NextRequest) {
   //    The restore is best-effort: if it fails, the slot stays consumed (acceptable).
   let answer: string;
   try {
-    const model = getMentorModel();
-    const result = await model.generateContent(question);
-    answer = sanitizeAnswer(result.response.text());
+    answer = sanitizeAnswer(
+      await callAIWithSystem(question, "QUESTION_EXPLAIN", MENTOR_SYSTEM_INSTRUCTION),
+    );
   } catch (err) {
     await prisma.user.update({
       where: { id: session.user.id },
       data: { lastMentorQuestionAt: currentUser?.lastMentorQuestionAt ?? null },
     }).catch(() => {});
+    const status = err instanceof AiNotConfiguredError ? 503 : 502;
     const message = err instanceof Error ? err.message : "Erro desconhecido.";
-    return NextResponse.json({ error: `Falha ao contatar o Mestre: ${message}` }, { status: 502 });
+    return NextResponse.json({ error: `Falha ao contatar o Mestre: ${message}` }, { status });
   }
 
   // 5. Persist the Q&A so the user can read it again when they revisit the page.

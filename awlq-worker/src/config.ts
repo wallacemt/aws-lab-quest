@@ -30,11 +30,11 @@ export const config = {
   redis: {
     url: require("REDIS_URL"),
   },
-  gemini: {
-    apiKey: require("GEMINI_API_KEY"),
-    model: optional("GEMINI_MODEL", "gemini-2.5-flash"),
-    safeTokensPerMinute: optionalInt("GEMINI_SAFE_TOKENS_PER_MINUTE", 9000),
-    minCallIntervalMs: optionalInt("GEMINI_MIN_CALL_INTERVAL_MS", 2500),
+  ai: {
+    // OPENROUTER_API_KEY is optional at boot — loaded from DB or env per-call
+    model: optional("AI_MODEL", "google/gemma-3-4b-it:free"),
+    safeTokensPerMinute: optionalInt("AI_SAFE_TOKENS_PER_MINUTE", 9000),
+    minCallIntervalMs: optionalInt("AI_MIN_CALL_INTERVAL_MS", 2500),
   },
   worker: {
     logLevel: optional("LOG_LEVEL", "info"),

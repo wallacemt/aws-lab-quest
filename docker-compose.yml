@@ -9,8 +9,9 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       DATABASE_POOL_MAX: "3"
       REDIS_URL: ${REDIS_URL}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-openrouter/free}
       NODE_ENV: production
       LOG_LEVEL: info
       WEAK_AREA_THRESHOLD: "0.60"
@@ -28,11 +29,9 @@ services:
     container_name: rt-awslq-app
     restart: unless-stopped
     environment:
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL}
-      GEMINI_SAFE_TOKENS_PER_MINUTE: 9_000
-      GEMINI_MIN_CALL_INTERVAL_MS: 2_500
-      GEMINI_OCR_MODEL: ${GEMINI_OCR_MODEL}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-openrouter/free}
       DATABASE_URL: ${DATABASE_URL}
 
       EMAIL_FROM: ${EMAIL_FROM}
