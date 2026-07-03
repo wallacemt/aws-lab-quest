@@ -19,8 +19,7 @@
     "seed": "bun run prisma/seed.ts"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "@prisma/adapter-pg": "^7.5.0",
+"@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.8.0",
     "@supabase/supabase-js": "^2.99.1",
     "@types/pdf-parse": "^1.1.5",
