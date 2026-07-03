@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAiModelForContext, extractJsonObject } from "@/lib/ai";
+import { callAI, extractJsonObject, AiNotConfiguredError } from "@/lib/ai";
 import { cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 
 type RouteContext = { params: Promise<{ chainId: string; stageId: string }> };
@@ -92,9 +92,7 @@ Responda APENAS com JSON válido, sem texto antes ou depois:
     questions = await cacheGetOrSet<TrailQuestion[]>(
       CACHE_KEYS.trailQuestions(stageId),
       async () => {
-        const aiModel = await getAiModelForContext("QUESTION_GENERATION");
-        const result = await aiModel.generateContent(prompt);
-        const rawText = result.response.text().trim();
+        const rawText = (await callAI(prompt, "TRAIL_QUESTION_GENERATION")).trim();
 
         const jsonStr = extractJsonObject(rawText);
         if (!jsonStr) throw new Error("Resposta da IA não é JSON válido.");
@@ -115,9 +113,10 @@ Responda APENAS com JSON válido, sem texto antes ou depois:
       CACHE_TTL.TRAIL_QUESTIONS,
     );
   } catch (err) {
+    const status = err instanceof AiNotConfiguredError ? 503 : 500;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Erro desconhecido" },
-      { status: 500 },
+      { status },
     );
   }
 

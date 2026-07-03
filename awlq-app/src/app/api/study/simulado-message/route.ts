@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getAiModel } from "@/lib/ai";
+import { callAIWithSystem } from "@/lib/ai";
 
 type Body = {
   userName?: string;
@@ -58,14 +58,12 @@ export async function POST(request: NextRequest) {
   const userPrompt = `Dados do simulado:\n${context}\n\nEscreva a mensagem personalizada para ${first}:`;
 
   try {
-    const model = getAiModel();
-    const result = await Promise.race([
-      model.generateContent([systemPrompt, userPrompt]),
+    const text = await Promise.race([
+      callAIWithSystem(userPrompt, "SIMULADO_MESSAGE", systemPrompt),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 12000)),
     ]);
 
-    const text = result.response.text().trim();
-    const message = text.length > 20 ? text : fallbackMessage(passed, first);
+    const message = text.trim().length > 20 ? text.trim() : fallbackMessage(passed, first);
 
     return NextResponse.json({ message });
   } catch {

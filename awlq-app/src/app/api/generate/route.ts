@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { containsPromptInjection, isLikelyAwsLabText, sanitizeUserText } from "@/lib/input-validation";
 import { parseTasksFromText } from "@/lib/parser";
 import { GenerateQuestInput } from "@/lib/types";
-import { getAiModel } from "@/lib/ai";
+import { callAI, AiNotConfiguredError } from "@/lib/ai";
 
 export async function POST(request: NextRequest) {
   // LSF-2026-001: require authenticated session before consuming AI quota
@@ -53,11 +53,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "GEMINI_API_KEY nao configurada no .env.local." }, { status: 500 });
-    }
-
     const prompt = `Voce e um assistente de aprendizado AWS gamificado. Com base no texto do laboratorio e no tema do usuario, gere tarefas para um quest interativo.
 
 Tema do usuario: "${theme}"
@@ -92,11 +87,7 @@ Regras obrigatorias:
   }
 ]`;
 
-
-    const model = getAiModel()
-
-    const result = await model.generateContent(prompt);
-    const rawText = result.response.text();
+    const rawText = await callAI(prompt, "LAB_GENERATION");
     const tasks = parseTasksFromText(rawText);
 
     if (tasks.length < 5 || tasks.length > 8) {
@@ -104,7 +95,8 @@ Regras obrigatorias:
     }
 
     return NextResponse.json({ tasks });
-  } catch {
-    return NextResponse.json({ error: "Erro ao gerar quest. Tente novamente em instantes." }, { status: 500 });
+  } catch (err) {
+    const status = err instanceof AiNotConfiguredError ? 503 : 500;
+    return NextResponse.json({ error: "Erro ao gerar quest. Tente novamente em instantes." }, { status });
   }
 }

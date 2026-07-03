@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { sanitizeUserText } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
-import { getAiModel, extractJsonObject } from "@/lib/ai";
+import { callAIWithSystem, extractJsonObject } from "@/lib/ai";
 
 type JourneyNarrative = {
   stageName: string;
@@ -61,13 +61,11 @@ Gere um JSON com exatamente estes campos:
 }`;
 
   try {
-    const model = getAiModel();
-    const result = await Promise.race([
-      model.generateContent([systemPrompt, userPrompt]),
+    const text = await Promise.race([
+      callAIWithSystem(userPrompt, "LAB_GENERATION", systemPrompt),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
     ]);
-    const text = result.response.text().trim();
-    const jsonStr = extractJsonObject(text);
+    const jsonStr = extractJsonObject(text.trim());
     if (!jsonStr) return narrativeFallback(packName, stageNumber, totalStages, isBoss);
     const parsed = JSON.parse(jsonStr) as Partial<JourneyNarrative>;
     if (parsed.stageName && parsed.storyText && parsed.awsContext) {
