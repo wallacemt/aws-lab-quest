@@ -143,6 +143,7 @@ export const flashcardGenerationQueue = new Queue<FlashcardGenerationJobData, vo
 export type KcGenerationJobData = {
   requestId: string;
   userId: string;
+  certificationPresetId?: string;
   serviceCode?: string;
   topic?: string;
   difficulty: "easy" | "medium" | "hard" | "nightmare";

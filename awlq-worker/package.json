@@ -10,8 +10,7 @@
     "prisma:generate": "prisma generate --schema=../packages/db/prisma/schema.prisma"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "@prisma/adapter-pg": "^7.5.0",
+"@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@types/nodemailer": "^8.0.0",
     "bullmq": "^5.56.0",

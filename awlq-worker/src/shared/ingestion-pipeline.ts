@@ -111,12 +111,6 @@ export function validateQuestion(
   if (!question.options.some((o) => o.isCorrect)) {
     return { valid: false, reason: "no correct option" };
   }
-  // Ensure statement references at least one AWS service
-  const combined = question.statement.toLowerCase();
-  const hasService = question.awsServices.some((s) => combined.includes(s.toLowerCase()));
-  if (question.awsServices.length > 0 && !hasService) {
-    return { valid: false, reason: "statement does not reference any listed AWS service" };
-  }
   // Reject trivial negation distractors
   for (const opt of question.options) {
     if (!opt.isCorrect && /\bnot\b|\bexcept\b/i.test(opt.content)) {
@@ -139,18 +133,39 @@ export function extractJsonObject(text: string): string | null {
   return text.slice(start, end + 1);
 }
 
+function repairJson(text: string): string {
+  return text
+    // Fix duplicate closing brace before array item separator or array end — common LLM artifact
+    .replace(/}\s*},/g, "},")
+    .replace(/}\s*}]/g, "}]")
+    // Remove trailing commas before } or ]
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]");
+}
+
 export function extractJsonArray(text: string): string | null {
-  const start = text.indexOf("[");
-  const end = text.lastIndexOf("]");
-  if (start === -1 || end === -1 || end <= start) return null;
-  return text.slice(start, end + 1);
+  // Strip markdown code fences
+  const stripped = text.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "");
+  // Walk backwards from the last ']' to find its balanced '['.
+  // This correctly skips fragments like ["ALB"]? that appear in chain-of-thought text.
+  const end = stripped.lastIndexOf("]");
+  if (end === -1) return null;
+  let depth = 0;
+  for (let i = end; i >= 0; i--) {
+    if (stripped[i] === "]") depth++;
+    else if (stripped[i] === "[") {
+      depth--;
+      if (depth === 0) return repairJson(stripped.slice(i, end + 1));
+    }
+  }
+  return null;
 }
 
 // ─── DB persistence (shared between workers) ─────────────────────────────────
 
 export async function persistQuestion(
   question: ParsedQuestion,
-  certificationId: string,
+  certificationId: string | null,
   certificationCode: string,
   usage: StudyQuestionUsage = StudyQuestionUsage.BOTH
 ): Promise<{ saved: true; id: string } | { saved: false; reason: "duplicate" | "db_error"; detail?: string }> {

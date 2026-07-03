@@ -1,7 +1,7 @@
 ﻿import { Worker } from "bullmq";
 import { connection, QualityReviewJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
-import { callGemini } from "../ai.js";
+import { callAI } from "../ai.js";
 import { extractJsonObject } from "../shared/ingestion-pipeline.js";
 import { logger } from "../shared/logger.js";
 
@@ -84,7 +84,7 @@ OR if retiring:
 }`;
 
   try {
-    const response = await callGemini(prompt);
+    const response = await callAI(prompt, "WORKER_QUALITY_REVIEW");
     const jsonStr = extractJsonObject(response);
     if (!jsonStr) return null;
 
