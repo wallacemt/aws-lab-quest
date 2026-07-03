@@ -1,4 +1,4 @@
-import { callGemini } from "../ai.js";
+import { callAI } from "../ai.js";
 import { logger } from "../shared/logger.js";
 
 type EmailContext = {
@@ -56,9 +56,9 @@ export async function generatePersonalizedEmail(ctx: EmailContext): Promise<Gene
 
   let rawResponse: string;
   try {
-    rawResponse = await callGemini(prompt);
+    rawResponse = await callAI(prompt, "WORKER_EMAIL");
   } catch (err) {
-    throw new Error(`Gemini API call failed for user ${ctx.name}: ${String(err)}`);
+    throw new Error(`AI call failed for user ${ctx.name}: ${String(err)}`);
   }
 
   // Strip any accidental markdown code fences
@@ -73,11 +73,11 @@ export async function generatePersonalizedEmail(ctx: EmailContext): Promise<Gene
     parsed = JSON.parse(cleaned) as GeneratedEmail;
   } catch {
     logger.error({ rawResponse, cleaned }, "personalized-email-generator: JSON parse failed");
-    throw new Error(`Failed to parse Gemini response as JSON for user ${ctx.name}`);
+    throw new Error(`Failed to parse AI response as JSON for user ${ctx.name}`);
   }
 
   if (!parsed.subject || !parsed.htmlBody) {
-    throw new Error(`Gemini returned incomplete email payload for user ${ctx.name}`);
+    throw new Error(`AI returned incomplete email payload for user ${ctx.name}`);
   }
 
   return parsed;

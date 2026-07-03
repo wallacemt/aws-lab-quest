@@ -1,4 +1,4 @@
-import { callGemini } from "../ai.js";
+import { callAI } from "../ai.js";
 import { logger } from "../shared/logger.js";
 import type { ParsedQuestion } from "../shared/ingestion-pipeline.js";
 import type { DomainTarget } from "./question-builder.js";
@@ -131,9 +131,9 @@ export async function reviewGeneratedQuestions(
 
   let response: string;
   try {
-    response = await callGemini(prompt);
+    response = await callAI(prompt, "WORKER_EXAM_GUIDE");
   } catch (err) {
-    logger.warn({ err }, "exam-guide-reviewer: Gemini call failed, accepting all");
+    logger.warn({ err }, "exam-guide-reviewer: AI call failed, accepting all");
     return questions.map(() => ({ action: "accept" as const, reason: "reviewer unavailable" }));
   }
 

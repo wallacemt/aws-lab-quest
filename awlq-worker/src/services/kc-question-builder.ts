@@ -9,7 +9,7 @@
  * - Reuses shared/ingestion-pipeline.ts for dedup and persistence
  */
 
-import { callGemini } from "../ai.js";
+import { callAI } from "../ai.js";
 import {
   ParsedQuestion,
   extractJsonArray,
@@ -22,6 +22,7 @@ import { prisma } from "../prisma.js";
 export type KcBuildOptions = {
   requestId: string;
   userId: string;
+  certificationPresetId?: string;
   serviceCode?: string;
   topic?: string;
   difficulty: "easy" | "medium" | "hard" | "nightmare";
@@ -39,29 +40,23 @@ function buildKcPrompt(options: KcBuildOptions): string {
     ? `AWS service: ${options.serviceCode}`
     : `topic: ${options.topic ?? "AWS General"}`;
 
-  const difficultyGuide: Record<string, string> = {
-    easy:      "concept definitions, basic use cases, single-step decisions",
-    medium:    "architecture comparisons, typical exam patterns, multi-step reasoning",
-    hard:      "edge cases, integration scenarios, cost/performance tradeoffs",
-    nightmare: "expert-level, nuanced, scenario-based, rarely tested details",
-  };
+  return `Você é um gerador de questões de Knowledge Check (KC) para preparação de certificações AWS.
 
-  const guide = difficultyGuide[options.difficulty] ?? difficultyGuide.medium;
+Alvo: ${subject}
+Total: ${options.count} questões
+Idioma: Português Brasileiro (pt-BR) — enunciados, opções e explicações DEVEM estar em pt-BR.
 
-  return `You are generating Knowledge Check (KC) study questions for AWS certification preparation.
+Requisitos:
+- Questões devem verificar conhecimento específico de AWS, não apenas memorização
+- Varie o tipo: a maioria "single" (1 opção correta), inclua 1-2 "multi" (múltiplas opções corretas) quando adequado
+- Varie a dificuldade ao longo do lote: aproximadamente 30% easy, 50% medium, 20% hard
+- Questões "single": exatamente 4 opções, apenas 1 correta
+- Questões "multi": 4-5 opções, 2-3 corretas
+- Inclua explicação clara para cada opção correta
+- Enunciados concisos (máx. 3 frases)
+- Foque em conceitos que o estudante deve ENTENDER, não memorizar
 
-Target: ${subject}
-Difficulty: ${options.difficulty} (${guide})
-Count: ${options.count} questions
-
-Requirements:
-- Questions must verify specific AWS knowledge, not just recall
-- Each question: 4 answer options (A-D), exactly 1 correct
-- Include a clear explanation for the correct answer
-- Keep statements concise (max 3 sentences)
-- Focus on concepts a student must UNDERSTAND, not memorize
-
-Respond with a JSON array:
+Retorne um array JSON:
 [
   {
     "statement": "...",
@@ -74,11 +69,11 @@ Respond with a JSON array:
       { "content": "...", "isCorrect": false, "explanation": "..." }
     ],
     "awsServices": ["${options.serviceCode ?? ""}"],
-    "difficulty": "${options.difficulty === "nightmare" ? "hard" : options.difficulty}"
+    "difficulty": "easy"
   }
 ]
 
-Return ONLY the JSON array. No markdown fences.`;
+Retorne APENAS o array JSON. Sem markdown, sem explicação, sem raciocínio, sem preâmbulo.`;
 }
 
 /**
@@ -90,9 +85,9 @@ export async function buildKcQuestions(options: KcBuildOptions): Promise<KcBuild
 
   let rawResponse: string;
   try {
-    rawResponse = await callGemini(prompt);
+    rawResponse = await callAI(prompt, "WORKER_KC_QUESTION");
   } catch (err) {
-    logger.error({ requestId: options.requestId, err }, "kc-question-builder: Gemini call failed");
+    logger.error({ requestId: options.requestId, err }, "kc-question-builder: AI call failed");
     throw err;
   }
 
@@ -107,7 +102,10 @@ export async function buildKcQuestions(options: KcBuildOptions): Promise<KcBuild
     const raw = JSON.parse(jsonText) as unknown;
     parsed = Array.isArray(raw) ? (raw as ParsedQuestion[]) : [];
   } catch {
-    logger.warn({ requestId: options.requestId }, "kc-question-builder: invalid JSON");
+    logger.warn(
+      { requestId: options.requestId, snippet: jsonText.slice(0, 200) },
+      "kc-question-builder: invalid JSON",
+    );
     return { savedCount: 0, duplicateCount: 0, rejectedCount: 0 };
   }
 
@@ -126,13 +124,17 @@ export async function buildKcQuestions(options: KcBuildOptions): Promise<KcBuild
       continue;
     }
 
-    // persistQuestion(question, certificationId, certificationCode, usage)
-    // certificationId is null — KC questions are not tied to a specific cert preset.
-    const result = await persistQuestion(question, "", certCode, "KC");
+    const result = await persistQuestion(question, options.certificationPresetId ?? null, certCode, "KC");
 
     if (result.saved) savedCount += 1;
     else if (result.reason === "duplicate") duplicateCount += 1;
-    else rejectedCount += 1;
+    else {
+      logger.warn(
+        { requestId: options.requestId, reason: result.reason, detail: (result as { detail?: string }).detail },
+        "kc-question-builder: persist failed",
+      );
+      rejectedCount += 1;
+    }
   }
 
   logger.info(

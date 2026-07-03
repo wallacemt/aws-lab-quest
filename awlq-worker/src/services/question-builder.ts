@@ -1,4 +1,4 @@
-import { callGemini } from "../ai.js";
+import { callAI } from "../ai.js";
 import {
   ParsedQuestion,
   buildUsageHash,
@@ -218,9 +218,9 @@ export async function generateAndPersistQuestions(
 
     let llmResponse: string;
     try {
-      llmResponse = await callGemini(prompt);
+      llmResponse = await callAI(prompt, "WORKER_QUESTION_GENERATION");
     } catch (err) {
-      logger.error({ err, domain: domainTarget.domainName }, "Gemini call failed");
+      logger.error({ err, domain: domainTarget.domainName }, "AI call failed");
       result.rejectedCount += domainTarget.count;
       continue;
     }

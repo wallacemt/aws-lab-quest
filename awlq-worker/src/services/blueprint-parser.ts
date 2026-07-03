@@ -1,4 +1,4 @@
-import { callGemini } from "../ai.js";
+import { callAI } from "../ai.js";
 import { extractJsonArray } from "../shared/ingestion-pipeline.js";
 import { logger } from "../shared/logger.js";
 
@@ -72,7 +72,7 @@ ${text.slice(0, 6000)}
 `.trim();
 
   try {
-    const response = await callGemini(prompt);
+    const response = await callAI(prompt, "WORKER_BLUEPRINT_PARSER");
     const jsonStr = extractJsonArray(response);
     if (!jsonStr) return [];
 
