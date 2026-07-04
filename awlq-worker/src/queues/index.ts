@@ -211,3 +211,15 @@ export const dailyQuizQueue = new Queue<DailyQuizSeedJobData, void, string>("dai
     backoff: { type: "fixed", delay: 5_000 },
   },
 });
+
+// ─── Issue #22: flashcard due-card email reminders ───────────────────────────
+
+export type FlashcardReminderJobData = Record<string, never>;
+
+export const flashcardReminderQueue = new Queue<FlashcardReminderJobData, void, string>("flashcard-reminder", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5_000 },
+  },
+});

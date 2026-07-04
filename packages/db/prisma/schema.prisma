@@ -161,6 +161,7 @@ model AwsService {
   active              Boolean              @default(true)
   questions           StudyQuestion[]
   questionAwsServices QuestionAwsService[]
+  flashcardTemplates  FlashcardTemplate[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -750,6 +751,8 @@ enum FlashcardSource {
   SLOW_ANSWER
   AI_EXPLANATION
   MEMORY_RECOVERY
+  USER_CREATED
+  DEFAULT_DECK
 }
 
 enum FlashcardGrade {
@@ -771,6 +774,10 @@ model Flashcard {
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   sourceQuestionId String?
   sourceQuestion   StudyQuestion?    @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
+  // Set when this card was materialized from a global FlashcardTemplate
+  // (source = DEFAULT_DECK). Used to make materialization idempotent per user.
+  templateId       String?
+  template         FlashcardTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   awsServiceId     String?
   topic            String?
   front            String
@@ -792,6 +799,25 @@ model Flashcard {
   @@index([userId, dueAt])
   @@index([userId, suspended, dueAt])
   @@index([sourceQuestionId])
+  @@index([userId, templateId])
+}
+
+/// Global catalog of default flashcards for key AWS services (issue #23).
+/// Materialized into per-user Flashcard rows (source = DEFAULT_DECK) on first
+/// access — no admin CRUD UI, seeded once via prisma/seed.ts.
+model FlashcardTemplate {
+  id           String      @id @default(cuid())
+  awsServiceId String
+  awsService   AwsService  @relation(fields: [awsServiceId], references: [id], onDelete: Cascade)
+  topic        String?
+  front        String
+  back         String
+  hint         String?
+  flashcards   Flashcard[]
+  createdAt    DateTime    @default(now())
+
+  @@unique([awsServiceId, front])
+  @@index([awsServiceId])
 }
 
 model FlashcardReview {

@@ -11,6 +11,8 @@ export type Flashcard = {
   back: string;
   hint: string | null;
   source: string;
+  awsServiceId: string | null;
+  topic: string | null;
   easeFactor: number;
   intervalDays: number;
   dueAt: string;
@@ -96,6 +98,42 @@ export async function submitFlashcardGrades(
 
 export async function enqueueFlashcardGeneration(): Promise<{ enqueued: boolean }> {
   return apiFetch("/api/retention/flashcards/generate", { method: "POST" });
+}
+
+export type FlashcardInput = {
+  front: string;
+  back: string;
+  hint?: string | null;
+  awsServiceId?: string | null;
+  topic?: string | null;
+};
+
+/** Lists flashcards the current user created themselves (source = USER_CREATED). */
+export async function fetchMyFlashcards(): Promise<{ cards: Flashcard[] }> {
+  return apiFetch("/api/retention/flashcards/manage");
+}
+
+export async function createFlashcard(input: FlashcardInput): Promise<{ card: Flashcard }> {
+  return apiFetch("/api/retention/flashcards/manage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateFlashcard(
+  flashcardId: string,
+  input: Partial<FlashcardInput>,
+): Promise<{ card: Flashcard }> {
+  return apiFetch(`/api/retention/flashcards/manage/${flashcardId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteFlashcard(flashcardId: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/retention/flashcards/manage/${flashcardId}`, { method: "DELETE" });
 }
 
 export async function fetchDailyReview(): Promise<DailyReviewData> {

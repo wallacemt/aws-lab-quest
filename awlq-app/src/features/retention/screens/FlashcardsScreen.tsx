@@ -1,22 +1,33 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { FlashcardDeck } from "@/features/retention/components/FlashcardDeck";
+import { FlashcardManager } from "@/features/retention/components/FlashcardManager";
 import { useFlashcardQueue } from "@/features/retention/hooks/useFlashcardQueue";
 
 /**
  * Main flashcard review screen.
  * Loads due cards on mount, presents them one by one, submits grades in batch.
+ * Also hosts the "Meus Flashcards" management panel (issue #22 AC).
  */
 export function FlashcardsScreen() {
   const { cards, currentIndex, dueTotal, isLoading, isSubmitting, isDone, error, load, gradeCard } =
     useFlashcardQueue();
+  const [mode, setMode] = useState<"review" | "manage">("review");
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  if (mode === "manage") {
+    return (
+      <AppLayout>
+        <FlashcardManager onClose={() => setMode("review")} />
+      </AppLayout>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -68,9 +79,12 @@ export function FlashcardsScreen() {
             Nenhum flashcard pendente para hoje. Continue estudando e os cards aparecerão aqui
             conforme você responder questões no KC ou Revisão.
           </p>
-          <PixelButton variant="ghost" onClick={() => void load()}>
-            Verificar novamente
-          </PixelButton>
+          <div className="flex gap-2">
+            <PixelButton variant="ghost" onClick={() => void load()}>
+              Verificar novamente
+            </PixelButton>
+            <PixelButton onClick={() => setMode("manage")}>Criar flashcard</PixelButton>
+          </div>
         </div>
       </AppLayout>
     );
@@ -86,7 +100,12 @@ export function FlashcardsScreen() {
           <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">
             Flashcards
           </h1>
-          <p className="font-mono text-xs text-[var(--pixel-muted)]">{dueTotal} para hoje</p>
+          <div className="flex items-center gap-3">
+            <p className="font-mono text-xs text-[var(--pixel-muted)]">{dueTotal} para hoje</p>
+            <PixelButton variant="ghost" onClick={() => setMode("manage")}>
+              Meus flashcards
+            </PixelButton>
+          </div>
         </div>
 
         <FlashcardDeck
