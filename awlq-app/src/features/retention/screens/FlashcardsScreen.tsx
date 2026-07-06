@@ -28,6 +28,7 @@ export function FlashcardsScreen() {
     gradeCard,
     goNext,
     goPrev,
+    retrySubmit,
   } = useFlashcardQueue();
   const [mode, setMode] = useState<"review" | "manage">("review");
 
@@ -54,13 +55,24 @@ export function FlashcardsScreen() {
   }
 
   if (error) {
+    // A failed grade submission (still on the last card, grades retained)
+    // needs a different recovery action than a failed load: retrying the
+    // submit reuses the retained pendingGrades, while load() would discard
+    // them and re-fetch a fresh queue (DEF-003).
+    const hasPendingSubmit = pendingGrades.length > 0;
     return (
       <AppLayout>
         <PixelCard className="mx-auto mt-16 flex max-w-lg flex-col items-center gap-4 text-center">
           <p className="font-mono text-sm text-red-500">{error}</p>
-          <PixelButton variant="ghost" onClick={() => void load()}>
-            Tentar novamente
-          </PixelButton>
+          {hasPendingSubmit ? (
+            <PixelButton onClick={() => void retrySubmit()} disabled={isSubmitting}>
+              Tentar enviar novamente
+            </PixelButton>
+          ) : (
+            <PixelButton variant="ghost" onClick={() => void load()}>
+              Tentar novamente
+            </PixelButton>
+          )}
         </PixelCard>
       </AppLayout>
     );
@@ -115,7 +127,7 @@ export function FlashcardsScreen() {
       <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-6">
         <PixelCard className="flex items-center justify-between gap-3">
           <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">Flashcards</h1>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col-reverse items-center gap-3">
             <p className="font-mono text-xs text-[var(--pixel-subtext)]">{dueTotal} para hoje</p>
             <PixelButton variant="ghost" onClick={() => setMode("manage")}>
               Meus flashcards
