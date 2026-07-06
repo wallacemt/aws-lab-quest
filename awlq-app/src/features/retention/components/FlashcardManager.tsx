@@ -13,6 +13,7 @@ import {
   updateFlashcard,
 } from "@/features/retention/services/retention-api";
 import { listStudyServices, StudyServiceItem } from "@/features/study/services/study-api";
+import { ServiceSearchSelect } from "@/features/retention/components/ServiceSearchSelect";
 
 type Props = {
   onClose: () => void;
@@ -115,18 +116,22 @@ export function FlashcardManager({ onClose }: Props) {
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-6">
-      <div className="flex items-center justify-between">
+      <PixelCard className="flex items-center justify-between gap-3">
         <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">Meus Flashcards</h1>
         <PixelButton variant="ghost" onClick={onClose}>
           Voltar
         </PixelButton>
-      </div>
+      </PixelCard>
 
-      {error && <p className="font-mono text-xs text-red-500">{error}</p>}
+      {error && (
+        <PixelCard>
+          <p className="font-mono text-xs text-red-500">{error}</p>
+        </PixelCard>
+      )}
 
       <PixelCard>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-muted)]">
+          <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-subtext)]">
             {editingId ? "Editar flashcard" : "Novo flashcard"}
           </p>
 
@@ -155,18 +160,16 @@ export function FlashcardManager({ onClose }: Props) {
             maxLength={300}
           />
 
-          <select
-            value={form.awsServiceId ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, awsServiceId: e.target.value }))}
-            className="h-9 w-full rounded-md border border-input bg-transparent px-2.5 font-mono text-sm text-[var(--pixel-text)] outline-none"
-          >
-            <option value="">Servico AWS (opcional)</option>
-            {services.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-col gap-1">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-[var(--pixel-subtext)]">
+              Serviço AWS (opcional)
+            </p>
+            <ServiceSearchSelect
+              services={services}
+              value={form.awsServiceId ?? ""}
+              onChange={(id) => setForm((f) => ({ ...f, awsServiceId: id }))}
+            />
+          </div>
 
           <div className="flex gap-2">
             <PixelButton type="submit" disabled={isSaving}>
@@ -183,14 +186,14 @@ export function FlashcardManager({ onClose }: Props) {
 
       <div className="flex flex-col gap-3">
         {isLoading ? (
-          <p className="font-mono text-xs text-[var(--pixel-muted)]">Carregando...</p>
+          <p className="font-mono text-xs text-[var(--pixel-subtext)]">Carregando...</p>
         ) : cards.length === 0 ? (
-          <p className="font-mono text-xs text-[var(--pixel-muted)]">Voce ainda nao criou nenhum flashcard.</p>
+          <p className="font-mono text-xs text-[var(--pixel-subtext)]">Voce ainda nao criou nenhum flashcard.</p>
         ) : (
           cards.map((card) => (
             <PixelCard key={card.id} className="flex flex-col gap-2">
               <p className="font-mono text-sm text-[var(--pixel-text)]">{card.front}</p>
-              <p className="font-mono text-xs text-[var(--pixel-muted)]">{card.back}</p>
+              <p className="font-mono text-xs text-[var(--pixel-text)]">{card.back}</p>
               <div className="flex gap-2">
                 <PixelButton variant="ghost" onClick={() => startEdit(card)}>
                   Editar
