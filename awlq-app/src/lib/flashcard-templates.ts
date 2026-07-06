@@ -38,5 +38,11 @@ export async function materializeDefaultDeck(userId: string): Promise<void> {
       hint: t.hint,
       source: FlashcardSource.DEFAULT_DECK,
     })),
+    // Two concurrent first-loads for the same fresh user can both pass the
+    // in-memory diff before either write lands. The @@unique([userId,
+    // templateId]) constraint is what actually prevents the duplicate rows;
+    // skipDuplicates just turns that race into a no-op instead of a P2002
+    // throw (DEF-001).
+    skipDuplicates: true,
   });
 }

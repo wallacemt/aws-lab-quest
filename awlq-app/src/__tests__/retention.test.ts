@@ -1,5 +1,5 @@
 /**
- * Retention spine test suite — TC-001 through TC-013
+ * Retention spine test suite — TC-001 through TC-014
  *
  * TC-001: SM-2 increasing intervals on GOOD x4
  * TC-002: SM-2 VERY_HARD resets + ease floor 1.3
@@ -11,9 +11,15 @@
  * TC-008: Sprint XP persists (CA-05)
  * TC-009: KC gap-fill routing (CA-08)
  * TC-010: IDOR negative tests (CA-15)
- * TC-011: Default-deck materialization diff logic (EPIC #6, issue #23)
- * TC-012: Flashcard due-reminder grouping, cooldown, HTML escaping (issue #22)
- * TC-013: IDOR guard — flashcard manage endpoints (issue #22)
+ * TC-014: Flashcard grade upsert — manual navigation fix (UI review pass)
+ *
+ * TC-011/TC-012/TC-013 (default-deck materialization, reminder worker,
+ * manage-route IDOR) moved out to dedicated files exercising the real
+ * implementations — see the note above TC-014's former location below.
+ * TC-101-106 (Test-Report-001 DEF-005 fix) live in:
+ *   - src/__tests__/flashcard-lifecycle.test.ts
+ *   - src/__tests__/flashcard-queue.test.tsx
+ *   - ../../awlq-worker/src/__tests__/flashcard-reminder.test.ts
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -753,198 +759,23 @@ describe("TC-010: IDOR ownership check — flashcard generation (CA-15)", () => 
 });
 
 // ---------------------------------------------------------------------------
-// TC-011: Default-deck materialization (EPIC #6, issue #23)
+// TC-011/TC-012/TC-013 (DEF-005 fix): these used to be "shadow tests" here —
+// local reimplementations of materializeDefaultDeck's diff, the reminder
+// worker's grouping/cooldown/escapeHtml, and the manage-route IDOR guard,
+// asserted against copies rather than the real code. They've been replaced
+// by tests that import and exercise the real implementations:
+//
+//   - TC-101/TC-102 (materializeDefaultDeck idempotence, incl. concurrent
+//     calls): src/__tests__/flashcard-lifecycle.test.ts
+//   - TC-103 (manage route IDOR — real PATCH/DELETE handlers):
+//     src/__tests__/flashcard-lifecycle.test.ts
+//   - TC-104 (reminder worker grouping/cooldown/opt-out/escaping/send):
+//     ../../awlq-worker/src/__tests__/flashcard-reminder.test.ts
+//
+// This file keeps a single vi.mock("@/lib/prisma") for the streak suite
+// (TC-005) above, which is why those other cases live in dedicated files
+// instead — vi.mock for a given module can only be declared once per file.
 // ---------------------------------------------------------------------------
-
-/**
- * materializeDefaultDeck (@/lib/flashcard-templates) diffs the global
- * FlashcardTemplate catalog against a user's already-materialized templateIds
- * and creates only the missing rows. As in TC-006/TC-010, the diff logic is
- * replicated here rather than re-mocking "@/lib/prisma" a third time in this
- * file (vi.mock("@/lib/prisma", ...) can only be declared once per test file;
- * TC-005 already owns that mock for the streak suite).
- */
-describe("TC-011: Default-deck materialization — diff logic (issue #23)", () => {
-  function diffMissingTemplates(
-    templates: Array<{ id: string }>,
-    alreadyMaterializedIds: Array<string | null>,
-  ) {
-    const existing = new Set(alreadyMaterializedIds);
-    return templates.filter((t) => !existing.has(t.id));
-  }
-
-  it("materializes only templates the user doesn't have yet", () => {
-    const templates = [{ id: "tpl-1" }, { id: "tpl-2" }, { id: "tpl-3" }];
-    const missing = diffMissingTemplates(templates, ["tpl-1"]);
-
-    expect(missing.map((t) => t.id)).toEqual(["tpl-2", "tpl-3"]);
-  });
-
-  it("materializes nothing once every template already exists for the user", () => {
-    const templates = [{ id: "tpl-1" }, { id: "tpl-2" }];
-    const missing = diffMissingTemplates(templates, ["tpl-1", "tpl-2"]);
-
-    expect(missing).toHaveLength(0);
-  });
-
-  it("materializes the full catalog for a brand-new user", () => {
-    const templates = [{ id: "tpl-1" }, { id: "tpl-2" }];
-    const missing = diffMissingTemplates(templates, []);
-
-    expect(missing).toHaveLength(2);
-  });
-
-  it("is a no-op when the global template catalog is empty", () => {
-    // Mirrors the early-return guard in materializeDefaultDeck: an empty
-    // catalog must not trigger any Flashcard.createMany call.
-    const templates: Array<{ id: string }> = [];
-    const shouldSkip = templates.length === 0;
-
-    expect(shouldSkip).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// TC-012: Flashcard due-reminder — grouping, cooldown, HTML escaping (issue #22)
-// ---------------------------------------------------------------------------
-
-describe("TC-012: Flashcard reminder — group due cards by user (issue #22)", () => {
-  function groupFrontsByUser(cards: Array<{ userId: string; front: string }>) {
-    const byUser = new Map<string, string[]>();
-    for (const card of cards) {
-      const fronts = byUser.get(card.userId) ?? [];
-      fronts.push(card.front);
-      byUser.set(card.userId, fronts);
-    }
-    return byUser;
-  }
-
-  it("sends one digest per user, not one email per card", () => {
-    const cards = [
-      { userId: "user-a", front: "Q1" },
-      { userId: "user-a", front: "Q2" },
-      { userId: "user-b", front: "Q3" },
-    ];
-
-    const byUser = groupFrontsByUser(cards);
-
-    expect(byUser.size).toBe(2);
-    expect(byUser.get("user-a")).toEqual(["Q1", "Q2"]);
-    expect(byUser.get("user-b")).toEqual(["Q3"]);
-  });
-});
-
-describe("TC-012: Flashcard reminder — cooldown + opt-out gating (issue #22)", () => {
-  const COOLDOWN_HOURS = 20;
-  const MS_PER_HOUR = 3_600_000;
-
-  function shouldSendReminder(params: {
-    emailNotifications: boolean;
-    lastReminderSentAt: Date | null;
-    now: Date;
-  }): boolean {
-    if (!params.emailNotifications) return false;
-    if (!params.lastReminderSentAt) return true;
-
-    const cooldownStart = new Date(params.now.getTime() - COOLDOWN_HOURS * MS_PER_HOUR);
-    return params.lastReminderSentAt < cooldownStart;
-  }
-
-  it("sends when the user has never received a reminder", () => {
-    const now = new Date("2026-07-03T13:00:00Z");
-    expect(shouldSendReminder({ emailNotifications: true, lastReminderSentAt: null, now })).toBe(true);
-  });
-
-  it("skips within the 20h cooldown window (prevents cron-overlap double-send)", () => {
-    const now = new Date("2026-07-03T13:00:00Z");
-    const lastReminderSentAt = new Date("2026-07-03T02:00:00Z"); // 11h ago
-    expect(shouldSendReminder({ emailNotifications: true, lastReminderSentAt, now })).toBe(false);
-  });
-
-  it("sends again once the cooldown has elapsed", () => {
-    const now = new Date("2026-07-03T13:00:00Z");
-    const lastReminderSentAt = new Date("2026-07-02T12:00:00Z"); // 25h ago
-    expect(shouldSendReminder({ emailNotifications: true, lastReminderSentAt, now })).toBe(true);
-  });
-
-  it("never sends when the user opted out of emails (emailNotifications = false)", () => {
-    const now = new Date("2026-07-03T13:00:00Z");
-    expect(shouldSendReminder({ emailNotifications: false, lastReminderSentAt: null, now })).toBe(false);
-  });
-});
-
-describe("TC-012: Flashcard reminder — HTML escaping of user-authored card text", () => {
-  // Personal flashcard fronts/backs are user-authored strings (source =
-  // USER_CREATED) that get interpolated into the reminder email's HTML body.
-  // Mirrors escapeHtml() in awlq-worker/src/workers/flashcard-reminder.worker.ts.
-  const HTML_ESCAPES: Record<string, string> = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  };
-
-  function escapeHtml(value: string): string {
-    return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]!);
-  }
-
-  it("neutralizes HTML/script injection from a user-created card front", () => {
-    const malicious = `<script>alert('xss')</script>`;
-    const escaped = escapeHtml(malicious);
-
-    expect(escaped).not.toContain("<script>");
-    expect(escaped).toBe("&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;");
-  });
-
-  it("leaves plain text untouched", () => {
-    expect(escapeHtml("O que e uma VPC?")).toBe("O que e uma VPC?");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// TC-013: IDOR guard — flashcard manage endpoints (CA-15 pattern, issue #22)
-// ---------------------------------------------------------------------------
-
-/**
- * Replicates the ownership guard in
- * /api/retention/flashcards/manage/[flashcardId]/route.ts (loadOwnedUserCreatedCard):
- *   404 -> flashcard doesn't exist
- *   403 -> exists but belongs to another user
- *   403 -> exists, belongs to the user, but isn't USER_CREATED (can't edit
- *          AI-generated / default-deck cards through this endpoint)
- *   200 -> exists, owned, USER_CREATED -> edit/delete proceeds
- */
-describe("TC-013: IDOR guard — flashcard manage endpoints (issue #22)", () => {
-  function checkOwnership(
-    card: { userId: string; source: string } | null,
-    requestingUserId: string,
-  ): { status: number } {
-    if (!card) return { status: 404 };
-    if (card.userId !== requestingUserId) return { status: 403 };
-    if (card.source !== "USER_CREATED") return { status: 403 };
-    return { status: 200 };
-  }
-
-  it("returns 404 when the flashcard does not exist", () => {
-    expect(checkOwnership(null, "user-a").status).toBe(404);
-  });
-
-  it("returns 403 when the flashcard belongs to a different user", () => {
-    const card = { userId: "user-b", source: "USER_CREATED" };
-    expect(checkOwnership(card, "user-a").status).toBe(403);
-  });
-
-  it("returns 403 when the card is owned but not user-created (e.g. DEFAULT_DECK)", () => {
-    const card = { userId: "user-a", source: "DEFAULT_DECK" };
-    expect(checkOwnership(card, "user-a").status).toBe(403);
-  });
-
-  it("returns 200 when the card is owned and user-created", () => {
-    const card = { userId: "user-a", source: "USER_CREATED" };
-    expect(checkOwnership(card, "user-a").status).toBe(200);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // TC-014: Flashcard grade upsert — manual navigation fix (UI review pass)
