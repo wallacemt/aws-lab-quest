@@ -945,3 +945,42 @@ describe("TC-013: IDOR guard — flashcard manage endpoints (issue #22)", () => 
     expect(checkOwnership(card, "user-a").status).toBe(200);
   });
 });
+
+// ---------------------------------------------------------------------------
+// TC-014: Flashcard grade upsert — manual navigation fix (UI review pass)
+// ---------------------------------------------------------------------------
+
+/**
+ * Regression guard for the grading bug fixed in useFlashcardQueue:
+ * grading used to append a new pendingGrades entry and auto-advance
+ * currentIndex in the same call. Now gradeCard only upserts the grade for
+ * the current card (replacing any prior pick) and never touches
+ * currentIndex — advancing is a separate, explicit goNext/goPrev action.
+ */
+describe("TC-014: Flashcard grade upsert (issue: grading no longer auto-advances)", () => {
+  it("appends a grade for a card that has none yet", async () => {
+    const { upsertGrade } = await import("@/features/retention/hooks/useFlashcardQueue");
+    const result = upsertGrade([], "card-1", "GOOD");
+    expect(result).toEqual([{ flashcardId: "card-1", grade: "GOOD" }]);
+  });
+
+  it("replaces the existing grade instead of appending a duplicate when re-graded", async () => {
+    const { upsertGrade } = await import("@/features/retention/hooks/useFlashcardQueue");
+    const first = upsertGrade([], "card-1", "HARD");
+    const second = upsertGrade(first, "card-1", "EASY");
+    expect(second).toEqual([{ flashcardId: "card-1", grade: "EASY" }]);
+  });
+
+  it("keeps grades for other cards untouched when one card is re-graded", async () => {
+    const { upsertGrade } = await import("@/features/retention/hooks/useFlashcardQueue");
+    const grades = [
+      { flashcardId: "card-1", grade: "GOOD" as const },
+      { flashcardId: "card-2", grade: "HARD" as const },
+    ];
+    const result = upsertGrade(grades, "card-1", "VERY_HARD");
+    expect(result).toEqual([
+      { flashcardId: "card-1", grade: "VERY_HARD" },
+      { flashcardId: "card-2", grade: "HARD" },
+    ]);
+  });
+});
