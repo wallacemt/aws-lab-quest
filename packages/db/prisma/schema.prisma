@@ -796,10 +796,16 @@ model Flashcard {
   updatedAt        DateTime          @updatedAt
 
   @@unique([userId, sourceQuestionId, source])
+  // Constrains DEFAULT_DECK rows (templateId set) so two concurrent
+  // first-loads for the same user can't double-insert every template
+  // (DEF-001). The unique([userId, sourceQuestionId, source]) above doesn't
+  // cover these rows since sourceQuestionId is null for DEFAULT_DECK cards
+  // and Postgres treats nulls as distinct in unique constraints. This also
+  // supersedes the old plain index on the same columns.
+  @@unique([userId, templateId])
   @@index([userId, dueAt])
   @@index([userId, suspended, dueAt])
   @@index([sourceQuestionId])
-  @@index([userId, templateId])
 }
 
 /// Global catalog of default flashcards for key AWS services (issue #23).
