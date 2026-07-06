@@ -17,96 +17,124 @@ const HTML_ESCAPES: Record<string, string> = {
   "'": "&#39;",
 };
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]!);
+}
+
+/** Groups due cards by owner so each user gets one digest, not one email per card. */
+export function groupFrontsByUser(cards: Array<{ userId: string; front: string }>): Map<string, string[]> {
+  const byUser = new Map<string, string[]>();
+  for (const card of cards) {
+    const fronts = byUser.get(card.userId) ?? [];
+    fronts.push(card.front);
+    byUser.set(card.userId, fronts);
+  }
+  return byUser;
+}
+
+/**
+ * Gates sending on opt-out and the cooldown window. Mirrors
+ * behavioral-email.worker.ts's pattern so a cron overlap or manual re-run
+ * can't double-send within the same day.
+ */
+export function shouldSendReminder(params: {
+  emailNotifications: boolean;
+  lastReminderSentAt: Date | null;
+  now: Date;
+}): boolean {
+  if (!params.emailNotifications) return false;
+  if (!params.lastReminderSentAt) return true;
+
+  const cooldownStart = new Date(params.now.getTime() - COOLDOWN_HOURS * MS_PER_HOUR);
+  return params.lastReminderSentAt < cooldownStart;
 }
 
 /**
  * Daily digest reminder for due flashcards (issue #22 AC: "E-mail de lembrete
  * enviado para cards vencidos"). One email per user, not one per card.
- * Cooldown mirrors behavioral-email.worker.ts's pattern so a cron overlap or
- * manual re-run can't double-send within the same day.
+ * Exported standalone (instead of only as the inline BullMQ processor) so
+ * tests can exercise the real grouping/cooldown/escaping/send logic without
+ * mounting a queue.
  */
-export function createFlashcardReminderWorker(): Worker<FlashcardReminderJobData> {
-  return new Worker<FlashcardReminderJobData>(
-    "flashcard-reminder",
-    async () => {
-      const now = new Date();
+export async function processFlashcardReminderJob(): Promise<void> {
+  const now = new Date();
 
-      const dueCards = await prisma.flashcard.findMany({
-        where: { suspended: false, dueAt: { lte: now } },
-        select: { userId: true, front: true },
+  const dueCards = await prisma.flashcard.findMany({
+    where: { suspended: false, dueAt: { lte: now } },
+    select: { userId: true, front: true },
+  });
+
+  if (dueCards.length === 0) {
+    logger.info("flashcard-reminder: no due cards, skipping");
+    return;
+  }
+
+  const frontsByUser = groupFrontsByUser(dueCards);
+
+  let sent = 0;
+  let skipped = 0;
+
+  for (const [userId, fronts] of frontsByUser) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true, emailNotifications: true },
+    });
+
+    if (!user || !user.emailNotifications) {
+      skipped++;
+      continue;
+    }
+
+    const cooldownStart = new Date(now.getTime() - COOLDOWN_HOURS * MS_PER_HOUR);
+    const recentEvent = await prisma.userEmailEvent.findFirst({
+      where: { userId, triggerCode: REMINDER_TRIGGER_CODE, sentAt: { gte: cooldownStart } },
+    });
+
+    if (
+      !shouldSendReminder({
+        emailNotifications: user.emailNotifications,
+        lastReminderSentAt: recentEvent?.sentAt ?? null,
+        now,
+      })
+    ) {
+      skipped++;
+      continue;
+    }
+
+    const count = fronts.length;
+    const subject = `Voce tem ${count} flashcard${count > 1 ? "s" : ""} para revisar`;
+    const previewItems = fronts
+      .slice(0, PREVIEW_LIMIT)
+      .map((front) => `<li>${escapeHtml(front)}</li>`)
+      .join("");
+    const remainder = count - PREVIEW_LIMIT;
+
+    const html = `
+      <p>Ola ${escapeHtml(user.name ?? "aluno")},</p>
+      <p>Voce tem <strong>${count}</strong> flashcard${count > 1 ? "s" : ""} aguardando revisao:</p>
+      <ul>${previewItems}</ul>
+      ${remainder > 0 ? `<p>...e mais ${remainder}.</p>` : ""}
+      <p>Entre no AWS Lab Quest para revisar agora.</p>
+    `;
+
+    try {
+      await sendEmail({ to: user.email, subject, html });
+      await prisma.userEmailEvent.create({
+        data: { userId, triggerCode: REMINDER_TRIGGER_CODE, subject, sentAt: now },
       });
+      sent++;
+    } catch (err) {
+      logger.warn({ err, userId }, "flashcard-reminder: failed to send");
+      skipped++;
+    }
+  }
 
-      if (dueCards.length === 0) {
-        logger.info("flashcard-reminder: no due cards, skipping");
-        return;
-      }
+  logger.info({ sent, skipped, usersWithDue: frontsByUser.size }, "flashcard-reminder: done");
+}
 
-      const frontsByUser = new Map<string, string[]>();
-      for (const card of dueCards) {
-        const fronts = frontsByUser.get(card.userId) ?? [];
-        fronts.push(card.front);
-        frontsByUser.set(card.userId, fronts);
-      }
-
-      let sent = 0;
-      let skipped = 0;
-
-      for (const [userId, fronts] of frontsByUser) {
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { email: true, name: true, emailNotifications: true },
-        });
-
-        if (!user || !user.emailNotifications) {
-          skipped++;
-          continue;
-        }
-
-        const cooldownStart = new Date(now.getTime() - COOLDOWN_HOURS * MS_PER_HOUR);
-        const recentEvent = await prisma.userEmailEvent.findFirst({
-          where: { userId, triggerCode: REMINDER_TRIGGER_CODE, sentAt: { gte: cooldownStart } },
-        });
-
-        if (recentEvent) {
-          skipped++;
-          continue;
-        }
-
-        const count = fronts.length;
-        const subject = `Voce tem ${count} flashcard${count > 1 ? "s" : ""} para revisar`;
-        const previewItems = fronts
-          .slice(0, PREVIEW_LIMIT)
-          .map((front) => `<li>${escapeHtml(front)}</li>`)
-          .join("");
-        const remainder = count - PREVIEW_LIMIT;
-
-        const html = `
-          <p>Ola ${escapeHtml(user.name ?? "aluno")},</p>
-          <p>Voce tem <strong>${count}</strong> flashcard${count > 1 ? "s" : ""} aguardando revisao:</p>
-          <ul>${previewItems}</ul>
-          ${remainder > 0 ? `<p>...e mais ${remainder}.</p>` : ""}
-          <p>Entre no AWS Lab Quest para revisar agora.</p>
-        `;
-
-        try {
-          await sendEmail({ to: user.email, subject, html });
-          await prisma.userEmailEvent.create({
-            data: { userId, triggerCode: REMINDER_TRIGGER_CODE, subject, sentAt: now },
-          });
-          sent++;
-        } catch (err) {
-          logger.warn({ err, userId }, "flashcard-reminder: failed to send");
-          skipped++;
-        }
-      }
-
-      logger.info({ sent, skipped, usersWithDue: frontsByUser.size }, "flashcard-reminder: done");
-    },
-    {
-      connection,
-      concurrency: 1,
-    },
-  );
+export function createFlashcardReminderWorker(): Worker<FlashcardReminderJobData> {
+  return new Worker<FlashcardReminderJobData>("flashcard-reminder", processFlashcardReminderJob, {
+    connection,
+    concurrency: 1,
+  });
 }
