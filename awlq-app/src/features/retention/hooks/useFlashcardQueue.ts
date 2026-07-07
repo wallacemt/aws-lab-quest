@@ -23,13 +23,30 @@ type UseFlashcardQueueState = {
 
 type UseFlashcardQueueActions = {
   load: () => Promise<void>;
-  gradeCard: (grade: FlashcardGrade) => Promise<void>;
-  flushGrades: () => Promise<void>;
+  gradeCard: (grade: FlashcardGrade) => void;
+  goNext: () => Promise<void>;
+  goPrev: () => void;
+  retrySubmit: () => Promise<void>;
 };
 
 /**
+ * Replaces (or appends) the grade for a given card, keeping at most one
+ * pending grade per flashcard so re-grading never duplicates entries.
+ * Exported standalone because it's pure — no need to mount the hook to test it.
+ */
+export function upsertGrade(grades: GradeItem[], flashcardId: string, grade: FlashcardGrade): GradeItem[] {
+  const existingIndex = grades.findIndex((item) => item.flashcardId === flashcardId);
+  if (existingIndex === -1) return [...grades, { flashcardId, grade }];
+  const next = [...grades];
+  next[existingIndex] = { flashcardId, grade };
+  return next;
+}
+
+/**
  * Manages the flashcard review queue.
- * Grades are batched locally and submitted when the queue is empty (RNF-07).
+ * Grading only records a grade for the current card — it never advances the
+ * queue. Navigation is explicit via goNext/goPrev. Grades are batched locally
+ * and submitted when the user advances past the last card (RNF-07).
  */
 export function useFlashcardQueue(): UseFlashcardQueueState & UseFlashcardQueueActions {
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -59,12 +76,31 @@ export function useFlashcardQueue(): UseFlashcardQueueState & UseFlashcardQueueA
     }
   }, []);
 
-  const flushGrades = useCallback(async () => {
-    if (pendingGrades.length === 0) return;
+  const gradeCard = useCallback(
+    (grade: FlashcardGrade) => {
+      const card = cards[currentIndex];
+      if (!card) return;
+      setPendingGrades((prev) => upsertGrade(prev, card.id, grade));
+    },
+    [cards, currentIndex],
+  );
+
+  const goPrev = useCallback(() => {
+    setCurrentIndex((index) => Math.max(0, index - 1));
+  }, []);
+
+  /**
+   * Submits pendingGrades and marks the session done only on success (DEF-003).
+   * On failure, pendingGrades stay intact and isDone stays false so the caller
+   * can retry via retrySubmit() without losing the user's entered grades.
+   */
+  const submitAndFinish = useCallback(async () => {
     setIsSubmitting(true);
+    setError(null);
     try {
       await submitFlashcardGrades(pendingGrades);
       setPendingGrades([]);
+      setIsDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao enviar avaliações.");
     } finally {
@@ -72,35 +108,25 @@ export function useFlashcardQueue(): UseFlashcardQueueState & UseFlashcardQueueA
     }
   }, [pendingGrades]);
 
-  const gradeCard = useCallback(
-    async (grade: FlashcardGrade) => {
-      const card = cards[currentIndex];
-      if (!card) return;
+  const goNext = useCallback(async () => {
+    // Synchronous re-entrancy guard: a second activation while a submit is
+    // already in flight must be a no-op regardless of render timing, since
+    // the `disabled={isSubmitting}` button prop lags one render behind a
+    // rapid double-click (DEF-002).
+    if (isSubmitting) return;
 
-      const newGrades = [...pendingGrades, { flashcardId: card.id, grade }];
-      setPendingGrades(newGrades);
+    const isLastCard = currentIndex >= cards.length - 1;
+    if (!isLastCard) {
+      setCurrentIndex((index) => index + 1);
+      return;
+    }
 
-      const nextIndex = currentIndex + 1;
-      const isLastCard = nextIndex >= cards.length;
-
-      setCurrentIndex(nextIndex);
-
-      if (isLastCard) {
-        // Flush all grades when the deck is exhausted (batch submit for RNF-07).
-        setIsSubmitting(true);
-        try {
-          await submitFlashcardGrades(newGrades);
-          setPendingGrades([]);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Erro ao enviar avaliações.");
-        } finally {
-          setIsSubmitting(false);
-          setIsDone(true);
-        }
-      }
-    },
-    [cards, currentIndex, pendingGrades],
-  );
+    if (pendingGrades.length > 0) {
+      await submitAndFinish();
+      return;
+    }
+    setIsDone(true);
+  }, [isSubmitting, currentIndex, cards.length, pendingGrades, submitAndFinish]);
 
   return {
     cards,
@@ -113,6 +139,8 @@ export function useFlashcardQueue(): UseFlashcardQueueState & UseFlashcardQueueA
     error,
     load,
     gradeCard,
-    flushGrades,
+    goNext,
+    goPrev,
+    retrySubmit: submitAndFinish,
   };
 }

@@ -1,5 +1,5 @@
 /**
- * Retention spine test suite — TC-001 through TC-010
+ * Retention spine test suite — TC-001 through TC-014
  *
  * TC-001: SM-2 increasing intervals on GOOD x4
  * TC-002: SM-2 VERY_HARD resets + ease floor 1.3
@@ -11,6 +11,15 @@
  * TC-008: Sprint XP persists (CA-05)
  * TC-009: KC gap-fill routing (CA-08)
  * TC-010: IDOR negative tests (CA-15)
+ * TC-014: Flashcard grade upsert — manual navigation fix (UI review pass)
+ *
+ * TC-011/TC-012/TC-013 (default-deck materialization, reminder worker,
+ * manage-route IDOR) moved out to dedicated files exercising the real
+ * implementations — see the note above TC-014's former location below.
+ * TC-101-106 (Test-Report-001 DEF-005 fix) live in:
+ *   - src/__tests__/flashcard-lifecycle.test.ts
+ *   - src/__tests__/flashcard-queue.test.tsx
+ *   - ../../awlq-worker/src/__tests__/flashcard-reminder.test.ts
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -746,5 +755,63 @@ describe("TC-010: IDOR ownership check — flashcard generation (CA-15)", () => 
 
     expect(result.status).toBe(403);
     expect(mockPrismaIdir.workerTrigger.create).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TC-011/TC-012/TC-013 (DEF-005 fix): these used to be "shadow tests" here —
+// local reimplementations of materializeDefaultDeck's diff, the reminder
+// worker's grouping/cooldown/escapeHtml, and the manage-route IDOR guard,
+// asserted against copies rather than the real code. They've been replaced
+// by tests that import and exercise the real implementations:
+//
+//   - TC-101/TC-102 (materializeDefaultDeck idempotence, incl. concurrent
+//     calls): src/__tests__/flashcard-lifecycle.test.ts
+//   - TC-103 (manage route IDOR — real PATCH/DELETE handlers):
+//     src/__tests__/flashcard-lifecycle.test.ts
+//   - TC-104 (reminder worker grouping/cooldown/opt-out/escaping/send):
+//     ../../awlq-worker/src/__tests__/flashcard-reminder.test.ts
+//
+// This file keeps a single vi.mock("@/lib/prisma") for the streak suite
+// (TC-005) above, which is why those other cases live in dedicated files
+// instead — vi.mock for a given module can only be declared once per file.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// TC-014: Flashcard grade upsert — manual navigation fix (UI review pass)
+// ---------------------------------------------------------------------------
+
+/**
+ * Regression guard for the grading bug fixed in useFlashcardQueue:
+ * grading used to append a new pendingGrades entry and auto-advance
+ * currentIndex in the same call. Now gradeCard only upserts the grade for
+ * the current card (replacing any prior pick) and never touches
+ * currentIndex — advancing is a separate, explicit goNext/goPrev action.
+ */
+describe("TC-014: Flashcard grade upsert (issue: grading no longer auto-advances)", () => {
+  it("appends a grade for a card that has none yet", async () => {
+    const { upsertGrade } = await import("@/features/retention/hooks/useFlashcardQueue");
+    const result = upsertGrade([], "card-1", "GOOD");
+    expect(result).toEqual([{ flashcardId: "card-1", grade: "GOOD" }]);
+  });
+
+  it("replaces the existing grade instead of appending a duplicate when re-graded", async () => {
+    const { upsertGrade } = await import("@/features/retention/hooks/useFlashcardQueue");
+    const first = upsertGrade([], "card-1", "HARD");
+    const second = upsertGrade(first, "card-1", "EASY");
+    expect(second).toEqual([{ flashcardId: "card-1", grade: "EASY" }]);
+  });
+
+  it("keeps grades for other cards untouched when one card is re-graded", async () => {
+    const { upsertGrade } = await import("@/features/retention/hooks/useFlashcardQueue");
+    const grades = [
+      { flashcardId: "card-1", grade: "GOOD" as const },
+      { flashcardId: "card-2", grade: "HARD" as const },
+    ];
+    const result = upsertGrade(grades, "card-1", "VERY_HARD");
+    expect(result).toEqual([
+      { flashcardId: "card-1", grade: "VERY_HARD" },
+      { flashcardId: "card-2", grade: "HARD" },
+    ]);
   });
 });

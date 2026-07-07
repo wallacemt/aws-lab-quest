@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { computeNextReview } from "@/lib/spaced-repetition";
 import { recordStudyActivity } from "@/lib/streak";
+import { materializeDefaultDeck } from "@/lib/flashcard-templates";
 import { FlashcardGrade } from "@prisma/client";
 
 const DUE_CARDS_LIMIT = 20;
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  await materializeDefaultDeck(session.user.id);
 
   const now = new Date();
 

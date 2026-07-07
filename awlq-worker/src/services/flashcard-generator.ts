@@ -253,6 +253,11 @@ function buildCardContent(
     REVIEW_FLAG: "Você marcou esta questão para revisão.",
     AI_EXPLANATION: "",
     MEMORY_RECOVERY: "Você acertou esta questão há muito tempo.",
+    // Never produced by this generator (built from StudyQuestion answers) —
+    // USER_CREATED and DEFAULT_DECK cards are created directly, not derived
+    // from a wrong/slow/flagged answer. Present only to satisfy exhaustiveness.
+    USER_CREATED: "",
+    DEFAULT_DECK: "",
   };
 
   const prefix = sourcePrefix[source];

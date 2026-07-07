@@ -19,7 +19,7 @@
     "seed": "bun run prisma/seed.ts"
   },
   "dependencies": {
-"@prisma/adapter-pg": "^7.5.0",
+    "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.8.0",
     "@supabase/supabase-js": "^2.99.1",
     "@types/pdf-parse": "^1.1.5",
@@ -53,6 +53,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/react": "^16",
+    "@types/bun": "latest",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.11",
@@ -62,11 +64,11 @@
     "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^25",
     "prisma": "^7.5.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.7",
-    "@types/bun": "latest"
+    "vitest": "^4.1.7"
   },
   "ignoreScripts": [
     "sharp",

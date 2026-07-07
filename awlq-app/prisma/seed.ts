@@ -206,6 +206,136 @@ async function seedAwsServicesAndQuestions() {
   }
 }
 
+// Issue #23: default flashcard deck for the key AWS services every user should
+// know cold, regardless of their certification track. Materialized into each
+// user's own Flashcard rows on first access (see @/lib/flashcard-templates).
+const FLASHCARD_TEMPLATES: Array<{ serviceCode: string; front: string; back: string; hint?: string }> = [
+  {
+    serviceCode: "EC2",
+    front: "O que e uma instancia sob demanda (On-Demand) na EC2?",
+    back: "Instancia cobrada por segundo/hora de uso, sem compromisso de longo prazo. Ideal para cargas imprevisiveis ou de curto prazo.",
+  },
+  {
+    serviceCode: "EC2",
+    front: "Qual a diferenca entre Security Group e Network ACL?",
+    back: "Security Group opera no nivel da instancia e e stateful (permite trafego de retorno automaticamente). Network ACL opera no nivel da subnet e e stateless (precisa de regras explicitas de entrada e saida).",
+  },
+  {
+    serviceCode: "EC2",
+    front: "O que sao Spot Instances?",
+    back: "Capacidade ociosa da AWS vendida com desconto de ate 90%, mas que pode ser interrompida pela AWS com 2 minutos de aviso. Ideal para cargas tolerantes a falha.",
+  },
+  {
+    serviceCode: "S3",
+    front: "Quais sao as classes de armazenamento do S3 para acesso infrequente?",
+    back: "S3 Standard-IA (Infrequent Access) e S3 One Zone-IA. Cobram uma taxa de recuperacao por GB, mas tem custo de armazenamento menor que o Standard.",
+  },
+  {
+    serviceCode: "S3",
+    front: "O S3 garante consistencia forte ou eventual?",
+    back: "Consistencia forte de leitura apos escrita (strong read-after-write consistency) para todas as operacoes, desde dezembro de 2020.",
+  },
+  {
+    serviceCode: "S3",
+    front: "O que e o S3 Lifecycle?",
+    back: "Conjunto de regras que movem objetos automaticamente entre classes de armazenamento (ex: Standard -> IA -> Glacier) ou os expiram, com base na idade do objeto.",
+  },
+  {
+    serviceCode: "IAM",
+    front: "Qual a diferenca entre uma Role e um User no IAM?",
+    back: "User representa uma identidade permanente (pessoa ou app) com credenciais de longo prazo. Role e assumida temporariamente (via STS) e nao tem credenciais fixas — usada por servicos, contas cruzadas ou federacao.",
+  },
+  {
+    serviceCode: "IAM",
+    front: "O que e o principio do menor privilegio (least privilege)?",
+    back: "Conceder a cada identidade apenas as permissoes minimas necessarias para realizar sua tarefa, reduzindo a superficie de risco em caso de comprometimento.",
+  },
+  {
+    serviceCode: "IAM",
+    front: "Como o IAM decide se uma acao e permitida quando ha multiplas policies?",
+    back: "Um DENY explicito sempre vence. Na ausencia de DENY explicito, um ALLOW explicito permite a acao. Por padrao (sem nenhuma policy), tudo e negado implicitamente (deny by default).",
+  },
+  {
+    serviceCode: "VPC",
+    front: "Qual a diferenca entre subnet publica e privada?",
+    back: "Subnet publica tem uma rota para um Internet Gateway (0.0.0.0/0 -> IGW). Subnet privada nao tem essa rota direta — para acesso a internet de saida, usa um NAT Gateway.",
+  },
+  {
+    serviceCode: "VPC",
+    front: "Para que serve um NAT Gateway?",
+    back: "Permite que instancias em subnets privadas iniciem conexoes de saida para a internet (ex: baixar atualizacoes), sem permitir conexoes de entrada iniciadas externamente.",
+  },
+  {
+    serviceCode: "VPC",
+    front: "O que e VPC Peering?",
+    back: "Conexao de rede entre duas VPCs que permite trafego roteado entre elas usando IPs privados, como se estivessem na mesma rede. Nao e transitivo (peering A-B e B-C nao da acesso A-C).",
+  },
+  {
+    serviceCode: "RDS",
+    front: "Qual a diferenca entre Multi-AZ e Read Replica no RDS?",
+    back: "Multi-AZ mantem uma replica sincrona em outra zona para failover automatico de disponibilidade (nao serve para leitura). Read Replica e assincrona e serve para escalar leituras, podendo estar em outra regiao.",
+  },
+  {
+    serviceCode: "RDS",
+    front: "O RDS oferece qual mecanismo de backup automatico?",
+    back: "Backups automaticos diarios com retencao configuravel (ate 35 dias) e point-in-time recovery, alem de snapshots manuais que persistem alem do periodo de retencao.",
+  },
+  {
+    serviceCode: "RDS",
+    front: "Quais engines de banco de dados o RDS suporta?",
+    back: "MySQL, PostgreSQL, MariaDB, Oracle, SQL Server e Amazon Aurora (compativel com MySQL/PostgreSQL).",
+  },
+  {
+    serviceCode: "LAMBDA",
+    front: "O que e 'cold start' no Lambda?",
+    back: "Latencia extra na primeira invocacao de uma funcao (ou apos ociosidade), quando a AWS precisa inicializar um novo ambiente de execucao antes de rodar o codigo.",
+  },
+  {
+    serviceCode: "LAMBDA",
+    front: "Qual o tempo maximo de execucao de uma funcao Lambda?",
+    back: "15 minutos (900 segundos) por invocacao.",
+  },
+  {
+    serviceCode: "LAMBDA",
+    front: "Como o Lambda escala para lidar com muitas invocacoes simultaneas?",
+    back: "Cria automaticamente instancias de execucao em paralelo, uma por invocacao concorrente, ate o limite de concorrencia da conta/funcao — sem gerenciamento manual de servidores.",
+  },
+];
+
+async function seedFlashcardTemplates() {
+  console.log("Seeding default flashcard templates...");
+
+  const services = await prisma.awsService.findMany({
+    where: { code: { in: [...new Set(FLASHCARD_TEMPLATES.map((t) => t.serviceCode))] } },
+    select: { id: true, code: true },
+  });
+  const serviceIdByCode = new Map(services.map((s) => [s.code, s.id]));
+
+  for (const template of FLASHCARD_TEMPLATES) {
+    const awsServiceId = serviceIdByCode.get(template.serviceCode);
+    if (!awsServiceId) {
+      console.warn(`Skipping flashcard template — AWS service not found: ${template.serviceCode}`);
+      continue;
+    }
+
+    await prisma.flashcardTemplate.upsert({
+      where: { awsServiceId_front: { awsServiceId, front: template.front } },
+      create: {
+        awsServiceId,
+        front: template.front,
+        back: template.back,
+        hint: template.hint,
+        topic: template.serviceCode,
+      },
+      update: {
+        back: template.back,
+        hint: template.hint,
+        topic: template.serviceCode,
+      },
+    });
+  }
+}
+
 async function seedBadgesIfConfigured() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -596,6 +726,7 @@ async function main() {
   await seedAdminIfConfigured();
   await seedCertifications();
   await seedAwsServicesAndQuestions();
+  await seedFlashcardTemplates();
   await seedXpWeights();
   await seedBadgesIfConfigured();
   await seedAchievementsIfConfigured();

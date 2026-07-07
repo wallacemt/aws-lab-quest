@@ -10,6 +10,7 @@ import {
   newsFetchQueue,
   changelogFetchQueue,
   dailyQuizQueue,
+  flashcardReminderQueue,
 } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { config } from "../config.js";
@@ -142,6 +143,14 @@ const DEFAULT_JOBS = [
     cronPattern: "5 0 * * *",
     payload: {},
   },
+  {
+    jobId: "cron-flashcard-reminder-daily",
+    name: "Lembrete de Flashcards (Diario)",
+    description: "Envia e-mail de lembrete para flashcards vencidos, agrupado por usuario",
+    queue: "flashcard-reminder",
+    cronPattern: "0 13 * * *",
+    payload: {},
+  },
 ] as const;
 
 function getQueueByName(queue: string): Queue | null {
@@ -156,6 +165,7 @@ function getQueueByName(queue: string): Queue | null {
     case "news-fetch": return newsFetchQueue;
     case "changelog-fetch": return changelogFetchQueue;
     case "daily-quiz": return dailyQuizQueue;
+    case "flashcard-reminder": return flashcardReminderQueue;
     default: return null;
   }
 }
@@ -172,6 +182,7 @@ function getJobNameForQueue(queue: string, jobId: string): string {
     case "news-fetch": return "news-fetch-cron";
     case "changelog-fetch": return "changelog-fetch-cron";
     case "daily-quiz": return "daily-quiz-seed";
+    case "flashcard-reminder": return "flashcard-reminder-daily";
     default: return jobId;
   }
 }
