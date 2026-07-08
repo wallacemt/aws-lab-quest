@@ -18,6 +18,7 @@ import {
   type MentorRecommendation,
   type AskStatus,
 } from "@/features/mentor/services/mentor-api";
+import { MESTRE_AVATAR_URL } from "@/lib/mentor-assets";
 import Image from "next/image";
 
 function MentorAnswer({
@@ -177,9 +178,7 @@ export function MentorScreen() {
           <div className="relative z-10 flex items-center gap-5">
             <div className="shrink-0 w-42 h-42 border-2 border-green-500 bg-green-900/40 flex items-center justify-center text-5xl shadow-[0_0_20px_rgba(34,197,94,0.2)]">
               <Image
-                src={
-                  "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/simulado-artwork/orphan/ai_mentor.png"
-                }
+                src={MESTRE_AVATAR_URL}
                 height={200}
                 width={200}
                 className=" object-cover"

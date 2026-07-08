@@ -2,17 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { ArrowLeft, GraduationCap, Maximize2, MessageCircle, Minimize2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Message, MessageAvatar, MessageContent, MessageGroup } from "@/components/ui/message";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Message, MessageContent, MessageGroup, MessageHeader } from "@/components/ui/message";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
 import { toTopicCode } from "@/features/study/screens/ReviewScreen";
 import {
@@ -22,8 +23,11 @@ import {
   StudyAnswerSnapshotPayload,
 } from "@/features/study/services";
 import { fetchTrails, QuestChain } from "@/features/trails/services/trails-api";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { MESTRE_AVATAR_URL } from "@/lib/mentor-assets";
 import { buildReviewOptions } from "@/lib/study-option-text";
 import { QuestionOption } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type GapReviewScreenProps = {
   serviceCode: string;
@@ -40,6 +44,7 @@ type GapChatPanelProps = {
 // Keyed by questionId in the parent so a fresh conversation starts per
 // question via remount, instead of resetting state inside an effect.
 function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: GapChatPanelProps) {
+  const { avatarUrl, profile } = useUserProfile();
   const [chatOpen, setChatOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [chatMessages, setChatMessages] = useState<GapChatTurn[]>([]);
@@ -49,8 +54,8 @@ function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: Gap
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages, chatLoading]);
+    chatEndRef.current?.scrollIntoView({ behavior: chatOpen ? "auto" : "smooth" });
+  }, [chatMessages, chatLoading, chatOpen]);
 
   async function handleSendChat() {
     const message = chatInput.trim();
@@ -79,69 +84,121 @@ function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: Gap
   }
 
   return (
-    <Sheet open={chatOpen} onOpenChange={setChatOpen}>
-      <SheetTrigger asChild>
-        <PixelButton variant="secondary">Chat com especialista</PixelButton>
-      </SheetTrigger>
+    <Sheet
+      open={chatOpen}
+      onOpenChange={(open) => {
+        setChatOpen(open);
+        if (!open) setFullscreen(false);
+      }}
+    >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SheetTrigger asChild>
+            <PixelButton variant="secondary" aria-label="Chat com especialista">
+              <MessageCircle className="h-4 w-4" />
+            </PixelButton>
+          </SheetTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Tirar dúvidas com a IA sobre esta questão</TooltipContent>
+      </Tooltip>
+
       <SheetContent
-        className={cn("flex w-full flex-col", fullscreen ? "data-[side=right]:sm:max-w-full" : "sm:max-w-md")}
+        className={cn("flex w-full flex-col gap-0 p-0", fullscreen ? "data-[side=right]:sm:max-w-full" : "sm:max-w-md")}
       >
-        <SheetHeader className="flex-row items-center justify-between">
-          <SheetTitle>Especialista em {serviceCode}</SheetTitle>
-          <PixelButton
-            variant="ghost"
-            className="px-2 py-1"
-            aria-label={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
-            title={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
-            onClick={() => setFullscreen((prev) => !prev)}
-          >
-            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </PixelButton>
+        <SheetHeader className="flex-row items-center justify-between gap-2 border-b border-[var(--pixel-border)] pr-14">
+          <div className="min-w-0">
+            <SheetTitle className="truncate">Especialista em {serviceCode}</SheetTitle>
+          </div>
+          {fullscreen && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Sair da tela cheia"
+                  onClick={() => setFullscreen(false)}
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Sair da tela cheia</TooltipContent>
+            </Tooltip>
+          )}
         </SheetHeader>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-4">
-          <ScrollArea className="h-[60vh] w-full">
-            <MessageGroup className="pr-2">
-              {chatMessages.length === 0 && (
-                <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-                  Pergunte sobre esta questão ou sobre {serviceCode}.
-                </p>
-              )}
-              {chatMessages.map((turn, index) => (
-                <Message key={index} align={turn.role === "user" ? "end" : "start"}>
-                  <MessageAvatar>
-                    <Avatar size="sm">
-                      <AvatarFallback>{turn.role === "user" ? "V" : "IA"}</AvatarFallback>
-                    </Avatar>
-                  </MessageAvatar>
-                  <MessageContent>
-                    <div
-                      className={cn(
-                        "max-w-[85%] border px-3 py-2 text-sm",
-                        turn.role === "user"
-                          ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
-                          : "border-[var(--pixel-border)] bg-[var(--pixel-bg)] prose prose-sm prose-invert max-w-none prose-p:font-sans prose-p:leading-relaxed prose-li:font-sans prose-strong:text-[var(--pixel-primary)] prose-code:font-mono prose-code:text-xs prose-ul:my-1 prose-li:my-0.5",
-                      )}
-                    >
-                      {turn.role === "assistant" ? (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.content}</ReactMarkdown>
-                      ) : (
-                        turn.content
-                      )}
-                    </div>
-                  </MessageContent>
-                </Message>
-              ))}
-              {chatLoading && (
-                <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                  Especialista digitando...
-                </p>
-              )}
-              {chatError && <p className="text-sm text-red-300">{chatError}</p>}
-              <div ref={chatEndRef} />
-            </MessageGroup>
-          </ScrollArea>
-        </div>
+        {!fullscreen && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="Expandir para tela cheia"
+                onClick={() => setFullscreen(true)}
+                className="absolute top-4 right-14 flex size-8 items-center justify-center rounded-[min(var(--radius-md),10px)] text-muted-foreground hover:bg-accent"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Tela cheia</TooltipContent>
+          </Tooltip>
+        )}
+
+        <ScrollArea className="min-h-0 flex-1">
+          <MessageGroup className="px-4 py-4">
+            {chatMessages.length === 0 && (
+              <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+                Pergunte sobre esta questão ou sobre {serviceCode}.
+              </p>
+            )}
+            {chatMessages.map((turn, index) => (
+              <Message key={index} align={turn.role === "user" ? "end" : "start"}>
+                <Avatar   className="mb-5 lg:w-20 lg:min-w-[5rem] lg:max-w-[5rem]">
+                  {turn.role === "user" ? (
+                    avatarUrl ? (
+                      <AvatarImage src={avatarUrl} alt="Você" />
+                    ) : (
+                      <AvatarFallback>{(profile.name || "V").charAt(0).toUpperCase()}</AvatarFallback>
+                    )
+                  ) : (
+                    <AvatarImage src={MESTRE_AVATAR_URL} alt={`Mestre ${serviceCode}`} />
+                  )}
+                </Avatar>
+                <MessageContent>
+                  <MessageHeader>{turn.role === "user" ? "Você" : `Mestre ${serviceCode}`}</MessageHeader>
+                  <div
+                    className={cn(
+                      "  rounded-2xl px-4 py-2.5 text-sm",
+                      turn.role === "user"
+                        ? "bg-[var(--pixel-primary)]/15 text-[var(--pixel-text)] lg:ml-42 ml-12"
+                        : "bg-[var(--pixel-muted)] prose prose-sm prose-invert max-w-none prose-p:font-sans prose-p:leading-relaxed prose-li:font-sans prose-strong:text-[var(--pixel-primary)] prose-code:font-mono prose-code:text-xs prose-ul:my-1 prose-li:my-0.5",
+                    )}
+                  >
+                    {turn.role === "assistant" ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.content}</ReactMarkdown>
+                    ) : (
+                      turn.content
+                    )}
+                  </div>
+                </MessageContent>
+              </Message>
+            ))}
+            {!chatLoading && (
+              <Message align="start">
+                <Avatar size="sm">
+                  <AvatarImage src={MESTRE_AVATAR_URL} alt={`Mestre ${serviceCode}`} />
+                </Avatar>
+                <MessageContent className="w-fit">
+                  <div className="flex items-center gap-1 rounded-2xl bg-[var(--pixel-muted)] px-4 py-2.5">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--pixel-subtext)] [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--pixel-subtext)] [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--pixel-subtext)]" />
+                  </div>
+                </MessageContent>
+              </Message>
+            )}
+            {chatError && <p className="text-sm text-red-300">{chatError}</p>}
+            <div ref={chatEndRef} />
+          </MessageGroup>
+        </ScrollArea>
 
         <div className="flex gap-2 border-t border-[var(--pixel-border)] p-4">
           <input
@@ -151,7 +208,7 @@ function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: Gap
               if (e.key === "Enter") void handleSendChat();
             }}
             placeholder="Digite sua dúvida..."
-            className="flex-1 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-sm outline-none"
+            className="flex-1 rounded-full border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-4 py-2 text-sm outline-none focus:border-[var(--pixel-primary)]"
           />
           <PixelButton onClick={() => void handleSendChat()} disabled={chatLoading || !chatInput.trim()}>
             Enviar
@@ -242,33 +299,65 @@ export function GapReviewScreen({ serviceCode, topic, awsServiceId }: GapReviewS
   return (
     <AppLayout>
       <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
-        <PixelCard className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Fechando gap</p>
-              <h1 className="font-[var(--font-body)] text-2xl">{serviceCode}</h1>
+        <TooltipProvider>
+          <PixelCard className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PixelButton variant="ghost" aria-label="Voltar" onClick={() => router.back()}>
+                      <ArrowLeft className="h-4 w-4" />
+                    </PixelButton>
+                  </TooltipTrigger>
+                  <TooltipContent>Voltar para a tela anterior</TooltipContent>
+                </Tooltip>
+                <div>
+                  <p className="font-mono text-[10px] uppercase text-primary">Fechando gap</p>
+                  <h1 className="font-[var(--font-body)] text-2xl">{serviceCode}</h1>
+                </div>
+              </div>
+
+              <div className="flex gap-8   items-end justify-end">
+                {selectedQuestion ? (
+                  <GapChatPanel
+                    key={selectedQuestion.questionId}
+                    serviceCode={serviceCode}
+                    questionStatement={selectedQuestion.statement}
+                    correctAnswerText={correctAnswerText}
+                  />
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>
+                        <PixelButton variant="secondary" disabled aria-label="Chat com especialista">
+                          <MessageCircle className="h-4 w-4" />
+                        </PixelButton>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Carregando questões...</TooltipContent>
+                  </Tooltip>
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PixelButton
+                      onClick={() => router.push(`/kc?topics=${encodeURIComponent(toTopicCode(serviceCode))}`)}
+                    >
+                      <GraduationCap className="h-4 w-4" />
+                    </PixelButton>
+                  </TooltipTrigger>
+                  <TooltipContent>Iniciar um Knowledge Check focado em {serviceCode}</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
-            <PixelButton variant="ghost" onClick={() => router.back()}>
-              ← Voltar
-            </PixelButton>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <PixelButton onClick={() => router.push(`/kc?topics=${encodeURIComponent(toTopicCode(serviceCode))}`)}>
-              Fazer KC sobre {serviceCode}
-            </PixelButton>
-          </div>
-        </PixelCard>
+          </PixelCard>
+        </TooltipProvider>
 
         {relatedChains.length > 0 && (
           <PixelCard className="space-y-2">
             <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Trilhas relacionadas</p>
             <div className="flex flex-wrap gap-2">
               {relatedChains.map((chain) => (
-                <PixelButton
-                  key={chain.id}
-                  variant="ghost"
-                  onClick={() => router.push(`/trilhas?chain=${chain.id}`)}
-                >
+                <PixelButton key={chain.id} variant="ghost" onClick={() => router.push(`/trilhas?chain=${chain.id}`)}>
                   {chain.name}
                 </PixelButton>
               ))}
@@ -326,13 +415,6 @@ export function GapReviewScreen({ serviceCode, topic, awsServiceId }: GapReviewS
                         Próxima
                       </PixelButton>
                     </div>
-
-                    <GapChatPanel
-                      key={selectedQuestion.questionId}
-                      serviceCode={serviceCode}
-                      questionStatement={selectedQuestion.statement}
-                      correctAnswerText={correctAnswerText}
-                    />
                   </div>
                 </PixelCard>
               )}
