@@ -9,12 +9,11 @@ import { getTaskXpByDifficulty } from "@/lib/levels";
 import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 
-// Sprint modes and their question counts / time limits.
+// Sprint modes: each combines a time limit with a matching question count.
 const SPRINT_MODE_CONFIG = {
-  q5: { count: 5, limitSeconds: null },
-  q10: { count: 10, limitSeconds: null },
-  t3: { count: 10, limitSeconds: 3 * 60 },
-  t5: { count: 10, limitSeconds: 5 * 60 },
+  s3: { count: 5, limitSeconds: 3 * 60 },
+  s5: { count: 10, limitSeconds: 5 * 60 },
+  s10: { count: 15, limitSeconds: 10 * 60 },
 } as const;
 
 type SprintMode = keyof typeof SPRINT_MODE_CONFIG;
@@ -39,8 +38,26 @@ type PostBody = {
 // correctOptions is a nullable Json column; { equals: Prisma.DbNull } matches SQL NULL.
 const SINGLE_SELECT_FILTER = { correctOptions: { equals: Prisma.DbNull } };
 
+const QUESTION_SELECT = {
+  id: true,
+  statement: true,
+  topic: true,
+  difficulty: true,
+  questionType: true,
+  optionA: true,
+  optionB: true,
+  optionC: true,
+  optionD: true,
+  optionE: true,
+  correctOption: true,
+  awsService: { select: { code: true, name: true } },
+} satisfies Prisma.StudyQuestionSelect;
+
+// How many of the user's most recent sprints to avoid repeating questions from.
+const RECENT_SPRINTS_TO_AVOID = 5;
+
 /**
- * GET /api/retention/sprint?mode=q5|q10|t3|t5
+ * GET /api/retention/sprint?mode=s3|s5|s10
  * Returns a set of single-select questions for a sprint session.
  */
 export async function GET(request: NextRequest) {
@@ -51,34 +68,51 @@ export async function GET(request: NextRequest) {
 
   const modeParam = request.nextUrl.searchParams.get("mode");
   if (!isSprintMode(modeParam)) {
-    return NextResponse.json({ error: "mode must be one of: q5, q10, t3, t5" }, { status: 400 });
+    return NextResponse.json({ error: "mode must be one of: s3, s5, s10" }, { status: 400 });
   }
 
   const { count, limitSeconds } = SPRINT_MODE_CONFIG[modeParam];
+  const baseWhere = { active: true, ...SINGLE_SELECT_FILTER };
+
+  // Avoid repeating questions the user answered in their recent sprints.
+  // ponytail: title-prefix match, not a dedicated subtype column — sprints
+  // share sessionType "KC" with regular Knowledge Checks (DEF-003). Add a
+  // subtype column if another feature ever needs to distinguish them too.
+  const recentSprints = await prisma.studySessionHistory.findMany({
+    where: { userId: session.user.id, sessionType: "KC", title: { startsWith: "Sprint " } },
+    orderBy: { completedAt: "desc" },
+    take: RECENT_SPRINTS_TO_AVOID,
+    select: { answersSnapshot: true },
+  });
+  const recentIds = new Set<string>();
+  for (const sprint of recentSprints) {
+    const snapshot = Array.isArray(sprint.answersSnapshot) ? (sprint.answersSnapshot as { questionId?: string }[]) : [];
+    for (const answer of snapshot) if (answer.questionId) recentIds.add(answer.questionId);
+  }
 
   // DEF-021: restrict to single-select questions so the client can score them.
-  const questions = await prisma.studyQuestion.findMany({
-    where: { active: true, ...SINGLE_SELECT_FILTER },
-    select: {
-      id: true,
-      statement: true,
-      topic: true,
-      difficulty: true,
-      questionType: true,
-      optionA: true,
-      optionB: true,
-      optionC: true,
-      optionD: true,
-      optionE: true,
-      correctOption: true,
-      awsService: { select: { code: true, name: true } },
-    },
+  const freshQuestions = await prisma.studyQuestion.findMany({
+    where: { ...baseWhere, id: { notIn: Array.from(recentIds) } },
+    select: QUESTION_SELECT,
     orderBy: { createdAt: "desc" },
     take: count * 3, // fetch extra, then sample randomly
   });
 
+  // The unseen pool may be smaller than the requested count (small question bank) —
+  // top it off with previously-seen questions rather than returning too few.
+  let candidates = freshQuestions;
+  if (candidates.length < count) {
+    const fallback = await prisma.studyQuestion.findMany({
+      where: { ...baseWhere, id: { notIn: candidates.map((q) => q.id) } },
+      select: QUESTION_SELECT,
+      orderBy: { createdAt: "desc" },
+      take: (count - candidates.length) * 3,
+    });
+    candidates = [...candidates, ...fallback];
+  }
+
   // Randomize and cap — avoids always returning the newest questions.
-  const shuffled = questions.sort(() => Math.random() - 0.5).slice(0, count);
+  const shuffled = candidates.sort(() => Math.random() - 0.5).slice(0, count);
 
   return NextResponse.json({ questions: shuffled, mode: modeParam, limitSeconds });
 }
@@ -117,7 +151,23 @@ export async function POST(request: NextRequest) {
   const [dbQuestions, weights] = await Promise.all([
     prisma.studyQuestion.findMany({
       where: { id: { in: questionIds }, active: true, ...SINGLE_SELECT_FILTER },
-      select: { id: true, correctOption: true, topic: true, difficulty: true },
+      select: {
+        id: true,
+        statement: true,
+        correctOption: true,
+        topic: true,
+        difficulty: true,
+        optionA: true,
+        optionB: true,
+        optionC: true,
+        optionD: true,
+        optionE: true,
+        explanationA: true,
+        explanationB: true,
+        explanationC: true,
+        explanationD: true,
+        explanationE: true,
+      },
     }),
     listXpWeightsByActivity("sprint" as Parameters<typeof listXpWeightsByActivity>[0]),
   ]);
@@ -150,6 +200,40 @@ export async function POST(request: NextRequest) {
   // Persist sprint XP through the same StudySessionHistory path as KC/Simulado (DEF-003 fix).
   const sprintTitle = `Sprint ${body.mode.toUpperCase()} — ${correctCount}/${answers.length} corretas`;
 
+  // Full snapshot shape (matches StudyAnswerSnapshotPayload) so the shared history
+  // review UI can render it — a bare {questionId, selectedOption} crashes that UI
+  // when it tries to read answer.options/explanations.
+  const answersSnapshot = answers
+    .map((answer) => {
+      const question = questionMap.get(answer.questionId);
+      if (!question) return null;
+      const selected = answer.selectedOption?.toUpperCase() ?? "-";
+      return {
+        questionId: answer.questionId,
+        statement: question.statement,
+        questionType: "single" as const,
+        selectedOption: selected,
+        selectedOptions: [selected],
+        correctOption: question.correctOption,
+        correctOptions: [question.correctOption],
+        options: {
+          A: question.optionA,
+          B: question.optionB,
+          C: question.optionC,
+          D: question.optionD,
+          ...(question.optionE ? { E: question.optionE } : {}),
+        },
+        explanations: {
+          A: question.explanationA ?? "Sem explicacao.",
+          B: question.explanationB ?? "Sem explicacao.",
+          C: question.explanationC ?? "Sem explicacao.",
+          D: question.explanationD ?? "Sem explicacao.",
+          ...(question.optionE ? { E: question.explanationE ?? "Sem explicacao." } : {}),
+        },
+      };
+    })
+    .filter((item) => item !== null);
+
   const historyItem = await prisma.studySessionHistory.create({
     data: {
       userId,
@@ -159,7 +243,7 @@ export async function POST(request: NextRequest) {
       scorePercent,
       correctAnswers: correctCount,
       totalQuestions: answers.length,
-      answersSnapshot: answers,
+      answersSnapshot,
       completedAt: new Date(),
     },
     select: { id: true },
