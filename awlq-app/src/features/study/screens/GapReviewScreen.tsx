@@ -17,8 +17,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
 import { toTopicCode } from "@/features/study/screens/ReviewScreen";
 import {
+  fetchGapProgress,
   fetchGapQuestions,
   GapChatTurn,
+  GapProgress,
   sendGapChatMessage,
   StudyAnswerSnapshotPayload,
 } from "@/features/study/services";
@@ -151,7 +153,7 @@ function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: Gap
             )}
             {chatMessages.map((turn, index) => (
               <Message key={index} align={turn.role === "user" ? "end" : "start"}>
-                <Avatar   className="mb-5 lg:w-20 lg:min-w-[5rem] lg:max-w-[5rem]">
+                <Avatar   className="mb-5  lg:min-h-14 lg:min-w-14">
                   {turn.role === "user" ? (
                     avatarUrl ? (
                       <AvatarImage src={avatarUrl} alt="Você" />
@@ -181,7 +183,7 @@ function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: Gap
                 </MessageContent>
               </Message>
             ))}
-            {!chatLoading && (
+            {chatLoading && (
               <Message align="start">
                 <Avatar size="sm">
                   <AvatarImage src={MESTRE_AVATAR_URL} alt={`Mestre ${serviceCode}`} />
@@ -227,6 +229,23 @@ export function GapReviewScreen({ serviceCode, topic, awsServiceId }: GapReviewS
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const [relatedChains, setRelatedChains] = useState<QuestChain[]>([]);
+  const [gapProgress, setGapProgress] = useState<GapProgress | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchGapProgress({ topic, awsServiceId })
+      .then((progress) => {
+        if (!cancelled) setGapProgress(progress);
+      })
+      .catch(() => {
+        // Progress bar is a nice-to-have — a failed fetch just hides it.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [topic, awsServiceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -349,6 +368,27 @@ export function GapReviewScreen({ serviceCode, topic, awsServiceId }: GapReviewS
                 </Tooltip>
               </div>
             </div>
+
+            {gapProgress && !gapProgress.cleared && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
+                    Progresso para fechar o gap
+                  </p>
+                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
+                    {gapProgress.consecutiveCorrect}/{gapProgress.threshold} acertos seguidos
+                  </p>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-[var(--pixel-border)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--pixel-accent)] transition-all"
+                    style={{
+                      width: `${Math.round((gapProgress.consecutiveCorrect / gapProgress.threshold) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </PixelCard>
         </TooltipProvider>
 

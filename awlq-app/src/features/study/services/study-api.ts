@@ -449,6 +449,26 @@ export async function fetchGapQuestions(params: {
   return data.questions ?? [];
 }
 
+export type GapProgress = {
+  consecutiveCorrect: number;
+  cleared: boolean;
+  threshold: number;
+};
+
+export async function fetchGapProgress(params: { topic: string; awsServiceId: string | null }): Promise<GapProgress> {
+  const searchParams = new URLSearchParams({ topic: params.topic });
+  if (params.awsServiceId) searchParams.set("sid", params.awsServiceId);
+
+  const response = await fetch(`/api/study/gap/progress?${searchParams.toString()}`);
+  const data = await parseJson<GapProgress & { error?: string }>(response);
+
+  if (!response.ok || data.error) {
+    throw new Error(data.error ?? "Erro ao carregar progresso do gap.");
+  }
+
+  return data;
+}
+
 export type GapChatTurn = { role: "user" | "assistant"; content: string };
 
 export async function sendGapChatMessage(params: {
