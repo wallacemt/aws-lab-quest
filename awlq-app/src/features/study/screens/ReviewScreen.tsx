@@ -10,7 +10,7 @@ import { fetchWeakServices, WeakServiceItem } from "@/features/study/services";
 const REVIEW_GAP_TOP_N = 20;
 const REVIEW_ACTION_TOPICS = 5;
 
-function toTopicCode(topic: string): string {
+export function toTopicCode(topic: string): string {
   const cleaned = topic
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
@@ -107,9 +107,14 @@ export function ReviewScreen() {
           {!loading && !error && weakServices.length > 0 && (
             <div className="space-y-2">
               {weakServices.map((item) => (
-                <div
+                <button
                   key={`${item.serviceCode}-${item.topic}`}
-                  className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2"
+                  onClick={() => {
+                    const params = new URLSearchParams({ topic: item.topic });
+                    if (item.awsServiceId) params.set("sid", item.awsServiceId);
+                    router.push(`/revisao/${encodeURIComponent(item.serviceCode || item.topic)}?${params.toString()}`);
+                  }}
+                  className="block w-full border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left transition hover:border-[var(--pixel-primary)]"
                 >
                   <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
                     {item.serviceCode || item.topic}
@@ -117,7 +122,12 @@ export function ReviewScreen() {
                   <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
                     {item.errors}/{item.attempts} erros ({item.errorRate}%)
                   </p>
-                </div>
+                  {item.gap && (
+                    <p className="mt-1 font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
+                      {item.gap.consecutiveCorrect}/10 acertos seguidos para fechar o gap
+                    </p>
+                  )}
+                </button>
               ))}
             </div>
           )}

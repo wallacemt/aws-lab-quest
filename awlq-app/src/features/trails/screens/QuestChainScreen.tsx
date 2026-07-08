@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
@@ -16,10 +17,11 @@ import { EmptyForScreens } from "@/components/ui/empty-screens";
  * stage map for each chain.
  */
 export function QuestChainScreen() {
+  const searchParams = useSearchParams();
   const [chains, setChains] = useState<QuestChain[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedChainId, setExpandedChainId] = useState<string | null>(null);
+  const [expandedChainId, setExpandedChainId] = useState<string | null>(searchParams.get("chain"));
   const [tooltip, setTooltip] = useState<string | null>(null);
 
   /**

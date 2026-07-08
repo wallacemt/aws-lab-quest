@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export type AiContext =
   // App contexts
-  | "QUESTION_EXPLAIN"           // explain + mentor/ask
+  | "QUESTION_EXPLAIN"           // explain + mentor/ask + revisao gap chat
   | "SIMULADO_MESSAGE"           // simulado message + artwork
   | "LAB_GENERATION"             // jornada/lab
   | "TRAIL_QUESTION_GENERATION"  // trails questions (formerly QUESTION_GENERATION)

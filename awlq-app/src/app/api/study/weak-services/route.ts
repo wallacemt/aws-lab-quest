@@ -16,6 +16,7 @@ type WeakServiceStat = {
   topic: string;
   serviceCode: string;
   serviceName: string;
+  awsServiceId: string | null;
   attempts: number;
   errors: number;
   correct: number;
@@ -76,10 +77,12 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       topic: true,
+      awsServiceId: true,
       questionAwsServices: {
         select: {
           service: {
             select: {
+              id: true,
               code: true,
               name: true,
             },
@@ -88,6 +91,7 @@ export async function GET(request: NextRequest) {
       },
       awsService: {
         select: {
+          id: true,
           code: true,
           name: true,
         },
@@ -110,6 +114,7 @@ export async function GET(request: NextRequest) {
       const normalizedService = question?.questionAwsServices?.[0]?.service;
       const serviceCode = normalizedService?.code ?? question?.awsService?.code ?? topic;
       const serviceName = normalizedService?.name ?? question?.awsService?.name ?? topic;
+      const awsServiceId = normalizedService?.id ?? question?.awsService?.id ?? question?.awsServiceId ?? null;
       const key = `${serviceCode.toUpperCase()}::${topic.toUpperCase()}`;
 
       const current =
@@ -118,6 +123,7 @@ export async function GET(request: NextRequest) {
           topic,
           serviceCode,
           serviceName,
+          awsServiceId,
           attempts: 0,
           errors: 0,
           correct: 0,
@@ -144,12 +150,19 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const gapProgress = await prisma.userGapProgress.findMany({
+    where: { userId: session.user.id },
+    select: { awsServiceId: true, topic: true, consecutiveCorrect: true, cleared: true },
+  });
+  const gapByKey = new Map(gapProgress.map((g) => [`${g.awsServiceId ?? ""}::${g.topic}`, g]));
+
   const weakServices = Array.from(aggregate.values())
     .map((item) => ({
       ...item,
       errorRate: item.attempts > 0 ? Math.round((item.errors / item.attempts) * 100) : 0,
+      gap: gapByKey.get(`${item.awsServiceId ?? ""}::${item.topic}`) ?? null,
     }))
-    .filter((item) => item.errors > 0)
+    .filter((item) => item.errors > 0 && !item.gap?.cleared)
     .sort((a, b) => {
       if (b.errorRate !== a.errorRate) {
         return b.errorRate - a.errorRate;

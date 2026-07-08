@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
 import { auth } from "@/lib/auth";
 import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
+import { GapAnswerResult, updateGapProgress } from "@/lib/gap-progress";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
 import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
@@ -90,6 +91,7 @@ export async function POST(request: NextRequest) {
   }
 
   const snapshot = Array.isArray(body.answersSnapshot) ? body.answersSnapshot.slice(0, 120) : [];
+  const gapAnswers: GapAnswerResult[] = [];
 
   let computedXp = Math.max(0, Math.round(body.gainedXp ?? 0));
   if (snapshot.length > 0) {
@@ -107,10 +109,12 @@ export async function POST(request: NextRequest) {
             id: true,
             topic: true,
             difficulty: true,
+            awsServiceId: true,
             questionAwsServices: {
               select: {
                 service: {
                   select: {
+                    id: true,
                     code: true,
                   },
                 },
@@ -132,11 +136,20 @@ export async function POST(request: NextRequest) {
           correctOptions: answer.correctOptions,
         });
 
+        const question = questionMap.get(answer.questionId);
+
+        if (body.sessionType === "SIMULADO" && question) {
+          gapAnswers.push({
+            awsServiceId: question.questionAwsServices?.[0]?.service?.id ?? question.awsServiceId ?? null,
+            topic: question.topic,
+            isCorrect,
+          });
+        }
+
         if (!isCorrect) {
           return total;
         }
 
-        const question = questionMap.get(answer.questionId);
         const difficulty = toTaskDifficulty(question?.difficulty);
         const normalizedTopic = question?.questionAwsServices?.[0]?.service?.code;
         const topic = normalizedTopic ?? question?.topic ?? "*";
@@ -213,6 +226,8 @@ export async function POST(request: NextRequest) {
     }),
     // Record streak for questions activity.
     recordStudyActivity(session.user.id, "questions", item.totalQuestions),
+    // Update gap-clearing streaks for Simulado answers (EPIC-03 #20).
+    updateGapProgress(session.user.id, gapAnswers),
   ]);
 
   return NextResponse.json({ item, prevXp, newXp, newAchievements }, { status: 201 });
