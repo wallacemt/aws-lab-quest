@@ -5,10 +5,20 @@ import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchWeakServices, WeakServiceItem } from "@/features/study/services";
+import { cn } from "@/lib/utils";
 
 const REVIEW_GAP_TOP_N = 20;
 const REVIEW_ACTION_TOPICS = 5;
+
+// Visual weight scales with how bad the gap is — worse error rate reads louder.
+function gapSeverityClass(errorRate: number): string {
+  if (errorRate >= 80) return "border-2 border-[#e74c3c] bg-red-900/30 text-red-300";
+  if (errorRate >= 50) return "border border-[#e74c3c]/70 bg-red-900/15 text-red-200";
+  return "border border-[var(--pixel-border)] bg-[var(--pixel-bg)] text-[var(--pixel-subtext)]";
+}
 
 export function toTopicCode(topic: string): string {
   const cleaned = topic
@@ -82,6 +92,10 @@ export function ReviewScreen() {
   return (
     <AppLayout>
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 xl:px-8">
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
+
         <PixelCard>
           <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Revisao</h1>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
@@ -105,31 +119,43 @@ export function ReviewScreen() {
           )}
 
           {!loading && !error && weakServices.length > 0 && (
-            <div className="space-y-2">
-              {weakServices.map((item) => (
-                <button
-                  key={`${item.serviceCode}-${item.topic}`}
-                  onClick={() => {
-                    const params = new URLSearchParams({ topic: item.topic });
-                    if (item.awsServiceId) params.set("sid", item.awsServiceId);
-                    router.push(`/revisao/${encodeURIComponent(item.serviceCode || item.topic)}?${params.toString()}`);
-                  }}
-                  className="block w-full border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-left transition hover:border-[var(--pixel-primary)]"
-                >
-                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                    {item.serviceCode || item.topic}
-                  </p>
-                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                    {item.errors}/{item.attempts} erros ({item.errorRate}%)
-                  </p>
-                  {item.gap && (
-                    <p className="mt-1 font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                      {item.gap.consecutiveCorrect}/10 acertos seguidos para fechar o gap
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
+            <TooltipProvider>
+              <ScrollArea className="h-72 w-full rounded-md border border-pixel-border">
+                <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
+                  {weakServices.map((item) => {
+                    const name = item.serviceCode || item.topic;
+                    return (
+                      <Tooltip key={`${item.serviceCode}-${item.topic}`}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => {
+                              const params = new URLSearchParams({ topic: item.topic });
+                              if (item.awsServiceId) params.set("sid", item.awsServiceId);
+                              router.push(`/revisao/${encodeURIComponent(name)}?${params.toString()}`);
+                            }}
+                            className={cn(
+                              "flex flex-col gap-1 px-2 py-2 text-left transition hover:border-[var(--pixel-primary)]",
+                              gapSeverityClass(item.errorRate),
+                            )}
+                          >
+                            <p className="truncate font-mono text-[10px] font-bold uppercase">{name}</p>
+                            <p className="font-[var(--font-body)] text-[11px] opacity-90">
+                              {item.errors}/{item.attempts} ({item.errorRate}%)
+                            </p>
+                            {item.gap && (
+                              <p className="font-mono text-[9px] uppercase text-[var(--pixel-accent)]">
+                                {item.gap.consecutiveCorrect}/10
+                              </p>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Clique para revisar {name}</TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </TooltipProvider>
           )}
         </PixelCard>
 
