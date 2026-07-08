@@ -65,6 +65,7 @@ export type SprintResult = {
   gainedXp: number;
   streakDays: number;
   newAchievements: { code: string; name: string; description: string }[];
+  historyId: string;
 };
 
 export type MemoryRecoveryItem = {
@@ -140,12 +141,12 @@ export async function fetchDailyReview(): Promise<DailyReviewData> {
   return apiFetch("/api/retention/daily-review");
 }
 
-export async function fetchSprintQuestions(mode: "q5" | "q10" | "t3" | "t5"): Promise<SprintData> {
+export async function fetchSprintQuestions(mode: "s3" | "s5" | "s10"): Promise<SprintData> {
   return apiFetch(`/api/retention/sprint?mode=${mode}`);
 }
 
 export async function submitSprint(
-  answers: { questionId: string; correct: boolean }[],
+  answers: { questionId: string; selectedOption: string }[],
   mode: string,
 ): Promise<SprintResult> {
   return apiFetch("/api/retention/sprint", {

@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
-import { HistoryTabs } from "@/features/study/components/history/HistoryTabs";
+import { ACTIVE_TABS, ActiveTab, HistoryTabs } from "@/features/study/components/history/HistoryTabs";
 import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 
 export function HistoryScreen() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const initialTab: ActiveTab = ACTIVE_TABS.includes(tabParam as ActiveTab) ? (tabParam as ActiveTab) : "LAB";
+  const initialReviewId = searchParams.get("reviewId") ?? undefined;
   const [labHistory, setLabHistory] = useState<QuestHistoryItem[]>([]);
   const [studyHistory, setStudyHistory] = useState<StudyHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +34,7 @@ export function HistoryScreen() {
           <div>
             <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Historico</h1>
             <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-              Labs finalizados e sessoes de estudo (KC e Simulado)
+              Labs finalizados e sessoes de estudo (KC, Sprint e Simulado)
             </p>
           </div>
         </div>
@@ -41,7 +46,13 @@ export function HistoryScreen() {
         )}
 
         {!loading && (
-          <HistoryTabs labHistory={labHistory} studyHistory={studyHistory} error={error} />
+          <HistoryTabs
+            labHistory={labHistory}
+            studyHistory={studyHistory}
+            error={error}
+            defaultTab={initialTab}
+            initialReviewId={initialReviewId}
+          />
         )}
       </main>
     </AppLayout>

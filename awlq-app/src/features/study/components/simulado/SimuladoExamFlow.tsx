@@ -3,22 +3,15 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
-import { STUDY_OPTIONS } from "@/features/study";
+import { QuestionOptionsCard } from "@/features/study/components/QuestionOptionsCard";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
+import { QuestionSideNav } from "@/features/study/components/QuestionSideNav";
 import { ReportQuestionModal } from "@/features/study/components/ReportQuestionModal";
 import { SimuladoPreSubmitModal } from "@/features/study/components/simulado/SimuladoPreSubmitModal";
 import { useSimuladoContext } from "@/features/study/context/SimuladoContext";
-import { isAnswerCorrect, normalizeAnswerValue, normalizeCorrectOptions } from "@/features/study/services";
-import { normalizeOptionText } from "@/lib/study-option-text";
-import { QuestionOption } from "@/lib/types";
+import { isAnswerCorrect } from "@/features/study/services";
 
-const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const GAP_TOP_N = 10;
-
-function toggleMultiAnswer(current: QuestionOption[], option: QuestionOption): QuestionOption[] {
-  if (current.includes(option)) return current.filter((item) => item !== option).sort();
-  return [...current, option].sort();
-}
 
 export function SimuladoExamFlow() {
   const {
@@ -146,12 +139,15 @@ export function SimuladoExamFlow() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
             >
-              <PixelCard className="space-y-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
-                    Questao {currentIndex + 1} de {questions.length}
-                  </p>
-                  <div className="flex items-center gap-2">
+              <QuestionOptionsCard
+                question={currentQuestion}
+                answer={answers[currentQuestion.id]}
+                onSelect={(value) => setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }))}
+                submitted={submitted}
+                large={focusMode}
+                questionLabel={`Questao ${currentIndex + 1} de ${questions.length}`}
+                headerActions={
+                  <>
                     {inExamFlow && (
                       <button
                         type="button"
@@ -199,141 +195,93 @@ export function SimuladoExamFlow() {
                         <line x1="12" y1="17" x2="12.01" y2="17" />
                       </svg>
                     </button>
-                  </div>
-                </div>
-
-                <p className={`font-[var(--font-body)] ${focusMode ? "text-lg" : "text-base"}`}>
-                  {currentQuestion.statement}
-                </p>
-                {currentQuestion.questionType === "multi" && (
-                  <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                    Questao multipla: selecione todas as alternativas corretas.
-                  </p>
-                )}
-
-                <div className="grid gap-2">
-                  {OPTIONS.map((option) => {
-                    const text = normalizeOptionText(currentQuestion.options[option]);
-                    if (!text) return null;
-                    const isReviewing = submitted;
-                    const selectedOptions = normalizeAnswerValue(answers[currentQuestion.id]);
-                    const correctOptions = normalizeCorrectOptions(currentQuestion);
-                    const isCorrectOption = isReviewing && correctOptions.includes(option);
-                    const isSelectedWrong = isReviewing && selectedOptions.includes(option) && !isCorrectOption;
-                    return (
-                      <label
-                        key={`${currentQuestion.id}-${option}`}
-                        className={`flex items-start gap-2 border-2 px-3 py-2 ${
-                          isCorrectOption
-                            ? "border-[#2ecc71] bg-green-900/35"
-                            : isSelectedWrong
-                              ? "border-[#e74c3c] bg-red-900/35"
-                              : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                        }`}
+                  </>
+                }
+                footer={
+                  <>
+                    {submitted && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
                       >
-                        <input
-                          type={currentQuestion.questionType === "multi" ? "checkbox" : "radio"}
-                          name={currentQuestion.id}
-                          checked={selectedOptions.includes(option)}
-                          onChange={() => {
-                            setAnswers((prev) => {
-                              const current = normalizeAnswerValue(prev[currentQuestion.id]);
-                              const nextValue =
-                                currentQuestion.questionType === "multi"
-                                  ? toggleMultiAnswer(current, option)
-                                  : option;
-                              return { ...prev, [currentQuestion.id]: nextValue };
-                            });
-                          }}
-                          disabled={submitted}
+                        <QuestionReviewPanel
+                          isCorrect={isAnswerCorrect({
+                            questionType: currentQuestion.questionType,
+                            answer: answers[currentQuestion.id],
+                            correctOption: currentQuestion.correctOption,
+                            correctOptions: currentQuestion.correctOptions,
+                          })}
+                          summary={currentReview?.summary}
+                          loading={Boolean(loadingReviewByQuestion[currentQuestion.id])}
+                          loadingText="Gerando revisao com IA..."
+                          options={currentReviewOptions}
+                          questionStatement={currentQuestion.statement}
+                          questionTypeLabel={
+                            currentQuestion.questionType === "multi" ? "Tipo multipla escolha" : "Tipo escolha unica"
+                          }
+                          questionIndex={currentIndex + 1}
+                          questionCount={questions.length}
                         />
-                        <span className={`font-[var(--font-body)] ${focusMode ? "text-base" : "text-sm"}`}>
-                          {option}) {text}
+                      </motion.div>
+                    )}
+
+                    <AnimatePresence>
+                      {reportMessage && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          className="font-[var(--font-body)] text-xs text-[var(--pixel-accent)]"
+                        >
+                          {reportMessage}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
+
+                    <div className="space-y-2 border-t border-[var(--pixel-border)] pt-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <PixelButton
+                          variant="ghost"
+                          onClick={() => void goToQuestion(currentIndex - 1)}
+                          disabled={currentIndex === 0}
+                        >
+                          ← Anterior
+                        </PixelButton>
+                        <span className="font-mono text-[11px] text-[var(--pixel-subtext)]">
+                          {currentIndex + 1} / {questions.length}
                         </span>
-                      </label>
-                    );
-                  })}
-                </div>
+                        <PixelButton
+                          onClick={() => void goToQuestion(currentIndex + 1)}
+                          disabled={currentIndex === questions.length - 1}
+                        >
+                          Proxima →
+                        </PixelButton>
+                      </div>
 
-                {submitted && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <QuestionReviewPanel
-                      isCorrect={isAnswerCorrect({
-                        questionType: currentQuestion.questionType,
-                        answer: answers[currentQuestion.id],
-                        correctOption: currentQuestion.correctOption,
-                        correctOptions: currentQuestion.correctOptions,
-                      })}
-                      summary={currentReview?.summary}
-                      loading={Boolean(loadingReviewByQuestion[currentQuestion.id])}
-                      loadingText="Gerando revisao com IA..."
-                      options={currentReviewOptions}
-                      questionStatement={currentQuestion.statement}
-                      questionTypeLabel={
-                        currentQuestion.questionType === "multi" ? "Tipo multipla escolha" : "Tipo escolha unica"
-                      }
-                      questionIndex={currentIndex + 1}
-                      questionCount={questions.length}
-                    />
-                  </motion.div>
-                )}
+                      {inExamFlow && (
+                        <div className="h-1 w-full overflow-hidden rounded bg-[var(--pixel-border)]">
+                          <div
+                            className="h-full bg-[var(--pixel-accent)] transition-all duration-300"
+                            style={{
+                              width: `${questions.length > 0 ? (answeredCount / questions.length) * 100 : 0}%`,
+                            }}
+                          />
+                        </div>
+                      )}
 
-                <AnimatePresence>
-                  {reportMessage && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="font-[var(--font-body)] text-xs text-[var(--pixel-accent)]"
-                    >
-                      {reportMessage}
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-
-                <div className="space-y-2 border-t border-[var(--pixel-border)] pt-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <PixelButton
-                      variant="ghost"
-                      onClick={() => void goToQuestion(currentIndex - 1)}
-                      disabled={currentIndex === 0}
-                    >
-                      ← Anterior
-                    </PixelButton>
-                    <span className="font-mono text-[11px] text-[var(--pixel-subtext)]">
-                      {currentIndex + 1} / {questions.length}
-                    </span>
-                    <PixelButton
-                      onClick={() => void goToQuestion(currentIndex + 1)}
-                      disabled={currentIndex === questions.length - 1}
-                    >
-                      Proxima →
-                    </PixelButton>
-                  </div>
-
-                  {inExamFlow && (
-                    <div className="h-1 w-full overflow-hidden rounded bg-[var(--pixel-border)]">
-                      <div
-                        className="h-full bg-[var(--pixel-accent)] transition-all duration-300"
-                        style={{ width: `${questions.length > 0 ? (answeredCount / questions.length) * 100 : 0}%` }}
-                      />
+                      {inReviewFlow && (
+                        <div className="flex justify-end gap-2">
+                          <PixelButton variant="ghost" onClick={navigateHome}>
+                            Voltar ao inicio
+                          </PixelButton>
+                          <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {inReviewFlow && (
-                    <div className="flex justify-end gap-2">
-                      <PixelButton variant="ghost" onClick={navigateHome}>
-                        Voltar ao inicio
-                      </PixelButton>
-                      <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
-                    </div>
-                  )}
-                </div>
-              </PixelCard>
+                  </>
+                }
+              />
             </motion.div>
           </section>
 
@@ -346,85 +294,15 @@ export function SimuladoExamFlow() {
                 transition={{ duration: 0.2 }}
                 className="space-y-4 xl:sticky xl:top-24 xl:self-start"
               >
-                <PixelCard className="space-y-3">
-                  <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Navegacao da prova</p>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between font-mono text-[10px] text-[var(--pixel-subtext)]">
-                      <span>
-                        Respondidas: {answeredCount}/{questions.length}
-                      </span>
-                      {inExamFlow && markedForReview.size > 0 && (
-                        <span className="text-yellow-400">{markedForReview.size} p/ revisao</span>
-                      )}
-                    </div>
-                    {inExamFlow && (
-                      <div className="h-1 w-full overflow-hidden rounded bg-[var(--pixel-border)]">
-                        <div
-                          className="h-full bg-[var(--pixel-accent)] transition-all duration-300"
-                          style={{
-                            width: `${questions.length > 0 ? (answeredCount / questions.length) * 100 : 0}%`,
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {inExamFlow && (
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] text-[var(--pixel-subtext)]">
-                      <span className="flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 border border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/30" />
-                        Resp.
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 border border-yellow-400 bg-yellow-900/30" />
-                        Revisar
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)]" />
-                        Vazia
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {questions.map((question, index) => {
-                      const answered = normalizeAnswerValue(answers[question.id]).length > 0;
-                      const isCurrent = index === currentIndex;
-                      const isMarked = inExamFlow && markedForReview.has(question.id);
-                      const isCorrectAfterSubmit =
-                        submitted &&
-                        isAnswerCorrect({
-                          questionType: question.questionType,
-                          answer: answers[question.id],
-                          correctOption: question.correctOption,
-                          correctOptions: question.correctOptions,
-                        });
-                      return (
-                        <button
-                          key={question.id}
-                          type="button"
-                          onClick={() => void goToQuestion(index)}
-                          className={`border px-1 py-1.5 font-mono text-[10px] uppercase transition-colors ${
-                            isCurrent
-                              ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/20"
-                              : submitted
-                                ? isCorrectAfterSubmit
-                                  ? "border-[#2ecc71] bg-green-900/15"
-                                  : "border-[#e74c3c] bg-red-900/20"
-                                : isMarked
-                                  ? "border-yellow-400 bg-yellow-900/20"
-                                  : answered
-                                    ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/15"
-                                    : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]"
-                          }`}
-                        >
-                          {index + 1}
-                        </button>
-                      );
-                    })}
-                  </div>
-
+                <QuestionSideNav
+                  questions={questions}
+                  answers={answers}
+                  currentIndex={currentIndex}
+                  submitted={submitted}
+                  markedForReview={markedForReview}
+                  onGoToQuestion={(index) => void goToQuestion(index)}
+                  title="Navegacao da prova"
+                >
                   {inExamFlow && (
                     <div className="flex flex-col gap-2 border-t border-[var(--pixel-border)] pt-3">
                       <PixelButton
@@ -443,7 +321,7 @@ export function SimuladoExamFlow() {
                       </PixelButton>
                     </div>
                   )}
-                </PixelCard>
+                </QuestionSideNav>
 
                 {inReviewFlow && (
                   <PixelCard className="space-y-3 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">

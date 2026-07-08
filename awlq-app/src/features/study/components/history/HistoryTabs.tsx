@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,7 +25,14 @@ type StudyAnswerSnapshot = {
 
 type StudySessionItem = Omit<StudyHistoryItem, "answersSnapshot"> & { answersSnapshot: StudyAnswerSnapshot[] };
 
-type ActiveTab = "LAB" | "KC" | "SIMULADO";
+export type ActiveTab = "LAB" | "KC" | "SPRINT" | "SIMULADO" | "TRILHAS" | "ARENA";
+
+export const ACTIVE_TABS: ActiveTab[] = ["LAB", "KC", "SPRINT", "SIMULADO", "TRILHAS", "ARENA"];
+
+// ponytail: Sprint shares StudySessionType.KC with regular Knowledge Checks (DEF-003) —
+// this title prefix is how the sprint route (src/app/api/retention/sprint/route.ts)
+// tags its own sessions, reused here to split the two into separate tabs.
+const SPRINT_TITLE_PREFIX = "Sprint ";
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: "Facil",
@@ -52,9 +59,18 @@ type Props = {
   error?: string | null;
   readOnly?: boolean;
   defaultTab?: ActiveTab;
+  initialReviewId?: string;
 };
 
-export function HistoryTabs({ labHistory, studyHistory, loading, error, readOnly, defaultTab = "LAB" }: Props) {
+export function HistoryTabs({
+  labHistory,
+  studyHistory,
+  loading,
+  error,
+  readOnly,
+  defaultTab = "LAB",
+  initialReviewId,
+}: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActiveTab>(defaultTab);
   const [search, setSearch] = useState("");
@@ -69,6 +85,17 @@ export function HistoryTabs({ labHistory, studyHistory, loading, error, readOnly
       })),
     [studyHistory],
   );
+
+  // Deep-link support: opens the review modal for a specific session (e.g. right
+  // after finishing a Sprint) then strips the query param so back/refresh doesn't reopen it.
+  useEffect(() => {
+    if (!initialReviewId) return;
+    const item = normalizedStudyHistory.find((i) => i.id === initialReviewId);
+    if (item) {
+      setSelectedStudyItem(item);
+      router.replace("/history");
+    }
+  }, [initialReviewId, normalizedStudyHistory, router]);
 
   const normalizedSearch = search.trim().toLowerCase();
 
@@ -90,20 +117,43 @@ export function HistoryTabs({ labHistory, studyHistory, loading, error, readOnly
     });
   }, [normalizedSearch, normalizedStudyHistory]);
 
-  const filteredKC = useMemo(() => filteredStudyHistory.filter((i) => i.sessionType === "KC"), [filteredStudyHistory]);
+  const filteredKC = useMemo(
+    () => filteredStudyHistory.filter((i) => i.sessionType === "KC" && !i.title.startsWith(SPRINT_TITLE_PREFIX)),
+    [filteredStudyHistory],
+  );
+  const filteredSprint = useMemo(
+    () => filteredStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(SPRINT_TITLE_PREFIX)),
+    [filteredStudyHistory],
+  );
   const filteredSimulado = useMemo(() => filteredStudyHistory.filter((i) => i.sessionType === "SIMULADO"), [filteredStudyHistory]);
 
-  const kcCount = normalizedStudyHistory.filter((i) => i.sessionType === "KC").length;
+  const kcCount = normalizedStudyHistory.filter((i) => i.sessionType === "KC" && !i.title.startsWith(SPRINT_TITLE_PREFIX)).length;
+  const sprintCount = normalizedStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(SPRINT_TITLE_PREFIX)).length;
   const simuladoCount = normalizedStudyHistory.filter((i) => i.sessionType === "SIMULADO").length;
 
-  const activeTabCount = activeTab === "LAB" ? filteredLabs.length : activeTab === "KC" ? filteredKC.length : filteredSimulado.length;
+  const activeTabCount =
+    activeTab === "LAB"
+      ? filteredLabs.length
+      : activeTab === "KC"
+        ? filteredKC.length
+        : activeTab === "SPRINT"
+          ? filteredSprint.length
+          : activeTab === "SIMULADO"
+            ? filteredSimulado.length
+            : 0; // TRILHAS / ARENA: wired up in a future epic
   const hasAnyResult = activeTabCount > 0;
 
   const tabs: { id: ActiveTab; label: string; total: number }[] = [
     { id: "LAB", label: "LAB", total: labHistory.length },
     { id: "KC", label: "KC", total: kcCount },
+    { id: "SPRINT", label: "Sprint", total: sprintCount },
     { id: "SIMULADO", label: "Simulado", total: simuladoCount },
+    { id: "TRILHAS", label: "Trilhas", total: 0 },
+    { id: "ARENA", label: "Arena", total: 0 },
   ];
+
+  const tabStripRef = useRef<HTMLDivElement>(null);
+  const scrollTabs = (direction: -1 | 1) => tabStripRef.current?.scrollBy({ left: direction * 160, behavior: "smooth" });
 
   const hasData = labHistory.length > 0 || normalizedStudyHistory.length > 0;
 
@@ -129,22 +179,40 @@ export function HistoryTabs({ labHistory, studyHistory, loading, error, readOnly
 
       {!loading && !error && hasData && (
         <>
-          <div className="flex gap-0 border-2 border-[var(--pixel-border)]">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 px-4 py-2 font-mono text-[10px] uppercase transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-[var(--pixel-primary)] text-[var(--pixel-bg)]"
-                    : "bg-[var(--pixel-card)] text-[var(--pixel-subtext)] hover:bg-[var(--pixel-muted)]"
-                }`}
-              >
-                {tab.label}
-                <span className="ml-1 opacity-70">({tab.total})</span>
-              </button>
-            ))}
+          <div className="flex items-stretch gap-1">
+            <button
+              type="button"
+              onClick={() => scrollTabs(-1)}
+              aria-label="Abas anteriores"
+              className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 font-mono text-xs text-[var(--pixel-subtext)] hover:bg-[var(--pixel-muted)]"
+            >
+              ‹
+            </button>
+            <div ref={tabStripRef} className="flex flex-1 gap-0 overflow-x-auto border-2 border-[var(--pixel-border)] scroll-smooth">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`shrink-0 grow basis-28 px-4 py-2 font-mono text-[10px] uppercase transition-colors ${
+                    activeTab === tab.id
+                      ? "bg-[var(--pixel-primary)] text-[var(--pixel-bg)]"
+                      : "bg-[var(--pixel-card)] text-[var(--pixel-subtext)] hover:bg-[var(--pixel-muted)]"
+                  }`}
+                >
+                  {tab.label}
+                  <span className="ml-1 opacity-70">({tab.total})</span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => scrollTabs(1)}
+              aria-label="Próximas abas"
+              className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-2 font-mono text-xs text-[var(--pixel-subtext)] hover:bg-[var(--pixel-muted)]"
+            >
+              ›
+            </button>
           </div>
 
           <PixelCard className="space-y-3">
@@ -215,6 +283,32 @@ export function HistoryTabs({ labHistory, studyHistory, loading, error, readOnly
             <ScrollArea className="h-92 w-full rounded-md border border-pixel-border">
               <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
                 {filteredKC.map((item) => (
+                  <button key={item.id} type="button" onClick={() => setSelectedStudyItem(item as StudySessionItem)} className="text-left">
+                    <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-[var(--font-body)] text-base">{item.title}</p>
+                          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{item.certificationCode ?? "Certificacao nao definida"}</p>
+                        </div>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-accent)]">{item.scorePercent}%</span>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)]">+{item.gainedXp} XP</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pixel-subtext)]">
+                        <span className="font-[var(--font-body)]">{item.correctAnswers}/{item.totalQuestions} corretas</span>
+                        <span className="font-[var(--font-body)]">· {new Date(item.completedAt).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                      <p className="font-mono text-[9px] uppercase text-[var(--pixel-accent)]">Clique para revisar respostas</p>
+                    </PixelCard>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+
+          {activeTab === "SPRINT" && filteredSprint.length > 0 && (
+            <ScrollArea className="h-92 w-full rounded-md border border-pixel-border">
+              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                {filteredSprint.map((item) => (
                   <button key={item.id} type="button" onClick={() => setSelectedStudyItem(item as StudySessionItem)} className="text-left">
                     <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[var(--pixel-accent)]">
                       <div className="flex items-start justify-between gap-3">
@@ -395,7 +489,7 @@ export function HistoryTabs({ labHistory, studyHistory, loading, error, readOnly
                     const questionType = normalizeQuestionType(answer.questionType);
                     const selectedLabels = Array.isArray(answer.selectedOptions) && answer.selectedOptions.length > 0 ? answer.selectedOptions : [answer.selectedOption];
                     const correctLabels = Array.isArray(answer.correctOptions) && answer.correctOptions.length > 0 ? answer.correctOptions : [answer.correctOption];
-                    const renderedOptions = Object.entries(answer.options).map(([opt, text]) => ({ option: opt, text: normalizeOptionText(text) })).filter((e) => e.text.length > 0);
+                    const renderedOptions = Object.entries(answer.options ?? {}).map(([opt, text]) => ({ option: opt, text: normalizeOptionText(text) })).filter((e) => e.text.length > 0);
                     const renderableSet = new Set(renderedOptions.map((e) => e.option));
                     const selectedVisible = selectedLabels.filter((l) => renderableSet.has(l));
                     const correctVisible = correctLabels.filter((l) => renderableSet.has(l));
@@ -423,7 +517,7 @@ export function HistoryTabs({ labHistory, studyHistory, loading, error, readOnly
                                 {correctVisible.includes(option) ? " · correta" : ""}
                                 {selectedVisible.includes(option) ? " · sua resposta" : ""}
                               </p>
-                              <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{answer.explanations[option] ?? "Sem explicacao."}</p>
+                              <p className="mt-1 font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{answer.explanations?.[option] ?? "Sem explicacao."}</p>
                             </div>
                           ))}
                         </div>
