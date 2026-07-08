@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Maximize2, Minimize2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Message, MessageAvatar, MessageContent, MessageGroup } from "@/components/ui/message";
@@ -9,6 +12,7 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
 import { toTopicCode } from "@/features/study/screens/ReviewScreen";
 import {
@@ -37,6 +41,7 @@ type GapChatPanelProps = {
 // question via remount, instead of resetting state inside an effect.
 function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: GapChatPanelProps) {
   const [chatOpen, setChatOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [chatMessages, setChatMessages] = useState<GapChatTurn[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -78,9 +83,20 @@ function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: Gap
       <SheetTrigger asChild>
         <PixelButton variant="secondary">Chat com especialista</PixelButton>
       </SheetTrigger>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
-        <SheetHeader>
+      <SheetContent
+        className={cn("flex w-full flex-col", fullscreen ? "data-[side=right]:sm:max-w-full" : "sm:max-w-md")}
+      >
+        <SheetHeader className="flex-row items-center justify-between">
           <SheetTitle>Especialista em {serviceCode}</SheetTitle>
+          <PixelButton
+            variant="ghost"
+            className="px-2 py-1"
+            aria-label={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
+            title={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
+            onClick={() => setFullscreen((prev) => !prev)}
+          >
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </PixelButton>
         </SheetHeader>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-4">
@@ -100,13 +116,18 @@ function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: Gap
                   </MessageAvatar>
                   <MessageContent>
                     <div
-                      className={
+                      className={cn(
+                        "max-w-[85%] border px-3 py-2 text-sm",
                         turn.role === "user"
-                          ? "max-w-[85%] border border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10 px-3 py-2 text-sm"
-                          : "max-w-[85%] border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-sm"
-                      }
+                          ? "border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10"
+                          : "border-[var(--pixel-border)] bg-[var(--pixel-bg)] prose prose-sm prose-invert max-w-none prose-p:font-sans prose-p:leading-relaxed prose-li:font-sans prose-strong:text-[var(--pixel-primary)] prose-code:font-mono prose-code:text-xs prose-ul:my-1 prose-li:my-0.5",
+                      )}
                     >
-                      {turn.content}
+                      {turn.role === "assistant" ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.content}</ReactMarkdown>
+                      ) : (
+                        turn.content
+                      )}
                     </div>
                   </MessageContent>
                 </Message>
