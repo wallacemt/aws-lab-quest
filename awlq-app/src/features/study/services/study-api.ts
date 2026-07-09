@@ -76,10 +76,12 @@ export type WeakServiceItem = {
   topic: string;
   serviceCode: string;
   serviceName: string;
+  awsServiceId: string | null;
   attempts: number;
   errors: number;
   correct: number;
   errorRate: number;
+  gap: { consecutiveCorrect: number; cleared: boolean } | null;
 };
 
 export type SimuladoExamGuidePayload = {
@@ -428,6 +430,66 @@ export async function fetchWeakServices(params?: { take?: number; sample?: numbe
   }
 
   return data.weakServices ?? [];
+}
+
+export async function fetchGapQuestions(params: {
+  topic: string;
+  awsServiceId: string | null;
+}): Promise<StudyAnswerSnapshotPayload[]> {
+  const searchParams = new URLSearchParams({ topic: params.topic });
+  if (params.awsServiceId) searchParams.set("sid", params.awsServiceId);
+
+  const response = await fetch(`/api/study/gap/questions?${searchParams.toString()}`);
+  const data = await parseJson<{ questions?: StudyAnswerSnapshotPayload[]; error?: string }>(response);
+
+  if (!response.ok || data.error) {
+    throw new Error(data.error ?? "Erro ao carregar questões do gap.");
+  }
+
+  return data.questions ?? [];
+}
+
+export type GapProgress = {
+  consecutiveCorrect: number;
+  cleared: boolean;
+  threshold: number;
+};
+
+export async function fetchGapProgress(params: { topic: string; awsServiceId: string | null }): Promise<GapProgress> {
+  const searchParams = new URLSearchParams({ topic: params.topic });
+  if (params.awsServiceId) searchParams.set("sid", params.awsServiceId);
+
+  const response = await fetch(`/api/study/gap/progress?${searchParams.toString()}`);
+  const data = await parseJson<GapProgress & { error?: string }>(response);
+
+  if (!response.ok || data.error) {
+    throw new Error(data.error ?? "Erro ao carregar progresso do gap.");
+  }
+
+  return data;
+}
+
+export type GapChatTurn = { role: "user" | "assistant"; content: string };
+
+export async function sendGapChatMessage(params: {
+  message: string;
+  serviceName: string;
+  questionStatement: string;
+  correctAnswerText: string;
+  history: GapChatTurn[];
+}): Promise<string> {
+  const response = await fetch("/api/study/gap/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const data = await parseJson<{ answer?: string; error?: string }>(response);
+
+  if (!response.ok || data.error) {
+    throw new Error(data.error ?? "Erro ao conversar com o especialista.");
+  }
+
+  return data.answer ?? "";
 }
 
 export async function suggestStudyQuestion(params: {

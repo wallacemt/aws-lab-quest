@@ -58,6 +58,7 @@ model User {
   bossBattles             BossBattle[]
   weeklyChallengeEntries  WeeklyChallengeEntry[]
   dailyQuizAttempts       DailyQuizAttempt[]
+  gapProgress             UserGapProgress[]
   lastMentorQuestionAt    DateTime?
   lastMentorQuestion      String?
   lastMentorAnswer        String?
@@ -162,6 +163,7 @@ model AwsService {
   questions           StudyQuestion[]
   questionAwsServices QuestionAwsService[]
   flashcardTemplates  FlashcardTemplate[]
+  gapProgress         UserGapProgress[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -354,6 +356,25 @@ model StudySessionHistory {
   @@index([sessionType])
   @@index([packId])
   @@index([anonymized, createdAt])
+}
+
+// Tracks per-user progress toward closing a knowledge gap on a service/topic.
+// consecutiveCorrect resets to 0 on any wrong answer; hitting the threshold
+// (see GAP_CLEAR_THRESHOLD in lib/gap-progress.ts) marks it cleared.
+model UserGapProgress {
+  id                 String      @id @default(cuid())
+  userId             String
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  awsServiceId       String?
+  awsService         AwsService? @relation(fields: [awsServiceId], references: [id], onDelete: Cascade)
+  topic              String
+  consecutiveCorrect Int         @default(0)
+  cleared            Boolean     @default(false)
+  updatedAt          DateTime    @updatedAt
+  createdAt          DateTime    @default(now())
+
+  @@unique([userId, awsServiceId, topic])
+  @@index([userId, cleared])
 }
 
 model QuestionReport {
