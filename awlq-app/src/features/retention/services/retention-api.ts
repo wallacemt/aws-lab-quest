@@ -26,18 +26,6 @@ export type StudyQuestionLite = {
   awsService?: { code: string; name: string } | null;
 };
 
-export type WeakService = {
-  code: string;
-  name: string;
-  correctRate: number;
-};
-
-export type DailyReviewData = {
-  dueFlashcards: Flashcard[];
-  recentWrong: StudyQuestionLite[];
-  weakServices: WeakService[];
-};
-
 export type SprintQuestion = {
   id: string;
   statement: string;
@@ -137,10 +125,6 @@ export async function deleteFlashcard(flashcardId: string): Promise<{ ok: boolea
   return apiFetch(`/api/retention/flashcards/manage/${flashcardId}`, { method: "DELETE" });
 }
 
-export async function fetchDailyReview(): Promise<DailyReviewData> {
-  return apiFetch("/api/retention/daily-review");
-}
-
 export async function fetchSprintQuestions(mode: "s3" | "s5" | "s10"): Promise<SprintData> {
   return apiFetch(`/api/retention/sprint?mode=${mode}`);
 }
@@ -158,15 +142,4 @@ export async function submitSprint(
 
 export async function fetchMemoryRecovery(): Promise<{ items: MemoryRecoveryItem[] }> {
   return apiFetch("/api/retention/memory-recovery");
-}
-
-/**
- * Signals to the server that the user completed their daily review session.
- * Triggers streak increment (idempotent per day). (DEF-004 fix)
- */
-export async function completeDailyReview(): Promise<{
-  streakDays: number;
-  incrementedToday: boolean;
-}> {
-  return apiFetch("/api/retention/daily-review/complete", { method: "POST" });
 }

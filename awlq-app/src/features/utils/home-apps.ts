@@ -45,12 +45,6 @@ export const RETENTION_MODES: GameMode[] = [
     description: "Sessoes ultra-rapidas de 3 a 10 questoes para manter o ritmo diario.",
     cta: "Iniciar Sprint",
   },
-  {
-    id: "daily-review",
-    title: "Revisao Diaria",
-    description: "Painel de itens pendentes para hoje com base no seu historico de erros.",
-    cta: "Ver Revisao",
-  },
 ];
 
 export const ADVENTURE_MODES: GameMode[] = [
@@ -104,7 +98,6 @@ export const APP_SECTION_LABEL: Record<string, string> = {
   revisao: "Estudo",
   flashcards: "Retencao",
   sprint: "Retencao",
-  "daily-review": "Retencao",
   arena: "Aventura",
   trilhas: "Aventura",
   biblioteca: "Ferramentas",

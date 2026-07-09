@@ -8,7 +8,7 @@
 
 import { prisma } from "@/lib/prisma";
 
-export type StudyActivity = "flashcards" | "questions" | "sprint" | "daily_review";
+export type StudyActivity = "flashcards" | "questions" | "sprint";
 
 export type StreakResult = {
   streakDays: number;
@@ -20,7 +20,6 @@ const ACTIVITY_THRESHOLDS: Record<StudyActivity, number> = {
   flashcards: 10,
   questions: 5,
   sprint: 1,
-  daily_review: 1,
 };
 
 function toCalendarDate(date: Date): string {

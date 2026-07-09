@@ -6,7 +6,6 @@ export type XpActivityType =
   | "SIMULADO"
   | "sprint"
   | "flashcard"
-  | "daily_review"
   | "boss_battle"
   | "weekly_challenge"
   | "daily_quiz";

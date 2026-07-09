@@ -288,7 +288,7 @@ describe("TC-005: Streak — gap reset", () => {
     });
     mockPrismaStreak.userBehaviorProfile.update.mockResolvedValue({ streakDays: 5 });
 
-    const result = await recordStudyActivity(USER_ID, "daily_review", 1);
+    const result = await recordStudyActivity(USER_ID, "sprint", 1);
 
     expect(result.streakDays).toBe(5);
     expect(mockPrismaStreak.userBehaviorProfile.update).toHaveBeenCalledWith(
