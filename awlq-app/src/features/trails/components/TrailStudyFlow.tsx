@@ -15,6 +15,7 @@ import {
 import { RetroIcon } from "@/components/ui/retro-loading";
 import { QuestionOptionsCard, type QuestionCardQuestion } from "@/features/study/components/QuestionOptionsCard";
 import type { QuestionOption } from "@/lib/types";
+import { X } from "lucide-react";
 
 // ─── State machine ────────────────────────────────────────────────────────────
 
@@ -165,7 +166,7 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
   const isCorrect = selected === question.correctKey;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 max-w-2xl mx-auto">
       <div className="flex items-center justify-between">
         <p className="font-mono text-[10px] uppercase text-primary">
           Questão {idx + 1} de {total}
@@ -196,12 +197,12 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
         footer={
           revealed ? (
             <div
-              className={`border-t pt-3 ${isCorrect ? "border-[var(--pixel-accent)]/60" : "border-red-500/40"}`}
+              className={`border-t pt-3 ${isCorrect ? "border-green-500/60" : "border-red-500/40"}`}
             >
-              <p className="font-mono text-[10px] uppercase text-[var(--pixel-muted)] mb-1">
+              <p className={`font-mono text-[10px] uppercase ${ isCorrect ? "text-accent" : "text-red-500"} mb-1`}>
                 {isCorrect ? "✓ Correto!" : `✗ Incorreto — Resposta: ${question.correctKey}`}
               </p>
-              <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{question.explanation}</p>
+              <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{question.explanation}</p>
             </div>
           ) : undefined
         }
@@ -312,7 +313,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
       >
         <PixelCard className="space-y-4 overflow-auto h-full">
           {/* Header */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start border-accent border-b-2 pb-2 justify-between gap-4">
             <div>
               <p className="font-mono text-[10px] uppercase text-accent tracking-widest">
                 {phase.tag === "explain" || phase.tag === "loading_explain"
@@ -333,9 +334,10 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
               <button
                 type="button"
                 onClick={onClose}
+                title="Fechar Trilha"
                 className="font-mono text-xs text-pixel-subtext hover:text-primary transition-colors shrink-0"
               >
-                ✕ Fechar
+                <X/>
               </button>
             )}
           </div>
@@ -440,7 +442,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
 
           {/* Quiz */}
           {phase.tag === "quiz" && (
-            <>
+            <div className="mx-auto max-w-2xl space-y-2">
               <QuizCard
                 question={phase.questions[phase.idx]!}
                 idx={phase.idx}
@@ -455,12 +457,12 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                   {phase.idx >= phase.questions.length - 1 ? "Ver resultado" : "Próxima questão →"}
                 </PixelButton>
               )}
-            </>
+            </div>
           )}
 
           {/* Failed */}
           {phase.tag === "quiz_failed" && (
-            <div className="flex flex-col items-center gap-4 py-6 text-center">
+            <div className="flex flex-col items-center max-w-2xl mx-auto gap-4 py-6 text-center">
               <p className="text-4xl">😓</p>
               <div>
                 <p className="font-mono text-base font-bold text-pixel-text">
@@ -485,7 +487,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
 
           {/* Review of the failed attempt: every question with the user's answer revealed */}
           {phase.tag === "review" && (
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6 max-w-2xl mx-auto">
               {answers.map((a, i) => (
                 <QuizCard
                   key={a.question.id}

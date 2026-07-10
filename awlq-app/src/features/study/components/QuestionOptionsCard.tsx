@@ -73,7 +73,7 @@ export function QuestionOptionsCard({
         </p>
       )}
 
-      <div className="grid gap-2">
+      <div className="grid gap-4">
         {OPTION_KEYS.map((option) => {
           const text = normalizeOptionText(question.options[option]);
           if (!text) return null;
