@@ -3,7 +3,7 @@ import { type AiContext, loadAiConfig } from "@/lib/ai-config";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 // ponytail: openrouter/free delegates model selection to the router — avoids hardcoded slugs that go stale
 const DEFAULT_MODEL = "openrouter/free";
-const DEFAULT_MAX_TOKENS = 2048;
+const DEFAULT_MAX_TOKENS = 4096;
 
 export class AiNotConfiguredError extends Error {
   constructor() {
@@ -78,5 +78,8 @@ export function extractJsonObject(text: string): string | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1 || end <= start) return null;
-  return text.slice(start, end + 1);
+  // ponytail: LLMs routinely leave a trailing comma before "]"/"}" — safe to
+  // strip since a trailing comma is never valid JSON, so this can't corrupt
+  // an otherwise-correct payload.
+  return text.slice(start, end + 1).replace(/,(\s*[\]}])/g, "$1");
 }

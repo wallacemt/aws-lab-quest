@@ -167,7 +167,7 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="font-mono text-[10px] uppercase text-[var(--pixel-muted)]">
+        <p className="font-mono text-[10px] uppercase text-primary">
           Questão {idx + 1} de {total}
         </p>
         {/* Progress dots */}
