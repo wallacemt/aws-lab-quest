@@ -383,28 +383,28 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
 
               {/* Selected topic content */}
               <div className="flex min-w-0 flex-1 flex-col gap-4">
-                <div className="max-w-prose flex-1 overflow-y-auto border border-pixel-border bg-pixel-card p-4 sm:p-6">
+                <div className="flex-1 overflow-y-auto border border-pixel-border bg-pixel-card p-4 sm:p-6">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      h1: ({ children }) => <h1 className="mb-2 font-mono text-sm uppercase text-primary">{children}</h1>,
+                      h1: ({ children }) => <h1 className="mb-3 font-mono text-base uppercase text-primary">{children}</h1>,
                       h2: ({ children }) => (
-                        <h2 className="mb-2 mt-4 font-mono text-xs uppercase text-accent">{children}</h2>
+                        <h2 className="mb-3 mt-5 font-mono text-sm uppercase text-accent">{children}</h2>
                       ),
                       h3: ({ children }) => (
-                        <h3 className="mb-1 mt-3 font-mono text-[11px] uppercase text-accent">{children}</h3>
+                        <h3 className="mb-2 mt-4 font-mono text-xs uppercase text-accent">{children}</h3>
                       ),
                       p: ({ children }) => (
-                        <p className="mb-2 font-sans text-sm leading-6 text-pixel-subtext">{children}</p>
+                        <p className="mb-3 font-sans text-base leading-7 text-pixel-subtext">{children}</p>
                       ),
                       li: ({ children }) => (
-                        <li className="mb-1 ml-4 list-disc font-sans text-sm text-pixel-subtext">{children}</li>
+                        <li className="mb-1.5 ml-4 list-disc font-sans text-base leading-7 text-pixel-subtext">{children}</li>
                       ),
-                      ul: ({ children }) => <ul className="mb-2 space-y-0.5">{children}</ul>,
-                      ol: ({ children }) => <ol className="mb-2 list-decimal ml-4 space-y-0.5">{children}</ol>,
+                      ul: ({ children }) => <ul className="mb-3 space-y-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="mb-3 list-decimal ml-4 space-y-1">{children}</ol>,
                       strong: ({ children }) => <strong className="font-semibold text-pixel-text">{children}</strong>,
                       code: ({ children }) => (
-                        <code className="bg-pixel-border/10 rounded-md px-1 py-0.5 font-mono text-xs text-accent">
+                        <code className="bg-pixel-border/10 rounded-md px-1 py-0.5 font-mono text-sm text-accent">
                           {children}
                         </code>
                       ),
@@ -414,19 +414,17 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                     {sections[topicIdx]?.body ?? ""}
                   </ReactMarkdown>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <PixelButton variant="ghost" onClick={onClose}>
+                    Voltar
+                  </PixelButton>
                   {isLastTopic ? (
-                    <PixelButton onClick={() => void startQuiz()} className="flex-1">
-                      Estou pronto — Iniciar Quiz
-                    </PixelButton>
+                    <PixelButton onClick={() => void startQuiz()}>Estou pronto — Iniciar Quiz</PixelButton>
                   ) : (
-                    <PixelButton onClick={() => setTopicIdx((i) => Math.min(i + 1, sections.length - 1))} className="flex-1">
+                    <PixelButton onClick={() => setTopicIdx((i) => Math.min(i + 1, sections.length - 1))}>
                       Próximo tópico →
                     </PixelButton>
                   )}
-                  <PixelButton variant="ghost" onClick={onClose} className="shrink-0">
-                    Voltar
-                  </PixelButton>
                 </div>
               </div>
             </div>
@@ -474,9 +472,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-3">
-                <PixelButton onClick={() => setPhase({ tag: "review" })} className="flex-1">
-                  Rever tentativa
-                </PixelButton>
+                <PixelButton onClick={() => setPhase({ tag: "review" })}>Rever tentativa</PixelButton>
                 <PixelButton variant="ghost" onClick={() => setPhase({ tag: "explain" })}>
                   Reler explicação
                 </PixelButton>
@@ -503,9 +499,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                 />
               ))}
               <div className="flex gap-3">
-                <PixelButton onClick={() => setPhase({ tag: "quiz_failed" })} className="flex-1">
-                  Voltar
-                </PixelButton>
+                <PixelButton onClick={() => setPhase({ tag: "quiz_failed" })}>Voltar</PixelButton>
                 <PixelButton variant="ghost" onClick={() => void startQuiz()}>
                   Novo quiz
                 </PixelButton>
