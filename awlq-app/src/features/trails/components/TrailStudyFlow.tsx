@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -13,16 +13,75 @@ import {
   type TrailQuestion,
 } from "@/features/trails/services/trails-api";
 import { RetroIcon } from "@/components/ui/retro-loading";
+import { QuestionOptionsCard, type QuestionCardQuestion } from "@/features/study/components/QuestionOptionsCard";
+import type { QuestionOption } from "@/lib/types";
+import { X } from "lucide-react";
 
 // ─── State machine ────────────────────────────────────────────────────────────
 
+type AnsweredQuestion = { question: TrailQuestion; selected: string | null };
+
 type Phase =
   | { tag: "loading_explain" }
-  | { tag: "explain"; markdown: string }
+  | { tag: "explain" }
   | { tag: "loading_questions" }
   | { tag: "quiz"; questions: TrailQuestion[]; idx: number; selected: string | null; revealed: boolean }
-  | { tag: "quiz_failed"; correct: number; total: number }
+  | { tag: "quiz_failed" }
+  | { tag: "review" }
   | { tag: "victory" };
+
+// ─── Themed loading messages ──────────────────────────────────────────────────
+
+const EXPLAIN_LOADING_MESSAGES = [
+  "Consultando os arquitetos da AWS...",
+  "Organizando os conceitos em ordem didática...",
+  "Preparando analogias para fixar o conteúdo...",
+  "Quase lá — revisando a explicação...",
+];
+
+function questionsLoadingMessages(title: string) {
+  return [
+    `Bolando pegadinhas sobre ${title}...`,
+    "Calibrando o nível de dificuldade...",
+    "Escrevendo as alternativas...",
+    "Revisando as respostas corretas...",
+  ];
+}
+
+function RotatingMessage({ messages }: { messages: string[] }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((prev) => (prev + 1) % messages.length), 1800);
+    return () => clearInterval(id);
+  }, [messages.length]);
+  return <p className="font-mono text-xs text-pixel-subtext">{messages[i]}</p>;
+}
+
+// ─── Explanation topics (Skill Builder-style sidebar) ─────────────────────────
+// Splits the AI explanation into its "## Heading" sections so they can be
+// browsed one at a time from a side nav, instead of one long scroll.
+
+type MarkdownSection = { title: string; body: string };
+
+function splitMarkdownSections(markdown: string): MarkdownSection[] {
+  const sections: MarkdownSection[] = [];
+  let current: MarkdownSection | null = null;
+
+  for (const line of markdown.split("\n")) {
+    const heading = /^##\s+(.+)$/.exec(line);
+    if (heading) {
+      if (current) sections.push(current);
+      current = { title: heading[1]!.trim(), body: `${line}\n` };
+    } else if (current) {
+      current.body += `${line}\n`;
+    }
+  }
+  if (current) sections.push(current);
+
+  // ponytail: naive split assumes the AI followed the prompt's "## Heading"
+  // structure; falls back to a single section (e.g. old cached explanations).
+  return sections.length > 0 ? sections : [{ title: "Explicação", body: markdown }];
+}
 
 // ─── Confetti particles ───────────────────────────────────────────────────────
 
@@ -74,6 +133,24 @@ function VictoryScreen({ onClose }: { onClose: () => void }) {
 }
 
 // ─── Question card ────────────────────────────────────────────────────────────
+// Reuses the shared Simulado/Sprint question renderer (QuestionOptionsCard)
+// instead of a bespoke option-highlighting implementation.
+
+function toCardQuestion(question: TrailQuestion): QuestionCardQuestion {
+  const options: Partial<Record<QuestionOption, string>> = {};
+  for (const opt of question.options) {
+    options[opt.key as QuestionOption] = opt.text;
+  }
+  const correctOption = question.correctKey as QuestionOption;
+  return {
+    id: question.id,
+    statement: question.statement,
+    questionType: "single",
+    options,
+    correctOption,
+    correctOptions: [correctOption],
+  };
+}
 
 type QuizCardProps = {
   question: TrailQuestion;
@@ -89,9 +166,9 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
   const isCorrect = selected === question.correctKey;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 max-w-2xl mx-auto">
       <div className="flex items-center justify-between">
-        <p className="font-mono text-[10px] uppercase text-[var(--pixel-muted)]">
+        <p className="font-mono text-[10px] uppercase text-primary">
           Questão {idx + 1} de {total}
         </p>
         {/* Progress dots */}
@@ -111,50 +188,25 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
         </div>
       </div>
 
-      <PixelCard>
-        <p className="font-[var(--font-body)] text-sm leading-relaxed text-[var(--pixel-text)]">{question.statement}</p>
-      </PixelCard>
-
-      <div className="flex flex-col gap-2">
-        {question.options.map((opt) => {
-          let optClass =
-            "border border-[var(--pixel-border)] bg-[var(--pixel-card)] hover:border-[var(--pixel-accent)] cursor-pointer";
-          if (selected === opt.key && !revealed) {
-            optClass = "border-2 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10 cursor-pointer";
-          }
-          if (revealed) {
-            if (opt.key === question.correctKey) {
-              optClass = "border-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10 cursor-default";
-            } else if (selected === opt.key) {
-              optClass = "border-2 border-red-500 bg-red-950/20 cursor-default";
-            } else {
-              optClass = "border border-[var(--pixel-border)] bg-[var(--pixel-card)] opacity-50 cursor-default";
-            }
-          }
-
-          return (
-            <button
-              key={opt.key}
-              type="button"
-              disabled={revealed}
-              onClick={() => onSelect(opt.key)}
-              className={`flex items-start gap-3 p-3 text-left transition-colors ${optClass}`}
+      <QuestionOptionsCard
+        question={toCardQuestion(question)}
+        answer={(selected as QuestionOption) ?? undefined}
+        onSelect={(value) => onSelect(Array.isArray(value) ? value[0]! : value)}
+        submitted={revealed}
+        disabled={revealed}
+        footer={
+          revealed ? (
+            <div
+              className={`border-t pt-3 ${isCorrect ? "border-green-500/60" : "border-red-500/40"}`}
             >
-              <span className="shrink-0 font-mono text-xs font-bold text-[var(--pixel-muted)]">{opt.key}</span>
-              <span className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">{opt.text}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {revealed && (
-        <PixelCard className={isCorrect ? "border-[var(--pixel-accent)]/60" : "border-red-500/40"}>
-          <p className="font-mono text-[10px] uppercase text-[var(--pixel-muted)] mb-1">
-            {isCorrect ? "✓ Correto!" : `✗ Incorreto — Resposta: ${question.correctKey}`}
-          </p>
-          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{question.explanation}</p>
-        </PixelCard>
-      )}
+              <p className={`font-mono text-[10px] uppercase ${ isCorrect ? "text-accent" : "text-red-500"} mb-1`}>
+                {isCorrect ? "✓ Correto!" : `✗ Incorreto — Resposta: ${question.correctKey}`}
+              </p>
+              <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{question.explanation}</p>
+            </div>
+          ) : undefined
+        }
+      />
 
       {!revealed && (
         <PixelButton disabled={!selected} onClick={onConfirm}>
@@ -176,36 +228,39 @@ type Props = {
 
 export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) {
   const [phase, setPhase] = useState<Phase>({ tag: "loading_explain" });
-  const [correctCount, setCorrectCount] = useState(0);
+  const [markdown, setMarkdown] = useState("");
+  const [topicIdx, setTopicIdx] = useState(0);
+  const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const sections = useMemo(() => splitMarkdownSections(markdown), [markdown]);
+  const isLastTopic = topicIdx >= sections.length - 1;
 
   // Start: load explanation on mount
   useState(() => {
     void (async () => {
       setError(null);
       try {
-        const { markdown } = await fetchStageExplain(chainId, stage.id);
-        setPhase({ tag: "explain", markdown });
+        const { markdown: md } = await fetchStageExplain(chainId, stage.id);
+        setMarkdown(md);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erro ao carregar explicação.");
-        setPhase({ tag: "explain", markdown: "" });
+      } finally {
+        setPhase({ tag: "explain" });
       }
     })();
   });
 
   async function startQuiz() {
     setPhase({ tag: "loading_questions" });
-    setCorrectCount(0);
+    setAnswers([]);
     setError(null);
     try {
       const { questions } = await fetchStageQuestions(chainId, stage.id);
       setPhase({ tag: "quiz", questions, idx: 0, selected: null, revealed: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao gerar questões.");
-      setPhase({
-        tag: "explain",
-        markdown: phase.tag === "loading_questions" ? "" : ((phase as { markdown?: string }).markdown ?? ""),
-      });
+      setPhase({ tag: "explain" });
     }
   }
 
@@ -221,18 +276,19 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
 
   async function handleNext() {
     if (phase.tag !== "quiz" || !phase.revealed) return;
-    const isCorrect = phase.selected === phase.questions[phase.idx]?.correctKey;
-    const newCorrect = correctCount + (isCorrect ? 1 : 0);
+    const answered: AnsweredQuestion = { question: phase.questions[phase.idx]!, selected: phase.selected };
+    const updatedAnswers = [...answers, answered];
     const isLast = phase.idx >= phase.questions.length - 1;
 
     if (!isLast) {
-      setCorrectCount(newCorrect);
+      setAnswers(updatedAnswers);
       setPhase({ ...phase, idx: phase.idx + 1, selected: null, revealed: false });
       return;
     }
 
     // Last question — evaluate
-    const allCorrect = newCorrect === phase.questions.length;
+    setAnswers(updatedAnswers);
+    const allCorrect = updatedAnswers.every((a) => a.selected === a.question.correctKey);
     if (allCorrect) {
       // Complete stage via API
       try {
@@ -243,7 +299,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
       }
       setPhase({ tag: "victory" });
     } else {
-      setPhase({ tag: "quiz_failed", correct: newCorrect, total: phase.questions.length });
+      setPhase({ tag: "quiz_failed" });
     }
   }
 
@@ -257,7 +313,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
       >
         <PixelCard className="space-y-4 overflow-auto h-full">
           {/* Header */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start border-accent border-b-2 pb-2 justify-between gap-4">
             <div>
               <p className="font-mono text-[10px] uppercase text-accent tracking-widest">
                 {phase.tag === "explain" || phase.tag === "loading_explain"
@@ -268,7 +324,9 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                       ? "Quiz"
                       : phase.tag === "quiz_failed"
                         ? "Tente novamente"
-                        : "Vitória!"}
+                        : phase.tag === "review"
+                          ? "Revisão da tentativa"
+                          : "Vitória!"}
               </p>
               <h2 className="font-mono text-base font-bold uppercase text-primary mt-0.5">{stage.title}</h2>
             </div>
@@ -276,9 +334,10 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
               <button
                 type="button"
                 onClick={onClose}
+                title="Fechar Trilha"
                 className="font-mono text-xs text-pixel-subtext hover:text-primary transition-colors shrink-0"
               >
-                ✕ Fechar
+                <X/>
               </button>
             )}
           </div>
@@ -293,66 +352,97 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
           {phase.tag === "loading_explain" && (
             <div className="flex flex-col items-center gap-2 py-4">
               <RetroIcon />
-              <p className="font-mono text-xs text-pixel-subtext">Gerando explicação personalizada...</p>
+              <RotatingMessage messages={EXPLAIN_LOADING_MESSAGES} />
             </div>
           )}
 
-          {/* Explanation */}
-          {phase.tag === "explain" && phase.markdown && (
-            <>
-              <div className="max-h-[70vh] text-wrap overflow-y-auto border border-pixel-border bg-pixel-card p-4">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    h1: ({ children }) => <h1 className="mb-2 font-mono text-sm uppercase text-primary">{children}</h1>,
-                    h2: ({ children }) => (
-                      <h2 className="mb-2 mt-4 font-mono text-xs uppercase text-accent">{children}</h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="mb-1 mt-3 font-mono text-[11px] uppercase text-accent">{children}</h3>
-                    ),
-                    p: ({ children }) => (
-                      <p className="mb-2 font-sans text-sm leading-6 text-pixel-subtext">{children}</p>
-                    ),
-                    li: ({ children }) => (
-                      <li className="mb-1 ml-4 list-disc font-sans text-sm text-pixel-subtext">{children}</li>
-                    ),
-                    ul: ({ children }) => <ul className="mb-2 space-y-0.5">{children}</ul>,
-                    ol: ({ children }) => <ol className="mb-2 list-decimal ml-4 space-y-0.5">{children}</ol>,
-                    strong: ({ children }) => <strong className="font-semibold text-pixel-text">{children}</strong>,
-                    code: ({ children }) => (
-                      <code className="bg-pixel-border/10 rounded-md px-1 py-0.5 font-mono text-xs text-accent">
-                        {children}
-                      </code>
-                    ),
-                    hr: () => <hr className="my-3 border-pixel-border" />,
-                  }}
-                >
-                  {phase.markdown}
-                </ReactMarkdown>
+          {/* Explanation — Skill Builder-style: topics on the side, content next to it */}
+          {phase.tag === "explain" && markdown && (
+            <div className="flex flex-col gap-4 md:flex-row md:h-[65vh]">
+              {/* Topic sidebar */}
+              <nav className="shrink-0 overflow-y-auto border border-pixel-border bg-pixel-card md:w-56 md:max-h-full">
+                <ul className="divide-y divide-pixel-border">
+                  {sections.map((section, i) => (
+                    <li key={section.title}>
+                      <button
+                        type="button"
+                        onClick={() => setTopicIdx(i)}
+                        className={`flex w-full items-center gap-2 px-3 py-2.5 text-left font-mono text-[11px] uppercase transition-colors ${
+                          i === topicIdx
+                            ? "bg-accent font-bold text-[var(--pixel-bg)]"
+                            : i < topicIdx
+                              ? "text-[var(--pixel-accent)] hover:bg-[var(--pixel-muted)]/30"
+                              : "text-pixel-subtext hover:bg-[var(--pixel-muted)]/30"
+                        }`}
+                      >
+                        <span className="shrink-0 opacity-70">{i < topicIdx ? "✓" : i + 1}</span>
+                        <span className="truncate">{section.title}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+
+              {/* Selected topic content */}
+              <div className="flex min-w-0 flex-1 flex-col gap-4">
+                <div className="flex-1 overflow-y-auto border border-pixel-border bg-pixel-card p-4 sm:p-6">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => <h1 className="mb-3 font-mono text-base uppercase text-primary">{children}</h1>,
+                      h2: ({ children }) => (
+                        <h2 className="mb-3 mt-5 font-mono text-sm uppercase text-accent">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="mb-2 mt-4 font-mono text-xs uppercase text-accent">{children}</h3>
+                      ),
+                      p: ({ children }) => (
+                        <p className="mb-3 font-sans text-base leading-7 text-pixel-subtext">{children}</p>
+                      ),
+                      li: ({ children }) => (
+                        <li className="mb-1.5 ml-4 list-disc font-sans text-base leading-7 text-pixel-subtext">{children}</li>
+                      ),
+                      ul: ({ children }) => <ul className="mb-3 space-y-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="mb-3 list-decimal ml-4 space-y-1">{children}</ol>,
+                      strong: ({ children }) => <strong className="font-semibold text-pixel-text">{children}</strong>,
+                      code: ({ children }) => (
+                        <code className="bg-pixel-border/10 rounded-md px-1 py-0.5 font-mono text-sm text-accent">
+                          {children}
+                        </code>
+                      ),
+                      hr: () => <hr className="my-3 border-pixel-border" />,
+                    }}
+                  >
+                    {sections[topicIdx]?.body ?? ""}
+                  </ReactMarkdown>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <PixelButton variant="ghost" onClick={onClose}>
+                    Voltar
+                  </PixelButton>
+                  {isLastTopic ? (
+                    <PixelButton onClick={() => void startQuiz()}>Estou pronto — Iniciar Quiz</PixelButton>
+                  ) : (
+                    <PixelButton onClick={() => setTopicIdx((i) => Math.min(i + 1, sections.length - 1))}>
+                      Próximo tópico →
+                    </PixelButton>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-3">
-                <PixelButton onClick={() => void startQuiz()} className="flex-1">
-                  Estou pronto — Iniciar Quiz
-                </PixelButton>
-                <PixelButton variant="ghost" onClick={onClose} className="shrink-0">
-                  Voltar
-                </PixelButton>
-              </div>
-            </>
+            </div>
           )}
 
           {/* Loading questions */}
           {phase.tag === "loading_questions" && (
             <div className="flex flex-col items-center gap-2 py-4">
               <RetroIcon />
-              <p className="font-mono text-xs text-pixel-subtext">Gerando 10 questões sobre {stage.title}...</p>
+              <RotatingMessage messages={questionsLoadingMessages(stage.title)} />
             </div>
           )}
 
           {/* Quiz */}
           {phase.tag === "quiz" && (
-            <>
+            <div className="mx-auto max-w-2xl space-y-2">
               <QuizCard
                 question={phase.questions[phase.idx]!}
                 idx={phase.idx}
@@ -367,26 +457,51 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                   {phase.idx >= phase.questions.length - 1 ? "Ver resultado" : "Próxima questão →"}
                 </PixelButton>
               )}
-            </>
+            </div>
           )}
 
           {/* Failed */}
           {phase.tag === "quiz_failed" && (
-            <div className="flex flex-col items-center gap-4 py-6 text-center">
+            <div className="flex flex-col items-center max-w-2xl mx-auto gap-4 py-6 text-center">
               <p className="text-4xl">😓</p>
               <div>
                 <p className="font-mono text-base font-bold text-pixel-text">
-                  {phase.correct}/{phase.total} corretas
+                  {answers.filter((a) => a.selected === a.question.correctKey).length}/{answers.length} corretas
                 </p>
                 <p className="mt-1 font-sans text-sm text-pixel-subtext">
-                  Você precisa acertar todas as {phase.total} questões para avançar. Revise a explicação e tente
+                  Você precisa acertar todas as {answers.length} questões para avançar. Revise a explicação e tente
                   novamente!
                 </p>
               </div>
-              <div className="flex gap-3">
-                <PixelButton onClick={() => setPhase({ tag: "explain", markdown: "" })} className="flex-1">
+              <div className="flex flex-wrap justify-center gap-3">
+                <PixelButton onClick={() => setPhase({ tag: "review" })}>Rever tentativa</PixelButton>
+                <PixelButton variant="ghost" onClick={() => setPhase({ tag: "explain" })}>
                   Reler explicação
                 </PixelButton>
+                <PixelButton variant="ghost" onClick={() => void startQuiz()}>
+                  Novo quiz
+                </PixelButton>
+              </div>
+            </div>
+          )}
+
+          {/* Review of the failed attempt: every question with the user's answer revealed */}
+          {phase.tag === "review" && (
+            <div className="flex flex-col gap-6 max-w-2xl mx-auto">
+              {answers.map((a, i) => (
+                <QuizCard
+                  key={a.question.id}
+                  question={a.question}
+                  idx={i}
+                  total={answers.length}
+                  selected={a.selected}
+                  revealed
+                  onSelect={() => {}}
+                  onConfirm={() => {}}
+                />
+              ))}
+              <div className="flex gap-3">
+                <PixelButton onClick={() => setPhase({ tag: "quiz_failed" })}>Voltar</PixelButton>
                 <PixelButton variant="ghost" onClick={() => void startQuiz()}>
                   Novo quiz
                 </PixelButton>

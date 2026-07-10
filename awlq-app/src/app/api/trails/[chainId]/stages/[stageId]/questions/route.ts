@@ -87,28 +87,41 @@ Responda APENAS com JSON válido, sem texto antes ou depois:
     explanation: string;
   };
 
+  // ponytail: the model occasionally returns truncated/malformed JSON for a
+  // 10-question batch — retry a couple of times before giving up, instead of
+  // failing the whole request on the first flaky response.
+  const MAX_ATTEMPTS = 3;
+
   let questions: TrailQuestion[];
   try {
     questions = await cacheGetOrSet<TrailQuestion[]>(
       CACHE_KEYS.trailQuestions(stageId),
       async () => {
-        const rawText = (await callAI(prompt, "TRAIL_QUESTION_GENERATION")).trim();
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          try {
+            const rawText = (await callAI(prompt, "TRAIL_QUESTION_GENERATION")).trim();
 
-        const jsonStr = extractJsonObject(rawText);
-        if (!jsonStr) throw new Error("Resposta da IA não é JSON válido.");
+            const jsonStr = extractJsonObject(rawText);
+            if (!jsonStr) throw new Error("Resposta da IA não é JSON válido.");
 
-        const parsed = JSON.parse(jsonStr) as { questions?: RawQuestion[] };
-        if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
-          throw new Error("Nenhuma questão gerada.");
+            const parsed = JSON.parse(jsonStr) as { questions?: RawQuestion[] };
+            if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+              throw new Error("Nenhuma questão gerada.");
+            }
+
+            return parsed.questions.slice(0, 10).map((q, i) => ({
+              id: `trail-q-${stageId}-${i}`,
+              statement: q.statement ?? "",
+              options: Array.isArray(q.options) ? q.options : [],
+              correctKey: (q.correctKey ?? "A").toUpperCase(),
+              explanation: q.explanation ?? "",
+            }));
+          } catch (err) {
+            lastError = err;
+          }
         }
-
-        return parsed.questions.slice(0, 10).map((q, i) => ({
-          id: `trail-q-${stageId}-${i}`,
-          statement: q.statement ?? "",
-          options: Array.isArray(q.options) ? q.options : [],
-          correctKey: (q.correctKey ?? "A").toUpperCase(),
-          explanation: q.explanation ?? "",
-        }));
+        throw lastError instanceof Error ? lastError : new Error("Resposta da IA não é JSON válido.");
       },
       CACHE_TTL.TRAIL_QUESTIONS,
     );
