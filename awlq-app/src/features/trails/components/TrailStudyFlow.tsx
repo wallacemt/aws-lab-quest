@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -13,16 +13,48 @@ import {
   type TrailQuestion,
 } from "@/features/trails/services/trails-api";
 import { RetroIcon } from "@/components/ui/retro-loading";
+import { QuestionOptionsCard, type QuestionCardQuestion } from "@/features/study/components/QuestionOptionsCard";
+import type { QuestionOption } from "@/lib/types";
 
 // ─── State machine ────────────────────────────────────────────────────────────
 
+type AnsweredQuestion = { question: TrailQuestion; selected: string | null };
+
 type Phase =
   | { tag: "loading_explain" }
-  | { tag: "explain"; markdown: string }
+  | { tag: "explain" }
   | { tag: "loading_questions" }
   | { tag: "quiz"; questions: TrailQuestion[]; idx: number; selected: string | null; revealed: boolean }
-  | { tag: "quiz_failed"; correct: number; total: number }
+  | { tag: "quiz_failed" }
+  | { tag: "review" }
   | { tag: "victory" };
+
+// ─── Themed loading messages ──────────────────────────────────────────────────
+
+const EXPLAIN_LOADING_MESSAGES = [
+  "Consultando os arquitetos da AWS...",
+  "Organizando os conceitos em ordem didática...",
+  "Preparando analogias para fixar o conteúdo...",
+  "Quase lá — revisando a explicação...",
+];
+
+function questionsLoadingMessages(title: string) {
+  return [
+    `Bolando pegadinhas sobre ${title}...`,
+    "Calibrando o nível de dificuldade...",
+    "Escrevendo as alternativas...",
+    "Revisando as respostas corretas...",
+  ];
+}
+
+function RotatingMessage({ messages }: { messages: string[] }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((prev) => (prev + 1) % messages.length), 1800);
+    return () => clearInterval(id);
+  }, [messages.length]);
+  return <p className="font-mono text-xs text-pixel-subtext">{messages[i]}</p>;
+}
 
 // ─── Confetti particles ───────────────────────────────────────────────────────
 
@@ -74,6 +106,24 @@ function VictoryScreen({ onClose }: { onClose: () => void }) {
 }
 
 // ─── Question card ────────────────────────────────────────────────────────────
+// Reuses the shared Simulado/Sprint question renderer (QuestionOptionsCard)
+// instead of a bespoke option-highlighting implementation.
+
+function toCardQuestion(question: TrailQuestion): QuestionCardQuestion {
+  const options: Partial<Record<QuestionOption, string>> = {};
+  for (const opt of question.options) {
+    options[opt.key as QuestionOption] = opt.text;
+  }
+  const correctOption = question.correctKey as QuestionOption;
+  return {
+    id: question.id,
+    statement: question.statement,
+    questionType: "single",
+    options,
+    correctOption,
+    correctOptions: [correctOption],
+  };
+}
 
 type QuizCardProps = {
   question: TrailQuestion;
@@ -111,50 +161,25 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
         </div>
       </div>
 
-      <PixelCard>
-        <p className="font-[var(--font-body)] text-sm leading-relaxed text-[var(--pixel-text)]">{question.statement}</p>
-      </PixelCard>
-
-      <div className="flex flex-col gap-2">
-        {question.options.map((opt) => {
-          let optClass =
-            "border border-[var(--pixel-border)] bg-[var(--pixel-card)] hover:border-[var(--pixel-accent)] cursor-pointer";
-          if (selected === opt.key && !revealed) {
-            optClass = "border-2 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10 cursor-pointer";
-          }
-          if (revealed) {
-            if (opt.key === question.correctKey) {
-              optClass = "border-2 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10 cursor-default";
-            } else if (selected === opt.key) {
-              optClass = "border-2 border-red-500 bg-red-950/20 cursor-default";
-            } else {
-              optClass = "border border-[var(--pixel-border)] bg-[var(--pixel-card)] opacity-50 cursor-default";
-            }
-          }
-
-          return (
-            <button
-              key={opt.key}
-              type="button"
-              disabled={revealed}
-              onClick={() => onSelect(opt.key)}
-              className={`flex items-start gap-3 p-3 text-left transition-colors ${optClass}`}
+      <QuestionOptionsCard
+        question={toCardQuestion(question)}
+        answer={(selected as QuestionOption) ?? undefined}
+        onSelect={(value) => onSelect(Array.isArray(value) ? value[0]! : value)}
+        submitted={revealed}
+        disabled={revealed}
+        footer={
+          revealed ? (
+            <div
+              className={`border-t pt-3 ${isCorrect ? "border-[var(--pixel-accent)]/60" : "border-red-500/40"}`}
             >
-              <span className="shrink-0 font-mono text-xs font-bold text-[var(--pixel-muted)]">{opt.key}</span>
-              <span className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">{opt.text}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {revealed && (
-        <PixelCard className={isCorrect ? "border-[var(--pixel-accent)]/60" : "border-red-500/40"}>
-          <p className="font-mono text-[10px] uppercase text-[var(--pixel-muted)] mb-1">
-            {isCorrect ? "✓ Correto!" : `✗ Incorreto — Resposta: ${question.correctKey}`}
-          </p>
-          <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{question.explanation}</p>
-        </PixelCard>
-      )}
+              <p className="font-mono text-[10px] uppercase text-[var(--pixel-muted)] mb-1">
+                {isCorrect ? "✓ Correto!" : `✗ Incorreto — Resposta: ${question.correctKey}`}
+              </p>
+              <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">{question.explanation}</p>
+            </div>
+          ) : undefined
+        }
+      />
 
       {!revealed && (
         <PixelButton disabled={!selected} onClick={onConfirm}>
@@ -176,7 +201,8 @@ type Props = {
 
 export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) {
   const [phase, setPhase] = useState<Phase>({ tag: "loading_explain" });
-  const [correctCount, setCorrectCount] = useState(0);
+  const [markdown, setMarkdown] = useState("");
+  const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Start: load explanation on mount
@@ -184,28 +210,26 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
     void (async () => {
       setError(null);
       try {
-        const { markdown } = await fetchStageExplain(chainId, stage.id);
-        setPhase({ tag: "explain", markdown });
+        const { markdown: md } = await fetchStageExplain(chainId, stage.id);
+        setMarkdown(md);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erro ao carregar explicação.");
-        setPhase({ tag: "explain", markdown: "" });
+      } finally {
+        setPhase({ tag: "explain" });
       }
     })();
   });
 
   async function startQuiz() {
     setPhase({ tag: "loading_questions" });
-    setCorrectCount(0);
+    setAnswers([]);
     setError(null);
     try {
       const { questions } = await fetchStageQuestions(chainId, stage.id);
       setPhase({ tag: "quiz", questions, idx: 0, selected: null, revealed: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao gerar questões.");
-      setPhase({
-        tag: "explain",
-        markdown: phase.tag === "loading_questions" ? "" : ((phase as { markdown?: string }).markdown ?? ""),
-      });
+      setPhase({ tag: "explain" });
     }
   }
 
@@ -221,18 +245,19 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
 
   async function handleNext() {
     if (phase.tag !== "quiz" || !phase.revealed) return;
-    const isCorrect = phase.selected === phase.questions[phase.idx]?.correctKey;
-    const newCorrect = correctCount + (isCorrect ? 1 : 0);
+    const answered: AnsweredQuestion = { question: phase.questions[phase.idx]!, selected: phase.selected };
+    const updatedAnswers = [...answers, answered];
     const isLast = phase.idx >= phase.questions.length - 1;
 
     if (!isLast) {
-      setCorrectCount(newCorrect);
+      setAnswers(updatedAnswers);
       setPhase({ ...phase, idx: phase.idx + 1, selected: null, revealed: false });
       return;
     }
 
     // Last question — evaluate
-    const allCorrect = newCorrect === phase.questions.length;
+    setAnswers(updatedAnswers);
+    const allCorrect = updatedAnswers.every((a) => a.selected === a.question.correctKey);
     if (allCorrect) {
       // Complete stage via API
       try {
@@ -243,7 +268,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
       }
       setPhase({ tag: "victory" });
     } else {
-      setPhase({ tag: "quiz_failed", correct: newCorrect, total: phase.questions.length });
+      setPhase({ tag: "quiz_failed" });
     }
   }
 
@@ -268,7 +293,9 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                       ? "Quiz"
                       : phase.tag === "quiz_failed"
                         ? "Tente novamente"
-                        : "Vitória!"}
+                        : phase.tag === "review"
+                          ? "Revisão da tentativa"
+                          : "Vitória!"}
               </p>
               <h2 className="font-mono text-base font-bold uppercase text-primary mt-0.5">{stage.title}</h2>
             </div>
@@ -293,14 +320,14 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
           {phase.tag === "loading_explain" && (
             <div className="flex flex-col items-center gap-2 py-4">
               <RetroIcon />
-              <p className="font-mono text-xs text-pixel-subtext">Gerando explicação personalizada...</p>
+              <RotatingMessage messages={EXPLAIN_LOADING_MESSAGES} />
             </div>
           )}
 
           {/* Explanation */}
-          {phase.tag === "explain" && phase.markdown && (
+          {phase.tag === "explain" && markdown && (
             <>
-              <div className="max-h-[70vh] text-wrap overflow-y-auto border border-pixel-border bg-pixel-card p-4">
+              <div className="max-h-[70vh] max-w-prose mx-auto text-wrap overflow-y-auto border border-pixel-border bg-pixel-card p-4 sm:p-6">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -328,7 +355,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                     hr: () => <hr className="my-3 border-pixel-border" />,
                   }}
                 >
-                  {phase.markdown}
+                  {markdown}
                 </ReactMarkdown>
               </div>
               <div className="flex gap-3">
@@ -346,7 +373,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
           {phase.tag === "loading_questions" && (
             <div className="flex flex-col items-center gap-2 py-4">
               <RetroIcon />
-              <p className="font-mono text-xs text-pixel-subtext">Gerando 10 questões sobre {stage.title}...</p>
+              <RotatingMessage messages={questionsLoadingMessages(stage.title)} />
             </div>
           )}
 
@@ -376,16 +403,45 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
               <p className="text-4xl">😓</p>
               <div>
                 <p className="font-mono text-base font-bold text-pixel-text">
-                  {phase.correct}/{phase.total} corretas
+                  {answers.filter((a) => a.selected === a.question.correctKey).length}/{answers.length} corretas
                 </p>
                 <p className="mt-1 font-sans text-sm text-pixel-subtext">
-                  Você precisa acertar todas as {phase.total} questões para avançar. Revise a explicação e tente
+                  Você precisa acertar todas as {answers.length} questões para avançar. Revise a explicação e tente
                   novamente!
                 </p>
               </div>
-              <div className="flex gap-3">
-                <PixelButton onClick={() => setPhase({ tag: "explain", markdown: "" })} className="flex-1">
+              <div className="flex flex-wrap justify-center gap-3">
+                <PixelButton onClick={() => setPhase({ tag: "review" })} className="flex-1">
+                  Rever tentativa
+                </PixelButton>
+                <PixelButton variant="ghost" onClick={() => setPhase({ tag: "explain" })}>
                   Reler explicação
+                </PixelButton>
+                <PixelButton variant="ghost" onClick={() => void startQuiz()}>
+                  Novo quiz
+                </PixelButton>
+              </div>
+            </div>
+          )}
+
+          {/* Review of the failed attempt: every question with the user's answer revealed */}
+          {phase.tag === "review" && (
+            <div className="flex flex-col gap-6">
+              {answers.map((a, i) => (
+                <QuizCard
+                  key={a.question.id}
+                  question={a.question}
+                  idx={i}
+                  total={answers.length}
+                  selected={a.selected}
+                  revealed
+                  onSelect={() => {}}
+                  onConfirm={() => {}}
+                />
+              ))}
+              <div className="flex gap-3">
+                <PixelButton onClick={() => setPhase({ tag: "quiz_failed" })} className="flex-1">
+                  Voltar
                 </PixelButton>
                 <PixelButton variant="ghost" onClick={() => void startQuiz()}>
                   Novo quiz
