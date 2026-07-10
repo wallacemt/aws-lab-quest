@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -54,6 +54,32 @@ function RotatingMessage({ messages }: { messages: string[] }) {
     return () => clearInterval(id);
   }, [messages.length]);
   return <p className="font-mono text-xs text-pixel-subtext">{messages[i]}</p>;
+}
+
+// ─── Explanation topics (Skill Builder-style sidebar) ─────────────────────────
+// Splits the AI explanation into its "## Heading" sections so they can be
+// browsed one at a time from a side nav, instead of one long scroll.
+
+type MarkdownSection = { title: string; body: string };
+
+function splitMarkdownSections(markdown: string): MarkdownSection[] {
+  const sections: MarkdownSection[] = [];
+  let current: MarkdownSection | null = null;
+
+  for (const line of markdown.split("\n")) {
+    const heading = /^##\s+(.+)$/.exec(line);
+    if (heading) {
+      if (current) sections.push(current);
+      current = { title: heading[1]!.trim(), body: `${line}\n` };
+    } else if (current) {
+      current.body += `${line}\n`;
+    }
+  }
+  if (current) sections.push(current);
+
+  // ponytail: naive split assumes the AI followed the prompt's "## Heading"
+  // structure; falls back to a single section (e.g. old cached explanations).
+  return sections.length > 0 ? sections : [{ title: "Explicação", body: markdown }];
 }
 
 // ─── Confetti particles ───────────────────────────────────────────────────────
@@ -202,8 +228,12 @@ type Props = {
 export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) {
   const [phase, setPhase] = useState<Phase>({ tag: "loading_explain" });
   const [markdown, setMarkdown] = useState("");
+  const [topicIdx, setTopicIdx] = useState(0);
   const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const sections = useMemo(() => splitMarkdownSections(markdown), [markdown]);
+  const isLastTopic = topicIdx >= sections.length - 1;
 
   // Start: load explanation on mount
   useState(() => {
@@ -324,49 +354,82 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
             </div>
           )}
 
-          {/* Explanation */}
+          {/* Explanation — Skill Builder-style: topics on the side, content next to it */}
           {phase.tag === "explain" && markdown && (
-            <>
-              <div className="max-h-[70vh] max-w-prose mx-auto text-wrap overflow-y-auto border border-pixel-border bg-pixel-card p-4 sm:p-6">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    h1: ({ children }) => <h1 className="mb-2 font-mono text-sm uppercase text-primary">{children}</h1>,
-                    h2: ({ children }) => (
-                      <h2 className="mb-2 mt-4 font-mono text-xs uppercase text-accent">{children}</h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="mb-1 mt-3 font-mono text-[11px] uppercase text-accent">{children}</h3>
-                    ),
-                    p: ({ children }) => (
-                      <p className="mb-2 font-sans text-sm leading-6 text-pixel-subtext">{children}</p>
-                    ),
-                    li: ({ children }) => (
-                      <li className="mb-1 ml-4 list-disc font-sans text-sm text-pixel-subtext">{children}</li>
-                    ),
-                    ul: ({ children }) => <ul className="mb-2 space-y-0.5">{children}</ul>,
-                    ol: ({ children }) => <ol className="mb-2 list-decimal ml-4 space-y-0.5">{children}</ol>,
-                    strong: ({ children }) => <strong className="font-semibold text-pixel-text">{children}</strong>,
-                    code: ({ children }) => (
-                      <code className="bg-pixel-border/10 rounded-md px-1 py-0.5 font-mono text-xs text-accent">
-                        {children}
-                      </code>
-                    ),
-                    hr: () => <hr className="my-3 border-pixel-border" />,
-                  }}
-                >
-                  {markdown}
-                </ReactMarkdown>
+            <div className="flex flex-col gap-4 md:flex-row md:h-[65vh]">
+              {/* Topic sidebar */}
+              <nav className="shrink-0 overflow-y-auto border border-pixel-border bg-pixel-card md:w-56 md:max-h-full">
+                <ul className="divide-y divide-pixel-border">
+                  {sections.map((section, i) => (
+                    <li key={section.title}>
+                      <button
+                        type="button"
+                        onClick={() => setTopicIdx(i)}
+                        className={`flex w-full items-center gap-2 px-3 py-2.5 text-left font-mono text-[11px] uppercase transition-colors ${
+                          i === topicIdx
+                            ? "bg-accent font-bold text-[var(--pixel-bg)]"
+                            : i < topicIdx
+                              ? "text-[var(--pixel-accent)] hover:bg-[var(--pixel-muted)]/30"
+                              : "text-pixel-subtext hover:bg-[var(--pixel-muted)]/30"
+                        }`}
+                      >
+                        <span className="shrink-0 opacity-70">{i < topicIdx ? "✓" : i + 1}</span>
+                        <span className="truncate">{section.title}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+
+              {/* Selected topic content */}
+              <div className="flex min-w-0 flex-1 flex-col gap-4">
+                <div className="max-w-prose flex-1 overflow-y-auto border border-pixel-border bg-pixel-card p-4 sm:p-6">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => <h1 className="mb-2 font-mono text-sm uppercase text-primary">{children}</h1>,
+                      h2: ({ children }) => (
+                        <h2 className="mb-2 mt-4 font-mono text-xs uppercase text-accent">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="mb-1 mt-3 font-mono text-[11px] uppercase text-accent">{children}</h3>
+                      ),
+                      p: ({ children }) => (
+                        <p className="mb-2 font-sans text-sm leading-6 text-pixel-subtext">{children}</p>
+                      ),
+                      li: ({ children }) => (
+                        <li className="mb-1 ml-4 list-disc font-sans text-sm text-pixel-subtext">{children}</li>
+                      ),
+                      ul: ({ children }) => <ul className="mb-2 space-y-0.5">{children}</ul>,
+                      ol: ({ children }) => <ol className="mb-2 list-decimal ml-4 space-y-0.5">{children}</ol>,
+                      strong: ({ children }) => <strong className="font-semibold text-pixel-text">{children}</strong>,
+                      code: ({ children }) => (
+                        <code className="bg-pixel-border/10 rounded-md px-1 py-0.5 font-mono text-xs text-accent">
+                          {children}
+                        </code>
+                      ),
+                      hr: () => <hr className="my-3 border-pixel-border" />,
+                    }}
+                  >
+                    {sections[topicIdx]?.body ?? ""}
+                  </ReactMarkdown>
+                </div>
+                <div className="flex gap-3">
+                  {isLastTopic ? (
+                    <PixelButton onClick={() => void startQuiz()} className="flex-1">
+                      Estou pronto — Iniciar Quiz
+                    </PixelButton>
+                  ) : (
+                    <PixelButton onClick={() => setTopicIdx((i) => Math.min(i + 1, sections.length - 1))} className="flex-1">
+                      Próximo tópico →
+                    </PixelButton>
+                  )}
+                  <PixelButton variant="ghost" onClick={onClose} className="shrink-0">
+                    Voltar
+                  </PixelButton>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <PixelButton onClick={() => void startQuiz()} className="flex-1">
-                  Estou pronto — Iniciar Quiz
-                </PixelButton>
-                <PixelButton variant="ghost" onClick={onClose} className="shrink-0">
-                  Voltar
-                </PixelButton>
-              </div>
-            </>
+            </div>
           )}
 
           {/* Loading questions */}

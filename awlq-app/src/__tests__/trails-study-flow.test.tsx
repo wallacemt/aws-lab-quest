@@ -103,3 +103,36 @@ describe("TrailStudyFlow — review after failing (#37)", () => {
     expect(screen.getByText(/Incorreto/)).toBeTruthy();
   });
 });
+
+describe("TrailStudyFlow — topic sidebar", () => {
+  it("navigates topics one at a time and only offers to start the quiz on the last one", async () => {
+    mockFetchStageExplain.mockResolvedValue({
+      markdown: "## O que e S3?\nTexto do topico 1\n\n## Casos de uso\nTexto do topico 2\n",
+      cached: true,
+    });
+
+    render(
+      <TrailStudyFlow
+        chainId="chain-1"
+        stage={{ id: "stage-1", title: "S3" }}
+        onClose={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+
+    await screen.findByText("Texto do topico 1");
+    // Not on the last topic yet — no quiz button, only "next topic".
+    expect(screen.queryByText("Estou pronto — Iniciar Quiz")).toBeNull();
+    expect(screen.getByText("Próximo tópico →")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Próximo tópico →"));
+
+    await screen.findByText("Texto do topico 2");
+    expect(screen.queryByText("Texto do topico 1")).toBeNull();
+    expect(screen.getByText("Estou pronto — Iniciar Quiz")).toBeTruthy();
+
+    // Sidebar lets the user jump back to an earlier topic directly.
+    fireEvent.click(screen.getByText("O que e S3?"));
+    await screen.findByText("Texto do topico 1");
+  });
+});
