@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "BossBattle" ADD COLUMN     "correctCount" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "streak" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "totalAnswered" INTEGER NOT NULL DEFAULT 0;

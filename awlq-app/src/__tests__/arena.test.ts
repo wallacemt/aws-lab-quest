@@ -57,6 +57,17 @@ vi.mock("@/lib/xp-weights", () => ({
 vi.mock("@/lib/levels", () => ({
   getTaskXpByDifficulty: vi.fn().mockReturnValue(60),
 }));
+vi.mock("@/lib/streak", () => ({ recordStudyActivity: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/realtime-events", () => ({ publishLeaderboardUpdatedEvent: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/cache", () => ({
+  CACHE_KEYS: {
+    userStudyHistory: (id: string) => `user:study-history:${id}`,
+    userPublicProfile: (id: string) => `user:public:${id}`,
+    userAchievements: (id: string) => `user:achievements:${id}`,
+    leaderboard: () => "global:leaderboard",
+  },
+  cacheDel: vi.fn().mockResolvedValue(undefined),
+}));
 
 // ---------------------------------------------------------------------------
 // Route handler imported after mocks
@@ -153,6 +164,10 @@ describe("TC-045: Arena — victory gate blocks boss rematch", () => {
     mockPrisma.bossBattle.create.mockResolvedValue({
       id: "battle-new",
       remainingHp: 100,
+      streak: 0,
+      correctCount: 0,
+      totalAnswered: 0,
+      gainedXp: 0,
       victory: false,
     });
     mockPrisma.awsService.findUnique.mockResolvedValue({ id: "svc-s3" });

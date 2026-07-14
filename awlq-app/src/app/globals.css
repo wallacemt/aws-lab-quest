@@ -274,6 +274,26 @@ textarea {
   -webkit-backdrop-filter: blur(1px);
 }
 
+/*
+ * Arena battle: forces a pixel-art Pokémon-arena backdrop, ignoring whatever
+ * background/theme the user picked, for full battle immersion. Toggled via
+ * html[data-arena-bg] in AppRouteShell while a boss battle is active.
+ * The looping <video> layer (ArenaBackgroundVideo) sits behind everything;
+ * this gradient is only the fallback shown before the video paints / if it fails.
+ */
+html[data-arena-bg] body {
+  background-image: linear-gradient(180deg, #14261a 0%, #0e1a12 55%, #070c08 100%) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+}
+
+html[data-arena-bg] .pixel-bg-adaptive {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 @keyframes float {
   0%,
   100% {

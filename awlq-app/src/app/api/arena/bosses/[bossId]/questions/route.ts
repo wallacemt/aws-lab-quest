@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
@@ -31,9 +32,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     select: { id: true },
   });
 
+  // Arena only supports single-select combat (one "attack" per turn) — exclude
+  // multi-select questions here so scoring in /api/arena/battle never silently
+  // drops an answer it can't grade (previously served but unscoreable).
   const where = service
-    ? { active: true, awsServiceId: service.id }
-    : { active: true };
+    ? { active: true, awsServiceId: service.id, questionType: "single" as const }
+    : { active: true, questionType: "single" as const };
 
   const pool = await prisma.studyQuestion.findMany({
     where,
@@ -46,10 +50,30 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       optionD: true,
       optionE: true,
     },
-    take: count * 5,
+    take: 200,
   });
 
   const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, count);
+
+  // Pool short of what this boss needs — enqueue backfill generation (reuses the
+  // KC gap-fill queue, EPIC-02 #4). Fire-and-forget: this response still returns
+  // whatever is available now.
+  const gap = count - pool.length;
+  if (gap > 0) {
+    await prisma.workerTrigger.create({
+      data: {
+        action: "generate-kc",
+        source: "arena_gap_fill",
+        payload: {
+          requestId: randomBytes(16).toString("hex"),
+          userId: auth.user.id,
+          serviceCode: boss.themeService,
+          difficulty: "medium",
+          count: gap,
+        },
+      },
+    });
+  }
 
   return NextResponse.json({ questions: shuffled });
 }

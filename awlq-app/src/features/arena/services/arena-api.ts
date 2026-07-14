@@ -9,6 +9,7 @@ export type BossWithBattle = {
   damagePerCorrect: number;
   artworkUrl: string | null;
   active: boolean;
+  defeated: boolean;
   currentBattle: {
     id: string;
     remainingHp: number;
@@ -19,6 +20,9 @@ export type BossWithBattle = {
 
 export type BattleResult = {
   remainingHp: number;
+  damage: number;
+  correct: boolean;
+  streak: number;
   victory: boolean;
   gainedXp?: number;
   newAchievements?: { code: string; name: string }[];
@@ -67,10 +71,18 @@ export async function submitBattle(
     body: JSON.stringify({ bossId, answers }),
   });
   if (!res.ok) {
-    const err = (await res.json()) as { error?: string };
+    const err = (await res.json()) as { error?: string; alreadyDefeated?: boolean };
+    if (err.alreadyDefeated) {
+      throw new Error("ALREADY_DEFEATED");
+    }
     throw new Error(err.error ?? "Battle submission failed");
   }
   return res.json() as Promise<BattleResult>;
+}
+
+export async function abandonBattle(bossId: string): Promise<void> {
+  const res = await fetch(`/api/arena/battle?bossId=${encodeURIComponent(bossId)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to abandon battle");
 }
 
 export async function fetchWeeklyChallenge(): Promise<WeeklyChallengeData> {

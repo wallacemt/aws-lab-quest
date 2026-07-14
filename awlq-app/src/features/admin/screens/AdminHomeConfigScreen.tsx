@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ALL_APP_MODES, APP_SECTION_LABEL } from "@/features/utils/home-apps";
 import type { AppEntry, HomeConfig } from "@/app/api/admin/home-config/route";
 
@@ -11,12 +11,17 @@ function buildDefault(): AppEntry[] {
 // Derive display metadata from the shared constants
 const APP_META = new Map(ALL_APP_MODES.map((m) => [m.id, m]));
 
+// Collapses bursts of reorder/toggle clicks into a single PATCH.
+const AUTOSAVE_DELAY_MS = 800;
+
 export function AdminHomeConfigScreen() {
   const [entries, setEntries] = useState<AppEntry[]>(buildDefault());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const hasLoadedRef = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void fetch("/api/admin/home-config", { credentials: "include" })
@@ -32,7 +37,11 @@ export function AdminHomeConfigScreen() {
         setEntries(merged.sort((a, b) => a.order - b.order));
       })
       .catch(() => setEntries(buildDefault()))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        // Marks the load as settled so the autosave effect below ignores this initial merge.
+        hasLoadedRef.current = true;
+      });
   }, []);
 
   // Re-number orders to be consecutive after any mutation
@@ -46,43 +55,50 @@ export function AdminHomeConfigScreen() {
     const updated = [...entries];
     [updated[index], updated[next]] = [updated[next], updated[index]];
     setEntries(normalize(updated));
-    setSuccess(false);
   }
 
   function toggle(id: string) {
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, enabled: !e.enabled } : e)));
-    setSuccess(false);
   }
 
   function setHighlight(id: string) {
     // Only one card can be highlighted at a time
     setEntries((prev) => prev.map((e) => ({ ...e, highlighted: e.id === id ? !e.highlighted : false })));
-    setSuccess(false);
   }
 
-  async function handleSave() {
+  const save = useCallback(async (toSave: AppEntry[]) => {
     setSaving(true);
     setError(null);
-    setSuccess(false);
     try {
       const res = await fetch("/api/admin/home-config", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ apps: entries } satisfies HomeConfig),
+        body: JSON.stringify({ apps: toSave } satisfies HomeConfig),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
         setError(data.error ?? "Erro ao salvar");
-      } else {
-        setSuccess(true);
+        return;
       }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch {
       setError("Falha na requisicao");
     } finally {
       setSaving(false);
     }
-  }
+  }, []);
+
+  // Auto-save whenever the config changes (reorder, toggle, highlight), debounced.
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => void save(entries), AUTOSAVE_DELAY_MS);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [entries, save]);
 
   const visibleEntries = entries.filter((e) => e.enabled);
 
@@ -94,7 +110,6 @@ export function AdminHomeConfigScreen() {
       </main>
     );
   }
-
   return (
     <main className="space-y-5">
       <Header />
@@ -102,7 +117,14 @@ export function AdminHomeConfigScreen() {
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* Left: editable list */}
         <section className="space-y-2">
-          <p className="font-mono text-[10px] uppercase text-[#64748b]">Arraste ou use as setas para reordenar</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-mono text-[10px] uppercase text-[#64748b]">Arraste ou use as setas para reordenar</p>
+            <p className="font-mono text-[10px] uppercase shrink-0">
+              {saving && <span className="text-[#64748b]">Salvando...</span>}
+              {!saving && saved && <span className="text-green-500">Alteracoes salvas</span>}
+              {!saving && error && <span className="text-red-400">{error}</span>}
+            </p>
+          </div>
 
           {entries.map((entry, index) => {
             const meta = APP_META.get(entry.id);
@@ -142,7 +164,9 @@ export function AdminHomeConfigScreen() {
                 {/* App info */}
                 <div className="flex-1 min-w-0">
                   <p className="font-mono text-xs uppercase text-[#e2e8f0] truncate">{meta.title}</p>
-                  <p className="text-[10px] text-[#64748b]">/{entry.id} &middot; {section}</p>
+                  <p className="text-[10px] text-[#64748b]">
+                    /{entry.id} &middot; {section}
+                  </p>
                 </div>
 
                 {/* Highlight toggle */}
@@ -162,9 +186,7 @@ export function AdminHomeConfigScreen() {
                   type="button"
                   onClick={() => toggle(entry.id)}
                   className={`shrink-0 w-10 h-5 rounded-full border transition-colors relative ${
-                    entry.enabled
-                      ? "bg-green-800 border-green-600"
-                      : "bg-[#0f172a] border-[#1e293b]"
+                    entry.enabled ? "bg-green-800 border-green-600" : "bg-[#0f172a] border-[#1e293b]"
                   }`}
                   aria-label={entry.enabled ? "Desativar" : "Ativar"}
                 >
@@ -177,20 +199,6 @@ export function AdminHomeConfigScreen() {
               </div>
             );
           })}
-
-          {/* Save */}
-          <div className="flex items-center gap-4 pt-2">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void handleSave()}
-              className="border border-[#14532d] bg-green-900/20 px-4 py-2 text-xs uppercase text-green-200 disabled:opacity-60"
-            >
-              {saving ? "Salvando..." : "Salvar configuracao"}
-            </button>
-            {success && <p className="text-xs text-green-300">Salvo com sucesso.</p>}
-            {error && <p className="text-xs text-red-300">{error}</p>}
-          </div>
         </section>
 
         {/* Right: preview */}
@@ -207,9 +215,7 @@ export function AdminHomeConfigScreen() {
                   <div
                     key={entry.id}
                     className={`flex items-center gap-2 px-2 py-1.5 border ${
-                      entry.highlighted
-                        ? "border-yellow-600 bg-yellow-900/10"
-                        : "border-[#1e293b] bg-[#111827]"
+                      entry.highlighted ? "border-yellow-600 bg-yellow-900/10" : "border-[#1e293b] bg-[#111827]"
                     }`}
                   >
                     {entry.highlighted && <span className="text-yellow-400 text-[10px]">★</span>}
@@ -234,9 +240,9 @@ function Header() {
     <header className="space-y-1">
       <p className="font-mono text-xs uppercase text-[#f97316]">Config</p>
       <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Home Screen — configuracao de cards</h1>
-      <p className="text-xs text-[#94a3b8]">
-        Controle quais cards aparecem na tela inicial, a ordem de exibicao, e qual recebe destaque.
-        Cards desativados ficam ocultos e o acesso direto pela URL e redirecionado para /home.
+      <p className="text-xs text-[#94a3b8] max-w-1/2">
+        Controle quais cards aparecem na tela inicial, a ordem de exibicao, e qual recebe destaque. Cards desativados
+        ficam ocultos e o acesso direto pela URL e redirecionado para /home.
       </p>
     </header>
   );
