@@ -101,7 +101,7 @@ export function BattleScreen() {
           if (bosses.length > 0 && visibleBosses.length === 0) {
             return (
               <PixelCard className="text-center">
-                <p className="font-mono text-xs text-[var(--pixel-muted)]">
+                <p className="font-mono text-xs text-accent">
                   {tab === "derrotados" ? "Nenhum boss derrotado ainda." : "Todos os bosses foram derrotados!"}
                 </p>
               </PixelCard>
@@ -131,6 +131,7 @@ export function BattleScreen() {
                           <Sword size={100} />
                         </div>
                       )}
+                      {boss.defeated && <span className="absolute bottom-2 text-acce right-2 retro-shadow  font-mono">F</span>}
                     </div>
 
                     <div className="flex flex-col gap-3 p-4">

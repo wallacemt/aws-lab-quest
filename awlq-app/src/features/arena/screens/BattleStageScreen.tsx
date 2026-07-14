@@ -79,9 +79,9 @@ export function BattleStageScreen({ boss }: Props) {
 
   useEffect(() => {
     if (!ready) return;
-    startBattle(pathname);
+    startBattle(pathname, boss.id);
     return () => endBattle();
-  }, [pathname, startBattle, endBattle, ready]);
+  }, [pathname, startBattle, endBattle, ready, boss.id]);
 
   useEffect(() => {
     if (victory || defeated) endBattle();

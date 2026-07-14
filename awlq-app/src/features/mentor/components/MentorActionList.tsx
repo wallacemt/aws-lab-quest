@@ -83,21 +83,21 @@ function RecommendationRow({ recommendation }: RecommendationRowProps) {
   return (
     <PixelCard className="flex items-start gap-4 p-4">
       {/* Rank badge */}
-      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--pixel-accent)] font-mono text-sm font-bold text-[var(--pixel-bg)]">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent font-mono text-sm font-bold text-bg">
         {recommendation.rank}
       </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-sm font-bold text-[var(--pixel-text)]">
+          <span className="font-mono text-sm font-bold text-pixel-text">
             {recommendation.title}
           </span>
           <span className={`rounded px-1.5 py-0.5 font-mono text-xs ${meta.badgeClass}`}>
             {meta.label}
           </span>
         </div>
-        <p className="mt-1 font-mono text-xs text-[var(--pixel-muted)]">
+        <p className="mt-1 font-mono text-xs text-accent">
           {recommendation.rationale}
         </p>
       </div>

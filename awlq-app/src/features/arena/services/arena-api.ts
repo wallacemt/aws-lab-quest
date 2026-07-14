@@ -80,6 +80,11 @@ export async function submitBattle(
   return res.json() as Promise<BattleResult>;
 }
 
+export async function abandonBattle(bossId: string): Promise<void> {
+  const res = await fetch(`/api/arena/battle?bossId=${encodeURIComponent(bossId)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to abandon battle");
+}
+
 export async function fetchWeeklyChallenge(): Promise<WeeklyChallengeData> {
   const res = await fetch("/api/weekly-challenge");
   if (!res.ok) throw new Error("Failed to fetch weekly challenge");
