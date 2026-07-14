@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 import { getTaskXpByDifficulty } from "@/lib/levels";
+import { recordStudyActivity } from "@/lib/streak";
+import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
+import { CACHE_KEYS, cacheDel } from "@/lib/cache";
+
+const LETTERS = ["A", "B", "C", "D", "E"] as const;
+
+// Damage doubles every 2 consecutive correct answers and stacks while the streak holds;
+// a miss resets it. streak=1→x1, streak=2→x2, streak=3→x2, streak=4→x4, ...
+function damageMultiplier(streak: number): number {
+  return 2 ** Math.floor(streak / 2);
+}
 
 type AnswerItem = {
   questionId: string;
@@ -18,9 +28,66 @@ type PostBody = {
 
 const BOSS_BATTLE_ACTIVITY = "boss_battle" as const;
 
-// DEF-021: filter expression that restricts to single-select questions only.
-// For nullable Json columns, the WHERE IS NULL predicate uses { equals: Prisma.DbNull }.
-const SINGLE_SELECT_FILTER = { correctOptions: { equals: Prisma.DbNull } };
+// DEF-021: restricts scoring to single-select questions only — kept as defense-in-depth
+// alongside the pool-fetch filter in bosses/[bossId]/questions/route.ts (DEF-019/021).
+const SINGLE_SELECT_FILTER = { questionType: "single" as const };
+
+type SnapshotQuestion = {
+  id: string;
+  statement: string;
+  correctOption: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  optionE: string | null;
+  explanationA: string | null;
+  explanationB: string | null;
+  explanationC: string | null;
+  explanationD: string | null;
+  explanationE: string | null;
+  cachedExplainSummary: string | null;
+};
+
+type BattleSnapshotEntry = {
+  questionId: string;
+  statement: string;
+  questionType: "single";
+  selectedOption: string;
+  correctOption: string;
+  options: Record<string, string>;
+  explanations: Record<string, string>;
+  explanationSummary?: string;
+};
+
+// Builds the review-screen shape (options/explanations by letter) from the raw question row.
+function toSnapshotEntry(question: SnapshotQuestion, selectedLetter: string): BattleSnapshotEntry {
+  const options: Record<string, string> = {
+    A: question.optionA,
+    B: question.optionB,
+    C: question.optionC,
+    D: question.optionD,
+  };
+  if (question.optionE) options.E = question.optionE;
+
+  const explanations: Record<string, string> = {};
+  if (question.explanationA) explanations.A = question.explanationA;
+  if (question.explanationB) explanations.B = question.explanationB;
+  if (question.explanationC) explanations.C = question.explanationC;
+  if (question.explanationD) explanations.D = question.explanationD;
+  if (question.explanationE) explanations.E = question.explanationE;
+
+  return {
+    questionId: question.id,
+    statement: question.statement,
+    questionType: "single",
+    selectedOption: selectedLetter,
+    correctOption: question.correctOption.toUpperCase(),
+    options,
+    explanations,
+    explanationSummary: question.cachedExplainSummary ?? undefined,
+  };
+}
 
 /**
  * POST /api/arena/battle
@@ -101,106 +168,124 @@ export async function POST(request: NextRequest) {
   const submittedIds = validatedAnswers.map((a) => a.questionId);
   const questions = await prisma.studyQuestion.findMany({
     where: { id: { in: submittedIds }, active: true, ...SINGLE_SELECT_FILTER },
-    select: { id: true, correctOption: true, topic: true, difficulty: true },
+    select: {
+      id: true,
+      correctOption: true,
+      topic: true,
+      difficulty: true,
+      statement: true,
+      optionA: true,
+      optionB: true,
+      optionC: true,
+      optionD: true,
+      optionE: true,
+      explanationA: true,
+      explanationB: true,
+      explanationC: true,
+      explanationD: true,
+      explanationE: true,
+      cachedExplainSummary: true,
+    },
   });
 
   const questionMap = new Map(questions.map((q) => [q.id, q]));
+  const weights = await listXpWeightsByActivity(BOSS_BATTLE_ACTIVITY);
 
-  let correctCount = 0;
+  // Process answers in order: each correct answer extends the streak and its damage
+  // multiplier (damageMultiplier); a miss resets the streak. Damage is no longer a flat
+  // rate, so correctCount/totalAnswered/streak are persisted on BossBattle instead of
+  // being reconstructed from HP deltas (previously DEF-020).
+  let streak = battle.streak;
+  let roundDamage = 0;
+  let roundCorrect = 0;
+  let roundXp = 0;
+  const roundSnapshotEntries: BattleSnapshotEntry[] = [];
   for (const answer of validatedAnswers) {
     const question = questionMap.get(answer.questionId);
     if (!question) continue;
-    const optionLetter = ["A", "B", "C", "D", "E"][answer.selectedOption];
-    if (optionLetter && question.correctOption.toUpperCase() === optionLetter) {
-      correctCount++;
+    const optionLetter = LETTERS[answer.selectedOption];
+    const isCorrect = Boolean(optionLetter) && question.correctOption.toUpperCase() === optionLetter;
+
+    roundSnapshotEntries.push(toSnapshotEntry(question, optionLetter ?? "A"));
+
+    if (!isCorrect) {
+      streak = 0;
+      continue;
     }
+
+    streak += 1;
+    roundCorrect += 1;
+    roundDamage += boss.damagePerCorrect * damageMultiplier(streak);
+
+    const difficulty = (question.difficulty ?? "medium") as "easy" | "medium" | "hard";
+    const topic = question.topic ?? "*";
+    const baseXp = Math.max(20, Math.round(getTaskXpByDifficulty(difficulty) / 3));
+    const weight = resolveXpWeight(weights, { activityType: BOSS_BATTLE_ACTIVITY, topic, difficulty });
+    roundXp += applyWeightedXp(baseXp, weight);
   }
 
-  const totalDamage = correctCount * boss.damagePerCorrect;
-  const newHp = Math.max(0, battle.remainingHp - totalDamage);
+  const newHp = Math.max(0, battle.remainingHp - roundDamage);
   const victory = newHp <= 0;
+  const correctCount = battle.correctCount + roundCorrect;
+  const totalAnswered = battle.totalAnswered + validatedAnswers.length;
+  const gainedXp = battle.gainedXp + roundXp + (victory ? 50 : 0);
+  const existingSnapshot = Array.isArray(battle.answersSnapshot)
+    ? (battle.answersSnapshot as unknown as BattleSnapshotEntry[])
+    : [];
+  const answersSnapshot = [...existingSnapshot, ...roundSnapshotEntries];
 
-  let gainedXp = 0;
   let newAchievements: { code: string; name: string }[] = [];
 
+  await prisma.bossBattle.update({
+    where: { id: battle.id },
+    data: {
+      remainingHp: newHp,
+      streak: victory ? 0 : streak,
+      correctCount,
+      totalAnswered,
+      gainedXp,
+      victory,
+      answersSnapshot,
+      ...(victory ? { finishedAt: new Date() } : {}),
+    },
+  });
+
   if (victory) {
-    // DEF-020: Compute XP and history from the whole battle, not only this submission.
-    // Derive the accumulated correct answers from total HP damage across all submissions:
-    //   correct answers in prior rounds = (boss.maxHp - battle.remainingHp) / damagePerCorrect
-    //   correct answers this round       = correctCount
-    const priorCorrect = Math.round((boss.maxHp - battle.remainingHp) / boss.damagePerCorrect);
-    const totalCorrect = priorCorrect + correctCount;
-
-    // Total questions seen across the whole battle: one per round of 5, inferred from HP.
-    // We use the XP computation only over the known question metadata for this round;
-    // prior rounds' exact questions are not stored. As a pragmatic approximation that
-    // avoids a schema migration, we award per-question XP for the current batch only
-    // and apply a multiplier for prior correct answers using the average base XP.
-    const weights = await listXpWeightsByActivity(BOSS_BATTLE_ACTIVITY);
-
-    // XP for correctly-answered questions in THIS submission (with full metadata).
-    gainedXp = questions.reduce((total, question) => {
-      const answer = validatedAnswers.find((a) => a.questionId === question.id);
-      if (!answer) return total;
-      const optionLetter = ["A", "B", "C", "D", "E"][answer.selectedOption];
-      if (!optionLetter || question.correctOption.toUpperCase() !== optionLetter) return total;
-      const difficulty = (question.difficulty ?? "medium") as "easy" | "medium" | "hard";
-      const topic = question.topic ?? "*";
-      const baseXp = Math.max(20, Math.round(getTaskXpByDifficulty(difficulty) / 3));
-      const weight = resolveXpWeight(weights, { activityType: BOSS_BATTLE_ACTIVITY, topic, difficulty });
-      return total + applyWeightedXp(baseXp, weight);
-    }, 0);
-
-    // XP for prior correct answers: use a flat base since we don't have their metadata.
-    const defaultBase = Math.max(20, Math.round(getTaskXpByDifficulty("medium") / 3));
-    gainedXp += priorCorrect * defaultBase;
-
-    // Flat victory bonus.
-    gainedXp += 50;
-
-    // totalAnswered: prior rounds' correct answers (derived from HP) + this round's submitted
-    // answers. Because each correct answer dealt 1 unit of damage, priorCorrect is exact;
-    // we can't know prior incorrect answers without a schema change, so we conservatively
-    // count only what we can verify: all valid answers in this final round plus prior corrects.
-    const totalAnswered = priorCorrect + validatedAnswers.length;
-
     const since = new Date();
-    await prisma.bossBattle.update({
-      where: { id: battle.id },
-      data: {
-        remainingHp: 0,
-        victory: true,
-        gainedXp,
-        finishedAt: new Date(),
-      },
-    });
 
     // Award XP via StudySessionHistory so leaderboard/achievements see it.
-    // Reflect the full battle's totals (DEF-020).
     await prisma.studySessionHistory.create({
       data: {
         userId: user.id,
         sessionType: "KC",
         title: `Boss Battle: ${boss.name}`,
         gainedXp,
-        scorePercent: totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 100,
-        correctAnswers: totalCorrect,
+        scorePercent: totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 100,
+        correctAnswers: correctCount,
         totalQuestions: totalAnswered,
-        answersSnapshot: validatedAnswers,
+        answersSnapshot,
         completedAt: new Date(),
       },
     });
 
-    newAchievements = await syncAndGetNewAchievements(user.id, since);
-  } else {
-    await prisma.bossBattle.update({
-      where: { id: battle.id },
-      data: { remainingHp: newHp },
-    });
+    [newAchievements] = await Promise.all([
+      syncAndGetNewAchievements(user.id, since),
+      cacheDel(
+        CACHE_KEYS.userStudyHistory(user.id),
+        CACHE_KEYS.userPublicProfile(user.id),
+        CACHE_KEYS.userAchievements(user.id),
+        CACHE_KEYS.leaderboard(),
+      ),
+      recordStudyActivity(user.id, "questions", totalAnswered),
+    ]);
+    void publishLeaderboardUpdatedEvent({ userId: user.id, source: "KC", gainedXp });
   }
 
   return NextResponse.json({
     remainingHp: newHp,
+    damage: roundDamage,
+    correct: roundCorrect > 0,
+    streak: victory ? 0 : streak,
     victory,
     ...(victory ? { gainedXp, newAchievements } : {}),
   });

@@ -17,12 +17,9 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "asc" },
   });
 
-  const activeBattles = await prisma.bossBattle.findMany({
-    where: {
-      userId: user.id,
-      victory: false,
-      finishedAt: null,
-    },
+  // Only one BossBattle row exists per (userId, bossId) — it transitions in place to victory=true.
+  const battles = await prisma.bossBattle.findMany({
+    where: { userId: user.id, bossId: { in: bosses.map((b) => b.id) } },
     select: {
       id: true,
       bossId: true,
@@ -32,7 +29,7 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const battleByBossId = new Map(activeBattles.map((b) => [b.bossId, b]));
+  const battleByBossId = new Map(battles.map((b) => [b.bossId, b]));
 
   const result = bosses.map((boss) => {
     const battle = battleByBossId.get(boss.id) ?? null;
@@ -45,7 +42,8 @@ export async function GET(request: NextRequest) {
       damagePerCorrect: boss.damagePerCorrect,
       artworkUrl: boss.artworkUrl,
       active: boss.active,
-      currentBattle: battle
+      defeated: Boolean(battle?.victory),
+      currentBattle: battle && !battle.victory
         ? {
             id: battle.id,
             remainingHp: battle.remainingHp,

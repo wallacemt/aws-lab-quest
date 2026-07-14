@@ -53,6 +53,27 @@ export function playSuccessSound() {
   }
 }
 
+export function playDefeatSound() {
+  try {
+    const ctx = new AudioContext();
+    const notes = [392, 349, 294, 220];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = "sawtooth";
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.22);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.22 + 0.35);
+      osc.start(ctx.currentTime + i * 0.22);
+      osc.stop(ctx.currentTime + i * 0.22 + 0.35);
+    });
+  } catch {
+    // Web Audio API não disponível
+  }
+}
+
 export async function triggerConfetti() {
   try {
     const confetti = (await import("canvas-confetti")).default;
