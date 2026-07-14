@@ -902,8 +902,14 @@ model BossBattle {
   bossId      String
   boss        Boss      @relation(fields: [bossId], references: [id], onDelete: Cascade)
   remainingHp Int
+  streak        Int       @default(0) // consecutive correct answers; resets to 0 on a miss
+  correctCount  Int       @default(0) // cumulative correct answers across the battle
+  totalAnswered Int       @default(0) // cumulative answers submitted across the battle
   victory     Boolean   @default(false)
   gainedXp    Int       @default(0)
+  // Per-question transcript (statement, options, correctOption, explanations) built up as
+  // answers are submitted — powers the post-defeat review screen without a second lookup.
+  answersSnapshot Json?
   finishedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
