@@ -290,3 +290,25 @@ export async function POST(request: NextRequest) {
     ...(victory ? { gainedXp, newAchievements } : {}),
   });
 }
+
+/**
+ * DELETE /api/arena/battle?bossId=...
+ * Abandons the user's in-progress (non-victory) battle against a boss, so the
+ * next attempt starts fresh at full HP instead of resuming mid-fight.
+ * No-op (still 200) if there's nothing to abandon — victories are never touched.
+ */
+export async function DELETE(request: NextRequest) {
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
+
+  const bossId = request.nextUrl.searchParams.get("bossId");
+  if (!bossId) {
+    return NextResponse.json({ error: "bossId is required." }, { status: 400 });
+  }
+
+  await prisma.bossBattle.deleteMany({
+    where: { userId: auth.user.id, bossId, victory: false },
+  });
+
+  return NextResponse.json({ abandoned: true });
+}

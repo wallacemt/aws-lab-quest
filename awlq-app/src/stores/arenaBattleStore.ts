@@ -4,12 +4,12 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_ARENA_SCENARIO_ID } from "@/lib/arena-scenarios";
 
-type ArenaBattleSession = { path: string } | null;
+type ArenaBattleSession = { path: string; bossId: string } | null;
 
 type ArenaBattleState = {
   session: ArenaBattleSession;
   scenarioId: string;
-  startBattle: (path: string) => void;
+  startBattle: (path: string, bossId: string) => void;
   endBattle: () => void;
   setScenario: (id: string) => void;
 };
@@ -22,7 +22,7 @@ export const useArenaBattleStore = create<ArenaBattleState>()(
     (set) => ({
       session: null,
       scenarioId: DEFAULT_ARENA_SCENARIO_ID,
-      startBattle: (path) => set({ session: { path } }),
+      startBattle: (path, bossId) => set({ session: { path, bossId } }),
       endBattle: () => set({ session: null }),
       setScenario: (id) => set({ scenarioId: id }),
     }),

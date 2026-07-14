@@ -8,6 +8,7 @@ import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
 import { useAdminModeStore } from "@/stores/adminModeStore";
 import { useArenaBattleStore } from "@/stores/arenaBattleStore";
 import { findArenaScenario } from "@/lib/arena-scenarios";
+import { abandonBattle } from "@/features/arena/services/arena-api";
 
 import type { HomeConfig } from "@/app/api/admin/home-config/route";
 import BottomNav from "../ui/bottom-nav";
@@ -198,8 +199,12 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   }
 
   function handleAbandonBattle() {
+    const bossId = arenaSession?.bossId;
     endArenaBattle();
     router.push("/arena");
+    // Resets remainingHp server-side so the next attempt starts at full HP instead
+    // of resuming mid-fight — fire-and-forget, the nav above shouldn't wait on it.
+    if (bossId) void abandonBattle(bossId);
   }
 
   return (
