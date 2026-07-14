@@ -14,7 +14,7 @@ node_modules
 # testing
 /coverage
 
-
+*.log
 generated
 # next.js
 .next
