@@ -20,6 +20,7 @@ const ADMIN_MENU = [
   { href: "/admin/worker", label: "Worker / Geracao" },
   { href: "/admin/config-ia", label: "Config de IA" },
   { href: "/admin/arena", label: "Arena" },
+  { href: "/admin/gamificacao", label: "Gamificacao" },
   { href: "/admin/noticias", label: "Noticias" },
   { href: "/admin/changelog", label: "Changelog" },
   { href: "/admin/home-config", label: "Home Config" },
@@ -38,6 +39,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/admin/worker": "Worker / Geracao",
   "/admin/config-ia": "Config de IA",
   "/admin/arena": "Arena",
+  "/admin/gamificacao": "Gamificacao",
   "/admin/noticias": "Noticias",
   "/admin/changelog": "Changelog",
 };

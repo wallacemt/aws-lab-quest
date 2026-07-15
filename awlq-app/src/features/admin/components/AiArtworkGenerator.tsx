@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Props = {
   simuladoName: string;
   onConfirm: (dataUrl: string) => void;
   disabled?: boolean;
+  /** Admin artwork-generation route to call. Defaults to the simulado pack route. */
+  endpoint?: string;
+  /** Body field name the route expects for the subject name. Defaults to the simulado route's field. */
+  bodyKey?: string;
 };
 
 type GenerateResponse = {
@@ -14,6 +18,14 @@ type GenerateResponse = {
   seed: number;
 };
 
+type PollinationsModel = {
+  name: string;
+  title: string;
+};
+
+const DEFAULT_MODEL = "flux";
+const FALLBACK_MODELS: PollinationsModel[] = [{ name: DEFAULT_MODEL, title: "Flux Schnell" }];
+
 type Phase =
   | { kind: "idle" }
   | { kind: "generating"; mode: "ai" | "custom" }
@@ -21,9 +33,39 @@ type Phase =
   | { kind: "asking-prompt-choice"; lastPrompt: string }
   | { kind: "custom-prompt"; draft: string };
 
-export function AiArtworkGenerator({ simuladoName, onConfirm, disabled }: Props) {
+export function AiArtworkGenerator({
+  simuladoName,
+  onConfirm,
+  disabled,
+  endpoint = "/api/admin/simulado-packs/generate-artwork",
+  bodyKey = "simuladoName",
+}: Props) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<PollinationsModel[]>(FALLBACK_MODELS);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+
+  useEffect(() => {
+    let cancelled = false;
+    setModelsLoading(true);
+    fetch("/api/admin/pollinations-models", { credentials: "include" })
+      .then((res) => res.json())
+      .then((json: { models?: PollinationsModel[] }) => {
+        if (!cancelled && json.models && json.models.length > 0) {
+          setAvailableModels(json.models);
+        }
+      })
+      .catch(() => {
+        // Keep the flux-only fallback — generation still works with the default model.
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const nameMissing = !simuladoName.trim();
 
@@ -31,13 +73,14 @@ export function AiArtworkGenerator({ simuladoName, onConfirm, disabled }: Props)
     setError(null);
     setPhase({ kind: "generating", mode: opts.customPrompt ? "custom" : "ai" });
     try {
-      const res = await fetch("/api/admin/simulado-packs/generate-artwork", {
+      const res = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          simuladoName: simuladoName.trim(),
+          [bodyKey]: simuladoName.trim(),
           customPrompt: opts.customPrompt,
+          model: selectedModel,
         }),
       });
       const json = (await res.json().catch(() => ({}))) as Partial<GenerateResponse> & { error?: string };
@@ -72,7 +115,6 @@ export function AiArtworkGenerator({ simuladoName, onConfirm, disabled }: Props)
   function handleChoiceUseAi() {
     void runGeneration({});
   }
-
   return (
     <div className="space-y-2 border border-dashed border-[#1e3a5f] bg-[#0b1220] p-3">
       <div className="flex items-center justify-between">
@@ -91,6 +133,26 @@ export function AiArtworkGenerator({ simuladoName, onConfirm, disabled }: Props)
           </button>
         )}
       </div>
+
+      {(phase.kind === "idle" || phase.kind === "custom-prompt" || phase.kind === "asking-prompt-choice") && (
+        <label className="block space-y-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">
+            Modelo {modelsLoading ? "(carregando...)" : ""}
+          </span>
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            disabled={disabled}
+            className="w-full border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#38bdf8] disabled:opacity-40"
+          >
+            {availableModels.map((m) => (
+              <option key={m.name} value={m.name}>
+                {m.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {nameMissing && phase.kind === "idle" && (
         <p className="font-[var(--font-body)] text-[10px] text-[#64748b]">
