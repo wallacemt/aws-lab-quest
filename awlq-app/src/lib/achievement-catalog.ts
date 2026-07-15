@@ -1,3 +1,5 @@
+import type { TriggerParams, TriggerType } from "@/lib/achievement-triggers";
+
 export type AchievementDef = {
   code: string;
   name: string;
@@ -6,6 +8,8 @@ export type AchievementDef = {
   target: number;
   displayOrder: number;
   prompt: string;
+  triggerType: TriggerType;
+  triggerParams: TriggerParams | null;
 };
 
 export const ACHIEVEMENT_DEFS: AchievementDef[] = [
@@ -18,6 +22,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     displayOrder: 1,
     prompt:
       "pixel-art badge, retro game style, bronze rank emblem, cloud icon, textless, warm colors, high contrast, aws learning journey",
+    triggerType: "LAB_COUNT",
+    triggerParams: null,
   },
   {
     code: "lab_master_10",
@@ -28,6 +34,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     displayOrder: 2,
     prompt:
       "pixel-art badge, retro shield with 10 stars, cloud and terminal motifs, green/teal palette, textless, crisp icon",
+    triggerType: "LAB_COUNT",
+    triggerParams: null,
   },
   {
     code: "lab_master_25",
@@ -37,6 +45,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 25,
     displayOrder: 3,
     prompt: "pixel-art badge, rare sapphire medal, lightning cloud symbol, arcade style, textless, polished edges",
+    triggerType: "LAB_COUNT",
+    triggerParams: null,
   },
   {
     code: "perfect_kc",
@@ -46,6 +56,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 1,
     displayOrder: 4,
     prompt: "pixel-art badge, perfect score trophy, checkmark + cloud, blue neon glow, retro game UI, textless",
+    triggerType: "SESSION_SCORE_COUNT",
+    triggerParams: { sessionType: "KC", minScorePercent: 100 },
   },
   {
     code: "simulado_aprovado",
@@ -55,6 +67,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 1,
     displayOrder: 5,
     prompt: "pixel-art badge, exam pass stamp, cloud and parchment, emerald accent, old-school style, textless",
+    triggerType: "SESSION_SCORE_COUNT",
+    triggerParams: { sessionType: "SIMULADO", minScorePercent: 70 },
   },
   {
     code: "simulado_veterano_5",
@@ -64,6 +78,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 5,
     displayOrder: 6,
     prompt: "pixel-art badge, five marks exam insignia, cyber-retro style, blue and orange contrast, textless",
+    triggerType: "SESSION_COUNT",
+    triggerParams: { sessionType: "SIMULADO" },
   },
   {
     code: "knowledge_hunter_10",
@@ -73,6 +89,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 10,
     displayOrder: 7,
     prompt: "pixel-art badge, hunter compass and cloud, vintage fantasy arcade style, cool hues, textless",
+    triggerType: "SESSION_COUNT",
+    triggerParams: { sessionType: "KC" },
   },
   {
     code: "xp_500",
@@ -82,6 +100,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 500,
     displayOrder: 8,
     prompt: "pixel-art badge, xp crystal shard icon, orange and teal glow, retro game inventory icon, textless",
+    triggerType: "XP_TOTAL",
+    triggerParams: null,
   },
   {
     code: "xp_2000",
@@ -91,6 +111,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 2000,
     displayOrder: 9,
     prompt: "pixel-art badge, epic crystal crown, magenta and cyan palette, dramatic arcade badge, textless",
+    triggerType: "XP_TOTAL",
+    triggerParams: null,
   },
   {
     code: "streak_3_days",
@@ -100,6 +122,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 3,
     displayOrder: 10,
     prompt: "pixel-art badge, calendar flame icon, continuous streak motif, bright green accent, textless",
+    triggerType: "STREAK_DAYS",
+    triggerParams: null,
   },
   {
     code: "consistency_20_sessions",
@@ -109,6 +133,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 20,
     displayOrder: 11,
     prompt: "pixel-art badge, disciplined warrior helm with cloud core, epic style, clean edges, textless",
+    triggerType: "TOTAL_SESSIONS",
+    triggerParams: null,
   },
   {
     code: "aws_legend",
@@ -118,6 +144,8 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 2,
     displayOrder: 12,
     prompt: "pixel-art legendary badge, radiant golden cloud dragon emblem, premium arcade icon, textless, high detail",
+    triggerType: "XP_AND_SESSION_SCORE_COMBO",
+    triggerParams: { xpThreshold: 5000, sessionType: "SIMULADO", minScorePercent: 70, sessionCountThreshold: 5 },
   },
   {
     code: "first_real_cert",
@@ -127,5 +155,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     target: 1,
     displayOrder: 13,
     prompt: "pixel-art badge, golden aws certification stamp, diploma scroll with cloud seal, epic glow, textless",
+    triggerType: "CERT_COUNT",
+    triggerParams: null,
   },
 ];

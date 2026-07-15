@@ -1,17 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ACHIEVEMENT_DEFS } from "@/lib/achievement-catalog";
-
-type QuestEvent = {
-  completedAt: Date;
-  xp: number;
-};
-
-type StudyEvent = {
-  completedAt: Date;
-  gainedXp: number;
-  sessionType: "KC" | "SIMULADO";
-  scorePercent: number;
-};
+import { computeAggregates, currentForTrigger, type TriggerParams, type TriggerType } from "@/lib/achievement-triggers";
 
 export type AchievementItem = {
   id: string;
@@ -33,123 +21,28 @@ export type AchievementSummary = {
   items: AchievementItem[];
 };
 
-type MetricMap = Record<string, { current: number; unlocked: boolean }>;
-
 function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function getConsecutiveDaysMax(dates: Date[]): number {
-  if (dates.length === 0) {
-    return 0;
-  }
-
-  const dayKeys = Array.from(
-    new Set(
-      dates
-        .map((date) => {
-          const d = new Date(date);
-          d.setHours(0, 0, 0, 0);
-          return d.toISOString();
-        })
-        .sort(),
-    ),
-  );
-
-  let maxStreak = 1;
-  let currentStreak = 1;
-
-  for (let i = 1; i < dayKeys.length; i += 1) {
-    const prev = new Date(dayKeys[i - 1]).getTime();
-    const curr = new Date(dayKeys[i]).getTime();
-    const diffDays = Math.round((curr - prev) / (24 * 60 * 60 * 1000));
-
-    if (diffDays === 1) {
-      currentStreak += 1;
-      maxStreak = Math.max(maxStreak, currentStreak);
-    } else {
-      currentStreak = 1;
-    }
-  }
-
-  return maxStreak;
-}
-
-function computeMetrics(input: {
-  questHistory: QuestEvent[];
-  studyHistory: StudyEvent[];
-  certBadgesCount: number;
-}): MetricMap {
-  const questHistory = input.questHistory;
-  const studyHistory = input.studyHistory;
-  const certBadgesCount = input.certBadgesCount;
-
-  const kcSessions = studyHistory.filter((item) => item.sessionType === "KC");
-  const simuladoSessions = studyHistory.filter((item) => item.sessionType === "SIMULADO");
-  const simuladoPassed = simuladoSessions.filter((item) => item.scorePercent >= 70);
-
-  const totalXp =
-    questHistory.reduce((sum, item) => sum + item.xp, 0) + studyHistory.reduce((sum, item) => sum + item.gainedXp, 0);
-
-  const allDates = [...questHistory.map((item) => item.completedAt), ...studyHistory.map((item) => item.completedAt)];
-  const maxStreak = getConsecutiveDaysMax(allDates);
-  const totalSessions = questHistory.length + studyHistory.length;
-
-  return {
-    first_lab: { current: questHistory.length, unlocked: questHistory.length >= 1 },
-    lab_master_10: { current: questHistory.length, unlocked: questHistory.length >= 10 },
-    lab_master_25: { current: questHistory.length, unlocked: questHistory.length >= 25 },
-    perfect_kc: {
-      current: kcSessions.some((item) => item.scorePercent === 100) ? 1 : 0,
-      unlocked: kcSessions.some((item) => item.scorePercent === 100),
-    },
-    simulado_aprovado: { current: simuladoPassed.length > 0 ? 1 : 0, unlocked: simuladoPassed.length > 0 },
-    simulado_veterano_5: { current: simuladoSessions.length, unlocked: simuladoSessions.length >= 5 },
-    knowledge_hunter_10: { current: kcSessions.length, unlocked: kcSessions.length >= 10 },
-    xp_500: { current: totalXp, unlocked: totalXp >= 500 },
-    xp_2000: { current: totalXp, unlocked: totalXp >= 2000 },
-    streak_3_days: { current: maxStreak, unlocked: maxStreak >= 3 },
-    consistency_20_sessions: { current: totalSessions, unlocked: totalSessions >= 20 },
-    aws_legend: {
-      current: (totalXp >= 5000 ? 1 : 0) + (simuladoPassed.length >= 5 ? 1 : 0),
-      unlocked: totalXp >= 5000 && simuladoPassed.length >= 5,
-    },
-    first_real_cert: { current: certBadgesCount, unlocked: certBadgesCount >= 1 },
-  };
-}
-
-export async function ensureAchievementCatalog() {
-  await prisma.$transaction(
-    ACHIEVEMENT_DEFS.map((achievement) =>
-      prisma.achievement.upsert(
-        {
-          where: { code: achievement.code },
-          create: {
-            code: achievement.code,
-            name: achievement.name,
-            description: achievement.description,
-            rarity: achievement.rarity,
-            generationPrompt: achievement.prompt,
-            displayOrder: achievement.displayOrder,
-            active: true,
-          },
-          update: {
-            name: achievement.name,
-            description: achievement.description,
-            rarity: achievement.rarity,
-            generationPrompt: achievement.prompt,
-            displayOrder: achievement.displayOrder,
-            active: true,
-          },
-        },
-      ),
-      { timeout: 30000 },
-    ),
-  );
-}
-
 async function getUserEvents(userId: string) {
-  const [questHistory, studyHistory, certBadgesCount] = await Promise.all([
+  // ponytail: 10 parallel queries per sync (up from 3) — each is a simple
+  // indexed count/select, fine at today's scale. Revisit (e.g. cache
+  // aggregates, compute async off the request path) if sync latency becomes
+  // a measured problem under load.
+  const [
+    questHistory,
+    studyHistory,
+    certBadgesCount,
+    arenaVictoryCount,
+    flashcardReviews,
+    user,
+    gapClearedCount,
+    trailStageCount,
+    activeChains,
+    completedStages,
+    libraryAccessCount,
+  ] = await Promise.all([
     prisma.questHistory.findMany({
       where: { userId },
       select: { completedAt: true, xp: true },
@@ -163,12 +56,30 @@ async function getUserEvents(userId: string) {
         gainedXp: true,
         sessionType: true,
         scorePercent: true,
+        title: true,
       },
       orderBy: { completedAt: "asc" },
       take: 2000,
     }),
     prisma.userCertBadge.count({ where: { userId } }),
+    prisma.bossBattle.count({ where: { userId, victory: true } }),
+    prisma.flashcardReview.findMany({
+      where: { flashcard: { userId } },
+      select: { reviewedAt: true },
+      take: 2000,
+    }),
+    prisma.user.findUnique({ where: { id: userId }, select: { lastMentorQuestionAt: true } }),
+    prisma.userGapProgress.count({ where: { userId, cleared: true } }),
+    prisma.questChainProgress.count({ where: { userId, completed: true } }),
+    prisma.questChain.findMany({ where: { active: true }, select: { id: true, stages: { select: { id: true } } } }),
+    prisma.questChainProgress.findMany({ where: { userId, completed: true }, select: { stageId: true } }),
+    prisma.libraryAccessLog.count({ where: { userId } }),
   ]);
+
+  const completedStageIds = new Set(completedStages.map((item) => item.stageId));
+  const trailChainCompletedCount = activeChains.filter(
+    (chain) => chain.stages.length > 0 && chain.stages.every((stage) => completedStageIds.has(stage.id)),
+  ).length;
 
   return {
     questHistory,
@@ -177,24 +88,36 @@ async function getUserEvents(userId: string) {
       sessionType: item.sessionType as "KC" | "SIMULADO",
     })),
     certBadgesCount,
+    arenaVictoryCount,
+    flashcardReviewDates: flashcardReviews.map((item) => item.reviewedAt),
+    mentorConsulted: user?.lastMentorQuestionAt != null,
+    gapClearedCount,
+    trailStageCount,
+    trailChainCompletedCount,
+    libraryAccessCount,
   };
 }
 
 export async function syncUserAchievements(userId: string): Promise<void> {
-  await ensureAchievementCatalog();
-
-  const [events, achievementCatalog] = await Promise.all([
+  const [events, catalog] = await Promise.all([
     getUserEvents(userId),
     prisma.achievement.findMany({
       where: { active: true },
-      select: { id: true, code: true },
+      select: { id: true, target: true, triggerType: true, triggerParams: true },
       orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
     }),
   ]);
 
-  const metrics = computeMetrics(events);
+  const aggregates = computeAggregates(events);
 
-  const unlockables = achievementCatalog.filter((achievement) => metrics[achievement.code]?.unlocked);
+  const unlockables = catalog.filter(
+    (achievement) =>
+      currentForTrigger(
+        achievement.triggerType as TriggerType,
+        achievement.triggerParams as TriggerParams | null,
+        aggregates,
+      ) >= achievement.target,
+  );
   if (unlockables.length === 0) {
     return;
   }
@@ -211,10 +134,24 @@ export async function syncUserAchievements(userId: string): Promise<void> {
         create: {
           userId,
           achievementId: achievement.id,
-          progress: Math.max(0, metrics[achievement.code]?.current ?? 0),
+          progress: Math.max(
+            0,
+            currentForTrigger(
+              achievement.triggerType as TriggerType,
+              achievement.triggerParams as TriggerParams | null,
+              aggregates,
+            ),
+          ),
         },
         update: {
-          progress: Math.max(0, metrics[achievement.code]?.current ?? 0),
+          progress: Math.max(
+            0,
+            currentForTrigger(
+              achievement.triggerType as TriggerType,
+              achievement.triggerParams as TriggerParams | null,
+              aggregates,
+            ),
+          ),
         },
       }),
     ),
@@ -254,6 +191,9 @@ export async function getUserAchievementSummary(userId: string): Promise<Achieve
         description: true,
         rarity: true,
         imageUrl: true,
+        target: true,
+        triggerType: true,
+        triggerParams: true,
       },
     }),
     prisma.userAchievement.findMany({
@@ -265,15 +205,17 @@ export async function getUserAchievementSummary(userId: string): Promise<Achieve
     }),
   ]);
 
-  const metrics = computeMetrics(events);
+  const aggregates = computeAggregates(events);
   const ownedMap = new Map(owned.map((item) => [item.achievementId, item.unlockedAt]));
-  const defsMap = new Map(ACHIEVEMENT_DEFS.map((item) => [item.code, item]));
 
   const items: AchievementItem[] = catalog.map((achievement) => {
-    const metric = metrics[achievement.code] ?? { current: 0, unlocked: false };
-    const def = defsMap.get(achievement.code);
-    const target = def?.target ?? 1;
+    const current = currentForTrigger(
+      achievement.triggerType as TriggerType,
+      achievement.triggerParams as TriggerParams | null,
+      aggregates,
+    );
     const unlockedAt = ownedMap.get(achievement.id);
+    const unlocked = Boolean(unlockedAt) || current >= achievement.target;
 
     return {
       id: achievement.id,
@@ -282,11 +224,11 @@ export async function getUserAchievementSummary(userId: string): Promise<Achieve
       description: achievement.description,
       rarity: (achievement.rarity as AchievementItem["rarity"]) ?? "common",
       imageUrl: achievement.imageUrl,
-      unlocked: Boolean(unlockedAt) || metric.unlocked,
+      unlocked,
       unlockedAt: unlockedAt ? unlockedAt.toISOString() : null,
-      current: metric.current,
-      target,
-      progressPercent: clampPercent((metric.current / Math.max(1, target)) * 100),
+      current,
+      target: achievement.target,
+      progressPercent: clampPercent((current / Math.max(1, achievement.target)) * 100),
     };
   });
 

@@ -7,6 +7,7 @@ export type AiContext =
   | "SIMULADO_MESSAGE"           // simulado message + artwork
   | "LAB_GENERATION"             // jornada/lab
   | "TRAIL_QUESTION_GENERATION"  // trails questions (formerly QUESTION_GENERATION)
+  | "ACHIEVEMENT_SUGGESTION"     // achievement suggestion + badge artwork prompt
   // Worker contexts
   | "WORKER_KC_QUESTION"            // kc-question-builder
   | "WORKER_QUESTION_GENERATION"    // question-builder (PDF/blueprint)
@@ -20,6 +21,7 @@ export const AI_CONTEXTS: AiContext[] = [
   "SIMULADO_MESSAGE",
   "LAB_GENERATION",
   "TRAIL_QUESTION_GENERATION",
+  "ACHIEVEMENT_SUGGESTION",
   "WORKER_KC_QUESTION",
   "WORKER_QUESTION_GENERATION",
   "WORKER_QUALITY_REVIEW",
@@ -34,6 +36,7 @@ export const AI_CONTEXT_LABELS: Record<AiContext, string> = {
   SIMULADO_MESSAGE:            "Mensagem motivacional",
   LAB_GENERATION:              "Geracao de labs",
   TRAIL_QUESTION_GENERATION:   "Questoes de trilhas",
+  ACHIEVEMENT_SUGGESTION:      "Conquistas: sugestao e arte",
   WORKER_KC_QUESTION:          "KC: Geracao de questoes",
   WORKER_QUESTION_GENERATION:  "Geracao via PDF/Blueprint",
   WORKER_QUALITY_REVIEW:       "Revisao de qualidade",
