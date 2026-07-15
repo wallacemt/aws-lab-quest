@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { callAI, AiNotConfiguredError } from "@/lib/ai";
 
 type GenerateBody = {
-  simuladoName?: string;
+  achievementName?: string;
   customPrompt?: string;
   model?: string;
 };
@@ -15,21 +15,21 @@ const IMAGE_HEIGHT = 512;
 const MAX_FETCH_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 4000;
 
-async function generateImagePromptFromName(simuladoName: string): Promise<string> {
+async function generateImagePromptFromName(achievementName: string): Promise<string> {
   const aiPrompt = [
-    "Voce e um diretor de arte criando uma capa para um simulado de certificacao AWS.",
-    `Nome do simulado: "${simuladoName}".`,
+    "Voce e um diretor de arte criando um badge de conquista (achievement) para uma plataforma gamificada de estudos AWS.",
+    `Nome da conquista: "${achievementName}".`,
     "Gere UM unico prompt em ingles para um modelo de geracao de imagem (flux).",
     "Requisitos obrigatorios do prompt:",
-    "- A cena deve ter relacao visual com o nome do simulado.",
-    "- A cena deve incluir elementos da Amazon Web Services (AWS) e seus servicos (ex.: data center, nuvem, cubos S3, instancias EC2, lambda, icones de cloud, racks).",
-    "- Estilo: ilustracao digital cinematica, vibrante, alta qualidade, paleta inspirada no laranja AWS (#f97316) com tons escuros (#0f172a).",
+    "- Estilo pixel-art retro, badge/emblema circular ou de escudo, icone limpo.",
+    "- A cena deve ter relacao visual com o nome da conquista.",
+    "- Pode incluir elementos da Amazon Web Services (AWS) e nuvem (cloud, servidores, icones de servico) quando fizer sentido.",
     "- Sem texto, sem letras, sem logos de marcas reais.",
-    "- Composicao centralizada para formato quadrado 512x512.",
+    "- Composicao centralizada para formato quadrado 512x512, fundo simples, alto contraste.",
     "Responda SOMENTE com o prompt final, sem aspas, sem prefixos, sem explicacao.",
   ].join("\n");
 
-  const text = (await callAI(aiPrompt, "SIMULADO_MESSAGE")).trim();
+  const text = (await callAI(aiPrompt, "ACHIEVEMENT_SUGGESTION")).trim();
 
   const cleaned = text
     .replace(/^["'`]+|["'`]+$/g, "")
@@ -76,13 +76,13 @@ export async function POST(request: NextRequest) {
   if (!adminResult.ok) return adminResult.response;
 
   const body = (await request.json().catch(() => ({}))) as Partial<GenerateBody>;
-  const simuladoName = body.simuladoName?.trim() ?? "";
+  const achievementName = body.achievementName?.trim() ?? "";
   const customPrompt = body.customPrompt?.trim() ?? "";
   const model = body.model?.trim() || DEFAULT_POLLINATIONS_MODEL;
 
-  if (!simuladoName && !customPrompt) {
+  if (!achievementName && !customPrompt) {
     return NextResponse.json(
-      { error: "Informe simuladoName ou customPrompt." },
+      { error: "Informe achievementName ou customPrompt." },
       { status: 400 },
     );
   }
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
   try {
     const prompt = customPrompt.length > 0
       ? customPrompt
-      : await generateImagePromptFromName(simuladoName);
+      : await generateImagePromptFromName(achievementName);
 
     const seed = Math.floor(Math.random() * 999_999);
     const { dataUrl } = await fetchPollinationsImage(prompt, seed, model);
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ prompt, dataUrl, seed });
   } catch (err) {
     const status = err instanceof AiNotConfiguredError ? 503 : 502;
-    const message = err instanceof Error ? err.message : "Erro ao gerar arte do simulado.";
+    const message = err instanceof Error ? err.message : "Erro ao gerar arte da conquista.";
     return NextResponse.json({ error: message }, { status });
   }
 }
