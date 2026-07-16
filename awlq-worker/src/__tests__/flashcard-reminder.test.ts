@@ -22,13 +22,17 @@ const { mockPrisma, mockSendEmail } = vi.hoisted(() => {
     flashcard: { findMany: vi.fn() },
     user: { findUnique: vi.fn() },
     userEmailEvent: { findFirst: vi.fn(), create: vi.fn() },
+    adminEmailTemplate: { findUnique: vi.fn() },
   };
   const mockSendEmail = vi.fn();
   return { mockPrisma, mockSendEmail };
 });
 
 vi.mock("../prisma.js", () => ({ prisma: mockPrisma }));
-vi.mock("../services/email.js", () => ({ sendEmail: mockSendEmail }));
+vi.mock("../services/email.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/email.js")>();
+  return { ...actual, sendEmail: mockSendEmail };
+});
 vi.mock("../shared/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -47,6 +51,8 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // No admin override by default — falls back to the built-in branded template.
+  mockPrisma.adminEmailTemplate.findUnique.mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -145,6 +151,53 @@ describe("TC-104: processFlashcardReminderJob — grouping, cooldown, opt-out, e
 
   it("does nothing when there are no due cards", async () => {
     mockPrisma.flashcard.findMany.mockResolvedValue([]);
+
+    await processFlashcardReminderJob();
+
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin-editable template (AdminEmailTemplate code "flashcard-due-reminder")
+// ---------------------------------------------------------------------------
+
+describe("processFlashcardReminderJob — admin template override", () => {
+  beforeEach(() => {
+    mockPrisma.flashcard.findMany.mockResolvedValue([{ userId: "user-a", front: "Q1" }]);
+    mockPrisma.user.findUnique.mockResolvedValue({
+      email: "a@example.com",
+      name: "Aluno A",
+      emailNotifications: true,
+    });
+    mockPrisma.userEmailEvent.findFirst.mockResolvedValue(null);
+    mockPrisma.userEmailEvent.create.mockResolvedValue({ id: "event-1" });
+    mockSendEmail.mockResolvedValue(undefined);
+  });
+
+  it("renders the admin-edited subject/html instead of the built-in fallback", async () => {
+    mockPrisma.adminEmailTemplate.findUnique.mockResolvedValue({
+      subject: "Ei {{name}}, {{count}} card{{plural}} te esperando!",
+      html: "<p>Oi {{name}}</p>{{card_list}}<a href='{{app_url}}/flashcards'>ir</a>",
+      active: true,
+    });
+
+    await processFlashcardReminderJob();
+
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    const [sendArgs] = mockSendEmail.mock.calls[0]!;
+    expect(sendArgs.subject).toBe("Ei Aluno A, 1 card te esperando!");
+    expect(sendArgs.html).toContain("<p>Oi Aluno A</p>");
+    expect(sendArgs.html).toContain("Q1");
+  });
+
+  it("skips sending entirely when the admin deactivates the template", async () => {
+    mockPrisma.adminEmailTemplate.findUnique.mockResolvedValue({
+      subject: "irrelevant",
+      html: "irrelevant",
+      active: false,
+    });
 
     await processFlashcardReminderJob();
 

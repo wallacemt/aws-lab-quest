@@ -10,6 +10,7 @@ type BaseEmailParams = {
 type InviteParams = BaseEmailParams;
 type FreeAccessParams = BaseEmailParams;
 type PasswordResetParams = BaseEmailParams;
+type FlashcardReminderParams = BaseEmailParams;
 
 export type SystemTemplateDraft = {
   code: string;
@@ -29,12 +30,16 @@ function renderBrandedEmail(input: {
   subtitle: string;
   intro: string;
   highlights: string[];
+  extraHtml?: string;
   ctaLabel: string;
   ctaHref: string;
   footer: string;
   logoUrl: string;
 }): string {
   const highlightItems = input.highlights.map((item) => `<li style="margin-bottom:6px;">${item}</li>`).join("");
+  const highlightsBlock = input.highlights.length
+    ? `<ul style="margin:0 0 18px 18px;padding:0;font-size:14px;line-height:1.5;color:#0f172a;">${highlightItems}</ul>`
+    : "";
 
   return `
     <div style="margin:0;padding:24px;background:#0b1220;font-family:Segoe UI,Arial,sans-serif;color:#0f172a;">
@@ -50,7 +55,8 @@ function renderBrandedEmail(input: {
         <tr>
           <td style="padding:24px 22px;">
             <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#0f172a;">${input.intro}</p>
-            <ul style="margin:0 0 18px 18px;padding:0;font-size:14px;line-height:1.5;color:#0f172a;">${highlightItems}</ul>
+            ${highlightsBlock}
+            ${input.extraHtml ?? ""}
             <div style="margin:20px 0 10px 0;text-align:center;">
               <a href="${input.ctaHref}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#0f172a;color:#e2e8f0;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;">${input.ctaLabel}</a>
             </div>
@@ -136,10 +142,35 @@ export function renderPasswordResetTemplate(params: PasswordResetParams) {
   };
 }
 
+export function renderFlashcardReminderTemplate(params: FlashcardReminderParams) {
+  const logoUrl = getLogoUrl(params);
+
+  const subject = "Voce tem {{count}} flashcard{{plural}} para revisar";
+  const html = renderBrandedEmail({
+    title: "Hora de revisar, {{name}}!",
+    subtitle: "{{count}} flashcard{{plural}} esperando por voce",
+    intro:
+      "A repeticao espacada so funciona se a revisao acontece no momento certo, e esse momento e agora. Confira o que esta pendente:",
+    highlights: [],
+    extraHtml: "{{card_list}}",
+    ctaLabel: "Revisar agora",
+    ctaHref: "{{app_url}}/flashcards",
+    footer: "Adiar demais faz o conteudo esfriar na memoria e a revisao custar mais caro depois.",
+    logoUrl,
+  });
+
+  return {
+    subject,
+    html,
+    text: "Ola {{name}}! Voce tem {{count}} flashcard{{plural}} aguardando revisao. Acesse {{app_url}}/flashcards para revisar agora.",
+  };
+}
+
 export function getSystemEmailTemplates(params: BaseEmailParams = { name: "Aluno" }): SystemTemplateDraft[] {
   const daily = renderDailyPraticeInviteTemplate(params);
   const freeAccess = renderFreeAcessTemplate(params);
   const passwordReset = renderPasswordResetTemplate(params);
+  const flashcardReminder = renderFlashcardReminderTemplate(params);
 
   return [
     {
@@ -165,6 +196,15 @@ export function getSystemEmailTemplates(params: BaseEmailParams = { name: "Aluno
       subject: passwordReset.subject,
       html: passwordReset.html,
       text: passwordReset.text,
+    },
+    {
+      code: "flashcard-due-reminder",
+      name: "Lembrete de flashcards",
+      description:
+        "Digest diario para flashcards vencidos (retencao espacada). Desative para pausar o envio automatico.",
+      subject: flashcardReminder.subject,
+      html: flashcardReminder.html,
+      text: flashcardReminder.text,
     },
   ];
 }

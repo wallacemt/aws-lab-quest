@@ -33,9 +33,14 @@ export async function ensureSystemTemplates(): Promise<void> {
   const drafts = getSystemEmailTemplates({ name: "Aluno" });
 
   for (const draft of drafts) {
-    await prisma.adminEmailTemplate.upsert({
-      where: { code: draft.code },
-      create: {
+    // Only backfill missing rows — an existing row means either it was already
+    // seeded or an admin has edited it, and neither should be clobbered by a
+    // code-side default on the next panel load.
+    const exists = await prisma.adminEmailTemplate.findUnique({ where: { code: draft.code } });
+    if (exists) continue;
+
+    await prisma.adminEmailTemplate.create({
+      data: {
         code: draft.code,
         name: draft.name,
         description: draft.description,
@@ -44,13 +49,6 @@ export async function ensureSystemTemplates(): Promise<void> {
         text: draft.text,
         active: true,
         isSystem: true,
-      },
-      update: {
-        // System templates are code-managed — regenerate to apply placeholder/URL changes.
-        isSystem: true,
-        subject: draft.subject,
-        html: draft.html,
-        text: draft.text ?? null,
       },
     });
   }
