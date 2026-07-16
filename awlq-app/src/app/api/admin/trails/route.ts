@@ -25,6 +25,17 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  // QuestChain.certificationPresetId has no Prisma relation to CertificationPreset
+  // (it's a plain string column), so resolve display labels with a separate lookup.
+  const certPresetIds = [...new Set(chains.map((c) => c.certificationPresetId).filter((id): id is string => id !== null))];
+  const certPresets = certPresetIds.length
+    ? await prisma.certificationPreset.findMany({
+        where: { id: { in: certPresetIds } },
+        select: { id: true, code: true, name: true },
+      })
+    : [];
+  const certPresetById = new Map(certPresets.map((c) => [c.id, { code: c.code, name: c.name }]));
+
   // Count distinct users with progress on each chain
   const chainIds = chains.map((c) => c.id);
 
@@ -52,6 +63,7 @@ export async function GET(request: NextRequest) {
   const result = chains.map((chain) => ({
     ...chain,
     userCount: userCountByChain.get(chain.id)?.size ?? 0,
+    certificationPreset: chain.certificationPresetId ? (certPresetById.get(chain.certificationPresetId) ?? null) : null,
   }));
 
   return NextResponse.json({ chains: result });

@@ -18,6 +18,7 @@ type UpdateChainBody = {
   description?: string;
   active?: boolean;
   displayOrder?: number;
+  certificationPresetId?: string | null;
 };
 
 export async function PUT(request: NextRequest, context: RouteContext) {
@@ -39,6 +40,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       ...(body.description !== undefined && { description: body.description?.trim() ?? null }),
       ...(body.active !== undefined && { active: body.active }),
       ...(body.displayOrder !== undefined && { displayOrder: body.displayOrder }),
+      ...(body.certificationPresetId !== undefined && { certificationPresetId: body.certificationPresetId }),
     },
   });
 
