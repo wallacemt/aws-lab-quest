@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AiArtworkGenerator } from "@/features/admin/components/AiArtworkGenerator";
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
 import { TRIGGER_TYPES, type TriggerParams, type TriggerType } from "@/lib/achievement-triggers";
+import Image from "next/image";
 
 export type Achievement = {
   id: string;
@@ -208,26 +209,23 @@ export function AchievementFormModal({ achievement, onClose, onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
-        isEdit ? `/api/admin/achievements/${achievement.id}` : "/api/admin/achievements",
-        {
-          method: isEdit ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            code: form.code,
-            name: form.name,
-            description: form.description,
-            rarity: form.rarity,
-            target: form.target,
-            displayOrder: form.displayOrder,
-            active: form.active,
-            triggerType: form.triggerType,
-            triggerParams: needsSessionType(form.triggerType) ? form.triggerParams : null,
-            imageUrl: form.imageUrl,
-          }),
-        },
-      );
+      const res = await fetch(isEdit ? `/api/admin/achievements/${achievement.id}` : "/api/admin/achievements", {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          code: form.code,
+          name: form.name,
+          description: form.description,
+          rarity: form.rarity,
+          target: form.target,
+          displayOrder: form.displayOrder,
+          active: form.active,
+          triggerType: form.triggerType,
+          triggerParams: needsSessionType(form.triggerType) ? form.triggerParams : null,
+          imageUrl: form.imageUrl,
+        }),
+      });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Erro ao salvar conquista");
       onSaved();
@@ -283,7 +281,9 @@ export function AchievementFormModal({ achievement, onClose, onSaved }: Props) {
             <p className="font-mono text-[10px] uppercase text-[#f97316]">
               {isEdit ? "Editar conquista" : "Nova conquista"}
             </p>
-            <h2 className="mt-1 text-base font-semibold text-[#f8fafc]">{isEdit ? achievement.name : "Criar conquista"}</h2>
+            <h2 className="mt-1 text-base font-semibold text-[#f8fafc]">
+              {isEdit ? achievement.name : "Criar conquista"}
+            </h2>
           </div>
           <button
             type="button"
@@ -296,10 +296,12 @@ export function AchievementFormModal({ achievement, onClose, onSaved }: Props) {
 
         {/* Scrollable body */}
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          {error && (
-            <p className="border border-[#7f1d1d] bg-red-900/20 px-3 py-2 text-xs text-[#fca5a5]">{error}</p>
+          {error && <p className="border border-[#7f1d1d] bg-red-900/20 px-3 py-2 text-xs text-[#fca5a5]">{error}</p>}
+          {achievement?.imageUrl && (
+            <div className="flex items-center justify-center">
+              <img src={achievement?.imageUrl} className="h-60 w-60 rounded-full  " alt={achievement.name} />
+            </div>
           )}
-
           {!isEdit && (
             <section className="space-y-2 border border-dashed border-[#1e3a5f] bg-[#0b1220] p-3">
               <div className="flex items-center justify-between">

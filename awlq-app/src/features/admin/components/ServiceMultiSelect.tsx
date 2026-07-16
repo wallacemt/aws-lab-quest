@@ -8,13 +8,15 @@ type Props = {
   allServices: ServiceOption[];
   selectedCodes: string[];
   onChange: (codes: string[]) => void;
+  /** Single-choice mode (e.g. a boss's theme service): picking an item replaces the selection instead of adding to it. */
+  single?: boolean;
 };
 
 function normalizeForSearch(value: string): string {
   return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
-export function ServiceMultiSelect({ allServices, selectedCodes, onChange }: Props) {
+export function ServiceMultiSelect({ allServices, selectedCodes, onChange, single = false }: Props) {
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -30,6 +32,10 @@ export function ServiceMultiSelect({ allServices, selectedCodes, onChange }: Pro
   }, [allServices, search]);
 
   function toggle(code: string) {
+    if (single) {
+      onChange(selectedCodes[0] === code ? [] : [code]);
+      return;
+    }
     onChange(
       selectedCodes.includes(code)
         ? selectedCodes.filter((c) => c !== code)
@@ -81,7 +87,8 @@ export function ServiceMultiSelect({ allServices, selectedCodes, onChange }: Pro
           {filtered.map((svc) => (
             <label key={svc.code} className="inline-flex cursor-pointer items-center gap-2 text-xs">
               <input
-                type="checkbox"
+                type={single ? "radio" : "checkbox"}
+                name={single ? "service-single-select" : undefined}
                 checked={selectedCodes.includes(svc.code)}
                 onChange={() => toggle(svc.code)}
               />
