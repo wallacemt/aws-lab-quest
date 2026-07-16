@@ -16,6 +16,8 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 // (XP, boss damage) depends on it, so it doesn't need server persistence like boss HP does.
 const PLAYER_MAX_HP = 100;
 const PLAYER_DAMAGE_PER_MISS = 20;
+// How long damage numbers / miss text stay on screen before the next question loads.
+const FEEDBACK_DISPLAY_MS = 1800;
 
 type Question = {
   id: string;
@@ -110,9 +112,13 @@ export function BattleStageScreen({ boss }: Props) {
       const isLastQuestion = currentIndex >= questions.length - 1;
       const isDefeated = nextPlayerHp <= 0 || isLastQuestion;
 
+      // Keep `submitting` true (options/attack button stay disabled) for the
+      // full linger window — otherwise a second click while the damage text
+      // is still showing could resubmit the same question.
       setTimeout(() => {
         setFeedback(null);
         setSelectedOption(null);
+        setSubmitting(false);
 
         if (result.victory) {
           setGainedXp(result.gainedXp ?? 0);
@@ -125,16 +131,15 @@ export function BattleStageScreen({ boss }: Props) {
         } else {
           setCurrentIndex((i) => i + 1);
         }
-      }, 700);
+      }, FEEDBACK_DISPLAY_MS);
     } catch (err) {
+      setSubmitting(false);
       if (err instanceof Error && err.message === "ALREADY_DEFEATED") {
         router.replace(`/arena/${boss.id}/revisao`);
         return;
       }
       const msg = err instanceof Error ? err.message : "Erro ao enviar resposta";
       setError(msg);
-    } finally {
-      setSubmitting(false);
     }
   }, [selectedOption, submitting, questions, currentIndex, boss.id, playerHp, router]);
 

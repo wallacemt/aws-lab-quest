@@ -7,9 +7,31 @@ import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { fetchBosses, type BossWithBattle } from "@/features/arena/services/arena-api";
 import Image from "next/image";
-import { Sword } from "lucide-react";
+import { Heart, HeartCrackIcon, Sword } from "lucide-react";
 
 type ArenaTab = "boss" | "derrotados";
+
+const HEART_COUNT = 5;
+
+/** Retro-HUD HP: a fixed row of hearts (Zelda-style), each covering an equal slice of maxHp. */
+function HeartHp({ current, max, colorClass }: { current: number; max: number; colorClass: string }) {
+  const slice = max / HEART_COUNT;
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: HEART_COUNT }, (_, i) => {
+        const fillPct = Math.max(0, Math.min(1, (current - i * slice) / slice)) * 100;
+        return (
+          <div key={i} className="relative h-5 w-5 shrink-0 drop-shadow-[1px_1px_0_rgba(0,0,0,0.9)]">
+            <Heart strokeWidth={2.5} className="absolute inset-0 h-5 w-5 text-white/25" />
+            <div className="absolute inset-0 overflow-hidden" style={{ width: `${fillPct}%` }}>
+              <Heart strokeWidth={2.5} className={`h-5 w-5 fill-current ${colorClass}`} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function BattleScreen() {
   const [bosses, setBosses] = useState<BossWithBattle[]>([]);
@@ -113,7 +135,8 @@ export function BattleScreen() {
               {visibleBosses.map((boss) => {
                 const battle = boss.currentBattle;
                 const hpPct = battle ? Math.round((battle.remainingHp / boss.maxHp) * 100) : 100;
-                const hpColor = hpPct > 60 ? "bg-[var(--pixel-accent)]" : hpPct > 30 ? "bg-yellow-500" : "bg-red-500";
+                const hpColor =
+                  hpPct > 60 ? "text-[var(--pixel-accent)]" : hpPct > 30 ? "text-yellow-500" : "text-red-500";
 
                 return (
                   <PixelCard key={boss.id} className="flex items-center flex-col gap-3  overflow-hidden ">
@@ -131,7 +154,21 @@ export function BattleScreen() {
                           <Sword size={100} />
                         </div>
                       )}
-                      {boss.defeated && <span className="absolute bottom-2 text-acce right-2 retro-shadow  font-mono">F</span>}
+                      {boss.defeated && (
+                        <span className="absolute bottom-2 text-acce right-2 retro-shadow  flex font-mono">
+                          <HeartCrackIcon size={40} className="text-red-700" />
+                        </span>
+                      )}
+
+                      {/* HP HUD — retro heart row, solid bar for legibility over any artwork */}
+                      {!boss.defeated && (
+                        <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-between gap-2 border-t-2 border-[var(--pixel-border)] bg-black/85 px-2 py-1.5">
+                          <HeartHp current={battle?.remainingHp ?? boss.maxHp} max={boss.maxHp} colorClass={hpColor} />
+                          <span className={`font-mono text-[10px] font-bold ${hpColor}`}>
+                            {battle?.remainingHp ?? boss.maxHp}/{boss.maxHp}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-3 p-4">
@@ -142,21 +179,6 @@ export function BattleScreen() {
                           {boss.themeService}
                         </p>
                       </div>
-
-                      {/* HP bar */}
-                      {battle && !boss.defeated && (
-                        <div className="space-y-1">
-                          <div className="flex justify-between font-mono text-[10px] text-[var(--pixel-subtext)]">
-                            <span>HP restante</span>
-                            <span>
-                              {battle.remainingHp} / {boss.maxHp}
-                            </span>
-                          </div>
-                          <div className="h-2 w-full bg-[var(--pixel-border)]">
-                            <div className={`h-full transition-all ${hpColor}`} style={{ width: `${hpPct}%` }} />
-                          </div>
-                        </div>
-                      )}
 
                       <Link href={boss.defeated ? `/arena/${boss.id}/revisao` : `/arena/${boss.id}`} className="block">
                         <PixelButton className="w-full text-xs" variant={boss.defeated ? "ghost" : "primary"}>
