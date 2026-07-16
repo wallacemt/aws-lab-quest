@@ -382,6 +382,16 @@ async function seedBadgesIfConfigured() {
 }
 
 async function seedAchievementsIfConfigured() {
+  // ponytail: the achievement catalog is now managed by admins via the
+  // Gamificacao CRUD screen — this seed only bootstraps a fresh, empty
+  // database. Once any Achievement exists, skip entirely so it never
+  // overwrites admin edits.
+  const existingCount = await prisma.achievement.count();
+  if (existingCount > 0) {
+    console.log("Achievements already seeded — skipping (managed via admin panel now).");
+    return;
+  }
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -389,27 +399,17 @@ async function seedAchievementsIfConfigured() {
     console.log("Seeding achievements without generated images (SUPABASE not configured).");
 
     for (const def of ACHIEVEMENT_DEFS) {
-      const existing = await prisma.achievement.findUnique({ where: { code: def.code } });
-      if (existing) {
-        return;
-      }
-      await prisma.achievement.upsert({
-        where: { code: def.code },
-        create: {
+      await prisma.achievement.create({
+        data: {
           code: def.code,
           name: def.name,
           description: def.description,
           rarity: def.rarity,
           generationPrompt: def.prompt,
           displayOrder: def.displayOrder,
-          active: true,
-        },
-        update: {
-          name: def.name,
-          description: def.description,
-          rarity: def.rarity,
-          generationPrompt: def.prompt,
-          displayOrder: def.displayOrder,
+          target: def.target,
+          triggerType: def.triggerType,
+          triggerParams: def.triggerParams ?? undefined,
           active: true,
         },
       });
@@ -423,52 +423,35 @@ async function seedAchievementsIfConfigured() {
   console.log("Seeding achievements and generated badges...");
 
   for (const def of ACHIEVEMENT_DEFS) {
-    const existing = await prisma.achievement.findUnique({ where: { code: def.code } });
+    const { data: imageBuffer, mimeType } = await generateBadgeImage(def.prompt);
+    const ext = mimeType.includes("png") ? "png" : "jpg";
+    const path = `achievements/${def.code}.${ext}`;
 
-    let imageUrl = existing?.imageUrl ?? null;
-    let supabasePath = existing?.supabasePath ?? null;
+    const { error: uploadError } = await supabase.storage
+      .from("aws-lab-quest")
+      .upload(path, imageBuffer, { contentType: mimeType, upsert: true });
 
-    if (!imageUrl || !supabasePath) {
-      const { data: imageBuffer, mimeType } = await generateBadgeImage(def.prompt);
-      const ext = mimeType.includes("png") ? "png" : "jpg";
-      const path = `achievements/${def.code}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("aws-lab-quest")
-        .upload(path, imageBuffer, { contentType: mimeType, upsert: true });
-
-      if (uploadError) {
-        throw new Error(`Upload failed for achievement ${def.code}: ${uploadError.message}`);
-      }
-
-      const { data: publicUrlData } = supabase.storage.from("aws-lab-quest").getPublicUrl(path);
-      imageUrl = publicUrlData.publicUrl;
-      supabasePath = path;
-
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+    if (uploadError) {
+      throw new Error(`Upload failed for achievement ${def.code}: ${uploadError.message}`);
     }
 
-    await prisma.achievement.upsert({
-      where: { code: def.code },
-      create: {
+    const { data: publicUrlData } = supabase.storage.from("aws-lab-quest").getPublicUrl(path);
+
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    await prisma.achievement.create({
+      data: {
         code: def.code,
         name: def.name,
         description: def.description,
         rarity: def.rarity,
         generationPrompt: def.prompt,
         displayOrder: def.displayOrder,
-        imageUrl,
-        supabasePath,
-        active: true,
-      },
-      update: {
-        name: def.name,
-        description: def.description,
-        rarity: def.rarity,
-        generationPrompt: def.prompt,
-        displayOrder: def.displayOrder,
-        imageUrl,
-        supabasePath,
+        target: def.target,
+        triggerType: def.triggerType,
+        triggerParams: def.triggerParams ?? undefined,
+        imageUrl: publicUrlData.publicUrl,
+        supabasePath: path,
         active: true,
       },
     });

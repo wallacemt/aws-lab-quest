@@ -62,6 +62,7 @@ model User {
   lastMentorQuestionAt    DateTime?
   lastMentorQuestion      String?
   lastMentorAnswer        String?
+  libraryAccessLogs       LibraryAccessLog[]
 
   @@index([accessStatus, active])
   @@map("user")
@@ -449,6 +450,9 @@ model Achievement {
   generationPrompt String?
   active           Boolean           @default(true)
   displayOrder     Int               @default(0)
+  target           Int               @default(1)
+  triggerType      String            @default("XP_TOTAL")
+  triggerParams    Json?
   userAchievements UserAchievement[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -1068,10 +1072,26 @@ model LibraryContent {
   createdByUserId       String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
+  accessLogs            LibraryAccessLog[]
 
   @@index([published, category])
   @@index([awsServiceId, published])
   @@index([questChainId, published])
+}
+
+// Per-user access record — LibraryContent.accessCount above is a global
+// counter and can't answer "how many items has this user opened", which the
+// gamification trigger engine (LIBRARY_ACCESS_COUNT) needs.
+model LibraryAccessLog {
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId  String
+  content    LibraryContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  accessedAt DateTime       @default(now())
+
+  @@index([userId, accessedAt])
+  @@index([contentId])
 }
 
 // ─── Phase 2: Mentor + Quest Chains ──────────────────────────────────────────
