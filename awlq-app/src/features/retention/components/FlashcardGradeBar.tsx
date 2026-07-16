@@ -1,7 +1,7 @@
 "use client";
 
 import { Frown, Meh, Smile, Laugh } from "lucide-react";
-import { PixelButton } from "@/components/ui/pixel-button";
+import { PixelButton, PixelButtonVariant } from "@/components/ui/pixel-button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FlashcardGrade } from "@/features/retention/services/retention-api";
 
@@ -15,12 +15,12 @@ const GRADE_OPTIONS: {
   grade: FlashcardGrade;
   label: string;
   icon: typeof Frown;
-  variant: "primary" | "secondary" | "ghost";
+  variant: PixelButtonVariant
 }[] = [
-  { grade: "VERY_HARD", label: "Muito Difícil", icon: Frown, variant: "ghost" },
-  { grade: "HARD", label: "Difícil", icon: Meh, variant: "ghost" },
+  { grade: "VERY_HARD", label: "Muito Difícil", icon: Frown, variant: "destructive" },
+  { grade: "HARD", label: "Difícil", icon: Meh, variant: "warning" },
   { grade: "GOOD", label: "Bom", icon: Smile, variant: "secondary" },
-  { grade: "EASY", label: "Fácil", icon: Laugh, variant: "primary" },
+  { grade: "EASY", label: "Fácil", icon: Laugh, variant: "info" },
 ];
 
 /**
@@ -36,7 +36,7 @@ export function FlashcardGradeBar({ onGrade, selectedGrade, disabled = false }: 
           <Tooltip key={grade}>
             <TooltipTrigger asChild>
               <PixelButton
-                variant={variant}
+                variant={variant} 
                 disabled={disabled}
                 onClick={() => onGrade(grade)}
                 aria-label={label}

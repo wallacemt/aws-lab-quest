@@ -39,8 +39,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     prisma.userProfile.findUnique({ where: { userId: user.id }, select: { certificationPresetId: true } }),
   ]);
 
+  // Arena only supports single-select combat (one "attack" per turn) — exclude
+  // multi-select questions here so scoring in /api/arena/battle never silently
+  // drops an answer it can't grade (previously served but unscoreable).
   const where: Prisma.StudyQuestionWhereInput = {
     active: true,
+    questionType: "single",
     ...(service ? { awsServiceId: service.id } : {}),
     ...(profile?.certificationPresetId ? { certificationPresetId: profile.certificationPresetId } : {}),
   };
@@ -56,7 +60,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       optionD: true,
       optionE: true,
     },
-    take: count * 5,
+    take: 200,
   });
 
   let generationRequestId: string | null = null;
