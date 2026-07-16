@@ -60,6 +60,7 @@ export function BattleStageScreen({ boss }: Props) {
   const [feedback, setFeedback] = useState<BattleFeedback>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [insufficientPool, setInsufficientPool] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -67,8 +68,10 @@ export function BattleStageScreen({ boss }: Props) {
     fetch(`/api/arena/bosses/${boss.id}/questions?count=${count}`)
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to load questions");
-        const data = (await res.json()) as { questions: Question[] };
+        const data = (await res.json()) as { questions: Question[]; insufficient?: boolean };
         setQuestions(data.questions);
+        // Pool was thin — background generation was enqueued to backfill it for next time.
+        setInsufficientPool(Boolean(data.insufficient));
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Erro ao carregar questões";
@@ -157,6 +160,21 @@ export function BattleStageScreen({ boss }: Props) {
         <div className="border border-red-500/30 bg-[#1a0a0a] p-3">
           <p className="font-mono text-xs text-red-400">{error}</p>
         </div>
+      )}
+
+      {questions.length === 0 && insufficientPool && (
+        <div className="border border-yellow-500/30 bg-[#1a1608] p-3">
+          <p className="font-mono text-xs text-yellow-400">
+            Ainda nao ha questoes suficientes para este boss na sua certificacao. Estamos gerando mais em segundo
+            plano — tente novamente em alguns instantes.
+          </p>
+        </div>
+      )}
+
+      {questions.length > 0 && insufficientPool && (
+        <p className="font-mono text-[10px] text-[#64748b]">
+          Gerando mais questoes para este boss em segundo plano (nao afeta esta batalha).
+        </p>
       )}
 
       <BossBattleStage

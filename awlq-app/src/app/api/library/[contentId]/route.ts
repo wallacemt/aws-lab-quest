@@ -17,8 +17,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ contentId: string }> },
 ) {
-  const { response } = await requireApprovedUser(request);
-  if (response) return response;
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
+  const { user } = auth;
 
   const { contentId } = await params;
 
@@ -37,6 +38,10 @@ export async function GET(
     }
     throw err;
   }
+
+  // Per-user access record for the LIBRARY_ACCESS_COUNT achievement trigger —
+  // accessCount above is a global counter and can't answer "did this user open it".
+  await prisma.libraryAccessLog.create({ data: { userId: user.id, contentId } });
 
   let signedUrl: string | undefined;
   if (content.storageBucket && content.storagePath) {
