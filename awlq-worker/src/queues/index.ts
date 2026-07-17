@@ -223,3 +223,15 @@ export const flashcardReminderQueue = new Queue<FlashcardReminderJobData, void, 
     backoff: { type: "fixed", delay: 5_000 },
   },
 });
+
+// ─── Issue #34: trail stage illustrations ────────────────────────────────────
+
+export type TrailIllustrationJobData = { stageId: string };
+
+export const trailIllustrationQueue = new Queue<TrailIllustrationJobData, void, string>("trail-illustration", {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 10_000 },
+  },
+});

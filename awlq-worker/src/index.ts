@@ -18,6 +18,7 @@ import { createNewsFetchWorker } from "./workers/news-fetch.worker.js";
 import { createChangelogFetchWorker } from "./workers/changelog-fetch.worker.js";
 import { createDailyQuizWorker } from "./workers/daily-quiz.worker.js";
 import { createFlashcardReminderWorker } from "./workers/flashcard-reminder.worker.js";
+import { createTrailIllustrationWorker } from "./workers/trail-illustration.worker.js";
 import { registerCronJobs, expandCronJob, syncCronJobs } from "./cron/scheduler.js";
 import { startTriggerPoller } from "./services/trigger-poller.js";
 import { prisma } from "./prisma.js";
@@ -55,6 +56,7 @@ async function main() {
     createChangelogFetchWorker(),
     createDailyQuizWorker(),
     createFlashcardReminderWorker(),
+    createTrailIllustrationWorker(),
   ];
 
   for (const worker of workers) {

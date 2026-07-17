@@ -98,12 +98,23 @@ function StageNode({ stage, chainId: _chainId, align, onTooltip, onStudy, onStag
           state === "locked" ? "opacity-60" : ""
         }`}
       >
-        <p className="font-mono text-xs font-bold text-primary leading-tight">{stage.title}</p>
-        {stage.awsServiceId && (
-          <p className="font-mono text-[10px] text-pixel-subtext uppercase mt-0.5">
-            {stage.awsServiceId}
-          </p>
-        )}
+        <div className="flex items-start gap-2">
+          {stage.imageUrl && (
+            <img
+              src={stage.imageUrl}
+              alt=""
+              className="h-12 w-12 shrink-0 border border-[var(--pixel-border)] object-cover"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="font-mono text-xs font-bold text-primary leading-tight">{stage.title}</p>
+            {stage.awsServiceId && (
+              <p className="font-mono text-[10px] text-pixel-subtext uppercase mt-0.5">
+                {stage.awsServiceId}
+              </p>
+            )}
+          </div>
+        </div>
 
         {/* Actions */}
         <div className={`mt-2 flex gap-2 ${isLeft ? "" : "flex-row-reverse"}`}>

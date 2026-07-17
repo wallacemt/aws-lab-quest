@@ -15,7 +15,8 @@ export type AiContext =
   | "WORKER_QUALITY_REVIEW"         // quality-review.worker
   | "WORKER_BLUEPRINT_PARSER"       // blueprint-parser
   | "WORKER_EXAM_GUIDE"             // exam-guide-reviewer
-  | "WORKER_EMAIL";                 // personalized-email-generator
+  | "WORKER_EMAIL"                  // personalized-email-generator
+  | "WORKER_TRAIL_ILLUSTRATION";    // trail-illustration.worker
 
 export const AI_CONTEXTS: AiContext[] = [
   "QUESTION_EXPLAIN",
@@ -30,6 +31,7 @@ export const AI_CONTEXTS: AiContext[] = [
   "WORKER_BLUEPRINT_PARSER",
   "WORKER_EXAM_GUIDE",
   "WORKER_EMAIL",
+  "WORKER_TRAIL_ILLUSTRATION",
 ];
 
 // Kept for backward-compat references that might be compiled in; not used in the new flow.
@@ -46,6 +48,7 @@ export const AI_CONTEXT_LABELS: Record<AiContext, string> = {
   WORKER_BLUEPRINT_PARSER:     "Parser de blueprint",
   WORKER_EXAM_GUIDE:           "Revisor de guia de exame",
   WORKER_EMAIL:                "Emails personalizados",
+  WORKER_TRAIL_ILLUSTRATION:   "Trilhas: ilustracao de estagio",
 };
 
 // ─── Encryption helpers (AES-256-GCM) ──────────────────────────────────────

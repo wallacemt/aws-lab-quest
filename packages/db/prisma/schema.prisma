@@ -1141,6 +1141,8 @@ model QuestChainStage {
   title        String
   // e.g. { minScorePercent: 70, sessionType: "KC" }
   unlockRule   Json?
+  // AI-generated illustration (Pollinations), cached in Supabase Storage — generated once by the worker.
+  imageUrl     String?
   progress     QuestChainProgress[]
   explain      TrailStageExplain?
 

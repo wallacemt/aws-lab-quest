@@ -50,4 +50,11 @@ export const config = {
   app: {
     url: optional("APP_URL", "https://awslabquest.com"),
   },
+  supabase: {
+    url: optional("SUPABASE_URL", ""),
+    serviceRoleKey: optional("SUPABASE_SERVICE_ROLE_KEY", ""),
+  },
+  pollinations: {
+    apiKey: optional("POLLINATIONS_API_KEY", ""),
+  },
 };

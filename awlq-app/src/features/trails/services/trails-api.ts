@@ -14,6 +14,7 @@ export type QuestStage = {
   awsServiceId: string | null;
   topic: string | null;
   unlockRule: UnlockRule | null;
+  imageUrl: string | null;
   unlocked: boolean;
   completed: boolean;
   completedAt: string | null;
