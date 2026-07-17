@@ -235,3 +235,15 @@ export const trailIllustrationQueue = new Queue<TrailIllustrationJobData, void, 
     backoff: { type: "fixed", delay: 10_000 },
   },
 });
+
+// ─── Issue #32: trail stage explanation review ───────────────────────────────
+
+export type TrailReviewJobData = { stageId: string };
+
+export const trailReviewQueue = new Queue<TrailReviewJobData, void, string>("trail-review", {
+  connection,
+  defaultJobOptions: {
+    attempts: 1,
+    backoff: { type: "fixed", delay: 30_000 },
+  },
+});

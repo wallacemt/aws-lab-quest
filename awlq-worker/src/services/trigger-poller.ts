@@ -12,6 +12,7 @@ import {
   changelogFetchQueue,
   newsFetchQueue,
   trailIllustrationQueue,
+  trailReviewQueue,
 } from "../queues/index.js";
 import { config } from "../config.js";
 
@@ -223,6 +224,16 @@ async function processOneTrigger(): Promise<void> {
           await trailIllustrationQueue.add(`trail-illustration-${payload.stageId}`, { stageId: payload.stageId });
         } else {
           logger.warn({ triggerId: trigger.id }, "generate-trail-illustration trigger missing stageId");
+        }
+        break;
+      }
+
+      case "review-trail-explain": {
+        const payload = trigger.payload as { stageId?: string } | null;
+        if (payload?.stageId) {
+          await trailReviewQueue.add(`trail-review-${payload.stageId}`, { stageId: payload.stageId });
+        } else {
+          logger.warn({ triggerId: trigger.id }, "review-trail-explain trigger missing stageId");
         }
         break;
       }

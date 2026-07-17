@@ -111,5 +111,15 @@ Regras:
     update: {},
   });
 
+  // Fire-and-forget via WorkerTrigger — content is served immediately (cached)
+  // and reviewed/improved in the background, same as quality-review for questions.
+  await prisma.workerTrigger.create({
+    data: {
+      action: "review-trail-explain",
+      source: "trail_explain_generate",
+      payload: { stageId },
+    },
+  });
+
   return NextResponse.json({ markdown, cached: false });
 }
