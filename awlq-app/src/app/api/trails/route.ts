@@ -135,6 +135,7 @@ export async function GET(request: NextRequest) {
         awsServiceId: stage.awsServiceId,
         topic: stage.topic,
         unlockRule: stage.unlockRule,
+        imageUrl: stage.imageUrl,
         unlocked,
         completed,
         completedAt: completion?.completedAt ?? null,

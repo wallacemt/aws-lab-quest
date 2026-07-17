@@ -196,10 +196,8 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
         disabled={revealed}
         footer={
           revealed ? (
-            <div
-              className={`border-t pt-3 ${isCorrect ? "border-green-500/60" : "border-red-500/40"}`}
-            >
-              <p className={`font-mono text-[10px] uppercase ${ isCorrect ? "text-accent" : "text-red-500"} mb-1`}>
+            <div className={`border-t pt-3 ${isCorrect ? "border-green-500/60" : "border-red-500/40"}`}>
+              <p className={`font-mono text-[10px] uppercase ${isCorrect ? "text-accent" : "text-red-500"} mb-1`}>
                 {isCorrect ? "✓ Correto!" : `✗ Incorreto — Resposta: ${question.correctKey}`}
               </p>
               <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{question.explanation}</p>
@@ -302,7 +300,19 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
       setPhase({ tag: "quiz_failed" });
     }
   }
-
+  function getPhaseTitle(): string {
+    return phase.tag === "explain" || phase.tag === "loading_explain"
+      ? "Explicação da IA"
+      : phase.tag === "loading_questions"
+        ? "Gerando questões..."
+        : phase.tag === "quiz"
+          ? "Quiz"
+          : phase.tag === "quiz_failed"
+            ? "Tente novamente"
+            : phase.tag === "review"
+              ? "Revisão da tentativa"
+              : "Vitória!";
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <motion.div
@@ -315,19 +325,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
           {/* Header */}
           <div className="flex items-start border-accent border-b-2 pb-2 justify-between gap-4">
             <div>
-              <p className="font-mono text-[10px] uppercase text-accent tracking-widest">
-                {phase.tag === "explain" || phase.tag === "loading_explain"
-                  ? "Explicação da IA"
-                  : phase.tag === "loading_questions"
-                    ? "Gerando questões..."
-                    : phase.tag === "quiz"
-                      ? "Quiz"
-                      : phase.tag === "quiz_failed"
-                        ? "Tente novamente"
-                        : phase.tag === "review"
-                          ? "Revisão da tentativa"
-                          : "Vitória!"}
-              </p>
+              <p className="font-mono text-[10px] uppercase text-accent tracking-widest">{getPhaseTitle()}</p>
               <h2 className="font-mono text-base font-bold uppercase text-primary mt-0.5">{stage.title}</h2>
             </div>
             {phase.tag !== "victory" && (
@@ -337,7 +335,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                 title="Fechar Trilha"
                 className="font-mono text-xs text-pixel-subtext hover:text-primary transition-colors shrink-0"
               >
-                <X/>
+                <X />
               </button>
             )}
           </div>
@@ -389,7 +387,9 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      h1: ({ children }) => <h1 className="mb-3 font-mono text-base uppercase text-primary">{children}</h1>,
+                      h1: ({ children }) => (
+                        <h1 className="mb-3 font-mono text-base uppercase text-primary">{children}</h1>
+                      ),
                       h2: ({ children }) => (
                         <h2 className="mb-3 mt-5 font-mono text-sm uppercase text-accent">{children}</h2>
                       ),
@@ -400,7 +400,9 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
                         <p className="mb-3 font-sans text-base leading-7 text-pixel-subtext">{children}</p>
                       ),
                       li: ({ children }) => (
-                        <li className="mb-1.5 ml-4 list-disc font-sans text-base leading-7 text-pixel-subtext">{children}</li>
+                        <li className="mb-1.5 ml-4 list-disc font-sans text-base leading-7 text-pixel-subtext">
+                          {children}
+                        </li>
                       ),
                       ul: ({ children }) => <ul className="mb-3 space-y-1">{children}</ul>,
                       ol: ({ children }) => <ol className="mb-3 list-decimal ml-4 space-y-1">{children}</ol>,

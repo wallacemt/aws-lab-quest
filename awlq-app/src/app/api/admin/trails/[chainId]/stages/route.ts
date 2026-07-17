@@ -72,6 +72,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
     });
 
+    // Fire-and-forget via WorkerTrigger — illustration is generated in the
+    // background and cached on the stage once ready (issue #34).
+    await prisma.workerTrigger.create({
+      data: {
+        action: "generate-trail-illustration",
+        source: "trail_stage_create",
+        payload: { stageId: stage.id },
+      },
+    });
+
     return NextResponse.json({ stage }, { status: 201 });
   } catch (error: unknown) {
     if (

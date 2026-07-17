@@ -16,6 +16,7 @@ export type AiContext =
   | "WORKER_BLUEPRINT_PARSER"       // blueprint-parser
   | "WORKER_EXAM_GUIDE"             // exam-guide-reviewer
   | "WORKER_EMAIL"                  // personalized-email-generator
+  | "WORKER_TRAIL_ILLUSTRATION"     // trail-illustration.worker
   | "WORKER_TRAIL_REVIEW";          // trail-review.worker
 
 export const AI_CONTEXTS: AiContext[] = [
@@ -31,6 +32,7 @@ export const AI_CONTEXTS: AiContext[] = [
   "WORKER_BLUEPRINT_PARSER",
   "WORKER_EXAM_GUIDE",
   "WORKER_EMAIL",
+  "WORKER_TRAIL_ILLUSTRATION",
   "WORKER_TRAIL_REVIEW",
 ];
 
@@ -48,6 +50,7 @@ export const AI_CONTEXT_LABELS: Record<AiContext, string> = {
   WORKER_BLUEPRINT_PARSER:     "Parser de blueprint",
   WORKER_EXAM_GUIDE:           "Revisor de guia de exame",
   WORKER_EMAIL:                "Emails personalizados",
+  WORKER_TRAIL_ILLUSTRATION:   "Trilhas: ilustracao de estagio",
   WORKER_TRAIL_REVIEW:         "Trilhas: revisao de explicacao",
 };
 
