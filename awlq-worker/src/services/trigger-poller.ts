@@ -11,6 +11,7 @@ import {
   mentorComputeQueue,
   changelogFetchQueue,
   newsFetchQueue,
+  trailReviewQueue,
 } from "../queues/index.js";
 import { config } from "../config.js";
 
@@ -213,6 +214,16 @@ async function processOneTrigger(): Promise<void> {
       case "news-fetch": {
         const payload = trigger.payload as { sourceId?: string } | null;
         await newsFetchQueue.add("manual-news-fetch", { sourceId: payload?.sourceId }, { priority: 1 });
+        break;
+      }
+
+      case "review-trail-explain": {
+        const payload = trigger.payload as { stageId?: string } | null;
+        if (payload?.stageId) {
+          await trailReviewQueue.add(`trail-review-${payload.stageId}`, { stageId: payload.stageId });
+        } else {
+          logger.warn({ triggerId: trigger.id }, "review-trail-explain trigger missing stageId");
+        }
         break;
       }
 
