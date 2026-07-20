@@ -126,7 +126,7 @@ export function AdminShellLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen  bg-[#0b1220] text-[#e2e8f0] ">
+    <div className="min-h-screen  bg-admin-bg/90   text-[#e2e8f0] ">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b  border-[#1e293b] bg-[#0f172a]/95 px-4 py-3 backdrop-blur lg:hidden">
         <div className="flex flex-col">
           <p className="font-mono text-xs uppercase text-[#f97316]">Admin Console</p>

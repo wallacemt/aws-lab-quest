@@ -57,24 +57,15 @@ const WORKER_CONTEXTS: AiContext[] = [
 
 const ALL_CONTEXTS: AiContext[] = [...APP_CONTEXTS, ...WORKER_CONTEXTS];
 
-// ponytail: openrouter/free auto-routes to whatever is currently free — individual :free slugs go stale
-export const FREE_MODELS = [
-  { id: "openrouter/free",                                        name: "Auto (openrouter/free)", context: "varies", desc: "Selecao automatica do melhor modelo gratuito disponivel no momento (recomendado)" },
-  { id: "google/gemma-3-4b-it:free",                             name: "Gemma 3 4B",             context: "8k",     desc: "Leve e rapido para geracao simples" },
-  { id: "google/gemma-3-12b-it:free",                            name: "Gemma 3 12B",            context: "8k",     desc: "Melhor raciocinio que o 4B" },
-  { id: "google/gemma-3-27b-it:free",                            name: "Gemma 3 27B",            context: "8k",     desc: "Maior qualidade da familia Gemma" },
-  { id: "meta-llama/llama-3.2-3b-instruct:free",                 name: "Llama 3.2 3B",           context: "131k",   desc: "Contexto longo, bom para resumos" },
-  { id: "meta-llama/llama-3.3-70b-instruct:free",                name: "Llama 3.3 70B",          context: "131k",   desc: "Excelente raciocinio e geracao" },
-  { id: "meta-llama/llama-4-scout:free",                         name: "Llama 4 Scout",          context: "512k",   desc: "Contexto enorme, ideal p/ documentos longos" },
-  { id: "meta-llama/llama-4-maverick:free",                      name: "Llama 4 Maverick",       context: "131k",   desc: "Llama 4 balanceado" },
-  { id: "mistralai/mistral-7b-instruct:free",                    name: "Mistral 7B",             context: "32k",    desc: "Eficiente, bom equilibrio velocidade/qualidade" },
-  { id: "mistralai/mistral-small-3.2-24b-instruct:free",         name: "Mistral Small 3.2 24B",  context: "128k",   desc: "Mistral com contexto longo" },
-  { id: "qwen/qwen3-8b:free",                                    name: "Qwen 3 8B",              context: "40k",    desc: "Bom em codigo e multilingue (PT incluido)" },
-  { id: "qwen/qwen3-14b:free",                                   name: "Qwen 3 14B",             context: "40k",    desc: "Versao maior, melhor qualidade" },
-  { id: "qwen/qwen3-30b-a3b:free",                               name: "Qwen 3 30B MoE",         context: "40k",    desc: "Alta capacidade com MoE" },
-  { id: "microsoft/phi-4-reasoning:free",                        name: "Phi-4 Reasoning",        context: "32k",    desc: "Focado em raciocinio passo a passo" },
-  { id: "nvidia/llama-3.1-nemotron-70b-instruct:free",           name: "Nemotron 70B",           context: "131k",   desc: "Fine-tune NVIDIA sobre Llama 3.1" },
-] as const;
+// Always available regardless of the live catalog — OpenRouter's own auto-router.
+const AUTO_MODEL = {
+  id: "openrouter/free",
+  name: "Auto (openrouter/free)",
+  context: "varies",
+  desc: "Selecao automatica entre os modelos gratuitos disponiveis no momento",
+};
+
+type FreeModel = { id: string; name: string; context: string; desc: string };
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -136,9 +127,30 @@ export function AdminAiConfigScreen() {
   // Shared test message for the "Testar" benchmark button
   const [testPrompt, setTestPrompt] = useState("");
 
+  // Live free-model catalog (fetched from OpenRouter — the hardcoded list used to go stale)
+  const [models, setModels] = useState<FreeModel[]>([AUTO_MODEL]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
   useEffect(() => {
     void load();
+    void loadModels();
   }, []);
+
+  async function loadModels() {
+    setModelsLoading(true);
+    setModelsError(null);
+    try {
+      const res = await fetch("/api/admin/openrouter-models", { credentials: "include" });
+      const data = (await res.json()) as { models?: FreeModel[]; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? "Falha ao carregar modelos");
+      setModels([AUTO_MODEL, ...(data.models ?? [])]);
+    } catch (err) {
+      setModelsError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setModelsLoading(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -368,11 +380,12 @@ export function AdminAiConfigScreen() {
         <div className="flex gap-2">
           <select
             value={bulkModel}
+            disabled={modelsLoading}
             onChange={(e) => { setBulkModel(e.target.value); setBulkError(null); setBulkSuccess(null); }}
-            className="flex-1 border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            className="flex-1 border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none disabled:opacity-60"
           >
-            <option value="">-- Selecione um modelo --</option>
-            {FREE_MODELS.map((m) => (
+            <option value="">{modelsLoading ? "Carregando modelos..." : "-- Selecione um modelo --"}</option>
+            {models.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name} ({m.context}) — {m.desc}
               </option>
@@ -389,6 +402,14 @@ export function AdminAiConfigScreen() {
         </div>
         {bulkError && <p className="text-xs text-[#fca5a5]">{bulkError}</p>}
         {bulkSuccess && <p className="text-xs text-green-300">{bulkSuccess}</p>}
+        {modelsError && (
+          <p className="text-xs text-[#fca5a5]">
+            Falha ao buscar catalogo da OpenRouter: {modelsError}{" "}
+            <button type="button" onClick={() => void loadModels()} className="underline">
+              tentar de novo
+            </button>
+          </p>
+        )}
       </section>
 
       {/* ── Shared test message ────────────────────────────────────── */}
@@ -415,6 +436,8 @@ export function AdminAiConfigScreen() {
             ctx={ctx}
             currentModel={configs?.[ctx]?.model ?? null}
             state={moduleStates[ctx] ?? makeModuleState()}
+            models={models}
+            modelsLoading={modelsLoading}
             onModelChange={(m) => patchModule(ctx, { model: m, error: null, success: false })}
             onSave={() => void saveModel(ctx)}
             onBenchmark={() => void runBenchmark(ctx)}
@@ -431,6 +454,8 @@ export function AdminAiConfigScreen() {
             ctx={ctx}
             currentModel={configs?.[ctx]?.model ?? null}
             state={moduleStates[ctx] ?? makeModuleState()}
+            models={models}
+            modelsLoading={modelsLoading}
             onModelChange={(m) => patchModule(ctx, { model: m, error: null, success: false })}
             onSave={() => void saveModel(ctx)}
             onBenchmark={() => void runBenchmark(ctx)}
@@ -468,12 +493,14 @@ type ModuleCardProps = {
   ctx: AiContext;
   currentModel: string | null;
   state: ModuleState;
+  models: FreeModel[];
+  modelsLoading: boolean;
   onModelChange: (model: string) => void;
   onSave: () => void;
   onBenchmark: () => void;
 };
 
-function ModuleCard({ ctx, currentModel, state, onModelChange, onSave, onBenchmark }: ModuleCardProps) {
+function ModuleCard({ ctx, currentModel, state, models, modelsLoading, onModelChange, onSave, onBenchmark }: ModuleCardProps) {
   const meta = MODULE_META[ctx];
 
   return (
@@ -493,16 +520,17 @@ function ModuleCard({ ctx, currentModel, state, onModelChange, onSave, onBenchma
         <div className="flex-1">
           <select
             value={state.model}
+            disabled={modelsLoading}
             onChange={(e) => onModelChange(e.target.value)}
-            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+            className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none disabled:opacity-60"
           >
-            <option value="">-- Selecione um modelo --</option>
-            {FREE_MODELS.map((m) => (
+            <option value="">{modelsLoading ? "Carregando modelos..." : "-- Selecione um modelo --"}</option>
+            {models.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name} ({m.context}) — {m.desc}
               </option>
             ))}
-            {state.model && !FREE_MODELS.find((m) => m.id === state.model) && (
+            {state.model && !models.find((m) => m.id === state.model) && (
               <option value={state.model}>{state.model}</option>
             )}
           </select>
