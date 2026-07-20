@@ -39,6 +39,17 @@ export async function GET(request: NextRequest) {
 
   if (!pack) return NextResponse.json({ error: "Pack nao encontrado ou inativo" }, { status: 404 });
 
+  const examGuide = pack.certificationPreset?.examGuide ?? "";
+  if (examGuide.trim().length < 120) {
+    return NextResponse.json(
+      {
+        error:
+          "Guia oficial da certificacao nao encontrado. O admin precisa enviar o Exam Guide antes de liberar simulados.",
+      },
+      { status: 400 },
+    );
+  }
+
   const questionIds = pack.questions.map((pq) => pq.questionId);
 
   const dbQuestions = await prisma.studyQuestion.findMany({
@@ -52,17 +63,12 @@ export async function GET(request: NextRequest) {
     .filter((q): q is NonNullable<typeof q> => q !== null)
     .map(mapDbQuestionToStudyQuestion);
 
-  const examGuide = pack.certificationPreset?.examGuide ?? "";
-  const examGuidePayload = examGuide.trim().length > 120
-    ? { markdown: examGuide, preview: examGuide.slice(0, 2400), highlights: [], totalChars: examGuide.length }
-    : null;
-
   return NextResponse.json({
     packId: pack.id,
     packName: pack.name,
     questions: orderedQuestions,
     certificationCode: pack.certificationPreset?.code ?? "AWS",
     examMinutes: pack.certificationPreset?.examMinutes ?? 90,
-    examGuide: examGuidePayload,
+    examGuide: { markdown: examGuide, preview: examGuide.slice(0, 2400), highlights: [], totalChars: examGuide.length },
   });
 }

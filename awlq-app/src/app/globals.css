@@ -7,6 +7,7 @@
 :root {
   --app-font-scale: 1;
 
+  --admin-bg: #0b1220;
   --pixel-bg: #efe8d6;
   --pixel-card: #fff8ea;
   --pixel-border: #2f2a23;
@@ -59,7 +60,7 @@ html {
   --color-foreground: var(--foreground);
   --color-pixel-border: var(--pixel-border);
   --color-primary: var(--pixel-primary);
-
+  --color-admin-bg: var(--admin-bg);
   --color-pixel-card: var(--pixel-card);
   --color-pixel-shadow: var(--pixel-shadow);
   --color-pixel-text: var(--pixel-text);
