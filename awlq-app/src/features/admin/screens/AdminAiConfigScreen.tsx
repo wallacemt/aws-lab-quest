@@ -7,24 +7,32 @@ type AiContext =
   | "SIMULADO_MESSAGE"
   | "LAB_GENERATION"
   | "TRAIL_QUESTION_GENERATION"
+  | "ACHIEVEMENT_SUGGESTION"
+  | "ARENA_BOSS_ARTWORK"
   | "WORKER_KC_QUESTION"
   | "WORKER_QUESTION_GENERATION"
   | "WORKER_QUALITY_REVIEW"
   | "WORKER_BLUEPRINT_PARSER"
   | "WORKER_EXAM_GUIDE"
-  | "WORKER_EMAIL";
+  | "WORKER_EMAIL"
+  | "WORKER_TRAIL_ILLUSTRATION"
+  | "WORKER_TRAIL_REVIEW";
 
 const MODULE_META: Record<AiContext, { label: string; desc: string; group: "app" | "worker" }> = {
   QUESTION_EXPLAIN:           { label: "Explicacao de Questoes",      desc: "Explicacoes e feedback em questoes (estudo, trilhas, mentor)",    group: "app" },
   SIMULADO_MESSAGE:           { label: "Mensagem do Simulado",         desc: "Texto motivacional e mensagens ao finalizar simulados",           group: "app" },
   LAB_GENERATION:             { label: "Geracao de Labs",              desc: "Labs praticos e roteiros da Jornada",                             group: "app" },
   TRAIL_QUESTION_GENERATION:  { label: "Questoes de Trilhas",          desc: "Geracao de questoes para as trilhas KC",                          group: "app" },
+  ACHIEVEMENT_SUGGESTION:     { label: "Conquistas: Sugestao e Arte",  desc: "Sugestao de conquistas e prompt de arte do badge",               group: "app" },
+  ARENA_BOSS_ARTWORK:         { label: "Arena: Arte de Bosses",        desc: "Prompt de arte para bosses da Arena",                             group: "app" },
   WORKER_KC_QUESTION:         { label: "KC: Geracao de Questoes",      desc: "Geracao de questoes KC por step (worker assíncrono)",            group: "worker" },
   WORKER_QUESTION_GENERATION: { label: "Geracao via PDF/Blueprint",    desc: "Ingestao de questoes de PDFs e blueprints AWS",                  group: "worker" },
   WORKER_QUALITY_REVIEW:      { label: "Revisao de Qualidade",         desc: "Revisao e descarte automatico de questoes baixa qualidade",      group: "worker" },
   WORKER_BLUEPRINT_PARSER:    { label: "Parser de Blueprint",          desc: "Extracao de dominios dos guias de exame AWS",                    group: "worker" },
   WORKER_EXAM_GUIDE:          { label: "Revisor de Guia de Exame",     desc: "Analise e revisao de guias de certificacao AWS",                 group: "worker" },
   WORKER_EMAIL:               { label: "Emails Personalizados",        desc: "Geracao de emails de estudo personalizados por aluno",           group: "worker" },
+  WORKER_TRAIL_ILLUSTRATION:  { label: "Trilhas: Ilustracao de Estagio", desc: "Geracao do prompt de ilustracao por estagio da trilha",        group: "worker" },
+  WORKER_TRAIL_REVIEW:        { label: "Trilhas: Revisao de Explicacao", desc: "Revisao automatica da explicacao de estagio",                  group: "worker" },
 };
 
 const APP_CONTEXTS: AiContext[] = [
@@ -32,6 +40,8 @@ const APP_CONTEXTS: AiContext[] = [
   "SIMULADO_MESSAGE",
   "LAB_GENERATION",
   "TRAIL_QUESTION_GENERATION",
+  "ACHIEVEMENT_SUGGESTION",
+  "ARENA_BOSS_ARTWORK",
 ];
 
 const WORKER_CONTEXTS: AiContext[] = [
@@ -41,7 +51,11 @@ const WORKER_CONTEXTS: AiContext[] = [
   "WORKER_BLUEPRINT_PARSER",
   "WORKER_EXAM_GUIDE",
   "WORKER_EMAIL",
+  "WORKER_TRAIL_ILLUSTRATION",
+  "WORKER_TRAIL_REVIEW",
 ];
+
+const ALL_CONTEXTS: AiContext[] = [...APP_CONTEXTS, ...WORKER_CONTEXTS];
 
 // ponytail: openrouter/free auto-routes to whatever is currently free — individual :free slugs go stale
 export const FREE_MODELS = [
@@ -113,6 +127,15 @@ export function AdminAiConfigScreen() {
     {} as Record<AiContext, ModuleState>,
   );
 
+  // Bulk model apply
+  const [bulkModel, setBulkModel] = useState("");
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkSuccess, setBulkSuccess] = useState<string | null>(null);
+
+  // Shared test message for the "Testar" benchmark button
+  const [testPrompt, setTestPrompt] = useState("");
+
   useEffect(() => {
     void load();
   }, []);
@@ -130,7 +153,7 @@ export function AdminAiConfigScreen() {
       setConfigs(data.configs);
       setMaskedKey(data.maskedKey);
       const states = {} as Record<AiContext, ModuleState>;
-      for (const ctx of [...APP_CONTEXTS, ...WORKER_CONTEXTS] as AiContext[]) {
+      for (const ctx of ALL_CONTEXTS) {
         states[ctx] = makeModuleState(data.configs[ctx]?.model);
       }
       setModuleStates(states);
@@ -203,6 +226,36 @@ export function AdminAiConfigScreen() {
     }
   }
 
+  async function applyBulkModel() {
+    if (!bulkModel.trim()) {
+      setBulkError("Selecione ou informe um modelo");
+      return;
+    }
+    setBulkApplying(true);
+    setBulkError(null);
+    setBulkSuccess(null);
+    try {
+      for (const ctx of ALL_CONTEXTS) {
+        const res = await fetch("/api/admin/ai-config", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ type: "model", context: ctx, model: bulkModel.trim() }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+          throw new Error(`${MODULE_META[ctx].label}: ${String(data.error ?? "erro ao salvar")}`);
+        }
+      }
+      setBulkSuccess(`Modelo aplicado a ${ALL_CONTEXTS.length} modulos.`);
+      await load();
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setBulkApplying(false);
+    }
+  }
+
   async function runBenchmark(ctx: AiContext) {
     const state = moduleStates[ctx];
     const model = state?.model || configs?.[ctx]?.model;
@@ -215,6 +268,7 @@ export function AdminAiConfigScreen() {
       // apiKey is optional — backend uses the stored key if not provided
       const body: Record<string, string> = { model };
       if (apiKeyInput.trim()) body.apiKey = apiKeyInput.trim();
+      if (testPrompt.trim()) body.prompt = testPrompt.trim();
       const res = await fetch("/api/admin/ai-config/benchmark", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -301,6 +355,55 @@ export function AdminAiConfigScreen() {
 
         {keyError && <p className="text-xs text-[#fca5a5]">{keyError}</p>}
         {keySuccess && <p className="text-xs text-green-300">Chave salva com sucesso.</p>}
+      </section>
+
+      {/* ── Bulk apply ──────────────────────────────────────────────── */}
+      <section className="border border-[#1e293b] bg-[#111827] p-4 space-y-3">
+        <div className="space-y-0.5">
+          <p className="font-mono text-xs uppercase text-[#f97316]">Aplicar a Todos os Modulos</p>
+          <p className="text-xs text-[#64748b]">
+            Define o mesmo modelo para os {ALL_CONTEXTS.length} modulos de uma vez, em vez de configurar um por um.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={bulkModel}
+            onChange={(e) => { setBulkModel(e.target.value); setBulkError(null); setBulkSuccess(null); }}
+            className="flex-1 border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+          >
+            <option value="">-- Selecione um modelo --</option>
+            {FREE_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} ({m.context}) — {m.desc}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={bulkApplying}
+            onClick={() => void applyBulkModel()}
+            className="border border-[#7c2d12] bg-orange-900/20 px-4 py-2 text-xs uppercase text-orange-200 disabled:opacity-60 shrink-0"
+          >
+            {bulkApplying ? "Aplicando..." : "Aplicar a Todos"}
+          </button>
+        </div>
+        {bulkError && <p className="text-xs text-[#fca5a5]">{bulkError}</p>}
+        {bulkSuccess && <p className="text-xs text-green-300">{bulkSuccess}</p>}
+      </section>
+
+      {/* ── Shared test message ────────────────────────────────────── */}
+      <section className="border border-[#1e293b] bg-[#111827] p-4 space-y-2">
+        <p className="font-mono text-xs uppercase text-[#94a3b8]">Mensagem de Teste</p>
+        <p className="text-xs text-[#64748b]">
+          Usada pelo botao &quot;Testar&quot; de cada modulo. Deixe em branco para usar a mensagem padrao.
+        </p>
+        <textarea
+          value={testPrompt}
+          onChange={(e) => setTestPrompt(e.target.value)}
+          placeholder="Explique em uma frase o que e o Amazon S3 e para que serve."
+          rows={2}
+          className="w-full resize-y border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
+        />
       </section>
 
       {/* ── App modules ────────────────────────────────────────────── */}
@@ -436,19 +539,32 @@ function ModuleCard({ ctx, currentModel, state, onModelChange, onSave, onBenchma
 }
 
 function BenchmarkDisplay({ result }: { result: BenchmarkResult }) {
+  const stats: Array<{ label: string; value: string }> = [
+    { label: "Latencia total", value: `${result.latencyMs}ms` },
+    { label: "TTFB", value: `${result.ttfbMs}ms` },
+  ];
+  if (result.tokens) {
+    stats.push(
+      { label: "Tokens prompt", value: String(result.tokens.prompt) },
+      { label: "Tokens resposta", value: String(result.tokens.completion) },
+    );
+  }
+
   return (
-    <div className="border border-[#1e293b] bg-[#0b1220] p-3 space-y-1">
-      <div className="flex gap-4 text-[10px] font-mono text-[#94a3b8]">
-        <span>Latencia: <span className="text-[#e2e8f0]">{result.latencyMs}ms</span></span>
-        <span>TTFB: <span className="text-[#e2e8f0]">{result.ttfbMs}ms</span></span>
-        {result.tokens && (
-          <span>
-            Tokens: <span className="text-[#e2e8f0]">{result.tokens.prompt}p / {result.tokens.completion}c</span>
-          </span>
-        )}
+    <div className="border border-[#1e293b] bg-[#0b1220] p-3 space-y-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className="border border-[#1e293b] bg-[#111827] px-2 py-1.5">
+            <p className="font-mono text-[9px] uppercase text-[#64748b]">{s.label}</p>
+            <p className="font-mono text-sm text-[#e2e8f0]">{s.value}</p>
+          </div>
+        ))}
       </div>
       {result.preview && (
-        <p className="text-[10px] text-[#64748b] line-clamp-3">{result.preview}</p>
+        <div className="border-t border-[#1e293b] pt-2">
+          <p className="font-mono text-[9px] uppercase text-[#64748b]">Resposta</p>
+          <p className="text-xs text-[#94a3b8]">{result.preview}</p>
+        </div>
       )}
     </div>
   );
