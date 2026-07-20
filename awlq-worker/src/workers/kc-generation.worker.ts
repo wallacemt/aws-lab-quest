@@ -20,6 +20,8 @@ export function createKcGenerationWorker(): Worker {
       // Low concurrency — each job makes a Gemini call; the rate limiter in ai.ts
       // serializes them, but cap concurrency to avoid memory pressure.
       concurrency: 2,
+      // AI retries in callAI() can push a single job close to BullMQ's 30s default lock.
+      lockDuration: 180_000,
     },
   );
 }

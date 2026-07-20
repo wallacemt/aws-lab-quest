@@ -55,6 +55,9 @@ export function createQuestionGenerationWorker(): Worker {
       connection,
       concurrency: 1,
       limiter: { max: 3, duration: 60_000 },
+      // Multiple domains x sub-batches x AI-call retries can push a run past several
+      // minutes — BullMQ's 30s default lock would otherwise mark it "stalled" mid-run.
+      lockDuration: 600_000,
     }
   );
 }

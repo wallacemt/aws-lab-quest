@@ -40,6 +40,10 @@ export type GenerationResult = {
   rejectedCount: number;
 };
 
+// Max questions requested per single AI completion — keeps responses well under max_tokens
+// so the JSON doesn't get truncated mid-generation.
+const GENERATION_BATCH_SIZE = 8;
+
 function distributeByDomain(
   domains: DomainTarget[],
   totalTarget: number
@@ -120,7 +124,11 @@ function parseQuestionsFromLlm(text: string): ParsedQuestion[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonStr);
-  } catch {
+  } catch (err) {
+    logger.debug(
+      { err: err instanceof Error ? err.message : String(err), tail: jsonStr.slice(-200) },
+      "parseQuestionsFromLlm: JSON.parse failed",
+    );
     return [];
   }
 
@@ -207,30 +215,45 @@ export async function generateAndPersistQuestions(
   for (const domainTarget of distributed) {
     if (domainTarget.count === 0) continue;
 
-    const prompt = buildPrompt(
-      options.certificationCode,
-      options.certificationName,
-      domainTarget,
-      domainTarget.count,
-      difficulty,
-      options.weakAreaFilter
-    );
+    // A single completion asking for the full domain count can exceed max_tokens and get
+    // cut off mid-JSON (seen in practice with domain.count=20 and no blueprint split) —
+    // request generation in smaller sub-batches instead of one large call.
+    const questions: ParsedQuestion[] = [];
+    for (let genStart = 0; genStart < domainTarget.count; genStart += GENERATION_BATCH_SIZE) {
+      const batchCount = Math.min(GENERATION_BATCH_SIZE, domainTarget.count - genStart);
 
-    let llmResponse: string;
-    try {
-      llmResponse = await callAI(prompt, "WORKER_QUESTION_GENERATION");
-    } catch (err) {
-      logger.error({ err, domain: domainTarget.domainName }, "AI call failed");
-      result.rejectedCount += domainTarget.count;
-      continue;
+      const prompt = buildPrompt(
+        options.certificationCode,
+        options.certificationName,
+        domainTarget,
+        batchCount,
+        difficulty,
+        options.weakAreaFilter
+      );
+
+      let llmResponse: string;
+      try {
+        llmResponse = await callAI(prompt, "WORKER_QUESTION_GENERATION");
+      } catch (err) {
+        logger.error({ err, domain: domainTarget.domainName }, "AI call failed");
+        result.rejectedCount += batchCount;
+        continue;
+      }
+
+      const batchQuestions = parseQuestionsFromLlm(llmResponse);
+      if (batchQuestions.length === 0) {
+        logger.warn(
+          { domain: domainTarget.domainName, responsePreview: llmResponse.slice(0, 500), responseLength: llmResponse.length },
+          "No questions parsed from LLM response",
+        );
+        result.rejectedCount += batchCount;
+        continue;
+      }
+
+      questions.push(...batchQuestions);
     }
 
-    const questions = parseQuestionsFromLlm(llmResponse);
-    if (questions.length === 0) {
-      logger.warn({ domain: domainTarget.domainName }, "No questions parsed from LLM response");
-      result.rejectedCount += domainTarget.count;
-      continue;
-    }
+    if (questions.length === 0) continue;
 
     const BATCH_SIZE = 5;
     const reviewedQueue: Array<{ question: ParsedQuestion; reviewAction: string }> = [];

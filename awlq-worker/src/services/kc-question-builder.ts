@@ -119,7 +119,10 @@ export async function buildKcQuestions(options: KcBuildOptions): Promise<KcBuild
   for (const question of parsed.slice(0, options.count)) {
     const validation = validateQuestion(question);
     if (!validation.valid) {
-      logger.warn({ reason: validation.reason }, "kc-question-builder: rejected question");
+      logger.warn(
+        { reason: validation.reason, question: JSON.stringify(question).slice(0, 300) },
+        "kc-question-builder: rejected question",
+      );
       rejectedCount += 1;
       continue;
     }
