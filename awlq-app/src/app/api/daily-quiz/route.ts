@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
+import { cacheDel, CACHE_KEYS } from "@/lib/cache";
+import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 
@@ -154,7 +156,23 @@ export async function POST(request: NextRequest) {
       // uses { equals: Prisma.DbNull } as the filter predicate.
       correctOptions: { equals: Prisma.DbNull },
     },
-    select: { id: true, correctOption: true, topic: true, difficulty: true },
+    select: {
+      id: true,
+      statement: true,
+      correctOption: true,
+      topic: true,
+      difficulty: true,
+      optionA: true,
+      optionB: true,
+      optionC: true,
+      optionD: true,
+      optionE: true,
+      explanationA: true,
+      explanationB: true,
+      explanationC: true,
+      explanationD: true,
+      explanationE: true,
+    },
   });
 
   const totalCount = questions.length; // the server's authoritative count (≤5)
@@ -214,7 +232,41 @@ export async function POST(request: NextRequest) {
     throw err;
   }
 
-  await prisma.studySessionHistory.create({
+  // Full snapshot shape (matches StudyAnswerSnapshotPayload) so the shared history
+  // review UI can render it — a bare {questionId, selectedOption} crashes that UI
+  // when it tries to read answer.options/explanations (see sprint route for the same fix).
+  const answersSnapshot = questions
+    .map((question) => {
+      const answer = answerByQuestionId.get(question.id);
+      if (!answer) return null;
+      const selected = ["A", "B", "C", "D", "E"][answer.selectedOption] ?? "-";
+      return {
+        questionId: question.id,
+        statement: question.statement,
+        questionType: "single" as const,
+        selectedOption: selected,
+        selectedOptions: [selected],
+        correctOption: question.correctOption,
+        correctOptions: [question.correctOption],
+        options: {
+          A: question.optionA,
+          B: question.optionB,
+          C: question.optionC,
+          D: question.optionD,
+          ...(question.optionE ? { E: question.optionE } : {}),
+        },
+        explanations: {
+          A: question.explanationA ?? "Sem explicacao.",
+          B: question.explanationB ?? "Sem explicacao.",
+          C: question.explanationC ?? "Sem explicacao.",
+          D: question.explanationD ?? "Sem explicacao.",
+          ...(question.optionE ? { E: question.explanationE ?? "Sem explicacao." } : {}),
+        },
+      };
+    })
+    .filter((item) => item !== null);
+
+  const historyItem = await prisma.studySessionHistory.create({
     data: {
       userId: user.id,
       sessionType: "KC",
@@ -223,12 +275,24 @@ export async function POST(request: NextRequest) {
       scorePercent: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0,
       correctAnswers: correctCount,
       totalQuestions: totalCount,
-      answersSnapshot: validatedAnswers,
+      answersSnapshot,
       completedAt: new Date(),
     },
+    select: { id: true },
   });
 
-  const newAchievements = await syncAndGetNewAchievements(user.id, since);
+  const [newAchievements] = await Promise.all([
+    syncAndGetNewAchievements(user.id, since),
+    cacheDel(
+      CACHE_KEYS.userStudyHistory(user.id),
+      CACHE_KEYS.userPublicProfile(user.id),
+      CACHE_KEYS.userAchievements(user.id),
+      CACHE_KEYS.leaderboard(),
+    ),
+  ]);
 
-  return NextResponse.json({ score: correctCount, totalCount, gainedXp, newAchievements });
+  // Fire-and-forget realtime leaderboard event (same pattern as sprint/study-history).
+  void publishLeaderboardUpdatedEvent({ userId: user.id, source: "KC", gainedXp });
+
+  return NextResponse.json({ score: correctCount, totalCount, gainedXp, newAchievements, historyId: historyItem.id });
 }

@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validActions = ["generate", "analyze-feedback", "fetch-sources", "quality-scan"];
+    const validActions = ["generate", "analyze-feedback", "fetch-sources", "quality-scan", "daily-quiz-seed"];
     if (!validActions.includes(body.action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
