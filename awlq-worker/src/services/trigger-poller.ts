@@ -13,6 +13,7 @@ import {
   newsFetchQueue,
   trailIllustrationQueue,
   trailReviewQueue,
+  dailyQuizQueue,
 } from "../queues/index.js";
 import { config } from "../config.js";
 
@@ -215,6 +216,13 @@ async function processOneTrigger(): Promise<void> {
       case "news-fetch": {
         const payload = trigger.payload as { sourceId?: string } | null;
         await newsFetchQueue.add("manual-news-fetch", { sourceId: payload?.sourceId }, { priority: 1 });
+        break;
+      }
+
+      // Reuses the same idempotent seedDailyQuiz() the cron runs — no-ops if today's
+      // quiz already exists, so this is safe to fire even if a quiz is already seeded.
+      case "daily-quiz-seed": {
+        await dailyQuizQueue.add("manual-daily-quiz-seed", {}, { priority: 1 });
         break;
       }
 
