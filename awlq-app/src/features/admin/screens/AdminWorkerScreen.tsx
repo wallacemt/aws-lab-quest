@@ -536,6 +536,7 @@ export function AdminWorkerScreen() {
                   <option value="analyze-feedback">Analisar feedback</option>
                   <option value="fetch-sources">Fetch de fontes</option>
                   <option value="quality-scan">Quality scan</option>
+                  <option value="daily-quiz-seed">Gerar quiz diario (hoje)</option>
                 </select>
               </div>
               <div className="space-y-1">

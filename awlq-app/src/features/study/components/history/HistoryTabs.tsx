@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
@@ -25,9 +26,9 @@ type StudyAnswerSnapshot = {
 
 type StudySessionItem = Omit<StudyHistoryItem, "answersSnapshot"> & { answersSnapshot: StudyAnswerSnapshot[] };
 
-export type ActiveTab = "LAB" | "KC" | "SPRINT" | "SIMULADO" | "TRILHAS" | "ARENA";
+export type ActiveTab = "LAB" | "KC" | "SPRINT" | "SIMULADO" | "TRILHAS" | "ARENA" | "QUIZ_DIARIO";
 
-export const ACTIVE_TABS: ActiveTab[] = ["LAB", "KC", "SPRINT", "SIMULADO", "TRILHAS", "ARENA"];
+export const ACTIVE_TABS: ActiveTab[] = ["LAB", "KC", "SPRINT", "SIMULADO", "TRILHAS", "ARENA", "QUIZ_DIARIO"];
 
 // ponytail: Sprint shares StudySessionType.KC with regular Knowledge Checks (DEF-003) —
 // this title prefix is how the sprint route (src/app/api/retention/sprint/route.ts)
@@ -38,12 +39,37 @@ const SPRINT_TITLE_PREFIX = "Sprint ";
 // same title-prefix trick as Sprint, so wins get their own Arena tab instead of showing under KC.
 const ARENA_TITLE_PREFIX = "Boss Battle: ";
 
+// Daily Quiz also shares StudySessionType.KC (see /api/daily-quiz/route.ts) — same trick.
+const DAILY_QUIZ_TITLE_PREFIX = "Quiz Diário — ";
+
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: "Facil",
   medium: "Media",
   hard: "Dificil",
   nightmare: "Nightmare",
 };
+
+/** Placeholder cards shaped like the real history list items while a fetch is in flight. */
+function HistoryListSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-9 w-full rounded-none" />
+      <Skeleton className="h-16 w-full rounded-none" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <PixelCard key={i} className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <Skeleton className="h-4 w-2/3 rounded-none" />
+              <Skeleton className="h-5 w-12 rounded-none" />
+            </div>
+            <Skeleton className="h-3 w-1/2 rounded-none" />
+            <Skeleton className="h-3 w-1/3 rounded-none" />
+          </PixelCard>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function normalizeSnapshot(tasks: Task[] | undefined): Task[] {
   if (!tasks || tasks.length === 0) return [];
@@ -127,7 +153,8 @@ export function HistoryTabs({
         (i) =>
           i.sessionType === "KC" &&
           !i.title.startsWith(SPRINT_TITLE_PREFIX) &&
-          !i.title.startsWith(ARENA_TITLE_PREFIX),
+          !i.title.startsWith(ARENA_TITLE_PREFIX) &&
+          !i.title.startsWith(DAILY_QUIZ_TITLE_PREFIX),
       ),
     [filteredStudyHistory],
   );
@@ -139,13 +166,24 @@ export function HistoryTabs({
     () => filteredStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(ARENA_TITLE_PREFIX)),
     [filteredStudyHistory],
   );
+  const filteredDailyQuiz = useMemo(
+    () => filteredStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(DAILY_QUIZ_TITLE_PREFIX)),
+    [filteredStudyHistory],
+  );
   const filteredSimulado = useMemo(() => filteredStudyHistory.filter((i) => i.sessionType === "SIMULADO"), [filteredStudyHistory]);
 
   const kcCount = normalizedStudyHistory.filter(
-    (i) => i.sessionType === "KC" && !i.title.startsWith(SPRINT_TITLE_PREFIX) && !i.title.startsWith(ARENA_TITLE_PREFIX),
+    (i) =>
+      i.sessionType === "KC" &&
+      !i.title.startsWith(SPRINT_TITLE_PREFIX) &&
+      !i.title.startsWith(ARENA_TITLE_PREFIX) &&
+      !i.title.startsWith(DAILY_QUIZ_TITLE_PREFIX),
   ).length;
   const sprintCount = normalizedStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(SPRINT_TITLE_PREFIX)).length;
   const arenaCount = normalizedStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(ARENA_TITLE_PREFIX)).length;
+  const dailyQuizCount = normalizedStudyHistory.filter(
+    (i) => i.sessionType === "KC" && i.title.startsWith(DAILY_QUIZ_TITLE_PREFIX),
+  ).length;
   const simuladoCount = normalizedStudyHistory.filter((i) => i.sessionType === "SIMULADO").length;
 
   const activeTabCount =
@@ -159,7 +197,9 @@ export function HistoryTabs({
             ? filteredSimulado.length
             : activeTab === "ARENA"
               ? filteredArena.length
-              : 0; // TRILHAS: wired up in a future epic
+              : activeTab === "QUIZ_DIARIO"
+                ? filteredDailyQuiz.length
+                : 0; // TRILHAS: wired up in a future epic
   const hasAnyResult = activeTabCount > 0;
 
   const tabs: { id: ActiveTab; label: string; total: number }[] = [
@@ -169,6 +209,7 @@ export function HistoryTabs({
     { id: "SIMULADO", label: "Simulado", total: simuladoCount },
     { id: "TRILHAS", label: "Trilhas", total: 0 },
     { id: "ARENA", label: "Arena", total: arenaCount },
+    { id: "QUIZ_DIARIO", label: "Quiz Diario", total: dailyQuizCount },
   ];
 
   const tabStripRef = useRef<HTMLDivElement>(null);
@@ -178,11 +219,7 @@ export function HistoryTabs({
 
   return (
     <div className="space-y-4">
-      {loading && (
-        <PixelCard>
-          <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando...</p>
-        </PixelCard>
-      )}
+      {loading && <HistoryListSkeleton />}
 
       {error && (
         <PixelCard className="border-red-500 bg-red-900/20">
@@ -368,6 +405,31 @@ export function HistoryTabs({
                         <span className="font-[var(--font-body)]">· {new Date(item.completedAt).toLocaleDateString("pt-BR")}</span>
                       </div>
                       <p className="font-mono text-[9px] uppercase text-[var(--pixel-primary)]">Clique para revisar respostas</p>
+                    </PixelCard>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+
+          {activeTab === "QUIZ_DIARIO" && filteredDailyQuiz.length > 0 && (
+            <ScrollArea className="h-92 w-full rounded-md border border-pixel-border">
+              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                {filteredDailyQuiz.map((item) => (
+                  <button key={item.id} type="button" onClick={() => setSelectedStudyItem(item as StudySessionItem)} className="text-left">
+                    <PixelCard className="space-y-2 transition-transform hover:-translate-y-[1px] hover:border-[#f97316]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-[var(--font-body)] text-base">{item.title}</p>
+                        </div>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-accent)]">{item.scorePercent}%</span>
+                        <span className="shrink-0 border-2 border-[var(--pixel-border)] bg-[var(--pixel-muted)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)]">+{item.gainedXp} XP</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--pixel-subtext)]">
+                        <span className="font-[var(--font-body)]">{item.correctAnswers}/{item.totalQuestions} corretas</span>
+                        <span className="font-[var(--font-body)]">· {new Date(item.completedAt).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                      <p className="font-mono text-[9px] uppercase text-[#f97316]">Clique para revisar respostas</p>
                     </PixelCard>
                   </button>
                 ))}

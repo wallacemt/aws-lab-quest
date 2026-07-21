@@ -11,6 +11,14 @@ import {
   type GameMode,
 } from "@/features/utils/home-apps";
 import type { AppEntry, HomeConfig } from "@/app/api/admin/home-config/route";
+import { fetchDailyQuiz } from "@/features/daily-quiz/services/daily-quiz-api";
+
+const DAILY_QUIZ_MODE: GameMode = {
+  id: "quiz-diario",
+  title: "Quiz Diario",
+  description: "5 questoes rapidas por dia para manter o streak e ganhar XP extra.",
+  cta: "Responder Quiz",
+};
 
 function SectionDivider({ title }: { title: string }) {
   return (
@@ -61,6 +69,48 @@ function JornadaCard({ onClick }: { onClick: () => void }) {
   );
 }
 
+function DailyQuizBanner({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group text-left w-full bg-pixel-card border-4 border-[#f97316] retro-shadow relative overflow-hidden focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-400/50 hover:border-orange-300 transition-colors animate-pulse-slow"
+    >
+      <div className="absolute -right-10 -top-10 w-40 h-40 bg-[#f97316]/20 rounded-full blur-3xl" />
+      <div className="absolute left-24 bottom-0 w-24 h-24 bg-[#f97316]/10 rounded-full blur-2xl" />
+
+      <div className="relative p-5 md:p-7 flex items-center gap-6">
+        <div className="shrink-0 flex items-center justify-center w-16 h-16 md:w-20 md:h-20 border-2 border-[#f97316] bg-orange-900/30 text-4xl">
+          🔥
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[10px] uppercase text-[#f97316] font-bold tracking-widest">
+              Disponivel hoje
+            </span>
+          </div>
+          <h3 className="font-mono text-xl md:text-2xl font-bold text-orange-300 uppercase tracking-wide mb-1">
+            Quiz Diario
+          </h3>
+          <p className="text-pixel-subtext text-sm leading-relaxed">
+            5 questoes rapidas. Responda antes da meia-noite para nao perder o XP de hoje.
+          </p>
+        </div>
+
+        <div className="shrink-0 hidden md:flex flex-col items-end gap-1 font-mono text-[10px] uppercase text-orange-500 group-hover:text-orange-300 transition-colors">
+          <span>Jogar agora</span>
+          <span className="text-lg font-bold text-[#f97316]">Entrar ▶</span>
+        </div>
+      </div>
+      <style>{`
+        @keyframes pulse-slow-border { 0%, 100% { border-color: #f97316; } 50% { border-color: #fdba74; } }
+        .animate-pulse-slow { animation: pulse-slow-border 2.4s ease-in-out infinite; }
+      `}</style>
+    </button>
+  );
+}
+
 type VisibleCard = { mode: GameMode; highlighted: boolean };
 
 // Returns modes that are enabled, sorted by admin-assigned order.
@@ -76,10 +126,13 @@ function getVisible(modes: GameMode[], config: AppEntry[]): VisibleCard[] {
     .map((m) => ({ mode: m, highlighted: entryMap.get(m.id)?.highlighted ?? false }));
 }
 
+type DailyQuizHomeState = "hidden" | "available" | "done";
+
 export function HomeScreen() {
   const router = useRouter();
   const [showJornada, setShowJornada] = useState(false);
   const [config, setConfig] = useState<AppEntry[]>([]);
+  const [dailyQuizState, setDailyQuizState] = useState<DailyQuizHomeState>("hidden");
 
   const fetchConfig = useCallback(() => {
     void fetch("/api/admin/home-config")
@@ -109,6 +162,20 @@ export function HomeScreen() {
       .catch(() => undefined);
   }, []);
 
+  // Only visible when the user has a certification badge (server-gated) — hidden
+  // entirely until then. Highlighted banner until today's quiz is done, then a normal card.
+  useEffect(() => {
+    void fetchDailyQuiz()
+      .then((data) => {
+        if (data.locked) {
+          setDailyQuizState("hidden");
+          return;
+        }
+        setDailyQuizState(data.completed ? "done" : "available");
+      })
+      .catch(() => setDailyQuizState("hidden"));
+  }, []);
+
   function handleClick(id: string) {
     if (id !== "simulado") {
       router.push(`/${id}`);
@@ -123,6 +190,9 @@ export function HomeScreen() {
   return (
     <AppLayout credits>
       <main className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 xl:px-8">
+        {/* Daily Quiz — highest-priority banner, shown only when unlocked and not yet done today */}
+        {dailyQuizState === "available" && <DailyQuizBanner onClick={() => router.push("/quiz-diario")} />}
+
         {/* Welcome */}
         <section className="mb-8 md:mb-12 retro-border bg-pixel-card p-6 md:p-10 retro-shadow relative overflow-hidden">
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl" />
@@ -160,7 +230,7 @@ export function HomeScreen() {
         )}
 
         {/* Retention modes */}
-        {retentionCards.length > 0 && (
+        {(retentionCards.length > 0 || dailyQuizState === "done") && (
           <section>
             <SectionDivider title="Retencao de Conhecimento" />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
@@ -172,6 +242,10 @@ export function HomeScreen() {
                   handleClick={() => handleClick(mode.id)}
                 />
               ))}
+
+              {dailyQuizState === "done" && (
+                <GameCard {...DAILY_QUIZ_MODE} handleClick={() => router.push("/quiz-diario")} />
+              )}
             </div>
           </section>
         )}

@@ -1,4 +1,4 @@
-import { DailyQuizScreen } from "@/features/arena/screens/DailyQuizScreen";
+import { DailyQuizScreen } from "@/features/daily-quiz/screens/DailyQuizScreen";
 
 export const metadata = { title: "Quiz Diário" };
 
