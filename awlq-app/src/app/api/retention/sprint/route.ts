@@ -91,8 +91,10 @@ export async function GET(request: NextRequest) {
   }
 
   // DEF-021: restrict to single-select questions so the client can score them.
+  const user = await prisma.userProfile.findUnique({ where: { userId: session.user.id } });
+  const certWhere = user?.certificationPresetId ? { certificationPresetId: user.certificationPresetId } : {};
   const freshQuestions = await prisma.studyQuestion.findMany({
-    where: { ...baseWhere, id: { notIn: Array.from(recentIds) } },
+    where: { ...baseWhere, ...certWhere, id: { notIn: Array.from(recentIds) } },
     select: QUESTION_SELECT,
     orderBy: { createdAt: "desc" },
     take: count * 3, // fetch extra, then sample randomly
@@ -103,7 +105,7 @@ export async function GET(request: NextRequest) {
   let candidates = freshQuestions;
   if (candidates.length < count) {
     const fallback = await prisma.studyQuestion.findMany({
-      where: { ...baseWhere, id: { notIn: candidates.map((q) => q.id) } },
+      where: { ...baseWhere, ...certWhere, id: { notIn: candidates.map((q) => q.id) } },
       select: QUESTION_SELECT,
       orderBy: { createdAt: "desc" },
       take: (count - candidates.length) * 3,
@@ -182,8 +184,7 @@ export async function POST(request: NextRequest) {
     const question = questionMap.get(answer.questionId);
     if (!question) return total; // unknown question ID — skip
 
-    const isCorrect =
-      answer.selectedOption?.toUpperCase() === question.correctOption?.toUpperCase();
+    const isCorrect = answer.selectedOption?.toUpperCase() === question.correctOption?.toUpperCase();
     if (isCorrect) correctCount++;
 
     if (!isCorrect) return total;
