@@ -2,8 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/client"
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -126,7 +126,7 @@ model UserProfile {
   certificationPresetId String?
   certificationPreset   CertificationPreset? @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
   favoriteTheme         String               @default("")
-  avatarUrl             String?
+  avatarUrl             String?              @default("https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg")
   bgImageUrl            String?
   themePreset           String?              @default("default")
   leaderboardVisible    Boolean              @default(true)
@@ -794,11 +794,11 @@ enum AnswerConfidence {
 }
 
 model Flashcard {
-  id               String            @id @default(cuid())
+  id               String             @id @default(cuid())
   userId           String
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   sourceQuestionId String?
-  sourceQuestion   StudyQuestion?    @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
+  sourceQuestion   StudyQuestion?     @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
   // Set when this card was materialized from a global FlashcardTemplate
   // (source = DEFAULT_DECK). Used to make materialization idempotent per user.
   templateId       String?
@@ -810,15 +810,15 @@ model Flashcard {
   hint             String?
   source           FlashcardSource
   // SM-2 scheduling state
-  easeFactor       Float             @default(2.5)
-  intervalDays     Int               @default(0)
-  repetitions      Int               @default(0)
-  dueAt            DateTime          @default(now())
+  easeFactor       Float              @default(2.5)
+  intervalDays     Int                @default(0)
+  repetitions      Int                @default(0)
+  dueAt            DateTime           @default(now())
   lastReviewedAt   DateTime?
-  suspended        Boolean           @default(false)
+  suspended        Boolean            @default(false)
   reviews          FlashcardReview[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   @@unique([userId, sourceQuestionId, source])
   // Constrains DEFAULT_DECK rows (templateId set) so two concurrent
@@ -900,23 +900,23 @@ model Boss {
 }
 
 model BossBattle {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bossId      String
-  boss        Boss      @relation(fields: [bossId], references: [id], onDelete: Cascade)
-  remainingHp Int
-  streak        Int       @default(0) // consecutive correct answers; resets to 0 on a miss
-  correctCount  Int       @default(0) // cumulative correct answers across the battle
-  totalAnswered Int       @default(0) // cumulative answers submitted across the battle
-  victory     Boolean   @default(false)
-  gainedXp    Int       @default(0)
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bossId          String
+  boss            Boss      @relation(fields: [bossId], references: [id], onDelete: Cascade)
+  remainingHp     Int
+  streak          Int       @default(0) // consecutive correct answers; resets to 0 on a miss
+  correctCount    Int       @default(0) // cumulative correct answers across the battle
+  totalAnswered   Int       @default(0) // cumulative answers submitted across the battle
+  victory         Boolean   @default(false)
+  gainedXp        Int       @default(0)
   // Per-question transcript (statement, options, correctOption, explanations) built up as
   // answers are submitted — powers the post-defeat review screen without a second lookup.
   answersSnapshot Json?
-  finishedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  finishedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([userId, bossId])
   @@index([userId, victory])
