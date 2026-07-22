@@ -28,6 +28,7 @@ const aggregates = computeAggregates({
   trailStageCount: 6,
   trailChainCompletedCount: 1,
   libraryAccessCount: 9,
+  weeklyChallengeWinsCount: 3,
 });
 // totalXp = (10+20+30) + (5+5+15+15+15) = 60 + 55 = 115
 
@@ -117,6 +118,7 @@ describe("currentForTrigger", () => {
       trailStageCount: 0,
       trailChainCompletedCount: 0,
       libraryAccessCount: 0,
+      weeklyChallengeWinsCount: 0,
     });
     expect(currentForTrigger("MENTOR_CONSULTED", null, neverAsked)).toBe(0);
   });
@@ -140,6 +142,10 @@ describe("currentForTrigger", () => {
   it("LIBRARY_ACCESS_COUNT reads the library access log count", () => {
     expect(currentForTrigger("LIBRARY_ACCESS_COUNT", null, aggregates)).toBe(9);
   });
+
+  it("WEEKLY_CHALLENGE_WINS_COUNT reads the weekly challenge win count", () => {
+    expect(currentForTrigger("WEEKLY_CHALLENGE_WINS_COUNT", null, aggregates)).toBe(3);
+  });
 });
 
 describe("validateTriggerParams", () => {
@@ -155,6 +161,7 @@ describe("validateTriggerParams", () => {
     expect(validateTriggerParams("TRAIL_STAGE_COUNT", null)).toBeNull();
     expect(validateTriggerParams("TRAIL_CHAIN_COMPLETED_COUNT", null)).toBeNull();
     expect(validateTriggerParams("LIBRARY_ACCESS_COUNT", null)).toBeNull();
+    expect(validateTriggerParams("WEEKLY_CHALLENGE_WINS_COUNT", null)).toBeNull();
   });
 
   it("rejects SESSION_COUNT without a valid sessionType", () => {

@@ -12,6 +12,7 @@ import {
   Library,
   Sparkles,
   CalendarCheck,
+  Trophy,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ const ICONS: Record<string, ElementType> = {
   biblioteca: Library,
   mentor: Sparkles,
   "quiz-diario": CalendarCheck,
+  "desafio-semanal": Trophy,
 };
 
 const COLORS: Record<string, string> = {
@@ -52,6 +54,7 @@ const COLORS: Record<string, string> = {
   biblioteca: "bg-violet-500",
   mentor: "bg-green-600",
   "quiz-diario": "bg-orange-500",
+  "desafio-semanal": "bg-amber-500",
 };
 
 export default function GameCard({ id, title, description, cta, handleClick, highlighted }: GameCardProps) {

@@ -6,26 +6,30 @@ import {
   LEADERBOARD_REALTIME_EVENT as LEADERBOARD_EVENT_NAME,
   HOME_CONFIG_REALTIME_CHANNEL,
   HOME_CONFIG_REALTIME_EVENT,
+  WEEKLY_CHALLENGE_REALTIME_CHANNEL,
+  WEEKLY_CHALLENGE_REALTIME_EVENT,
 } from "@/lib/realtime-constants";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-let leaderboardChannel: RealtimeChannel | null = null;
-let subscribePromise: Promise<RealtimeChannel> | null = null;
+const channels = new Map<string, RealtimeChannel>();
+const subscribePromises = new Map<string, Promise<RealtimeChannel>>();
 
-async function ensureLeaderboardChannel(): Promise<RealtimeChannel> {
-  if (leaderboardChannel) {
-    return leaderboardChannel;
+async function ensureChannel(name: string): Promise<RealtimeChannel> {
+  const existing = channels.get(name);
+  if (existing) {
+    return existing;
   }
 
-  if (subscribePromise) {
-    return subscribePromise;
+  const pending = subscribePromises.get(name);
+  if (pending) {
+    return pending;
   }
 
-  const channel = supabase.channel(LEADERBOARD_CHANNEL_NAME);
+  const channel = supabase.channel(name);
 
-  subscribePromise = new Promise<RealtimeChannel>((resolve, reject) => {
+  const subscribePromise = new Promise<RealtimeChannel>((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error("Supabase realtime subscribe timeout"));
     }, 4000);
@@ -33,7 +37,7 @@ async function ensureLeaderboardChannel(): Promise<RealtimeChannel> {
     channel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
         clearTimeout(timeout);
-        leaderboardChannel = channel;
+        channels.set(name, channel);
         resolve(channel);
       }
 
@@ -48,22 +52,19 @@ async function ensureLeaderboardChannel(): Promise<RealtimeChannel> {
       throw error;
     })
     .finally(() => {
-      subscribePromise = null;
+      subscribePromises.delete(name);
     });
 
+  subscribePromises.set(name, subscribePromise);
   return subscribePromise;
 }
 
-export async function publishLeaderboardUpdatedEvent(payload: {
-  userId: string;
-  source: "LAB" | "KC" | "SIMULADO";
-  gainedXp: number;
-}) {
+async function broadcast(channelName: string, event: string, payload: object): Promise<void> {
   try {
-    const channel = await ensureLeaderboardChannel();
+    const channel = await ensureChannel(channelName);
     await channel.send({
       type: "broadcast",
-      event: LEADERBOARD_EVENT_NAME,
+      event,
       payload: {
         ...payload,
         emittedAt: new Date().toISOString(),
@@ -71,8 +72,23 @@ export async function publishLeaderboardUpdatedEvent(payload: {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
-    console.warn(`[Realtime] leaderboard event failed: ${message}`);
+    console.warn(`[Realtime] ${channelName}/${event} broadcast failed: ${message}`);
   }
+}
+
+export async function publishLeaderboardUpdatedEvent(payload: {
+  userId: string;
+  source: "LAB" | "KC" | "SIMULADO";
+  gainedXp: number;
+}) {
+  await broadcast(LEADERBOARD_CHANNEL_NAME, LEADERBOARD_EVENT_NAME, payload);
+}
+
+export async function publishWeeklyChallengeUpdatedEvent(payload: {
+  userId: string;
+  score: number;
+}) {
+  await broadcast(WEEKLY_CHALLENGE_REALTIME_CHANNEL, WEEKLY_CHALLENGE_REALTIME_EVENT, payload);
 }
 
 // REST broadcast — no WebSocket subscription needed on the server side.

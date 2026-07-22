@@ -158,4 +158,15 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     triggerType: "CERT_COUNT",
     triggerParams: null,
   },
+  {
+    code: "weekly_champion",
+    name: "Campeao da Semana",
+    description: "Terminar em 1o lugar no Desafio Semanal.",
+    rarity: "legendary",
+    target: 1,
+    displayOrder: 14,
+    prompt: "pixel-art legendary badge, golden laurel crown over cloud icon, radiant podium glow, textless, high detail",
+    triggerType: "WEEKLY_CHALLENGE_WINS_COUNT",
+    triggerParams: null,
+  },
 ];

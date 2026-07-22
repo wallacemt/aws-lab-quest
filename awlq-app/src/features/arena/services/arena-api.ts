@@ -31,19 +31,26 @@ export type BattleResult = {
 export type WeeklyChallengeData = {
   challenge: {
     id: string;
+    title: string | null;
     weekStart: string;
     weekEnd: string;
     active: boolean;
   } | null;
   entry: {
+    userId: string;
     score: number;
     rank: number | null;
+    liveRank: number | null;
     gainedXp: number;
+    name: string;
+    avatarUrl: string | null;
   } | null;
   leaderboard: Array<{
     userId: string;
     score: number;
     rank: number | null;
+    name: string;
+    avatarUrl: string | null;
   }>;
   submitted: boolean;
 };
@@ -51,7 +58,18 @@ export type WeeklyChallengeData = {
 export type WeeklyChallengeSubmitResult = {
   score: number;
   gainedXp: number;
-  newAchievements?: { code: string; name: string }[];
+  historyId: string;
+  newAchievements?: { code: string; name: string; description: string }[];
+};
+
+export type WeeklyChallengeQuestion = {
+  id: string;
+  statement: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  optionE?: string | null;
 };
 
 export async function fetchBosses(): Promise<BossWithBattle[]> {
@@ -89,6 +107,13 @@ export async function fetchWeeklyChallenge(): Promise<WeeklyChallengeData> {
   const res = await fetch("/api/weekly-challenge");
   if (!res.ok) throw new Error("Failed to fetch weekly challenge");
   return res.json() as Promise<WeeklyChallengeData>;
+}
+
+export async function fetchWeeklyChallengeQuestions(): Promise<WeeklyChallengeQuestion[]> {
+  const res = await fetch("/api/weekly-challenge/questions");
+  if (!res.ok) throw new Error("Failed to fetch weekly challenge questions");
+  const data = (await res.json()) as { questions: WeeklyChallengeQuestion[] };
+  return data.questions;
 }
 
 export async function submitWeeklyChallenge(

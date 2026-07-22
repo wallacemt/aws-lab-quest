@@ -1,162 +1,183 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  fetchWeeklyChallenge,
-  submitWeeklyChallenge,
-  type WeeklyChallengeData,
-} from "@/features/arena/services/arena-api";
+import { useRouter } from "next/navigation";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { EmptyForScreens } from "@/components/ui/empty-screens";
+import { ErrorForScreens } from "@/components/ui/error-screens";
+import { LoadingForScreens } from "@/components/ui/loading-screens";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { PixelCard } from "@/components/ui/pixel-card";
+import { QuestionCardQuestion, QuestionOptionsCard } from "@/features/study/components/QuestionOptionsCard";
+import { QuestionSideNav } from "@/features/study/components/QuestionSideNav";
+import { useWeeklyChallenge } from "@/features/arena/hooks/useWeeklyChallenge";
+import { WeeklyChallengeQuestion } from "@/features/arena/services/arena-api";
 import { WeeklyChallengeCard } from "@/features/arena/components/WeeklyChallengeCard";
 
-type Question = {
-  id: string;
-  statement: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
-  optionE?: string | null;
-};
-
-const OPTIONS = ["A", "B", "C", "D", "E"] as const;
-const QUESTION_COUNT = 10;
+/** Weekly challenge questions hide the answer key until submit, so correctOption is a placeholder — never revealed inline. */
+function toCardQuestion(question: WeeklyChallengeQuestion): QuestionCardQuestion {
+  return {
+    id: question.id,
+    statement: question.statement,
+    questionType: "single",
+    options: {
+      A: question.optionA,
+      B: question.optionB,
+      C: question.optionC,
+      D: question.optionD,
+      E: question.optionE ?? undefined,
+    },
+    correctOption: "A",
+    correctOptions: ["A"],
+  };
+}
 
 export function WeeklyChallengeScreen() {
-  const [challengeData, setChallengeData] = useState<WeeklyChallengeData | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ score: number; gainedXp: number } | null>(null);
+  const router = useRouter();
+  const { state, answers, currentIndex, isSubmitting, start, selectAnswer, goToQuestion, submit, reload } =
+    useWeeklyChallenge();
 
-  useEffect(() => {
-    fetchWeeklyChallenge()
-      .then((data) => {
-        setChallengeData(data);
-        if (!data.submitted && data.challenge) {
-          // Load questions for the challenge
-          return fetch(`/api/study/questions?count=${QUESTION_COUNT}&usage=KC`)
-            .then(async (res) => {
-              if (!res.ok) return;
-              const d = (await res.json()) as { questions: Question[] };
-              setQuestions(d.questions ?? []);
-            });
-        }
-      })
-      .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Erro ao carregar desafio";
-        setError(msg);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  async function handleSubmit() {
-    const answersArr = Object.entries(answers).map(([questionId, selectedOption]) => ({
-      questionId,
-      selectedOption,
-    }));
-
-    if (answersArr.length === 0) {
-      setError("Responda ao menos uma questão antes de enviar.");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const res = await submitWeeklyChallenge(answersArr);
-      setResult({ score: res.score, gainedXp: res.gainedXp });
-      const updated = await fetchWeeklyChallenge();
-      setChallengeData(updated);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao enviar respostas";
-      setError(msg);
-    } finally {
-      setSubmitting(false);
-    }
+  if (state.status === "loading" || state.status === "starting") {
+    return <LoadingForScreens text="Carregando Desafio Semanal..." />;
   }
 
-  if (loading) {
+  if (state.status === "error") {
+    return <ErrorForScreens error={state.message} load={() => void reload()} />;
+  }
+
+  if (state.status === "idle" && !state.data.challenge) {
+    return <EmptyForScreens text="Nenhum desafio semanal ativo no momento." />;
+  }
+
+  if (state.status === "idle" || state.status === "submitted") {
+    const { data } = state;
     return (
-      <div className="grid min-h-[40vh] place-items-center">
-        <p className="font-mono text-xs uppercase text-[#94a3b8]">Carregando desafio...</p>
-      </div>
+      <AppLayout>
+        <div className="mx-auto max-w-2xl space-y-6 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h1 className="font-mono text-lg font-bold uppercase text-primary">Desafio Semanal</h1>
+              <p className="mt-1 font-mono text-xs text-pixel-subtext">Compita com todos os usuários</p>
+            </div>
+            <PixelButton variant="ghost" onClick={() => router.back()}>
+              ← Voltar
+            </PixelButton>
+          </div>
+
+          {state.status === "submitted" && (
+            <PixelCard className="border-[var(--pixel-accent)]">
+              <p className="font-mono text-sm text-[var(--pixel-accent)]">
+                Pontuação: {state.score} | +{state.gainedXp} XP
+              </p>
+              {state.newAchievements.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-accent)]">
+                    Conquistas Desbloqueadas
+                  </p>
+                  {state.newAchievements.map((a) => (
+                    <PixelCard key={a.code} className="flex flex-col gap-1">
+                      <p className="font-mono text-sm text-pixel-text">{a.name}</p>
+                      <p className="font-mono text-xs text-pixel-subtext">{a.description}</p>
+                    </PixelCard>
+                  ))}
+                </div>
+              )}
+              <PixelButton
+                variant="ghost"
+                className="mt-3 w-full"
+                onClick={() => router.push(`/history?tab=KC&reviewId=${state.historyId}`)}
+              >
+                Revisar respostas
+              </PixelButton>
+            </PixelCard>
+          )}
+
+          {data && <WeeklyChallengeCard data={data} />}
+
+          {state.status === "idle" && !data.submitted && data.challenge && (
+            <PixelButton className="w-full" onClick={() => void start()}>
+              Iniciar Desafio
+            </PixelButton>
+          )}
+
+          {state.status === "idle" && data.submitted && (
+            <p className="text-center font-mono text-xs text-pixel-subtext">
+              Você já respondeu o desafio desta semana. Volte na próxima segunda-feira!
+            </p>
+          )}
+        </div>
+      </AppLayout>
     );
   }
 
+  // in-progress
+  const cardQuestions = state.questions.map(toCardQuestion);
+  const currentQuestion = cardQuestions[currentIndex];
+  if (!currentQuestion) return null;
+
+  const allAnswered = state.questions.every((q) => Boolean(answers[q.id]));
+
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-4">
-      <div>
-        <h1 className="font-mono text-lg font-bold uppercase text-[#f97316]">Desafio Semanal</h1>
-        <p className="mt-1 font-mono text-xs text-[#94a3b8]">Compita com todos os usuários</p>
+    <AppLayout>
+      <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-4">
+        <PixelButton variant="ghost" onClick={() => void reload()}>
+          ← Voltar
+        </PixelButton>
       </div>
-
-      {challengeData && <WeeklyChallengeCard data={challengeData} />}
-
-      {error && (
-        <div className="border border-red-500/30 bg-[#1a0a0a] p-3">
-          <p className="font-mono text-xs text-red-400">{error}</p>
-        </div>
-      )}
-
-      {result && (
-        <div className="border border-[#22c55e]/30 bg-[#052e16] p-4">
-          <p className="font-mono text-sm text-[#22c55e]">
-            Pontuação: {result.score} | +{result.gainedXp} XP
+      <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6">
+        <PixelCard className="flex flex-wrap items-center justify-between gap-2 border-primary bg-primary/10">
+          <p className="font-mono text-[10px] uppercase text-primary">
+            Desafio Semanal · {state.questions.length} questões · 1 tentativa por semana
           </p>
-        </div>
-      )}
+        </PixelCard>
 
-      {!challengeData?.submitted && questions.length > 0 && !result && (
-        <div className="space-y-4">
-          <p className="font-mono text-xs uppercase text-[#94a3b8]">
-            {questions.length} questões — responda todas antes de enviar
-          </p>
-
-          {questions.map((q, qIdx) => (
-            <div key={q.id} className="space-y-2 border border-[#1e293b] bg-[#0f172a] p-4">
-              <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Questão {qIdx + 1}</p>
-              <p className="font-[var(--font-body)] text-sm leading-6 text-[#e2e8f0]">
-                {q.statement}
-              </p>
-              <div className="space-y-2">
-                {OPTIONS.map((letter, idx) => {
-                  const text = [q.optionA, q.optionB, q.optionC, q.optionD, q.optionE][idx];
-                  if (!text) return null;
-                  const isSelected = answers[q.id] === idx;
-                  return (
-                    <button
-                      key={letter}
-                      type="button"
-                      onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: idx }))}
-                      className={[
-                        "w-full border px-4 py-2 text-left font-mono text-xs transition-colors",
-                        isSelected
-                          ? "border-[#f97316] bg-[#1f2937] text-[#f97316]"
-                          : "border-[#1e293b] text-[#cbd5e1] hover:border-[#334155]",
-                      ].join(" ")}
-                    >
-                      <span className="mr-3 font-bold">{letter}.</span>
-                      {text}
-                    </button>
-                  );
-                })}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <QuestionOptionsCard
+            question={currentQuestion}
+            answer={answers[currentQuestion.id]}
+            onSelect={(value) => selectAnswer(currentQuestion.id, Array.isArray(value) ? value[0] : value)}
+            submitted={false}
+            disabled={isSubmitting}
+            questionLabel={`Questão ${currentIndex + 1} de ${state.questions.length}`}
+            footer={
+              <div className="flex items-center justify-between gap-2 border-t border-[var(--pixel-border)] pt-3">
+                <PixelButton
+                  variant="ghost"
+                  onClick={() => goToQuestion(currentIndex - 1)}
+                  disabled={currentIndex === 0}
+                >
+                  ← Anterior
+                </PixelButton>
+                <span className="font-mono text-[11px] text-[var(--pixel-subtext)]">
+                  {currentIndex + 1} / {state.questions.length}
+                </span>
+                <PixelButton
+                  onClick={() => goToQuestion(currentIndex + 1)}
+                  disabled={currentIndex === state.questions.length - 1}
+                >
+                  Próxima →
+                </PixelButton>
               </div>
-            </div>
-          ))}
+            }
+          />
 
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full border border-[#f97316] bg-[#f97316]/10 px-4 py-3 font-mono text-xs font-bold uppercase text-[#f97316] transition-colors hover:bg-[#f97316]/20 disabled:opacity-50"
+          <QuestionSideNav
+            questions={cardQuestions}
+            answers={answers}
+            currentIndex={currentIndex}
+            submitted={false}
+            onGoToQuestion={goToQuestion}
+            title="Navegação do desafio"
           >
-            {submitting ? "Enviando..." : "Enviar Respostas"}
-          </button>
+            <PixelButton
+              onClick={() => void submit()}
+              disabled={!allAnswered || isSubmitting}
+              className="w-full justify-center"
+            >
+              {isSubmitting ? "Enviando..." : "Enviar Respostas"}
+            </PixelButton>
+          </QuestionSideNav>
         </div>
-      )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }

@@ -63,6 +63,7 @@ export const TRIGGER_TYPE_LABELS: Record<TriggerType, string> = {
   TRAIL_STAGE_COUNT: "Trilhas: estagios concluidos",
   TRAIL_CHAIN_COMPLETED_COUNT: "Trilhas: trilhas completas",
   LIBRARY_ACCESS_COUNT: "Biblioteca: conteudos acessados",
+  WEEKLY_CHALLENGE_WINS_COUNT: "Desafio Semanal: vitorias (1o lugar)",
 };
 
 function needsSessionType(t: TriggerType) {

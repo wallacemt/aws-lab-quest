@@ -19,6 +19,10 @@ const { mockRequireAdmin, mockPrisma } = vi.hoisted(() => {
       updateMany: vi.fn(),
       update: vi.fn(),
     },
+    scheduledJob: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn(),
+    },
     workerTrigger: {
       create: vi.fn(),
     },
@@ -33,6 +37,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 import { GET as listChallenges } from "@/app/api/admin/weekly-challenge/route";
 import { GET as getChallenge, PATCH as patchChallenge } from "@/app/api/admin/weekly-challenge/[challengeId]/route";
 import { POST as triggerChallenge } from "@/app/api/admin/weekly-challenge/trigger/route";
+import { POST as pauseChallenge } from "@/app/api/admin/weekly-challenge/pause/route";
 
 const ADMIN_OK = { ok: true as const, userId: "admin-1", email: "admin@test.com", role: "admin" };
 const NOT_ADMIN = {
@@ -76,6 +81,88 @@ describe("Admin weekly-challenge routes — auth gate", () => {
     );
     expect(triggerRes.status).toBe(403);
     expect(mockPrisma.workerTrigger.create).not.toHaveBeenCalled();
+
+    const pauseRes = await pauseChallenge(
+      makeRequest("http://localhost/api/admin/weekly-challenge/pause", { paused: true }, "POST")
+    );
+    expect(pauseRes.status).toBe(403);
+    expect(mockPrisma.scheduledJob.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/admin/weekly-challenge — list", () => {
+  it("reports openCronPaused based on the cron-weekly-challenge-open ScheduledJob", async () => {
+    mockRequireAdmin.mockResolvedValue(ADMIN_OK);
+    mockPrisma.weeklyChallenge.findMany.mockResolvedValue([]);
+    mockPrisma.scheduledJob.findUnique.mockResolvedValue({ active: false });
+
+    const res = await listChallenges(makeRequest("http://localhost/api/admin/weekly-challenge"));
+    const body = (await res.json()) as { openCronPaused: boolean };
+
+    expect(res.status).toBe(200);
+    expect(body.openCronPaused).toBe(true);
+  });
+
+  it("reports openCronPaused=false when no ScheduledJob row exists yet", async () => {
+    mockRequireAdmin.mockResolvedValue(ADMIN_OK);
+    mockPrisma.weeklyChallenge.findMany.mockResolvedValue([]);
+    mockPrisma.scheduledJob.findUnique.mockResolvedValue(null);
+
+    const res = await listChallenges(makeRequest("http://localhost/api/admin/weekly-challenge"));
+    const body = (await res.json()) as { openCronPaused: boolean };
+
+    expect(body.openCronPaused).toBe(false);
+  });
+});
+
+describe("POST /api/admin/weekly-challenge/pause", () => {
+  beforeEach(() => {
+    mockRequireAdmin.mockResolvedValue(ADMIN_OK);
+  });
+
+  it("disables the open cron job when paused:true", async () => {
+    mockPrisma.scheduledJob.upsert.mockResolvedValue({ active: false });
+
+    const res = await pauseChallenge(
+      makeRequest("http://localhost/api/admin/weekly-challenge/pause", { paused: true }, "POST")
+    );
+    const body = (await res.json()) as { paused: boolean };
+
+    expect(res.status).toBe(200);
+    expect(body.paused).toBe(true);
+    expect(mockPrisma.scheduledJob.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { jobId: "cron-weekly-challenge-open" },
+        update: { active: false },
+      }),
+    );
+  });
+
+  it("re-enables the open cron job when paused:false", async () => {
+    mockPrisma.scheduledJob.upsert.mockResolvedValue({ active: true });
+
+    const res = await pauseChallenge(
+      makeRequest("http://localhost/api/admin/weekly-challenge/pause", { paused: false }, "POST")
+    );
+    const body = (await res.json()) as { paused: boolean };
+
+    expect(res.status).toBe(200);
+    expect(body.paused).toBe(false);
+    expect(mockPrisma.scheduledJob.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { jobId: "cron-weekly-challenge-open" },
+        update: { active: true },
+      }),
+    );
+  });
+
+  it("returns 400 when 'paused' is not a boolean", async () => {
+    const res = await pauseChallenge(
+      makeRequest("http://localhost/api/admin/weekly-challenge/pause", { paused: "yes" }, "POST")
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockPrisma.scheduledJob.upsert).not.toHaveBeenCalled();
   });
 });
 
@@ -150,6 +237,37 @@ describe("PATCH /api/admin/weekly-challenge/[challengeId] — activation", () =>
 
     expect(res.status).toBe(400);
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when neither 'active' nor 'title' is provided", async () => {
+    const res = await patchChallenge(
+      makeRequest("http://localhost/api/admin/weekly-challenge/c1", {}),
+      makeParams("c1")
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("updates only the title, without touching other active challenges", async () => {
+    const updateManyMock = vi.fn();
+    const updateMock = vi.fn().mockResolvedValue({ id: "c1", title: "Semana da IAM" });
+
+    mockPrisma.$transaction.mockImplementation(async (fn: (tx: typeof mockPrisma) => Promise<unknown>) => {
+      const tx = {
+        weeklyChallenge: { updateMany: updateManyMock, update: updateMock },
+      };
+      return fn(tx as unknown as typeof mockPrisma);
+    });
+
+    const res = await patchChallenge(
+      makeRequest("http://localhost/api/admin/weekly-challenge/c1", { title: "Semana da IAM" }),
+      makeParams("c1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateManyMock).not.toHaveBeenCalled();
+    expect(updateMock).toHaveBeenCalledWith({ where: { id: "c1" }, data: { title: "Semana da IAM" } });
   });
 });
 

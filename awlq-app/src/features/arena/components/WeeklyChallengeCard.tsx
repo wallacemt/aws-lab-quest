@@ -1,3 +1,5 @@
+import { PixelCard } from "@/components/ui/pixel-card";
+import { LeaderboardList, type LeaderboardListEntry } from "@/components/leaderboard/LeaderboardList";
 import type { WeeklyChallengeData } from "@/features/arena/services/arena-api";
 
 type Props = {
@@ -16,48 +18,70 @@ export function WeeklyChallengeCard({ data }: Props) {
 
   if (!challenge) {
     return (
-      <div className="border border-[#1e293b] bg-[#0f172a] p-6 text-center">
-        <p className="font-mono text-xs text-[#94a3b8]">Nenhum desafio ativo no momento.</p>
-      </div>
+      <PixelCard className="text-center">
+        <p className="font-mono text-xs text-pixel-subtext">Nenhum desafio ativo no momento.</p>
+      </PixelCard>
     );
+  }
+
+  const displayRank = entry?.rank ?? entry?.liveRank ?? null;
+
+  const leaderboardEntries: LeaderboardListEntry[] = leaderboard.map(
+    (item, idx): LeaderboardListEntry => ({
+      id: item.userId,
+      rank: item.rank ?? idx + 1,
+      name: item.name,
+      avatarUrl: item.avatarUrl,
+      value: `${item.score} pts`,
+      isCurrentUser: entry?.userId === item.userId,
+    }),
+  );
+
+  // The user might be outside the visible top 10 — append their own row so they
+  // can always see where they stand, with a divider marking the gap.
+  const isInTop10 = entry ? leaderboard.some((item) => item.userId === entry.userId) : true;
+  if (entry && !isInTop10) {
+    leaderboardEntries.push({
+      id: entry.userId,
+      rank: displayRank,
+      name: entry.name,
+      avatarUrl: entry.avatarUrl,
+      value: `${entry.score} pts`,
+      isCurrentUser: true,
+      showDividerBefore: true,
+    });
   }
 
   return (
     <div className="space-y-4">
-      <div className="border border-[#1e293b] bg-[#0f172a] p-4">
-        <p className="font-mono text-xs uppercase text-[#f97316]">Desafio da Semana</p>
-        <p className="mt-1 font-mono text-[10px] text-[#94a3b8]">
+      <PixelCard>
+        <p className="font-mono text-xs uppercase text-primary">{challenge.title || "Desafio da Semana"}</p>
+        <p className="mt-1 font-mono text-[10px] text-pixel-subtext">
           {formatDate(challenge.weekStart)} — {formatDate(challenge.weekEnd)}
         </p>
         {entry && (
           <div className="mt-3 flex gap-6">
             <div>
-              <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Sua pontuação</p>
-              <p className="font-mono text-lg font-bold text-[#38bdf8]">{entry.score}</p>
+              <p className="font-mono text-[10px] uppercase text-pixel-subtext">Sua pontuação</p>
+              <p className="font-mono text-lg font-bold text-[var(--pixel-accent)]">{entry.score}</p>
             </div>
-            {entry.rank !== null && (
+            {displayRank !== null && (
               <div>
-                <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Ranking</p>
-                <p className="font-mono text-lg font-bold text-[#f97316]">#{entry.rank}</p>
+                <p className="font-mono text-[10px] uppercase text-pixel-subtext">
+                  Ranking{entry.rank === null ? " (parcial)" : ""}
+                </p>
+                <p className="font-mono text-lg font-bold text-primary">#{displayRank}</p>
               </div>
             )}
           </div>
         )}
-      </div>
+      </PixelCard>
 
-      {leaderboard.length > 0 && (
-        <div className="border border-[#1e293b] bg-[#0f172a] p-4">
-          <p className="mb-3 font-mono text-[10px] uppercase text-[#94a3b8]">Top 10</p>
-          <ol className="space-y-2">
-            {leaderboard.map((item, idx) => (
-              <li key={item.userId} className="flex items-center justify-between font-mono text-xs">
-                <span className="text-[#94a3b8]">#{item.rank ?? idx + 1}</span>
-                <span className="truncate text-[#cbd5e1]">{item.userId.slice(0, 8)}…</span>
-                <span className="font-bold text-[#38bdf8]">{item.score} pts</span>
-              </li>
-            ))}
-          </ol>
-        </div>
+      {leaderboardEntries.length > 0 && (
+        <PixelCard>
+          <p className="mb-3 font-mono text-[10px] uppercase text-pixel-subtext">Top 10</p>
+          <LeaderboardList entries={leaderboardEntries} />
+        </PixelCard>
       )}
     </div>
   );

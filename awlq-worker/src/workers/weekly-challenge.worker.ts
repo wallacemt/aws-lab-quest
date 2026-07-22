@@ -2,6 +2,8 @@
 import { connection, WeeklyChallengeJobData } from "../queues/index.js";
 import { prisma } from "../prisma.js";
 import { logger } from "../shared/logger.js";
+import { generateWeeklyChallengeTitle } from "../services/weekly-challenge-title.js";
+import { pickWeeklyChallengeQuestionIds } from "../services/weekly-challenge-questions.js";
 
 function startOfWeekUtc(date: Date): Date {
   const d = new Date(date);
@@ -28,8 +30,7 @@ async function openWeeklyChallenge(): Promise<void> {
 
   // DEF-023: Guard against duplicate runs — if a challenge already exists for this
   // week (e.g. cron fired twice or a manual retry), skip creation and return early.
-  // weekStart is not unique in the schema so we use findFirst, not findUnique.
-  const existing = await prisma.weeklyChallenge.findFirst({
+  const existing = await prisma.weeklyChallenge.findUnique({
     where: { weekStart },
     select: { id: true },
   });
@@ -45,11 +46,19 @@ async function openWeeklyChallenge(): Promise<void> {
     data: { active: false },
   });
 
+  const [title, questionIds] = await Promise.all([
+    generateWeeklyChallengeTitle(weekStart),
+    pickWeeklyChallengeQuestionIds(),
+  ]);
+
   const challenge = await prisma.weeklyChallenge.create({
-    data: { weekStart, weekEnd, active: true },
+    data: { weekStart, weekEnd, active: true, title, questionIds },
   });
 
-  logger.info({ challengeId: challenge.id, weekStart, weekEnd }, "weekly-challenge: opened new challenge");
+  logger.info(
+    { challengeId: challenge.id, weekStart, weekEnd, title, questionCount: questionIds.length },
+    "weekly-challenge: opened new challenge",
+  );
 }
 
 async function closeWeeklyChallenge(): Promise<void> {

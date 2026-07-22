@@ -42,6 +42,7 @@ async function getUserEvents(userId: string) {
     activeChains,
     completedStages,
     libraryAccessCount,
+    weeklyChallengeWinsCount,
   ] = await Promise.all([
     prisma.questHistory.findMany({
       where: { userId },
@@ -74,6 +75,7 @@ async function getUserEvents(userId: string) {
     prisma.questChain.findMany({ where: { active: true }, select: { id: true, stages: { select: { id: true } } } }),
     prisma.questChainProgress.findMany({ where: { userId, completed: true }, select: { stageId: true } }),
     prisma.libraryAccessLog.count({ where: { userId } }),
+    prisma.weeklyChallengeEntry.count({ where: { userId, rank: 1 } }),
   ]);
 
   const completedStageIds = new Set(completedStages.map((item) => item.stageId));
@@ -95,6 +97,7 @@ async function getUserEvents(userId: string) {
     trailStageCount,
     trailChainCompletedCount,
     libraryAccessCount,
+    weeklyChallengeWinsCount,
   };
 }
 
