@@ -26,8 +26,6 @@ import { FontSizeControl } from "../ui/font-size-control";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { formatCompact } from "@/utils/number-format";
 
-
-
 export const Header = () => {
   const { theme } = useTheme();
 
@@ -113,25 +111,31 @@ export const Header = () => {
 
       <div className="flex items-center gap-2 md:gap-4">
         {/* Online Users */}
-        {!simulatedExamActive && onlineCount > 1 && (
+        {!simulatedExamActive && (
           <>
-            <Tooltip>
-              <TooltipTrigger>
-                <div className="hidden md:flex items-center gap-2 bg-pixel-card retro-border border-2 px-3 py-1 rounded-lg retro-shadow-sm">
-                  <div className="relative flex h-3 w-3 items-center justify-center animate-pulse">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-95"></span>
+            {onlineCount > 1 && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <div className="hidden md:flex items-center gap-2 bg-pixel-card retro-border border-2 px-3 py-1 rounded-lg retro-shadow-sm">
+                    <div className="relative flex h-3 w-3 items-center justify-center animate-pulse">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-95"></span>
+                    </div>
+                    <span className="font-mono font-bold text-pixel-text text-[0.6rem] mt-0.5">
+                      {formatCompact(onlineCount)}
+                    </span>
                   </div>
-                  <span className="font-mono font-bold text-pixel-text text-[0.6rem] mt-0.5">{formatCompact(onlineCount)}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Usuarios Online</TooltipContent>
-            </Tooltip>
+                </TooltipTrigger>
+                <TooltipContent>Usuarios Online</TooltipContent>
+              </Tooltip>
+            )}
             {/* XP Badge */}
             <Tooltip>
               <TooltipTrigger>
                 <div className="flex items-center gap-1.5 bg-pixel-card retro-border border-2 px-2 md:px-2 py-1 rounded-lg retro-shadow-sm">
                   <Star className="w-4 h-4 text-primary fill-primary" />
-                  <span className="font-mono font-bold text-pixel-text text-[0.6rem]  ">{formatCompact(displayXp)}</span>
+                  <span className="font-mono font-bold text-pixel-text text-[0.6rem]  ">
+                    {formatCompact(displayXp)}
+                  </span>
                 </div>
               </TooltipTrigger>
               <TooltipContent>XP Acumulado</TooltipContent>
