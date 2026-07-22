@@ -70,6 +70,11 @@ export function DailyQuizScreen() {
     const { score, totalCount, gainedXp } = state;
     return (
       <AppLayout>
+        <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-4">
+          <PixelButton variant="ghost" onClick={() => router.back()}>
+            ← Voltar
+          </PixelButton>
+        </div>
         <div className="mx-auto flex max-w-lg flex-col items-center gap-6 px-4 py-12">
           <h1 className="font-mono text-lg uppercase tracking-wide text-[#f97316]">Quiz Diario Concluido!</h1>
           <PixelCard className="w-full flex flex-col gap-3 text-center border-[#f97316]">
@@ -124,6 +129,11 @@ export function DailyQuizScreen() {
 
   return (
     <AppLayout>
+      <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-4">
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
+      </div>
       <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6">
         <PixelCard className="flex flex-wrap items-center justify-between gap-2 border-[#f97316] bg-[#f97316]/10">
           <p className="font-mono text-[10px] uppercase text-[#f97316]">
@@ -141,13 +151,20 @@ export function DailyQuizScreen() {
             questionLabel={`Questao ${currentIndex + 1} de ${state.questions.length}`}
             footer={
               <div className="flex items-center justify-between gap-2 border-t border-[var(--pixel-border)] pt-3">
-                <PixelButton variant="ghost" onClick={() => goToQuestion(currentIndex - 1)} disabled={currentIndex === 0}>
+                <PixelButton
+                  variant="ghost"
+                  onClick={() => goToQuestion(currentIndex - 1)}
+                  disabled={currentIndex === 0}
+                >
                   ← Anterior
                 </PixelButton>
                 <span className="font-mono text-[11px] text-[var(--pixel-subtext)]">
                   {currentIndex + 1} / {state.questions.length}
                 </span>
-                <PixelButton onClick={() => goToQuestion(currentIndex + 1)} disabled={currentIndex === state.questions.length - 1}>
+                <PixelButton
+                  onClick={() => goToQuestion(currentIndex + 1)}
+                  disabled={currentIndex === state.questions.length - 1}
+                >
                   Proxima →
                 </PixelButton>
               </div>
@@ -162,7 +179,11 @@ export function DailyQuizScreen() {
             onGoToQuestion={goToQuestion}
             title="Navegacao do quiz"
           >
-            <PixelButton onClick={() => void submit()} disabled={!allAnswered || isSubmitting} className="w-full justify-center">
+            <PixelButton
+              onClick={() => void submit()}
+              disabled={!allAnswered || isSubmitting}
+              className="w-full justify-center"
+            >
               {isSubmitting ? "Enviando..." : "Enviar Respostas"}
             </PixelButton>
           </QuestionSideNav>
