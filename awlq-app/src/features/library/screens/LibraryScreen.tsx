@@ -6,6 +6,7 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { ContentCard } from "@/features/library/components/ContentCard";
 import type { LibraryContentLite } from "@/features/library/types";
 import type { LibraryContentType } from "@prisma/client";
+import { useRouter } from "next/navigation";
 
 const CATEGORIES = [
   "Todos",
@@ -35,15 +36,12 @@ export function LibraryScreen({ initialContent }: LibraryScreenProps) {
   const [activeCategory, setActiveCategory] = useState<string>("Todos");
   const [activeType, setActiveType] = useState<LibraryContentType | "Todos">("Todos");
   const [searchQuery, setSearchQuery] = useState<string>("");
-
+const router = useRouter();
   const filtered = useMemo(() => {
     return initialContent.filter((item) => {
       if (activeCategory !== "Todos" && item.category !== activeCategory) return false;
       if (activeType !== "Todos" && item.type !== activeType) return false;
-      if (
-        searchQuery.trim() &&
-        !item.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
-      ) {
+      if (searchQuery.trim() && !item.title.toLowerCase().includes(searchQuery.trim().toLowerCase())) {
         return false;
       }
       return true;
@@ -68,6 +66,10 @@ export function LibraryScreen({ initialContent }: LibraryScreenProps) {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6">
+      <PixelButton variant="ghost" onClick={() => router.back()}>
+        ← Voltar
+      </PixelButton>
+
       {/* Header */}
       <PixelCard>
         <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Biblioteca</h1>
@@ -79,9 +81,7 @@ export function LibraryScreen({ initialContent }: LibraryScreenProps) {
       {/* Filters */}
       <PixelCard className="space-y-4">
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--pixel-accent)]">
-            Filtros
-          </p>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--pixel-accent)]">Filtros</p>
           {hasActiveFilters && (
             <PixelButton variant="ghost" className="text-[10px]" onClick={clearFilters}>
               Limpar filtros

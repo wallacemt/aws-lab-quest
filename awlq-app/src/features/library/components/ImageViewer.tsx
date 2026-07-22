@@ -147,7 +147,7 @@ export function ImageViewer({ src, alt }: ImageViewerProps) {
         </div>
       </div>
 
-      <p className="font-mono text-[10px] text-[var(--pixel-muted)] text-center">
+      <p className="font-mono text-[10px] text-accent text-center">
         Scroll para zoom · Arraste para mover · Duplo clique para resetar
       </p>
     </div>
