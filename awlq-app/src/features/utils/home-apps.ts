@@ -60,6 +60,12 @@ export const ADVENTURE_MODES: GameMode[] = [
     description: "Percursos de aprendizagem por servico AWS com estagio a estagio.",
     cta: "Ver Trilhas",
   },
+  {
+    id: "desafio-semanal",
+    title: "Desafio Semanal",
+    description: "Responda o desafio da semana e dispute o ranking com todos os usuarios.",
+    cta: "Encarar Desafio",
+  },
 ];
 
 export const TOOLS_MODES: GameMode[] = [
@@ -100,6 +106,7 @@ export const APP_SECTION_LABEL: Record<string, string> = {
   sprint: "Retencao",
   arena: "Aventura",
   trilhas: "Aventura",
+  "desafio-semanal": "Aventura",
   biblioteca: "Ferramentas",
   mentor: "Ferramentas",
   noticias: "Ferramentas",

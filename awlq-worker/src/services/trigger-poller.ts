@@ -137,15 +137,27 @@ async function processOneTrigger(): Promise<void> {
       }
 
       case "email-send": {
-        const payload = trigger.payload as { templateId?: string; targetMode?: string; userId?: string } | null;
-        if (payload?.templateId) {
+        const payload = trigger.payload as {
+          templateId?: string;
+          subject?: string;
+          html?: string;
+          targetMode?: string;
+          userId?: string;
+          userIds?: string[];
+        } | null;
+        const hasTemplate = Boolean(payload?.templateId);
+        const hasRawContent = Boolean(payload?.subject && payload?.html);
+        if (hasTemplate || hasRawContent) {
           await emailSendQueue.add("admin-email-send", {
-            templateId: payload.templateId,
-            targetMode: (payload.targetMode ?? "all-users") as "all-users" | "single-user",
-            userId: payload.userId,
+            templateId: payload?.templateId,
+            subject: payload?.subject,
+            html: payload?.html,
+            targetMode: (payload?.targetMode ?? "all-users") as "all-users" | "single-user" | "specific-users",
+            userId: payload?.userId,
+            userIds: payload?.userIds,
           });
         } else {
-          logger.warn({ triggerId: trigger.id }, "email-send trigger missing templateId payload");
+          logger.warn({ triggerId: trigger.id }, "email-send trigger missing templateId or subject+html payload");
         }
         break;
       }

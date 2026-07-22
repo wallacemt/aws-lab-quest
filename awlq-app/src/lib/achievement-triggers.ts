@@ -15,7 +15,8 @@ export type TriggerType =
   | "SPRINT_COUNT"
   | "TRAIL_STAGE_COUNT"
   | "TRAIL_CHAIN_COMPLETED_COUNT"
-  | "LIBRARY_ACCESS_COUNT";
+  | "LIBRARY_ACCESS_COUNT"
+  | "WEEKLY_CHALLENGE_WINS_COUNT";
 
 export const TRIGGER_TYPES: TriggerType[] = [
   "LAB_COUNT",
@@ -35,6 +36,7 @@ export const TRIGGER_TYPES: TriggerType[] = [
   "TRAIL_STAGE_COUNT",
   "TRAIL_CHAIN_COMPLETED_COUNT",
   "LIBRARY_ACCESS_COUNT",
+  "WEEKLY_CHALLENGE_WINS_COUNT",
 ];
 
 export type SessionType = "KC" | "SIMULADO";
@@ -71,6 +73,7 @@ export type AchievementAggregates = {
   trailStageCount: number;
   trailChainCompletedCount: number;
   libraryAccessCount: number;
+  weeklyChallengeWinsCount: number;
 };
 
 function getConsecutiveDaysMax(dates: Date[]): number {
@@ -120,6 +123,7 @@ export function computeAggregates(input: {
   trailStageCount: number;
   trailChainCompletedCount: number;
   libraryAccessCount: number;
+  weeklyChallengeWinsCount: number;
 }): AchievementAggregates {
   const kcSessions = input.studyHistory.filter((item) => item.sessionType === "KC");
   const simuladoSessions = input.studyHistory.filter((item) => item.sessionType === "SIMULADO");
@@ -152,6 +156,7 @@ export function computeAggregates(input: {
     trailStageCount: input.trailStageCount,
     trailChainCompletedCount: input.trailChainCompletedCount,
     libraryAccessCount: input.libraryAccessCount,
+    weeklyChallengeWinsCount: input.weeklyChallengeWinsCount,
   };
 }
 
@@ -183,6 +188,7 @@ export function validateTriggerParams(triggerType: TriggerType, params: TriggerP
     case "TRAIL_STAGE_COUNT":
     case "TRAIL_CHAIN_COMPLETED_COUNT":
     case "LIBRARY_ACCESS_COUNT":
+    case "WEEKLY_CHALLENGE_WINS_COUNT":
       return null;
     case "SESSION_COUNT":
       return requireSessionType();
@@ -239,6 +245,8 @@ export function currentForTrigger(
       return aggregates.trailChainCompletedCount;
     case "LIBRARY_ACCESS_COUNT":
       return aggregates.libraryAccessCount;
+    case "WEEKLY_CHALLENGE_WINS_COUNT":
+      return aggregates.weeklyChallengeWinsCount;
     case "SESSION_COUNT": {
       if (!params?.sessionType) return 0;
       return aggregates.sessionsByType[params.sessionType].length;

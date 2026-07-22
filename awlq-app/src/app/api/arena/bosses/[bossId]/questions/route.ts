@@ -3,17 +3,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
+import { expandServiceCodes } from "@/lib/aws-service-codes";
 
 type RouteParams = { params: Promise<{ bossId: string }> };
 
 /**
  * GET /api/arena/bosses/[bossId]/questions?count=5
  *
- * Returns questions filtered by the boss's themeService (AwsService.code),
+ * Returns questions matching the boss's themeService (AwsService.code),
  * scoped to the user's target certification when one is set (same as KC —
  * a boss themed on S3 shouldn't pull SAA questions for a Security+ user).
- * When the pool is short, enqueues background generation the same way KC
- * does (WorkerTrigger action "generate-kc" -> kcGenerationQueue), so a
+ * The service match is broad, not a strict awsServiceId equals: it also
+ * catches questions tagged with the service via the secondary
+ * questionAwsServices join, "Amazon X"/"AWS X" prefix variants, and
+ * questions whose statement/topic mentions the service by name — so the
+ * pool stays diverse without depending entirely on fresh worker generation.
+ * When the pool is still short, enqueues background generation the same way
+ * KC does (WorkerTrigger action "generate-kc" -> kcGenerationQueue), so a
  * thin pool self-heals for future battles instead of hard-failing.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -35,9 +41,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   const [service, profile] = await Promise.all([
-    prisma.awsService.findUnique({ where: { code: boss.themeService }, select: { id: true } }),
+    prisma.awsService.findUnique({ where: { code: boss.themeService }, select: { id: true, name: true } }),
     prisma.userProfile.findUnique({ where: { userId: user.id }, select: { certificationPresetId: true } }),
   ]);
+
+  const expandedCodes = expandServiceCodes([boss.themeService]);
+  const serviceOr: Prisma.StudyQuestionWhereInput[] = [
+    { awsService: { code: { in: expandedCodes } } },
+    { questionAwsServices: { some: { service: { code: { in: expandedCodes } } } } },
+  ];
+  if (service?.name) {
+    serviceOr.push({ statement: { contains: service.name, mode: "insensitive" } });
+    serviceOr.push({ topic: { contains: service.name, mode: "insensitive" } });
+  }
 
   // Arena only supports single-select combat (one "attack" per turn) — exclude
   // multi-select questions here so scoring in /api/arena/battle never silently
@@ -45,7 +61,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const where: Prisma.StudyQuestionWhereInput = {
     active: true,
     questionType: "single",
-    ...(service ? { awsServiceId: service.id } : {}),
+    OR: serviceOr,
     ...(profile?.certificationPresetId ? { certificationPresetId: profile.certificationPresetId } : {}),
   };
 

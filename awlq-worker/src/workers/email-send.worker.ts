@@ -13,29 +13,54 @@ export function createEmailSendWorker(): Worker {
   return new Worker<EmailSendJobData>(
     "email-send",
     async (job) => {
-      const { templateId, targetMode, userId } = job.data;
+      const { templateId, targetMode, userId, userIds } = job.data;
 
-      const template = await prisma.adminEmailTemplate.findUnique({
-        where: { id: templateId },
-        select: { subject: true, html: true, name: true },
-      });
+      // Either a saved template or a raw subject+html pair written directly in the
+      // admin "Escrever" tab — the two are mutually exclusive alternatives.
+      let subjectSource: string;
+      let htmlSource: string;
+      let templateName = "raw";
 
-      if (!template) {
-        logger.warn({ templateId }, "email-send: template not found, skipping");
+      if (templateId) {
+        const template = await prisma.adminEmailTemplate.findUnique({
+          where: { id: templateId },
+          select: { subject: true, html: true, name: true },
+        });
+
+        if (!template) {
+          logger.warn({ templateId }, "email-send: template not found, skipping");
+          return;
+        }
+
+        subjectSource = template.subject;
+        htmlSource = template.html;
+        templateName = template.name;
+      } else if (job.data.subject && job.data.html) {
+        subjectSource = job.data.subject;
+        htmlSource = job.data.html;
+      } else {
+        logger.warn({ templateId, targetMode }, "email-send: neither templateId nor subject+html provided, skipping");
         return;
       }
 
-      // For broadcast (all-users), only include users who have not opted out
+      // For broadcast-style sends (all-users / admin-picked specific-users), only
+      // include users who have not opted out. single-user bypasses opt-out —
+      // reserved for essential transactional sends (password reset, etc).
       const users =
         targetMode === "single-user"
           ? await prisma.user.findMany({
               where: { id: userId, active: true },
               select: { id: true, email: true, name: true, emailNotifications: true },
             })
-          : await prisma.user.findMany({
-              where: { accessStatus: "approved", active: true, emailNotifications: true },
-              select: { id: true, email: true, name: true, emailNotifications: true },
-            });
+          : targetMode === "specific-users"
+            ? await prisma.user.findMany({
+                where: { id: { in: userIds ?? [] }, active: true, emailNotifications: true },
+                select: { id: true, email: true, name: true, emailNotifications: true },
+              })
+            : await prisma.user.findMany({
+                where: { accessStatus: "approved", active: true, emailNotifications: true },
+                select: { id: true, email: true, name: true, emailNotifications: true },
+              });
 
       const appUrl = config.app.url;
       const logoUrl = STATIC_LOGO_URL;
@@ -70,7 +95,7 @@ export function createEmailSendWorker(): Worker {
           logo_url: logoUrl,
           unsubscribe_url: unsubscribeUrl,
         };
-        const { html: renderedHtml, subject } = buildEmailContent(template.html, template.subject, vars);
+        const { html: renderedHtml, subject } = buildEmailContent(htmlSource, subjectSource, vars);
         const html = renderedHtml + unsubscribeFooter;
 
         try {
@@ -83,7 +108,7 @@ export function createEmailSendWorker(): Worker {
       }
 
       logger.info(
-        { templateId, templateName: template.name, targetMode, sent, failed },
+        { templateId, templateName, targetMode, sent, failed },
         "email-send: done"
       );
     },

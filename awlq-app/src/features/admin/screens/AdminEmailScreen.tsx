@@ -13,6 +13,7 @@ import {
   toggleBehavioralEmail,
   triggerBehavioralEmailAnalysis,
 } from "@/features/admin/services/admin-api";
+import { CheckSquare, Square } from "lucide-react";
 import { AdminEmailTemplateItem, AdminUserListItem, BehavioralEmailStatus } from "@/features/admin/types";
 
 type DraftState = {
@@ -43,7 +44,8 @@ function renderPreview(template: string, name: string, appUrl: string): string {
     .replace(/{{\s*name\s*}}/gi, name)
     .replace(/{{\s*app_url\s*}}/gi, appUrl)
     .replace(/{{\s*logo_url\s*}}/gi, STATIC_LOGO_URL)
-    .replace(/{{\s*reset_url\s*}}/gi, `${appUrl}/reset-password`);
+    .replace(/{{\s*reset_url\s*}}/gi, `${appUrl}/reset-password`)
+    .replace(/{{\s*unsubscribe_url\s*}}/gi, `${appUrl}/api/user/unsubscribe?token=preview`);
 }
 
 const TRIGGER_LABELS: Record<string, string> = {
@@ -63,7 +65,7 @@ function AutomaticosStat({ title, value }: { title: string; value: string }) {
 }
 
 export function AdminEmailScreen() {
-  const [activeTab, setActiveTab] = useState<"templates" | "send" | "automaticos">("templates");
+  const [activeTab, setActiveTab] = useState<"templates" | "send" | "compose" | "automaticos">("templates");
 
   // Behavioral email state
   const [behavioralStatus, setBehavioralStatus] = useState<BehavioralEmailStatus | null>(null);
@@ -97,6 +99,17 @@ export function AdminEmailScreen() {
   const [userSearch, setUserSearch] = useState("");
   const [userOptions, setUserOptions] = useState<AdminUserListItem[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
+
+  // Compose tab state — write a one-off subject+html without saving it as a template
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeHtml, setComposeHtml] = useState("");
+  const [composeTargetMode, setComposeTargetMode] = useState<"all-users" | "specific-users">("all-users");
+  const [composeUserSearch, setComposeUserSearch] = useState("");
+  const [composeUserOptions, setComposeUserOptions] = useState<AdminUserListItem[]>([]);
+  const [composeSelectedUserIds, setComposeSelectedUserIds] = useState<Set<string>>(new Set());
+  const [composeSending, setComposeSending] = useState(false);
+  const [composeMessage, setComposeMessage] = useState<string | null>(null);
+  const [composeError, setComposeError] = useState<string | null>(null);
 
   const selectedTemplateIdRef = useRef<string | null>(null);
 
@@ -177,6 +190,31 @@ export function AdminEmailScreen() {
     void loadUsers();
     return () => { cancelled = true; };
   }, [targetMode, userSearch]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadComposeUsers() {
+      if (activeTab !== "compose" || composeTargetMode !== "specific-users") return;
+
+      try {
+        const data = await listAdminUsers({
+          page: 1,
+          pageSize: 20,
+          role: "user",
+          active: "true",
+          accessStatus: "approved",
+          search: composeUserSearch,
+        });
+        if (!cancelled) setComposeUserOptions(data.items);
+      } catch {
+        if (!cancelled) setComposeUserOptions([]);
+      }
+    }
+
+    void loadComposeUsers();
+    return () => { cancelled = true; };
+  }, [activeTab, composeTargetMode, composeUserSearch]);
 
   useEffect(() => {
     if (activeTab !== "automaticos") return;
@@ -349,6 +387,50 @@ export function AdminEmailScreen() {
     }
   }
 
+  function toggleComposeUser(userId: string) {
+    setComposeSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  async function handleSendCompose() {
+    if (!composeSubject.trim() || !composeHtml.trim()) {
+      setComposeError("Preencha o assunto e o conteudo do email.");
+      return;
+    }
+
+    if (composeTargetMode === "specific-users" && composeSelectedUserIds.size === 0) {
+      setComposeError("Selecione ao menos um usuario.");
+      return;
+    }
+
+    setComposeSending(true);
+    setComposeMessage(null);
+    setComposeError(null);
+
+    try {
+      await sendAdminEmailTemplate({
+        subject: composeSubject,
+        html: composeHtml,
+        targetMode: composeTargetMode,
+        userIds: composeTargetMode === "specific-users" ? Array.from(composeSelectedUserIds) : undefined,
+      });
+
+      setComposeMessage(
+        composeTargetMode === "specific-users"
+          ? `Email enfileirado para ${composeSelectedUserIds.size} usuario(s) selecionado(s).`
+          : "Email enfileirado para todos os usuarios aprovados. O worker processara o envio em segundo plano.",
+      );
+    } catch (err) {
+      setComposeError(err instanceof Error ? err.message : "Falha ao enviar email.");
+    } finally {
+      setComposeSending(false);
+    }
+  }
+
   return (
     <main className="space-y-5">
       <header className="space-y-2">
@@ -361,7 +443,7 @@ export function AdminEmailScreen() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-[#1e293b]">
-        {(["templates", "send", "automaticos"] as const).map((tab) => (
+        {(["templates", "send", "compose", "automaticos"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -372,7 +454,7 @@ export function AdminEmailScreen() {
                 : "text-[#94a3b8] hover:text-[#cbd5e1]"
             }`}
           >
-            {tab === "templates" ? "Templates" : tab === "send" ? "Envio" : "Automaticos"}
+            {tab === "templates" ? "Templates" : tab === "send" ? "Envio" : tab === "compose" ? "Escrever" : "Automaticos"}
           </button>
         ))}
       </div>
@@ -570,7 +652,7 @@ export function AdminEmailScreen() {
                       Usada nos links do preview. No envio real, usa a variavel APP_URL do servidor.
                     </p>
                   </div>
-                  <div className="max-h-[80vh] overflow-auto rounded border border-[#334155] bg-white p-2">
+                  <div className="max-h-[80vh] overflow-auto rounded border border-[#334155] bg-secondary p-2">
                     <div
                       className="min-h-[240px]"
                       dangerouslySetInnerHTML={{
@@ -697,6 +779,135 @@ export function AdminEmailScreen() {
               </div>
             )}
             {sendError && <p className="text-sm text-[#fca5a5]">{sendError}</p>}
+          </div>
+        </section>
+      )}
+
+      {/* Tab: Escrever (envio avulso, sem template salvo) */}
+      {activeTab === "compose" && (
+        <section className="space-y-4">
+          <p className="text-sm text-[#94a3b8]">
+            Escreva um email avulso — nao precisa ser um template salvo. As mesmas variaveis dos templates funcionam
+            aqui: {"{{name}}"}, {"{{app_url}}"}, {"{{logo_url}}"}, {"{{unsubscribe_url}}"}.
+          </p>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="space-y-4 border border-[#1e293b] bg-[#111827] p-4">
+              <label className="space-y-1 text-xs uppercase text-[#94a3b8]">
+                Assunto
+                <input
+                  value={composeSubject}
+                  onChange={(event) => setComposeSubject(event.target.value)}
+                  placeholder="Assunto do email"
+                  className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                />
+              </label>
+
+              <label className="space-y-1 text-xs uppercase text-[#94a3b8]">
+                Conteudo (HTML)
+                <textarea
+                  value={composeHtml}
+                  onChange={(event) => setComposeHtml(event.target.value)}
+                  placeholder="<p>Ola {{name}}, ...</p>"
+                  className="min-h-[260px] w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-xs text-[#e2e8f0]"
+                />
+              </label>
+
+              <div className="space-y-2">
+                <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Destinatarios</p>
+                <div className="flex flex-wrap gap-3 text-xs uppercase">
+                  <label className="flex items-center gap-2 text-[#cbd5e1]">
+                    <input
+                      type="radio"
+                      checked={composeTargetMode === "all-users"}
+                      onChange={() => setComposeTargetMode("all-users")}
+                    />
+                    Todos os usuarios aprovados
+                  </label>
+                  <label className="flex items-center gap-2 text-[#cbd5e1]">
+                    <input
+                      type="radio"
+                      checked={composeTargetMode === "specific-users"}
+                      onChange={() => setComposeTargetMode("specific-users")}
+                    />
+                    Usuarios especificos
+                  </label>
+                </div>
+
+                {composeTargetMode === "specific-users" && (
+                  <div className="space-y-2">
+                    <input
+                      value={composeUserSearch}
+                      onChange={(event) => setComposeUserSearch(event.target.value)}
+                      placeholder="Buscar usuario por nome/email"
+                      className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                    />
+                    <div className="max-h-[220px] space-y-1 overflow-auto border border-[#334155] p-2">
+                      {composeUserOptions.length === 0 && (
+                        <p className="text-xs text-[#64748b]">Nenhum usuario encontrado.</p>
+                      )}
+                      {composeUserOptions.map((user) => {
+                        const selected = composeSelectedUserIds.has(user.id);
+                        return (
+                          <button
+                            key={user.id}
+                            type="button"
+                            onClick={() => toggleComposeUser(user.id)}
+                            className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs ${
+                              selected ? "bg-[#f9731615] text-[#f97316]" : "text-[#cbd5e1] hover:bg-[#0b1220]"
+                            }`}
+                          >
+                            {selected ? <CheckSquare size={13} /> : <Square size={13} />}
+                            {user.name} ({user.email})
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {composeSelectedUserIds.size > 0 && (
+                      <p className="text-[10px] uppercase text-[#94a3b8]">
+                        {composeSelectedUserIds.size} usuario(s) selecionado(s)
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleSendCompose()}
+                disabled={composeSending}
+                className="border border-[#22c55e] px-4 py-2 text-xs uppercase text-[#86efac] disabled:opacity-40"
+              >
+                {composeSending ? "Enfileirando..." : "Enfileirar Envio"}
+              </button>
+
+              {composeMessage && <p className="text-sm text-[#86efac]">{composeMessage}</p>}
+              {composeError && <p className="text-sm text-[#fca5a5]">{composeError}</p>}
+            </div>
+
+            <aside className="space-y-2 border border-[#1e293b] bg-[#111827] p-3 xl:sticky xl:top-4">
+              <p className="font-mono text-xs uppercase text-[#cbd5e1]">Preview do email</p>
+              <input
+                value={previewName}
+                onChange={(event) => setPreviewName(event.target.value)}
+                placeholder="Nome para preview"
+                className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
+              />
+              <input
+                value={previewAppUrl}
+                onChange={(event) => setPreviewAppUrl(event.target.value)}
+                placeholder="https://seuapp.com"
+                className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
+              />
+              <div className="max-h-[80vh] overflow-auto rounded border border-[#334155] bg-secondary p-2">
+                <div
+                  className="min-h-[240px]"
+                  dangerouslySetInnerHTML={{
+                    __html: renderPreview(composeHtml || "<p>Sem HTML para preview.</p>", previewName, previewAppUrl),
+                  }}
+                />
+              </div>
+            </aside>
           </div>
         </section>
       )}

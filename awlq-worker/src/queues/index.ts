@@ -55,9 +55,12 @@ export type QualityReviewJobData = {
 };
 
 export type EmailSendJobData = {
-  templateId: string;
-  targetMode: "all-users" | "single-user";
+  templateId?: string;
+  subject?: string;
+  html?: string;
+  targetMode: "all-users" | "single-user" | "specific-users";
   userId?: string;
+  userIds?: string[];
 };
 
 // ─── Queues ───────────────────────────────────────────────────────────────────
