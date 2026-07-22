@@ -10,6 +10,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { extractBoardTitle } from "@/lib/retro";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { Task } from "@/lib/types";
+import { PixelButton } from "@/components/ui/pixel-button";
 
 type QuestDraft = {
   theme: string;
@@ -135,6 +136,9 @@ export function LabScreen() {
   return (
     <AppLayout credits>
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 xl:px-8">
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
         <PixelCard>
           <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Lab</h1>
           <p className="mt-2 font-[var(--font-body)] text-base text-[var(--pixel-subtext)]">

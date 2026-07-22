@@ -30,6 +30,7 @@ import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { QuestionOption, StudyQuestion } from "@/lib/types";
 import { STUDY_OPTIONS } from "@/features/study/constants";
+import { PixelButton } from "@/components/ui/pixel-button";
 
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const SERVICES_PAGE_SIZE = 12;
@@ -114,11 +115,16 @@ export function KCScreen() {
   useEffect(() => {
     const topicsRaw = searchParams.get("topics");
     if (!topicsRaw || services.length === 0) return;
-    const requested = topicsRaw.split(",").map((item) => item.trim().toUpperCase()).filter(Boolean);
+    const requested = topicsRaw
+      .split(",")
+      .map((item) => item.trim().toUpperCase())
+      .filter(Boolean);
     if (requested.length === 0) return;
     const maxTopics = maxTopicsForCount(questionCount);
     const availableCodes = new Set(services.map((s) => s.code.toUpperCase()));
-    const preselected = Array.from(new Set(requested)).filter((c) => availableCodes.has(c)).slice(0, maxTopics);
+    const preselected = Array.from(new Set(requested))
+      .filter((c) => availableCodes.has(c))
+      .slice(0, maxTopics);
     if (preselected.length > 0) {
       setSelectedTopics(preselected);
       setActiveStep(3); // jump to summary when topics are pre-selected via URL
@@ -151,8 +157,15 @@ export function KCScreen() {
 
   const stats = useMemo(() => {
     const answered = questions.filter((q) => normalizeAnswerValue(answers[q.id]).length > 0).length;
-    const correct = questions.filter((q) =>
-      answers[q.id] && isAnswerCorrect({ questionType: q.questionType, answer: answers[q.id], correctOption: q.correctOption, correctOptions: q.correctOptions }),
+    const correct = questions.filter(
+      (q) =>
+        answers[q.id] &&
+        isAnswerCorrect({
+          questionType: q.questionType,
+          answer: answers[q.id],
+          correctOption: q.correctOption,
+          correctOptions: q.correctOptions,
+        }),
     ).length;
     return { answered, total: questions.length, correct, wrong: Math.max(0, answered - correct) };
   }, [answers, questions]);
@@ -178,7 +191,8 @@ export function KCScreen() {
       return {
         option,
         text,
-        explanation: currentExplanation?.options[option] ?? currentQuestion.explanations[option] ?? "Sem explicacao adicional.",
+        explanation:
+          currentExplanation?.options[option] ?? currentQuestion.explanations[option] ?? "Sem explicacao adicional.",
         isCorrect: correctOptions.includes(option),
         isSelected: selectedOptions.includes(option),
       };
@@ -320,12 +334,7 @@ export function KCScreen() {
 
       if (result.insufficient && result.generationRequestId) {
         // Pool had fewer questions than requested: show thematic loading and poll (Issue #18).
-        startGenerationPolling(
-          result.generationRequestId,
-          selectedTopics,
-          questionCount,
-          result.questions,
-        );
+        startGenerationPolling(result.generationRequestId, selectedTopics, questionCount, result.questions);
       } else {
         setQuestions(result.questions);
       }
@@ -339,10 +348,17 @@ export function KCScreen() {
   async function submitCurrentAnswer() {
     if (!currentQuestion) return;
     const normalizedAnswer = normalizeAnswerValue(currentAnswer);
-    if (normalizedAnswer.length === 0) { setFlowError("Selecione uma alternativa antes de enviar."); return; }
+    if (normalizedAnswer.length === 0) {
+      setFlowError("Selecione uma alternativa antes de enviar.");
+      return;
+    }
     setFlowError(null);
     setSubmittingAnswer(true);
-    if (explanationByQuestion[currentQuestion.id]) { setSubmittedCurrent(true); setSubmittingAnswer(false); return; }
+    if (explanationByQuestion[currentQuestion.id]) {
+      setSubmittedCurrent(true);
+      setSubmittingAnswer(false);
+      return;
+    }
     try {
       setLoadingExplanation(true);
       const explanation = await createStudyExplanation({
@@ -351,9 +367,18 @@ export function KCScreen() {
         selectedOptions: currentQuestion.questionType === "multi" ? normalizedAnswer : undefined,
         optionMapping: currentQuestion.optionMapping,
       });
-      setExplanationByQuestion((prev) => ({ ...prev, [currentQuestion.id]: { summary: explanation.summary, options: explanation.options } }));
+      setExplanationByQuestion((prev) => ({
+        ...prev,
+        [currentQuestion.id]: { summary: explanation.summary, options: explanation.options },
+      }));
     } catch {
-      setExplanationByQuestion((prev) => ({ ...prev, [currentQuestion.id]: { summary: "Auditoria local baseada no gabarito da questao.", options: currentQuestion.explanations } }));
+      setExplanationByQuestion((prev) => ({
+        ...prev,
+        [currentQuestion.id]: {
+          summary: "Auditoria local baseada no gabarito da questao.",
+          options: currentQuestion.explanations,
+        },
+      }));
     } finally {
       setLoadingExplanation(false);
       setSubmittedCurrent(true);
@@ -391,20 +416,33 @@ export function KCScreen() {
     }
   }
 
-  async function rerollKC() { restartKC(); await startKC(); }
+  async function rerollKC() {
+    restartKC();
+    await startKC();
+  }
 
   async function finishKC() {
     if (questions.length === 0) return;
     const correctAnswers = questions.filter((q) =>
-      isAnswerCorrect({ questionType: q.questionType, answer: answers[q.id], correctOption: q.correctOption, correctOptions: q.correctOptions }),
+      isAnswerCorrect({
+        questionType: q.questionType,
+        answer: answers[q.id],
+        correctOption: q.correctOption,
+        correctOptions: q.correctOptions,
+      }),
     ).length;
     const scorePercent = Math.round((correctAnswers / questions.length) * 100);
     // Difficulty is auto-detected per-service; use hard as the scoring anchor for XP.
     const xpPerCorrect = Math.max(20, Math.round(getTaskXpByDifficulty("hard") / 4));
     const gainedXp = correctAnswers * xpPerCorrect;
-    const selectedTopicNames = services.filter((s) => selectedTopics.includes(s.code)).map((s) => s.name).slice(0, 4);
+    const selectedTopicNames = services
+      .filter((s) => selectedTopics.includes(s.code))
+      .map((s) => s.name)
+      .slice(0, 4);
     const titleTopics = selectedTopicNames.length > 0 ? selectedTopicNames.join(", ") : selectedTopics.join(", ");
-    const sessionTitle = titleTopics ? `Knowledge Check ${titleTopics}` : `Knowledge Check ${questions[0]?.certificationCode ?? "AWS"}`;
+    const sessionTitle = titleTopics
+      ? `Knowledge Check ${titleTopics}`
+      : `Knowledge Check ${questions[0]?.certificationCode ?? "AWS"}`;
 
     let historySaved = false;
     try {
@@ -452,10 +490,14 @@ export function KCScreen() {
           });
         }
       }
-      setCompletionMessage(`KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). +${gainedXp} XP salvo no historico.`);
+      setCompletionMessage(
+        `KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). +${gainedXp} XP salvo no historico.`,
+      );
       setLastEarnedXp(gainedXp);
     } catch {
-      setCompletionMessage(`KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). Nao foi possivel salvar no historico.`);
+      setCompletionMessage(
+        `KC finalizado: ${correctAnswers}/${questions.length} (${scorePercent}%). Nao foi possivel salvar no historico.`,
+      );
       setLastEarnedXp(gainedXp);
     }
 
@@ -463,12 +505,26 @@ export function KCScreen() {
     restartKC();
   }
 
-  async function submitQuestionReport(input: { reason: "INCORRECT_ANSWER" | "UNCLEAR_STATEMENT" | "MISSING_CONTEXT" | "GRAMMAR_TYPO" | "DUPLICATE" | "QUALITY_ISSUE" | "OTHER"; description: string }) {
+  async function submitQuestionReport(input: {
+    reason:
+      | "INCORRECT_ANSWER"
+      | "UNCLEAR_STATEMENT"
+      | "MISSING_CONTEXT"
+      | "GRAMMAR_TYPO"
+      | "DUPLICATE"
+      | "QUALITY_ISSUE"
+      | "OTHER";
+    description: string;
+  }) {
     if (!currentQuestion) return;
     setReportSubmitting(true);
     setReportMessage(null);
     try {
-      await reportStudyQuestion({ questionId: currentQuestion.id, reason: input.reason, description: input.description });
+      await reportStudyQuestion({
+        questionId: currentQuestion.id,
+        reason: input.reason,
+        description: input.description,
+      });
       setReportMessage("Denuncia enviada com sucesso. Obrigado pelo feedback.");
       setTimeout(() => setReportMessage(null), 4500);
     } finally {
@@ -487,7 +543,9 @@ export function KCScreen() {
               exit={{ opacity: 0, y: -24 }}
               transition={{ duration: 0.35 }}
               className="fixed left-1/2 top-24 z-50 w-full max-w-sm -translate-x-1/2 px-4"
-              onAnimationComplete={() => { window.setTimeout(() => setLastEarnedXp(null), 1800); }}
+              onAnimationComplete={() => {
+                window.setTimeout(() => setLastEarnedXp(null), 1800);
+              }}
             >
               <PixelCard className="border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/20 text-center">
                 <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">XP Recebido</p>
@@ -496,7 +554,9 @@ export function KCScreen() {
             </motion.div>
           )}
         </AnimatePresence>
-
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
         <PixelCard>
           <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">KC - Knowledge Check</h1>
           <p className="mt-2 font-sans text-sm text-[var(--pixel-subtext)]">
@@ -536,7 +596,10 @@ export function KCScreen() {
             flowError={flowError}
             completionMessage={completionMessage}
             weakServices={weakServices}
-            onSearchTopicChange={(v) => { setSearchTopic(v); setServicesPage(1); }}
+            onSearchTopicChange={(v) => {
+              setSearchTopic(v);
+              setServicesPage(1);
+            }}
             onServicesPageChange={setServicesPage}
             onToggleTopic={handleToggleTopic}
             onQuestionCountChange={handleQuestionCountChange}
@@ -549,8 +612,14 @@ export function KCScreen() {
         {!inProgress && kcSummary && (
           <KCSummaryCard
             summary={kcSummary}
-            onNewKC={() => { setKcSummary(null); router.push("/kc"); }}
-            onGoHome={() => { setKcSummary(null); router.push("/home"); }}
+            onNewKC={() => {
+              setKcSummary(null);
+              router.push("/kc");
+            }}
+            onGoHome={() => {
+              setKcSummary(null);
+              router.push("/home");
+            }}
           />
         )}
 
@@ -560,7 +629,8 @@ export function KCScreen() {
             {generationTimedOut && (
               <PixelCard className="border-yellow-500/50 bg-yellow-900/10">
                 <p className="font-[var(--font-body)] text-sm text-yellow-300">
-                  Geracao de questoes demorou mais que o esperado. Iniciando com {questions.length} questoes disponíveis.
+                  Geracao de questoes demorou mais que o esperado. Iniciando com {questions.length} questoes
+                  disponíveis.
                 </p>
               </PixelCard>
             )}
