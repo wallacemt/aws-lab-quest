@@ -249,22 +249,22 @@ async function processOneTrigger(): Promise<void> {
         break;
       }
 
-      case "review-trail-explain": {
-        const payload = trigger.payload as { stageId?: string } | null;
-        if (payload?.stageId) {
-          await trailReviewQueue.add(`trail-review-${payload.stageId}`, { stageId: payload.stageId });
-        } else {
-          logger.warn({ triggerId: trigger.id }, "review-trail-explain trigger missing stageId");
-        }
-        break;
-      }
-
       case "weekly-challenge-force": {
         const payload = trigger.payload as { mode?: "open" | "close" } | null;
         if (payload?.mode === "open" || payload?.mode === "close") {
           await weeklyChallengeQueue.add(`manual-weekly-challenge-${payload.mode}`, { mode: payload.mode }, { priority: 1 });
         } else {
           logger.warn({ triggerId: trigger.id }, "weekly-challenge-force trigger missing valid mode");
+        }
+        break;
+      }
+
+      case "review-trail-explain": {
+        const payload = trigger.payload as { stageId?: string } | null;
+        if (payload?.stageId) {
+          await trailReviewQueue.add(`trail-review-${payload.stageId}`, { stageId: payload.stageId });
+        } else {
+          logger.warn({ triggerId: trigger.id }, "review-trail-explain trigger missing stageId");
         }
         break;
       }
