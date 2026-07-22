@@ -20,6 +20,7 @@ import {
 } from "@/features/mentor/services/mentor-api";
 import { MESTRE_AVATAR_URL } from "@/lib/mentor-assets";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 function MentorAnswer({
   question,
@@ -31,7 +32,9 @@ function MentorAnswer({
   isHistory?: boolean;
 }) {
   return (
-    <div className={`border rounded-sm ${isHistory ? "border-green-700/20 bg-green-900/5" : "border-green-700/40 bg-green-900/10"}`}>
+    <div
+      className={`border rounded-sm ${isHistory ? "border-green-700/20 bg-green-900/5" : "border-green-700/40 bg-green-900/10"}`}
+    >
       {isHistory && (
         <p className="font-mono text-[9px] uppercase text-green-600 tracking-widest px-5 pt-3">Última consulta</p>
       )}
@@ -46,18 +49,22 @@ function MentorAnswer({
         </p>
       )}
       {/* prose-invert + font-sans: readable serif-free body text; code stays mono */}
-      <div className="px-5 py-4 prose prose-sm prose-invert max-w-none
+      <div
+        className="px-5 py-4 prose prose-sm prose-invert max-w-none
         prose-p:font-sans prose-p:leading-relaxed prose-p:text-[var(--pixel-text)]
         prose-li:font-sans prose-li:leading-relaxed prose-li:text-[var(--pixel-text)]
         prose-headings:font-sans prose-headings:text-[var(--pixel-text)]
         prose-strong:text-green-300
         prose-code:font-mono prose-code:text-xs
-        prose-ul:my-2 prose-li:my-0.5">
+        prose-ul:my-2 prose-li:my-0.5"
+      >
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
       </div>
     </div>
   );
 }
+
+
 
 const SMOKE_PARTICLES = [
   { left: "20%", delay: 0, size: "w-20 h-20" },
@@ -87,7 +94,7 @@ export function MentorScreen() {
   const [answer, setAnswer] = useState<string | null>(null);
   const [askedQuestion, setAskedQuestion] = useState<string | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
-
+  const router = useRouter();
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -151,6 +158,9 @@ export function MentorScreen() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-lg px-4 pt-8 pb-4 space-y-6">
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
         {/* Yoda avatar card with smoke effect */}
         <PixelCard className="relative overflow-hidden border-green-700/60">
           {/* Smoke particles (behind content) */}
@@ -177,13 +187,7 @@ export function MentorScreen() {
           {/* Avatar + info */}
           <div className="relative z-10 flex items-center gap-5">
             <div className="shrink-0 w-42 h-42 border-2 border-green-500 bg-green-900/40 flex items-center justify-center text-5xl shadow-[0_0_20px_rgba(34,197,94,0.2)]">
-              <Image
-                src={MESTRE_AVATAR_URL}
-                height={200}
-                width={200}
-                className=" object-cover"
-                alt="Ai Mentor"
-              />
+              <Image src={MESTRE_AVATAR_URL} height={200} width={200} className=" object-cover" alt="Ai Mentor" />
             </div>
             <div>
               <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)] tracking-widest mb-1">
@@ -224,7 +228,6 @@ export function MentorScreen() {
           </p>
           <MentorActionList recommendations={isLoading ? null : (recommendations ?? [])} isLoading={isLoading} />
         </PixelCard>
-
       </div>
 
       {/* Pergunta ao Mestre — container mais largo para melhor leitura */}

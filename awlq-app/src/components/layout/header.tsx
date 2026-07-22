@@ -24,12 +24,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FontSizeControl } from "../ui/font-size-control";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { formatCompact } from "@/utils/number-format";
 
-function formatCompact(n: number): string {
-  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
+
 
 export const Header = () => {
   const { theme } = useTheme();
