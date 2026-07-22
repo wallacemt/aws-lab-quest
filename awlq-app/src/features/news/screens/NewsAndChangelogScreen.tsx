@@ -5,6 +5,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { NewsList } from "@/features/news/components/NewsList";
 import { ChangelogList } from "@/features/changelog/components/ChangelogList";
+import { PixelButton } from "@/components/ui/pixel-button";
+import { useRouter } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,7 +63,7 @@ export function NewsAndChangelogScreen() {
   const [changelogReleases, setChangelogReleases] = useState<ChangelogRelease[] | null>(null);
   const [changelogLoading, setChangelogLoading] = useState(false);
   const [changelogError, setChangelogError] = useState<string | null>(null);
-
+  const router = useRouter();
   useEffect(() => {
     async function loadNews() {
       setNewsLoading(true);
@@ -115,6 +117,9 @@ export function NewsAndChangelogScreen() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-2xl px-4 py-8 space-y-6">
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
         {/* Header */}
         <PixelCard>
           <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Novidades</h1>
@@ -157,9 +162,7 @@ export function NewsAndChangelogScreen() {
 
             {newsLoading && (
               <PixelCard className="text-center py-8">
-                <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
-                  Buscando notícias...
-                </p>
+                <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Buscando notícias...</p>
               </PixelCard>
             )}
 
@@ -177,9 +180,7 @@ export function NewsAndChangelogScreen() {
               </PixelCard>
             )}
 
-            {!newsLoading && !newsError && newsItems.length > 0 && (
-              <NewsList items={newsItems} />
-            )}
+            {!newsLoading && !newsError && newsItems.length > 0 && <NewsList items={newsItems} />}
           </div>
         )}
 
@@ -188,9 +189,7 @@ export function NewsAndChangelogScreen() {
           <div className="space-y-4">
             {changelogLoading && (
               <PixelCard className="text-center py-8">
-                <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
-                  Carregando changelog...
-                </p>
+                <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando changelog...</p>
               </PixelCard>
             )}
 
@@ -200,17 +199,16 @@ export function NewsAndChangelogScreen() {
               </PixelCard>
             )}
 
-            {!changelogLoading && !changelogError && changelogReleases !== null && (
-              changelogReleases.length === 0 ? (
+            {!changelogLoading &&
+              !changelogError &&
+              changelogReleases !== null &&
+              (changelogReleases.length === 0 ? (
                 <PixelCard className="text-center">
-                  <p className="font-mono text-xs text-[var(--pixel-muted)]">
-                    Nenhuma release publicada ainda.
-                  </p>
+                  <p className="font-mono text-xs text-[var(--pixel-muted)]">Nenhuma release publicada ainda.</p>
                 </PixelCard>
               ) : (
                 <ChangelogList releases={changelogReleases} />
-              )
-            )}
+              ))}
           </div>
         )}
       </div>

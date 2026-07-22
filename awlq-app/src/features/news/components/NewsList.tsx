@@ -53,7 +53,7 @@ export function NewsList({ items }: Props) {
               {item.summary}
             </p>
           )}
-          <p className="font-mono text-[10px] uppercase text-[var(--pixel-muted)]">{item.source.name}</p>
+          <p className="font-mono text-[10px] uppercase text-accent">{item.source.name}</p>
         </article>
       ))}
     </div>
