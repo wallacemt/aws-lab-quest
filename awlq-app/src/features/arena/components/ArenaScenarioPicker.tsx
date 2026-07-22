@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ARENA_SCENARIOS } from "@/lib/arena-scenarios";
 import { PixelButton } from "@/components/ui/pixel-button";
 import Link from "next/dist/client/link";
+import { useRouter } from "next/navigation";
 
 type Props = {
   selectedId: string;
@@ -13,13 +14,13 @@ type Props = {
 
 export function ArenaScenarioPicker({ selectedId, onSelect, onConfirm }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-
+  const router = useRouter();
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4">
       <div className="flex items-center gap-3">
-        <Link href="/arena" className="font-mono text-xs text-accent/70 underline">
-          Voltar
-        </Link>
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
         <span className="font-mono text-xs text-[#334155]">/</span>
         <p className="text-center font-mono text-xs uppercase text-[#f97316]">Escolha o cenário da batalha</p>
       </div>

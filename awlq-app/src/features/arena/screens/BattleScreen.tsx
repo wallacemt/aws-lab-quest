@@ -8,6 +8,8 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { fetchBosses, type BossWithBattle } from "@/features/arena/services/arena-api";
 import Image from "next/image";
 import { Heart, HeartCrackIcon, Sword } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { formatCompact } from "@/utils/number-format";
 
 type ArenaTab = "boss" | "derrotados";
 
@@ -38,7 +40,7 @@ export function BattleScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<ArenaTab>("boss");
-
+  const router = useRouter( );
   useEffect(() => {
     fetchBosses()
       .then(setBosses)
@@ -74,6 +76,9 @@ export function BattleScreen() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
         <PixelCard>
           <h1 className="font-mono text-sm uppercase text-primary">Arena de Batalha</h1>
           <p className="mt-1 font-[var(--font-body)] text-sm text-pixel-subtext">
@@ -165,7 +170,7 @@ export function BattleScreen() {
                         <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-between gap-2 border-t-2 border-[var(--pixel-border)] bg-black/85 px-2 py-1.5">
                           <HeartHp current={battle?.remainingHp ?? boss.maxHp} max={boss.maxHp} colorClass={hpColor} />
                           <span className={`font-mono text-[10px] font-bold ${hpColor}`}>
-                            {battle?.remainingHp ?? boss.maxHp}/{boss.maxHp}
+                            {formatCompact(battle?.remainingHp ?? boss.maxHp)}/{formatCompact(boss.maxHp)}
                           </span>
                         </div>
                       )}
