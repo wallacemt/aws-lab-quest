@@ -129,6 +129,11 @@ export function SprintScreen() {
     // Mode selection screen.
     return (
       <AppLayout>
+        <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-4">
+          <PixelButton variant="ghost" onClick={() => router.back()}>
+            ← Voltar
+          </PixelButton>
+        </div>
         <PixelCard className="mx-auto mt-4 max-w-lg px-2 py-3">
           <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
             <div className="flex items-center gap-2">
@@ -168,7 +173,9 @@ export function SprintScreen() {
             {timeLeft !== null && (
               <div
                 className={`border-2 px-3 py-1 font-mono text-sm ${
-                  timeLeft < 30 ? "border-red-400 text-red-300" : "border-[var(--pixel-border)] text-[var(--pixel-text)]"
+                  timeLeft < 30
+                    ? "border-red-400 text-red-300"
+                    : "border-[var(--pixel-border)] text-[var(--pixel-text)]"
                 }`}
               >
                 {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}

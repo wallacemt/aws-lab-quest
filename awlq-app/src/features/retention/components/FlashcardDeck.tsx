@@ -73,7 +73,7 @@ export function FlashcardDeck({
 
           {/* Back face — answer, pre-rotated so it reads right-side-up once flipped */}
           <PixelCard
-            className="absolute inset-0 flex cursor-pointer flex-col gap-3 select-none border-[var(--pixel-accent)]"
+            className="absolute inset-0 flex cursor-pointer flex-col gap-3 bg-secondary select-none border-[var(--pixel-accent)]"
             style={{ ...FACE_STYLE, transform: "rotateY(180deg)" }}
             onClick={handleFlip}
             role="button"
