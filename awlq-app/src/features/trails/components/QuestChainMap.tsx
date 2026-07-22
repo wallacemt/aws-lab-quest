@@ -183,6 +183,9 @@ export function QuestChainMap({ chain, tooltip, onShowTooltip, onStageCompleted 
     onStageCompleted(stageId, unlockedNextId);
   }
 
+  const studyStageIdx = studyStage ? chain.stages.findIndex((s) => s.id === studyStage.id) : -1;
+  const studyNextStage = studyStageIdx >= 0 ? chain.stages[studyStageIdx + 1] : undefined;
+
   return (
     <>
       <div className="space-y-1 py-2">
@@ -216,11 +219,16 @@ export function QuestChainMap({ chain, tooltip, onShowTooltip, onStageCompleted 
         {studyStage && (
           <TrailStudyFlow
             chainId={chain.id}
+            chainName={chain.name}
             stage={studyStage}
+            nextStage={studyNextStage ? { id: studyNextStage.id, title: studyNextStage.title } : null}
             onClose={() => setStudyStage(null)}
             onCompleted={(stageId, unlockedNextId) => {
-              setStudyStage(null);
               handleStudyCompleted(stageId, unlockedNextId);
+            }}
+            onGoToNext={(next) => {
+              const nextStage = chain.stages.find((s) => s.id === next.id);
+              if (nextStage) setStudyStage(nextStage);
             }}
           />
         )}

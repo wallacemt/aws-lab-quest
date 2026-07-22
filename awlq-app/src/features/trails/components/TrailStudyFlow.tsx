@@ -15,7 +15,8 @@ import {
 import { RetroIcon } from "@/components/ui/retro-loading";
 import { QuestionOptionsCard, type QuestionCardQuestion } from "@/features/study/components/QuestionOptionsCard";
 import type { QuestionOption } from "@/lib/types";
-import { X } from "lucide-react";
+import { X, Minus, Plus } from "lucide-react";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 // ─── State machine ────────────────────────────────────────────────────────────
 
@@ -57,6 +58,43 @@ function RotatingMessage({ messages }: { messages: string[] }) {
   return <p className="font-mono text-xs text-pixel-subtext">{messages[i]}</p>;
 }
 
+// ─── Font size accessibility control ──────────────────────────────────────────
+
+const FONT_SCALE_MIN = 0.85;
+const FONT_SCALE_MAX = 1.3;
+const FONT_SCALE_STEP = 0.15;
+const FONT_SCALE_DEFAULT = 1;
+
+function FontSizeControl({ scale, onChange }: { scale: number; onChange: (next: number) => void }) {
+  return (
+    <div className="flex shrink-0 items-center gap-1 border-2 border-[var(--pixel-border)] px-1 py-1">
+      <button
+        type="button"
+        title="Diminuir fonte"
+        aria-label="Diminuir fonte"
+        disabled={scale <= FONT_SCALE_MIN}
+        onClick={() => onChange(Math.max(FONT_SCALE_MIN, +(scale - FONT_SCALE_STEP).toFixed(2)))}
+        className="p-1 text-pixel-subtext hover:text-primary disabled:opacity-40"
+      >
+        <Minus className="h-3 w-3" />
+      </button>
+      <span className="font-mono text-[9px] uppercase text-pixel-subtext w-7 text-center">
+        {Math.round(scale * 100)}%
+      </span>
+      <button
+        type="button"
+        title="Aumentar fonte"
+        aria-label="Aumentar fonte"
+        disabled={scale >= FONT_SCALE_MAX}
+        onClick={() => onChange(Math.min(FONT_SCALE_MAX, +(scale + FONT_SCALE_STEP).toFixed(2)))}
+        className="p-1 text-pixel-subtext hover:text-primary disabled:opacity-40"
+      >
+        <Plus className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
 // ─── Explanation topics (Skill Builder-style sidebar) ─────────────────────────
 // Splits the AI explanation into its "## Heading" sections so they can be
 // browsed one at a time from a side nav, instead of one long scroll.
@@ -91,7 +129,15 @@ const CONFETTI = Array.from({ length: 20 }, (_, i) => ({
   color: ["#f97316", "#22c55e", "#38bdf8", "#a78bfa", "#f59e0b"][i % 5],
 }));
 
-function VictoryScreen({ onClose }: { onClose: () => void }) {
+type VictoryScreenProps = {
+  chainName: string;
+  chainCompleted: boolean;
+  nextStageTitle: string | null;
+  onClose: () => void;
+  onGoToNext: () => void;
+};
+
+function VictoryScreen({ chainName, chainCompleted, nextStageTitle, onClose, onGoToNext }: VictoryScreenProps) {
   return (
     <div className="flex flex-col items-center gap-6 py-8 text-center relative overflow-hidden">
       {/* Confetti */}
@@ -112,7 +158,7 @@ function VictoryScreen({ onClose }: { onClose: () => void }) {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="text-6xl"
       >
-        🏆
+        {chainCompleted ? "👑" : "🏆"}
       </motion.div>
 
       <motion.div
@@ -121,13 +167,33 @@ function VictoryScreen({ onClose }: { onClose: () => void }) {
         transition={{ delay: 0.4 }}
         className="space-y-2"
       >
-        <p className="font-mono text-xl font-bold uppercase text-[var(--pixel-accent)]">Estágio Concluído!</p>
-        <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-          Você acertou todas as questões e avançou na trilha.
+        <p className="font-mono text-xl font-bold uppercase text-[var(--pixel-accent)]">
+          {chainCompleted ? "Trilha Concluída!" : "Estágio Concluído!"}
         </p>
+        <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+          {chainCompleted
+            ? `Parabéns! Você acertou todas as questões e concluiu a trilha "${chainName}" por completo.`
+            : "Você acertou todas as questões e avançou na trilha."}
+        </p>
+        {!chainCompleted && nextStageTitle && (
+          <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+            Deseja seguir para o próximo estágio, <strong>{nextStageTitle}</strong>, agora?
+          </p>
+        )}
       </motion.div>
 
-      <PixelButton onClick={onClose}>Continuar trilha</PixelButton>
+      <div className="flex flex-wrap justify-center gap-3">
+        {!chainCompleted && nextStageTitle ? (
+          <>
+            <PixelButton onClick={onGoToNext}>Ir para o próximo estágio →</PixelButton>
+            <PixelButton variant="ghost" onClick={onClose}>
+              Continuar depois
+            </PixelButton>
+          </>
+        ) : (
+          <PixelButton onClick={onClose}>{chainCompleted ? "Fechar" : "Continuar trilha"}</PixelButton>
+        )}
+      </div>
     </div>
   );
 }
@@ -219,20 +285,35 @@ function QuizCard({ question, idx, total, selected, revealed, onSelect, onConfir
 
 type Props = {
   chainId: string;
+  chainName: string;
   stage: { id: string; title: string };
+  /** Next stage by chain position, if any — purely positional, not a guarantee it's unlocked. */
+  nextStage: { id: string; title: string } | null;
   onClose: () => void;
   onCompleted: (stageId: string, unlockedNextId: string | undefined) => void;
+  onGoToNext: (nextStage: { id: string; title: string }) => void;
 };
 
-export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) {
+export function TrailStudyFlow({ chainId, chainName, stage, nextStage, onClose, onCompleted, onGoToNext }: Props) {
   const [phase, setPhase] = useState<Phase>({ tag: "loading_explain" });
   const [markdown, setMarkdown] = useState("");
   const [topicIdx, setTopicIdx] = useState(0);
   const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [unlockedNextId, setUnlockedNextId] = useState<string | undefined>(undefined);
+  const { value: fontScale, setValue: setFontScale } = useLocalStorage("trail-font-scale", FONT_SCALE_DEFAULT);
 
   const sections = useMemo(() => splitMarkdownSections(markdown), [markdown]);
   const isLastTopic = topicIdx >= sections.length - 1;
+
+  // Keep the background page from scrolling behind the modal while it's open.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   // Start: load explanation on mount
   useState(() => {
@@ -291,6 +372,7 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
       // Complete stage via API
       try {
         const result = await completeStage(chainId, stage.id);
+        setUnlockedNextId(result.unlockedNext);
         onCompleted(stage.id, result.unlockedNext);
       } catch {
         // Non-fatal — still show victory
@@ -328,18 +410,24 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
               <p className="font-mono text-[10px] uppercase text-accent tracking-widest">{getPhaseTitle()}</p>
               <h2 className="font-mono text-base font-bold uppercase text-primary mt-0.5">{stage.title}</h2>
             </div>
-            {phase.tag !== "victory" && (
-              <button
-                type="button"
-                onClick={onClose}
-                title="Fechar Trilha"
-                className="font-mono text-xs text-pixel-subtext hover:text-primary transition-colors shrink-0"
-              >
-                <X />
-              </button>
-            )}
+            <div className="flex shrink-0 items-center gap-3">
+              <FontSizeControl scale={fontScale} onChange={setFontScale} />
+              {phase.tag !== "victory" && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  title="Fechar Trilha"
+                  className="font-mono text-xs text-pixel-subtext hover:text-primary transition-colors"
+                >
+                  <X />
+                </button>
+              )}
+            </div>
           </div>
 
+          {/* ponytail: `zoom` scales layout+text together without breaking Tailwind's
+              rem-based sizing; swap for a full em-based rework if Firefox <126 support matters. */}
+          <div className="space-y-4" style={{ zoom: fontScale }}>
           {error && (
             <PixelCard className="border-red-500/40">
               <p className="font-mono text-xs text-red-400">{error}</p>
@@ -512,7 +600,18 @@ export function TrailStudyFlow({ chainId, stage, onClose, onCompleted }: Props) 
           )}
 
           {/* Victory */}
-          {phase.tag === "victory" && <VictoryScreen onClose={onClose} />}
+          {phase.tag === "victory" && (
+            <VictoryScreen
+              chainName={chainName}
+              chainCompleted={!nextStage}
+              nextStageTitle={nextStage && unlockedNextId === nextStage.id ? nextStage.title : null}
+              onClose={onClose}
+              onGoToNext={() => {
+                if (nextStage && unlockedNextId === nextStage.id) onGoToNext(nextStage);
+              }}
+            />
+          )}
+          </div>
         </PixelCard>
       </motion.div>
     </div>

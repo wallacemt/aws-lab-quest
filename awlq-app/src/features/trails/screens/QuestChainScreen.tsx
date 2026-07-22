@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
@@ -11,6 +11,24 @@ import { fetchTrails, type QuestChain, type QuestStage } from "@/features/trails
 import { LoadingForScreens } from "@/components/ui/loading-screens";
 import { ErrorForScreens } from "@/components/ui/error-screens";
 import { EmptyForScreens } from "@/components/ui/empty-screens";
+
+// ─── Progress tabs ─────────────────────────────────────────────────────────────
+
+type ChainTab = "IN_PROGRESS" | "NOT_STARTED" | "COMPLETED";
+
+const CHAIN_TABS: { id: ChainTab; label: string }[] = [
+  { id: "IN_PROGRESS", label: "Em progresso" },
+  { id: "NOT_STARTED", label: "Não iniciadas" },
+  { id: "COMPLETED", label: "Concluídas" },
+];
+
+function classifyChain(chain: QuestChain): ChainTab {
+  const total = chain.stages.length;
+  const completedCount = chain.stages.filter((s) => s.completed).length;
+  if (total > 0 && completedCount === total) return "COMPLETED";
+  if (completedCount > 0) return "IN_PROGRESS";
+  return "NOT_STARTED";
+}
 
 /**
  * Lists all active Quest Chains with per-chain progress and an expandable
@@ -23,7 +41,8 @@ export function QuestChainScreen() {
   const [error, setError] = useState<string | null>(null);
   const [expandedChainId, setExpandedChainId] = useState<string | null>(searchParams.get("chain"));
   const [tooltip, setTooltip] = useState<string | null>(null);
-
+  const [activeTab, setActiveTab] = useState<ChainTab>("IN_PROGRESS");
+  const router = useRouter();
   /**
    * Optimistic update after completeStage POST succeeds.
    *
@@ -69,6 +88,15 @@ export function QuestChainScreen() {
     void load();
   }, [load]);
 
+  // Deep-linked chain (e.g. from GapReviewScreen's "/trilhas?chain=<id>") may
+  // sit in a tab other than the default — jump to whichever tab has it so it's
+  // still visible once the map auto-expands.
+  useEffect(() => {
+    if (!expandedChainId) return;
+    const target = chains.find((c) => c.id === expandedChainId);
+    if (target) setActiveTab(classifyChain(target));
+  }, [chains, expandedChainId]);
+
   if (isLoading) {
     return <LoadingForScreens text="Carregando trilhas..." />;
   }
@@ -93,13 +121,54 @@ export function QuestChainScreen() {
     );
   }
 
+  const chainsByTab: Record<ChainTab, QuestChain[]> = {
+    IN_PROGRESS: [],
+    NOT_STARTED: [],
+    COMPLETED: [],
+  };
+  for (const chain of chains) {
+    chainsByTab[classifyChain(chain)].push(chain);
+  }
+  const filteredChains = chainsByTab[activeTab];
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-5xl px-4 py-8 flex flex-col gap-6">
+        <PixelButton variant="ghost" onClick={() => router.back()}>
+          ← Voltar
+        </PixelButton>
+
         <h1 className="font-mono text-sm uppercase tracking-wide text-primary">Trilhas de Aprendizagem</h1>
 
+        {/* Progress tabs */}
+        <div className="flex border-2 border-[var(--pixel-border)]">
+          {CHAIN_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 px-4 py-2 font-mono text-[10px] uppercase transition-colors ${
+                activeTab === tab.id
+                  ? "bg-[var(--pixel-primary)] text-[var(--pixel-bg)]"
+                  : "bg-[var(--pixel-card)] text-[var(--pixel-subtext)] hover:bg-[var(--pixel-muted)]"
+              }`}
+            >
+              {tab.label}
+              <span className="ml-1 opacity-70">({chainsByTab[tab.id].length})</span>
+            </button>
+          ))}
+        </div>
+
+        {filteredChains.length === 0 && (
+          <PixelCard className="py-8 text-center">
+            <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">
+              Nenhuma trilha em &quot;{CHAIN_TABS.find((t) => t.id === activeTab)?.label}&quot; ainda.
+            </p>
+          </PixelCard>
+        )}
+
         <div className="space-y-4">
-          {chains.map((chain) => {
+          {filteredChains.map((chain) => {
             const completedCount = chain.stages.filter((s) => s.completed).length;
             const totalCount = chain.stages.length;
             const isExpanded = expandedChainId === chain.id;
