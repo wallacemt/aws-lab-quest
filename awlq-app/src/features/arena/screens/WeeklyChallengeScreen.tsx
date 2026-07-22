@@ -119,7 +119,7 @@ export function WeeklyChallengeScreen() {
   return (
     <AppLayout>
       <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-4">
-        <PixelButton variant="ghost" onClick={() => void reload()}>
+        <PixelButton variant="ghost" onClick={() => router.back()}>
           ← Voltar
         </PixelButton>
       </div>
