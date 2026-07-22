@@ -51,6 +51,13 @@ export const ARENA_SCENARIOS: ArenaScenario[] = [
     previewUrl: `${base}/donuts-shop-preview.mp4`,
     posterUrl: `${base}/donuts-shop.jpg`,
   },
+  {
+    id: "gladiator-arena",
+    label: "Arena de Gladiadores",
+    videoUrl: `${base}/gladiator-arena.mp4`,
+    previewUrl: `${base}/gladiator-arena-preview.mp4`,
+    posterUrl: `${base}/gladiator-arena.jpg`,
+  },
 ];
 
 export const DEFAULT_ARENA_SCENARIO_ID = ARENA_SCENARIOS[0].id;

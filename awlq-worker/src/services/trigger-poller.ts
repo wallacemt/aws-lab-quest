@@ -14,6 +14,7 @@ import {
   trailIllustrationQueue,
   trailReviewQueue,
   dailyQuizQueue,
+  weeklyChallengeQueue,
 } from "../queues/index.js";
 import { config } from "../config.js";
 
@@ -232,6 +233,16 @@ async function processOneTrigger(): Promise<void> {
           await trailIllustrationQueue.add(`trail-illustration-${payload.stageId}`, { stageId: payload.stageId });
         } else {
           logger.warn({ triggerId: trigger.id }, "generate-trail-illustration trigger missing stageId");
+        }
+        break;
+      }
+
+      case "weekly-challenge-force": {
+        const payload = trigger.payload as { mode?: "open" | "close" } | null;
+        if (payload?.mode === "open" || payload?.mode === "close") {
+          await weeklyChallengeQueue.add(`manual-weekly-challenge-${payload.mode}`, { mode: payload.mode }, { priority: 1 });
+        } else {
+          logger.warn({ triggerId: trigger.id }, "weekly-challenge-force trigger missing valid mode");
         }
         break;
       }
