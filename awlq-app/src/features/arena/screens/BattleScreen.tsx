@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fetchBosses, type BossWithBattle } from "@/features/arena/services/arena-api";
 import Image from "next/image";
 import { Heart, HeartCrackIcon, Sword } from "lucide-react";
@@ -35,6 +36,24 @@ function HeartHp({ current, max, colorClass }: { current: number; max: number; c
   );
 }
 
+/** Placeholder cards shaped like the boss grid while the bosses fetch is in flight. */
+function BossGridSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <PixelCard key={i} className="flex flex-col items-center gap-3 overflow-hidden">
+          <Skeleton className="h-50 w-50 md:h-72 md:w-full rounded-none" />
+          <div className="flex w-full flex-col gap-3 p-4">
+            <Skeleton className="h-4 w-2/3 rounded-none" />
+            <Skeleton className="h-3 w-1/3 rounded-none" />
+            <Skeleton className="h-9 w-full rounded-none" />
+          </div>
+        </PixelCard>
+      ))}
+    </div>
+  );
+}
+
 export function BattleScreen() {
   const [bosses, setBosses] = useState<BossWithBattle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,8 +73,14 @@ export function BattleScreen() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="grid min-h-[40vh] place-items-center">
-          <p className="font-mono text-xs uppercase text-[var(--pixel-muted)]">Carregando arena...</p>
+        <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+          <PixelCard>
+            <h1 className="font-mono text-sm uppercase text-primary">Arena de Batalha</h1>
+            <p className="mt-1 font-[var(--font-body)] text-sm text-pixel-subtext">
+              Escolha um boss para enfrentar e responda questões para reduzir seu HP.
+            </p>
+          </PixelCard>
+          <BossGridSkeleton />
         </div>
       </AppLayout>
     );

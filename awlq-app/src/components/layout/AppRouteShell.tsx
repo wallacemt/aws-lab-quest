@@ -198,13 +198,13 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
     clearSession();
   }
 
-  function handleAbandonBattle() {
+  async function handleAbandonBattle() {
     const bossId = arenaSession?.bossId;
     endArenaBattle();
+    // Await the server-side reset before navigating — otherwise the arena list's
+    // fetch on mount can race the DELETE and render the stale (pre-reset) HP.
+    if (bossId) await abandonBattle(bossId).catch(() => undefined);
     router.push("/arena");
-    // Resets remainingHp server-side so the next attempt starts at full HP instead
-    // of resuming mid-fight — fire-and-forget, the nav above shouldn't wait on it.
-    if (bossId) void abandonBattle(bossId);
   }
 
   return (

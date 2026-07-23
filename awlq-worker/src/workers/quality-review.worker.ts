@@ -145,6 +145,14 @@ export function createQualityReviewWorker(): Worker {
         logger.info({ questionId, note: review.reviewNote }, "quality-review: question retired");
       } else if (review.action === "improve" && review.improved) {
         const imp = review.improved;
+        const correctOption = imp.correctOption?.trim().toUpperCase();
+        if (!["A", "B", "C", "D"].includes(correctOption)) {
+          // AI hallucinated a malformed/out-of-range letter for its own rewritten
+          // options — applying it would silently corrupt scoring, so skip the
+          // improvement entirely rather than trust an unverifiable answer key.
+          logger.warn({ questionId, correctOption: imp.correctOption }, "quality-review: invalid correctOption, skipping improvement");
+          return;
+        }
         await prisma.studyQuestion.update({
           where: { id: questionId },
           data: {
@@ -153,7 +161,7 @@ export function createQualityReviewWorker(): Worker {
             optionB: imp.optionB,
             optionC: imp.optionC,
             optionD: imp.optionD,
-            correctOption: imp.correctOption,
+            correctOption,
             explanationA: imp.explanationA ?? null,
             explanationB: imp.explanationB ?? null,
             explanationC: imp.explanationC ?? null,

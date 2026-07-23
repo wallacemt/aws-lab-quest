@@ -1,9 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
-import { expandServiceCodes } from "@/lib/aws-service-codes";
+import { buildBossQuestionPoolWhere } from "@/lib/arena-question-pool";
 
 type RouteParams = { params: Promise<{ bossId: string }> };
 
@@ -45,25 +44,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     prisma.userProfile.findUnique({ where: { userId: user.id }, select: { certificationPresetId: true } }),
   ]);
 
-  const expandedCodes = expandServiceCodes([boss.themeService]);
-  const serviceOr: Prisma.StudyQuestionWhereInput[] = [
-    { awsService: { code: { in: expandedCodes } } },
-    { questionAwsServices: { some: { service: { code: { in: expandedCodes } } } } },
-  ];
-  if (service?.name) {
-    serviceOr.push({ statement: { contains: service.name, mode: "insensitive" } });
-    serviceOr.push({ topic: { contains: service.name, mode: "insensitive" } });
-  }
-
   // Arena only supports single-select combat (one "attack" per turn) — exclude
   // multi-select questions here so scoring in /api/arena/battle never silently
   // drops an answer it can't grade (previously served but unscoreable).
-  const where: Prisma.StudyQuestionWhereInput = {
-    active: true,
-    questionType: "single",
-    OR: serviceOr,
-    ...(profile?.certificationPresetId ? { certificationPresetId: profile.certificationPresetId } : {}),
-  };
+  const where = buildBossQuestionPoolWhere(boss.themeService, service?.name ?? null, profile?.certificationPresetId);
 
   const pool = await prisma.studyQuestion.findMany({
     where,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
+import { buildBossQuestionPoolWhere } from "@/lib/arena-question-pool";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 import { getTaskXpByDifficulty } from "@/lib/levels";
@@ -147,14 +148,14 @@ export async function POST(request: NextRequest) {
 
   // DEF-019: Validate submitted question IDs against the boss's authorised pool.
   // A client must not be able to submit arbitrary questions to harvest XP.
-  // DEF-021: Restrict to single-select questions only (correctOptions must be null).
-  const service = await prisma.awsService.findUnique({
-    where: { code: boss.themeService },
-    select: { id: true },
-  });
-  const poolWhere = service
-    ? { active: true, awsServiceId: service.id, ...SINGLE_SELECT_FILTER }
-    : { active: true, ...SINGLE_SELECT_FILTER };
+  // Must use the exact same pool query as bosses/[bossId]/questions/route.ts — a narrower
+  // filter here silently rejects legitimately-displayed questions as "unauthorised",
+  // scoring a genuinely correct answer as a miss (DEF-019/021 previously diverged this way).
+  const [service, profile] = await Promise.all([
+    prisma.awsService.findUnique({ where: { code: boss.themeService }, select: { name: true } }),
+    prisma.userProfile.findUnique({ where: { userId: user.id }, select: { certificationPresetId: true } }),
+  ]);
+  const poolWhere = buildBossQuestionPoolWhere(boss.themeService, service?.name ?? null, profile?.certificationPresetId);
 
   const authorisedPool = await prisma.studyQuestion.findMany({
     where: poolWhere,

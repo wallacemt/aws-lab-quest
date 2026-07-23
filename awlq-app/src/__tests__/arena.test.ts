@@ -32,6 +32,9 @@ const { mockRequireApprovedUser, mockPrisma } = vi.hoisted(() => {
     awsService: {
       findUnique: vi.fn(),
     },
+    userProfile: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     studyQuestion: {
       findMany: vi.fn(),
     },
@@ -102,6 +105,7 @@ beforeEach(() => {
   mockRequireApprovedUser.mockResolvedValue({ user: SESSION_USER, response: null });
   mockPrisma.studySessionHistory.create.mockResolvedValue({ id: "hist-arena" });
   mockPrisma.xpWeightConfig.findMany.mockResolvedValue([]);
+  mockPrisma.userProfile.findUnique.mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -170,7 +174,7 @@ describe("TC-045: Arena — victory gate blocks boss rematch", () => {
       gainedXp: 0,
       victory: false,
     });
-    mockPrisma.awsService.findUnique.mockResolvedValue({ id: "svc-s3" });
+    mockPrisma.awsService.findUnique.mockResolvedValue({ name: "S3" });
     mockPrisma.studyQuestion.findMany
       .mockResolvedValueOnce([{ id: "q1" }]) // authorised pool
       .mockResolvedValueOnce([{ id: "q1", correctOption: "A", topic: "s3", difficulty: "medium" }]); // scored questions
