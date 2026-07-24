@@ -75,7 +75,7 @@ export function WeeklyChallengeScreen() {
                   </p>
                   {state.newAchievements.map((a) => (
                     <PixelCard key={a.code} className="flex flex-col gap-1">
-                      <p className="font-mono text-sm text-pixel-text">{a.name}</p>
+                      <p className="font-mono text-sm text-accent/90">{a.name}</p>
                       <p className="font-mono text-xs text-pixel-subtext">{a.description}</p>
                     </PixelCard>
                   ))}

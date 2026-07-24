@@ -193,6 +193,30 @@ describe("TC-004: SM-2 — exam-date interval compression", () => {
 });
 
 // ---------------------------------------------------------------------------
+// TC-015: SM-2 — EASY graduates the first review past the fixed 1-day step
+// ---------------------------------------------------------------------------
+
+describe("TC-015: SM-2 — EASY grants a graduated first interval", () => {
+  it("first-ever EASY review jumps straight to 4 days, not the fixed 1-day step", () => {
+    const result = computeNextReview(BASE_STATE, "EASY");
+    expect(result.intervalDays).toBe(4);
+    expect(result.repetitions).toBe(1);
+  });
+
+  it("first-ever GOOD/HARD reviews are unaffected and stay at 1 day", () => {
+    expect(computeNextReview(BASE_STATE, "GOOD").intervalDays).toBe(1);
+    expect(computeNextReview(BASE_STATE, "HARD").intervalDays).toBe(1);
+  });
+
+  it("second EASY review (repetitions already >= 1) uses the normal SM-2 progression", () => {
+    const afterFirst = computeNextReview(BASE_STATE, "EASY");
+    const afterSecond = computeNextReview(afterFirst, "EASY");
+    // Repetition 2 uses the normal fixed 6-day step, same as GOOD.
+    expect(afterSecond.intervalDays).toBe(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // TC-005: Streak — threshold gating + idempotence + gap reset
 // ---------------------------------------------------------------------------
 

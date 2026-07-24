@@ -13,6 +13,12 @@
  * repetitions or interval. It advances the schedule at a reduced rate and
  * penalises easeFactor by 0.15 (floor: MIN_EASE_FACTOR = 1.3).
  * Only VERY_HARD resets to repetitions=0, intervalDays=1.
+ *
+ * Deviation from canonical SM-2: the first-ever review always yields a 1-day
+ * interval regardless of grade, which made a virgin card graded EASY come due
+ * again the very next day — indistinguishable from GOOD/HARD. EASY on the
+ * first review instead graduates straight to EASY_FIRST_INTERVAL_DAYS, the
+ * same "graduating interval" idea Anki uses for its "Easy" button.
  */
 
 export type Sm2State = {
@@ -26,6 +32,7 @@ export type Sm2Grade = "VERY_HARD" | "HARD" | "GOOD" | "EASY";
 export type Sm2Result = Sm2State & { dueAt: Date };
 
 const MIN_EASE_FACTOR = 1.3;
+const EASY_FIRST_INTERVAL_DAYS = 4;
 
 function addDays(base: Date, days: number): Date {
   const result = new Date(base);
@@ -93,8 +100,11 @@ export function computeNextReview(state: Sm2State, grade: Sm2Grade, targetExamDa
 
     case "EASY": {
       // Effortless correct — advance schedule, larger ease boost.
+      // First-ever review graduates straight to EASY_FIRST_INTERVAL_DAYS
+      // instead of the fixed 1-day first step GOOD/HARD get.
+      const isFirstReview = repetitions === 0;
       repetitions += 1;
-      intervalDays = nextInterval(repetitions, intervalDays, easeFactor);
+      intervalDays = isFirstReview ? EASY_FIRST_INTERVAL_DAYS : nextInterval(repetitions, intervalDays, easeFactor);
       easeFactor = easeFactor + 0.15;
       break;
     }

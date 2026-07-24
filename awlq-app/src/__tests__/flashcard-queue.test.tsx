@@ -56,6 +56,7 @@ const QUEUE_CARDS = [
     easeFactor: 2.5,
     intervalDays: 0,
     dueAt: DUE_AT,
+    suspended: false,
   },
   {
     id: "c2",
@@ -68,6 +69,7 @@ const QUEUE_CARDS = [
     easeFactor: 2.5,
     intervalDays: 0,
     dueAt: DUE_AT,
+    suspended: false,
   },
 ];
 
@@ -210,6 +212,7 @@ const DECK_CARD_1 = {
   easeFactor: 2.5,
   intervalDays: 0,
   dueAt: DUE_AT,
+  suspended: false,
 };
 
 const DECK_CARD_2 = {
@@ -223,6 +226,7 @@ const DECK_CARD_2 = {
   easeFactor: 2.5,
   intervalDays: 0,
   dueAt: DUE_AT,
+  suspended: false,
 };
 
 const DECK_PROPS = {
