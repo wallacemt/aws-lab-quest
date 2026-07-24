@@ -20,9 +20,10 @@ type CreateBody = {
 
 /**
  * GET /api/retention/flashcards/manage
- * Lists flashcards the current user created themselves (source = USER_CREATED),
- * for the "manage my flashcards" screen. Not the due-review queue — see
- * GET /api/retention/flashcards for that.
+ * Lists every flashcard the user owns (user-created + system-generated from
+ * errors/reviews), for the "manage my flashcards" panel — a browser over the
+ * whole review pipeline, not just user-authored cards. Not the due-review
+ * queue — see GET /api/retention/flashcards for that.
  */
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
   }
 
   const cards = await prisma.flashcard.findMany({
-    where: { userId: session.user.id, source: FlashcardSource.USER_CREATED },
+    where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
     take: MY_CARDS_LIMIT,
   });
