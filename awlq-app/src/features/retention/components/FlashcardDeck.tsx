@@ -25,8 +25,8 @@ const FACE_STYLE = { backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hi
 /**
  * Displays a single flashcard with a 3D flip interaction.
  * Click/tap the card to flip between question and answer, either direction.
- * Grade buttons appear once flipped; prev/next navigation is always available
- * and never gated on grading (grading and advancing are independent actions).
+ * Grade buttons appear once flipped. Advancing to the next card requires a
+ * grade for the current card first — going back (prev) is always free.
  */
 export function FlashcardDeck({
   card,
@@ -94,16 +94,28 @@ export function FlashcardDeck({
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-6 pt-2">
-        <PixelButton variant="ghost" onClick={onPrev} disabled={!canGoPrev} aria-label="Card anterior">
-          <ChevronLeft className="h-4 w-4" />
-        </PixelButton>
-        <span className="font-mono text-xs text-[var(--pixel-subtext)]">
-          Card {cardNumber} / {totalCards}
-        </span>
-        <PixelButton variant="ghost" onClick={onNext} disabled={isSubmitting} aria-label="Próximo card">
-          <ChevronRight className="h-4 w-4" />
-        </PixelButton>
+      <div className="flex flex-col items-center gap-2 pt-2">
+        {!selectedGrade && (
+          <p className="font-mono text-[8px] text-pixel-subtext animate-pulse text-center">
+            Avalie o card (toque nele e escolha uma opção) para avançar.
+          </p>
+        )}
+        <div className="flex items-center justify-center gap-6">
+          <PixelButton variant="ghost" onClick={onPrev} disabled={!canGoPrev} aria-label="Card anterior">
+            <ChevronLeft className="h-4 w-4" />
+          </PixelButton>
+          <span className="font-mono text-xs text-[var(--pixel-subtext)]">
+            Card {cardNumber} / {totalCards}
+          </span>
+          <PixelButton
+            variant="ghost"
+            onClick={onNext}
+            disabled={isSubmitting || !selectedGrade}
+            aria-label="Próximo card"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </PixelButton>
+        </div>
       </div>
     </div>
   );

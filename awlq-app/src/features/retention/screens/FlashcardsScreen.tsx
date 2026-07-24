@@ -6,6 +6,8 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { FlashcardDeck } from "@/features/retention/components/FlashcardDeck";
 import { FlashcardManager } from "@/features/retention/components/FlashcardManager";
+import { FlashcardGradeLegend } from "@/features/retention/components/FlashcardGradeLegend";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useFlashcardQueue } from "@/features/retention/hooks/useFlashcardQueue";
 import { useRouter } from "next/navigation";
 
@@ -90,13 +92,23 @@ export function FlashcardsScreen() {
         <PixelButton variant="ghost" onClick={() => router.back()}>
           ← Voltar
         </PixelButton>
-        <PixelCard className="flex items-center justify-between gap-3">
-          <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)]">Flashcards</h1>
+        <PixelCard className="flex flex-col items-center justify-between gap-3">
+          <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)] ">Flashcards</h1>
           <div className="flex flex-col-reverse items-center gap-3">
             <p className="font-mono text-xs text-[var(--pixel-subtext)]">{dueTotal} para hoje</p>
-            <PixelButton variant="ghost" onClick={() => setMode("manage")}>
-              Meus flashcards
-            </PixelButton>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <PixelButton variant="ghost">Como avaliar?</PixelButton>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 border-0 bg-transparent p-0 shadow-none ring-0" align="end">
+                  <FlashcardGradeLegend />
+                </PopoverContent>
+              </Popover>
+              <PixelButton variant="ghost" onClick={() => setMode("manage")}>
+                Meus flashcards
+              </PixelButton>
+            </div>
           </div>
         </PixelCard>
         {isDone && (

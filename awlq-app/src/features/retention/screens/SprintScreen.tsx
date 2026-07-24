@@ -100,7 +100,7 @@ export function SprintScreen() {
               </p>
               {result.newAchievements.map((a) => (
                 <PixelCard key={a.code} className="flex flex-col gap-1">
-                  <p className="font-mono text-sm text-[var(--pixel-text)]">{a.name}</p>
+                  <p className="font-mono text-sm text-accent/90">{a.name}</p>
                   <p className="font-mono text-xs text-[var(--pixel-muted)]">{a.description}</p>
                 </PixelCard>
               ))}

@@ -16,6 +16,7 @@ export type Flashcard = {
   easeFactor: number;
   intervalDays: number;
   dueAt: string;
+  suspended: boolean;
 };
 
 export type StudyQuestionLite = {
@@ -97,9 +98,18 @@ export type FlashcardInput = {
   topic?: string | null;
 };
 
-/** Lists flashcards the current user created themselves (source = USER_CREATED). */
-export async function fetchMyFlashcards(): Promise<{ cards: Flashcard[] }> {
+/** Lists every flashcard the user owns (user-created + system-generated), for the review-pipeline panel. */
+export async function fetchAllFlashcards(): Promise<{ cards: Flashcard[] }> {
   return apiFetch("/api/retention/flashcards/manage");
+}
+
+/** Adds a flashcard to the active review pipeline now, or pulls it out (suspends it). */
+export async function queueFlashcard(flashcardId: string, action: "add" | "remove"): Promise<{ card: Flashcard }> {
+  return apiFetch(`/api/retention/flashcards/manage/${flashcardId}/queue`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }),
+  });
 }
 
 export async function createFlashcard(input: FlashcardInput): Promise<{ card: Flashcard }> {
