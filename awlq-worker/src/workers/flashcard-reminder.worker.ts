@@ -75,10 +75,11 @@ export function groupFrontsByUser(cards: Array<{ userId: string; front: string }
  */
 export function shouldSendReminder(params: {
   emailNotifications: boolean;
+  notifyFlashcardEmails: boolean;
   lastReminderSentAt: Date | null;
   now: Date;
 }): boolean {
-  if (!params.emailNotifications) return false;
+  if (!params.emailNotifications || !params.notifyFlashcardEmails) return false;
   if (!params.lastReminderSentAt) return true;
 
   const cooldownStart = new Date(params.now.getTime() - COOLDOWN_HOURS * MS_PER_HOUR);
@@ -120,10 +121,10 @@ export async function processFlashcardReminderJob(): Promise<void> {
   for (const [userId, fronts] of frontsByUser) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, name: true, emailNotifications: true },
+      select: { email: true, name: true, emailNotifications: true, notifyFlashcardEmails: true },
     });
 
-    if (!user || !user.emailNotifications) {
+    if (!user || !user.emailNotifications || !user.notifyFlashcardEmails) {
       skipped++;
       continue;
     }
@@ -136,6 +137,7 @@ export async function processFlashcardReminderJob(): Promise<void> {
     if (
       !shouldSendReminder({
         emailNotifications: user.emailNotifications,
+        notifyFlashcardEmails: user.notifyFlashcardEmails,
         lastReminderSentAt: recentEvent?.sentAt ?? null,
         now,
       })

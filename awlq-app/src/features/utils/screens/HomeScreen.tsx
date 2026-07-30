@@ -12,6 +12,8 @@ import {
 } from "@/features/utils/home-apps";
 import type { AppEntry, HomeConfig } from "@/app/api/admin/home-config/route";
 import { fetchDailyQuiz } from "@/features/daily-quiz/services/daily-quiz-api";
+import { useRealtimeChannel } from "@/hooks/useRealtimeLeaderboard";
+import { HOME_CONFIG_REALTIME_CHANNEL, HOME_CONFIG_REALTIME_EVENT } from "@/lib/realtime-constants";
 
 const DAILY_QUIZ_MODE: GameMode = {
   id: "quiz-diario",
@@ -141,15 +143,12 @@ export function HomeScreen() {
       .catch(() => undefined);
   }, []);
 
+  // Pushed via Supabase Realtime instead of polled — the admin PATCH already
+  // broadcasts on this channel (publishHomeConfigUpdatedEvent), it just had no subscriber.
   useEffect(() => {
     fetchConfig();
-    const interval = window.setInterval(fetchConfig, 10_000);
-    window.addEventListener("focus", fetchConfig);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", fetchConfig);
-    };
   }, [fetchConfig]);
+  useRealtimeChannel(HOME_CONFIG_REALTIME_CHANNEL, HOME_CONFIG_REALTIME_EVENT, fetchConfig);
 
   useEffect(() => {
     void fetch("/api/study/jornada?count=true", { credentials: "include" })
@@ -164,7 +163,7 @@ export function HomeScreen() {
 
   // Only visible when the user has a certification badge (server-gated) — hidden
   // entirely until then. Highlighted banner until today's quiz is done, then a normal card.
-  useEffect(() => {
+  const checkDailyQuiz = useCallback(() => {
     void fetchDailyQuiz()
       .then((data) => {
         if (data.locked) {
@@ -175,6 +174,14 @@ export function HomeScreen() {
       })
       .catch(() => setDailyQuizState("hidden"));
   }, []);
+
+  // Refetch on focus too — otherwise completing the quiz and navigating back
+  // (without a full remount) leaves the banner showing stale "available" state.
+  useEffect(() => {
+    checkDailyQuiz();
+    window.addEventListener("focus", checkDailyQuiz);
+    return () => window.removeEventListener("focus", checkDailyQuiz);
+  }, [checkDailyQuiz]);
 
   function handleClick(id: string) {
     if (id !== "simulado") {

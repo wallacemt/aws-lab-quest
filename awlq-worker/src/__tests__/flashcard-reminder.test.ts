@@ -89,21 +89,35 @@ describe("shouldSendReminder", () => {
   const now = new Date("2026-07-03T13:00:00Z");
 
   it("sends when the user has never received a reminder", () => {
-    expect(shouldSendReminder({ emailNotifications: true, lastReminderSentAt: null, now })).toBe(true);
+    expect(
+      shouldSendReminder({ emailNotifications: true, notifyFlashcardEmails: true, lastReminderSentAt: null, now }),
+    ).toBe(true);
   });
 
   it("skips within the 20h cooldown window", () => {
     const lastReminderSentAt = new Date("2026-07-03T02:00:00Z"); // 11h ago
-    expect(shouldSendReminder({ emailNotifications: true, lastReminderSentAt, now })).toBe(false);
+    expect(
+      shouldSendReminder({ emailNotifications: true, notifyFlashcardEmails: true, lastReminderSentAt, now }),
+    ).toBe(false);
   });
 
   it("sends again once the cooldown has elapsed", () => {
     const lastReminderSentAt = new Date("2026-07-02T12:00:00Z"); // 25h ago
-    expect(shouldSendReminder({ emailNotifications: true, lastReminderSentAt, now })).toBe(true);
+    expect(
+      shouldSendReminder({ emailNotifications: true, notifyFlashcardEmails: true, lastReminderSentAt, now }),
+    ).toBe(true);
   });
 
-  it("never sends when the user opted out of emails", () => {
-    expect(shouldSendReminder({ emailNotifications: false, lastReminderSentAt: null, now })).toBe(false);
+  it("never sends when the user opted out of emails globally", () => {
+    expect(
+      shouldSendReminder({ emailNotifications: false, notifyFlashcardEmails: true, lastReminderSentAt: null, now }),
+    ).toBe(false);
+  });
+
+  it("never sends when the user hasn't opted in to flashcard emails specifically", () => {
+    expect(
+      shouldSendReminder({ emailNotifications: true, notifyFlashcardEmails: false, lastReminderSentAt: null, now }),
+    ).toBe(false);
   });
 });
 
@@ -120,9 +134,12 @@ describe("TC-104: processFlashcardReminderJob — grouping, cooldown, opt-out, e
     ]);
 
     mockPrisma.user.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => {
-      if (where.id === "user-a") return { email: "a@example.com", name: "Aluno A", emailNotifications: true };
-      if (where.id === "user-b") return { email: "b@example.com", name: "Aluno B", emailNotifications: false };
-      if (where.id === "user-c") return { email: "c@example.com", name: "Aluno C", emailNotifications: true };
+      if (where.id === "user-a")
+        return { email: "a@example.com", name: "Aluno A", emailNotifications: true, notifyFlashcardEmails: true };
+      if (where.id === "user-b")
+        return { email: "b@example.com", name: "Aluno B", emailNotifications: false, notifyFlashcardEmails: true };
+      if (where.id === "user-c")
+        return { email: "c@example.com", name: "Aluno C", emailNotifications: true, notifyFlashcardEmails: true };
       return null;
     });
 
@@ -170,6 +187,7 @@ describe("processFlashcardReminderJob — admin template override", () => {
       email: "a@example.com",
       name: "Aluno A",
       emailNotifications: true,
+      notifyFlashcardEmails: true,
     });
     mockPrisma.userEmailEvent.findFirst.mockResolvedValue(null);
     mockPrisma.userEmailEvent.create.mockResolvedValue({ id: "event-1" });

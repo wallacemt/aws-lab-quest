@@ -7,6 +7,73 @@ import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { authClient } from "@/lib/auth-client";
 
+type EmailPrefKey = "notifyFlashcardEmails" | "notifyEngagementEmails" | "notifyProductUpdateEmails";
+
+const EMAIL_PREF_OPTIONS: { key: EmailPrefKey; label: string; description: string }[] = [
+  {
+    key: "notifyFlashcardEmails",
+    label: "Lembretes de flashcards",
+    description: "Receba um email quando tiver flashcards vencidos para revisar.",
+  },
+  {
+    key: "notifyEngagementEmails",
+    label: "Emails de incentivo",
+    description: "Dicas e lembretes personalizados quando voce fica um tempo sem estudar.",
+  },
+  {
+    key: "notifyProductUpdateEmails",
+    label: "Atualizacoes do app",
+    description: "Novidades, melhorias e comunicados gerais sobre o AWS Lab Quest.",
+  },
+];
+
+function EmailPrefToggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (next: boolean) => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleClick() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onChange(!checked);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <label className="flex cursor-pointer items-start gap-3">
+      <div
+        role="switch"
+        aria-checked={checked}
+        onClick={handleClick}
+        className={`relative mt-0.5 h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-[var(--pixel-border)] transition-colors ${
+          checked ? "bg-[var(--pixel-primary)]" : "bg-[var(--pixel-muted)]"
+        } ${saving ? "opacity-50" : ""}`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0.5"
+          }`}
+        />
+      </div>
+      <div>
+        <p className="font-sans text-sm text-[var(--pixel-text)]">{label}</p>
+        <p className="font-sans text-xs text-[var(--pixel-subtext)]">{description}</p>
+      </div>
+    </label>
+  );
+}
+
 export function PrivacyTab() {
   const router = useRouter();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -15,14 +82,24 @@ export function PrivacyTab() {
   const [exporting, setExporting] = useState(false);
   const [leaderboardVisible, setLeaderboardVisible] = useState(true);
   const [savingVisibility, setSavingVisibility] = useState(false);
+  const [emailPrefs, setEmailPrefs] = useState<Record<EmailPrefKey, boolean>>({
+    notifyFlashcardEmails: false,
+    notifyEngagementEmails: false,
+    notifyProductUpdateEmails: false,
+  });
 
   useEffect(() => {
     fetch("/api/user/profile")
       .then((r) => r.json())
-      .then((data: { leaderboardVisible?: boolean }) => {
+      .then((data: { leaderboardVisible?: boolean } & Partial<Record<EmailPrefKey, boolean>>) => {
         if (typeof data.leaderboardVisible === "boolean") {
           setLeaderboardVisible(data.leaderboardVisible);
         }
+        setEmailPrefs((prev) => ({
+          notifyFlashcardEmails: data.notifyFlashcardEmails ?? prev.notifyFlashcardEmails,
+          notifyEngagementEmails: data.notifyEngagementEmails ?? prev.notifyEngagementEmails,
+          notifyProductUpdateEmails: data.notifyProductUpdateEmails ?? prev.notifyProductUpdateEmails,
+        }));
       })
       .catch(() => void 0);
   }, []);
@@ -39,6 +116,15 @@ export function PrivacyTab() {
     } finally {
       setSavingVisibility(false);
     }
+  }
+
+  async function handleToggleEmailPref(key: EmailPrefKey, next: boolean) {
+    await fetch("/api/user/privacy-settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [key]: next }),
+    });
+    setEmailPrefs((prev) => ({ ...prev, [key]: next }));
   }
 
   async function handleExportData() {
@@ -118,6 +204,24 @@ export function PrivacyTab() {
             {leaderboardVisible ? "Aparecer no ranking publico" : "Oculto do ranking publico"}
           </span>
         </label>
+      </PixelCard>
+
+      <PixelCard className="space-y-4">
+        <div>
+          <h3 className="font-mono text-xs uppercase text-[var(--pixel-text)]">Notificacoes por email</h3>
+          <p className="font-sans text-sm text-[var(--pixel-subtext)]">
+            Por padrao voce nao recebe nenhum email. Ative apenas o que quiser receber.
+          </p>
+        </div>
+        {EMAIL_PREF_OPTIONS.map((option) => (
+          <EmailPrefToggle
+            key={option.key}
+            label={option.label}
+            description={option.description}
+            checked={emailPrefs[option.key]}
+            onChange={(next) => handleToggleEmailPref(option.key, next)}
+          />
+        ))}
       </PixelCard>
 
       <PixelCard className="space-y-3">

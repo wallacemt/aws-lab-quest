@@ -44,8 +44,10 @@ export function createEmailSendWorker(): Worker {
       }
 
       // For broadcast-style sends (all-users / admin-picked specific-users), only
-      // include users who have not opted out. single-user bypasses opt-out —
-      // reserved for essential transactional sends (password reset, etc).
+      // include users who have not opted out AND explicitly opted in to product
+      // update emails (LGPD Art. 8 — explicit, granular consent). single-user
+      // bypasses both — reserved for essential transactional sends (password
+      // reset, etc).
       const users =
         targetMode === "single-user"
           ? await prisma.user.findMany({
@@ -54,11 +56,21 @@ export function createEmailSendWorker(): Worker {
             })
           : targetMode === "specific-users"
             ? await prisma.user.findMany({
-                where: { id: { in: userIds ?? [] }, active: true, emailNotifications: true },
+                where: {
+                  id: { in: userIds ?? [] },
+                  active: true,
+                  emailNotifications: true,
+                  notifyProductUpdateEmails: true,
+                },
                 select: { id: true, email: true, name: true, emailNotifications: true },
               })
             : await prisma.user.findMany({
-                where: { accessStatus: "approved", active: true, emailNotifications: true },
+                where: {
+                  accessStatus: "approved",
+                  active: true,
+                  emailNotifications: true,
+                  notifyProductUpdateEmails: true,
+                },
                 select: { id: true, email: true, name: true, emailNotifications: true },
               });
 

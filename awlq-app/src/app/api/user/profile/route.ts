@@ -86,7 +86,15 @@ export async function GET(request: NextRequest) {
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { name: true, email: true, username: true, role: true },
+        select: {
+          name: true,
+          email: true,
+          username: true,
+          role: true,
+          notifyFlashcardEmails: true,
+          notifyEngagementEmails: true,
+          notifyProductUpdateEmails: true,
+        },
       });
 
       // getSignedAvatarUrl returns null on failure (fail-closed). We fall back
@@ -97,6 +105,9 @@ export async function GET(request: NextRequest) {
         ...profile,
         role: user?.role,
         avatarUrl: resolvedAvatarUrl,
+        notifyFlashcardEmails: user?.notifyFlashcardEmails ?? false,
+        notifyEngagementEmails: user?.notifyEngagementEmails ?? false,
+        notifyProductUpdateEmails: user?.notifyProductUpdateEmails ?? false,
         user: {
           name: user?.name ?? session.user.name,
           email: user?.email ?? session.user.email,

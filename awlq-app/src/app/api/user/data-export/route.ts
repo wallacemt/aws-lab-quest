@@ -42,6 +42,10 @@ export async function GET(request: NextRequest) {
         accessStatus: true,
         createdAt: true,
         lastSeen: true,
+        emailNotifications: true,
+        notifyFlashcardEmails: true,
+        notifyEngagementEmails: true,
+        notifyProductUpdateEmails: true,
       },
     }),
     prisma.userProfile.findUnique({

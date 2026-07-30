@@ -30,6 +30,7 @@ export function createBehavioralEmailWorker(): Worker<BehavioralEmailJobData> {
           name: true,
           email: true,
           emailNotifications: true,
+          notifyEngagementEmails: true,
           profile: {
             select: {
               certificationPreset: { select: { code: true } },
@@ -43,8 +44,8 @@ export function createBehavioralEmailWorker(): Worker<BehavioralEmailJobData> {
         return;
       }
 
-      if (!user.emailNotifications) {
-        logger.info({ userId }, "behavioral-email: user opted out of emails, skipping");
+      if (!user.emailNotifications || !user.notifyEngagementEmails) {
+        logger.info({ userId }, "behavioral-email: user opted out of engagement emails, skipping");
         return;
       }
 

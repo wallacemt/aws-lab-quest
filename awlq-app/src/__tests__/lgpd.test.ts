@@ -359,6 +359,61 @@ describe("TC-006: PATCH /api/user/privacy-settings", () => {
 });
 
 // ---------------------------------------------------------------------------
+// TC-051: PATCH /api/user/privacy-settings — granular email consent (Art. 8)
+// ---------------------------------------------------------------------------
+
+describe("TC-051: PATCH /api/user/privacy-settings — granular email consent", () => {
+  beforeEach(() => {
+    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockPrisma.user.update.mockResolvedValue({});
+  });
+
+  it("persists only the email preference keys the caller sent", async () => {
+    const req = makeRequest("PATCH", "http://localhost/api/user/privacy-settings", {
+      notifyFlashcardEmails: true,
+    });
+    const res = await patchPrivacySettings(req);
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: SESSION_USER.id },
+      data: { notifyFlashcardEmails: true },
+    });
+    expect(mockPrisma.userProfile.upsert).not.toHaveBeenCalled();
+  });
+
+  it("persists multiple email preference keys in one call", async () => {
+    const req = makeRequest("PATCH", "http://localhost/api/user/privacy-settings", {
+      notifyEngagementEmails: true,
+      notifyProductUpdateEmails: false,
+    });
+    await patchPrivacySettings(req);
+
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: SESSION_USER.id },
+      data: { notifyEngagementEmails: true, notifyProductUpdateEmails: false },
+    });
+  });
+
+  it("rejects a non-boolean value with 400", async () => {
+    const req = makeRequest("PATCH", "http://localhost/api/user/privacy-settings", {
+      notifyFlashcardEmails: "yes",
+    });
+    const res = await patchPrivacySettings(req);
+
+    expect(res.status).toBe(400);
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty body with 400", async () => {
+    const req = makeRequest("PATCH", "http://localhost/api/user/privacy-settings", {});
+    const res = await patchPrivacySettings(req);
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // TC-007: GET /api/user/unsubscribe?token=INVALID → 400
 // ---------------------------------------------------------------------------
 

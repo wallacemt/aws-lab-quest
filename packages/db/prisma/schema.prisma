@@ -32,7 +32,14 @@ model User {
   lastSeen             DateTime         @default(now())
   emailVerified        Boolean          @default(false)
   image                String?
+  // Master kill-switch: false suppresses every email regardless of the
+  // granular flags below (set by the LGPD Art. 18 one-click unsubscribe link).
   emailNotifications   Boolean          @default(true)
+  // Granular, opt-in consent per LGPD Art. 8 (explicit, informed, specific) —
+  // each defaults to false so no category is sent unless the user turns it on.
+  notifyFlashcardEmails     Boolean     @default(false)
+  notifyEngagementEmails    Boolean     @default(false)
+  notifyProductUpdateEmails Boolean     @default(false)
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 

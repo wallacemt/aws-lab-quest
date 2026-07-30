@@ -78,6 +78,7 @@ export async function analyzeAndScheduleBehavioralEmails(): Promise<AnalysisResu
       accessStatus: "approved",
       active: true,
       emailNotifications: true,
+      notifyEngagementEmails: true,
     },
     select: {
       id: true,
