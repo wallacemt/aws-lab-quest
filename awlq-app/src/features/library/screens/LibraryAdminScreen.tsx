@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LibraryContent, LibraryContentType } from "@prisma/client";
+import { listStudyServices, type StudyServiceItem } from "@/features/study/services";
+import { fetchTrails, type QuestChain } from "@/features/trails/services/trails-api";
 
 const CONTENT_TYPES: LibraryContentType[] = ["PDF", "IMAGE", "MARKDOWN", "SLIDES"];
 const CATEGORIES = [
@@ -79,6 +81,10 @@ function ContentForm({ initial, onSaved, onCancel }: ContentFormProps) {
   const [authorUrl, setAuthorUrl] = useState(initial?.authorUrl ?? "");
   const [authorContact, setAuthorContact] = useState(initial?.authorContact ?? "");
   const [bodyMarkdown, setBodyMarkdown] = useState(initial?.bodyMarkdown ?? "");
+  const [awsServiceId, setAwsServiceId] = useState(initial?.awsServiceId ?? "");
+  const [questChainId, setQuestChainId] = useState(initial?.questChainId ?? "");
+  const [services, setServices] = useState<StudyServiceItem[]>([]);
+  const [chains, setChains] = useState<QuestChain[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,6 +96,15 @@ function ContentForm({ initial, onSaved, onCancel }: ContentFormProps) {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  // Populates the "vincular a" selects — content tagging is what lets the
+  // mentor and study-session screens surface this item contextually.
+  useEffect(() => {
+    listStudyServices().then(setServices).catch(() => {});
+    fetchTrails()
+      .then((data) => setChains(data.chains))
+      .catch(() => {});
+  }, []);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0] ?? null;
@@ -112,6 +127,8 @@ function ContentForm({ initial, onSaved, onCancel }: ContentFormProps) {
         authorUrl: authorUrl.trim() || undefined,
         authorContact: authorContact.trim() || undefined,
         bodyMarkdown: type === "MARKDOWN" ? bodyMarkdown : undefined,
+        awsServiceId: awsServiceId || undefined,
+        questChainId: questChainId || undefined,
       };
 
       let saved: LibraryContent;
@@ -206,6 +223,40 @@ function ContentForm({ initial, onSaved, onCancel }: ContentFormProps) {
           className={inputClass}
         />
       </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">Serviço AWS</span>
+          <select
+            value={awsServiceId}
+            onChange={(e) => setAwsServiceId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Nenhum</option>
+            {services.map((service) => (
+              <option key={service.id} value={service.code}>{service.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase text-[#64748b]">Trilha</span>
+          <select
+            value={questChainId}
+            onChange={(e) => setQuestChainId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Nenhuma</option>
+            {chains.map((chain) => (
+              <option key={chain.id} value={chain.id}>{chain.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <p className="font-mono text-[10px] text-[#64748b]">
+        Vincular a um serviço ou trilha permite que este conteúdo apareça como sugestão contextual no Mentor e nas
+        telas de revisão de estudo.
+      </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="flex flex-col gap-1">

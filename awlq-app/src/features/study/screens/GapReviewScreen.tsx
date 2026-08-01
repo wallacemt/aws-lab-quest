@@ -14,6 +14,7 @@ import { PixelCard } from "@/components/ui/pixel-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ContextualLibrarySuggestions } from "@/features/library/components/ContextualLibrarySuggestions";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
 import { toTopicCode } from "@/features/study/screens/ReviewScreen";
 import {
@@ -404,6 +405,11 @@ export function GapReviewScreen({ serviceCode, topic, awsServiceId }: GapReviewS
             </div>
           </PixelCard>
         )}
+
+        <ContextualLibrarySuggestions
+          awsServiceId={serviceCode}
+          heading={`Sugestões da Biblioteca — ${serviceCode}`}
+        />
 
         {loading && (
           <PixelCard>

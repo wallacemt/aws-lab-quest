@@ -6,6 +6,7 @@ import Image from "next/image";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { ContextualLibrarySuggestions } from "@/features/library/components/ContextualLibrarySuggestions";
 import { QuestionReviewPanel, type QuestionReviewOption } from "@/features/study/components/QuestionReviewPanel";
 import { QuestionOption } from "@/lib/types";
 
@@ -21,7 +22,7 @@ export type BossBattleSnapshotEntry = {
 };
 
 type Props = {
-  boss: { id: string; name: string; artworkUrl: string | null };
+  boss: { id: string; name: string; artworkUrl: string | null; themeService: string };
   gainedXp: number;
   correctCount: number;
   totalAnswered: number;
@@ -123,6 +124,11 @@ export function BossBattleReviewScreen({
             )}
           </div>
         </PixelCard>
+
+        <ContextualLibrarySuggestions
+          awsServiceId={boss.themeService}
+          heading={`Sugestões da Biblioteca — ${boss.name}`}
+        />
 
         <PixelCard className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

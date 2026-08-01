@@ -27,6 +27,24 @@ export async function getLibraryContent(filters: LibraryFilters = {}): Promise<L
   return data.content;
 }
 
+export async function getContextualLibrarySuggestions(opts: {
+  awsServiceId?: string;
+  questChainId?: string;
+}): Promise<LibraryContentLite[]> {
+  const params = new URLSearchParams();
+  if (opts.awsServiceId) params.set("awsServiceId", opts.awsServiceId);
+  if (opts.questChainId) params.set("questChainId", opts.questChainId);
+
+  const query = params.toString();
+  if (!query) return [];
+
+  const response = await fetch(`/api/library/suggestions?${query}`, { credentials: "include" });
+  if (!response.ok) return [];
+
+  const data = (await response.json()) as { content: LibraryContentLite[] };
+  return data.content;
+}
+
 export async function getLibraryItem(contentId: string): Promise<LibraryContentWithUrl> {
   const response = await fetch(`/api/library/${contentId}`, { credentials: "include" });
   if (!response.ok) {
