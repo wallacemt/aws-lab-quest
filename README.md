@@ -19,18 +19,24 @@
 
 ### Modos de estudo
 
+Três modos formam o núcleo (em ordem crescente de formalidade), e dois modos mais recentes reaproveitam a mesma máquina de perguntas/revelação de resposta:
+
 | Modo | Descrição |
 |---|---|
 | **Lab** | Quests temáticas geradas por IA com contexto personalizado (ex: musica, games, esporte) |
 | **KC (Knowledge Check)** | Bateria de questões por serviço ou tópico para revisão pontual |
 | **Simulado** | Prova completa com timer, detecção de questões marcadas, revisão pré-envio e score final |
+| **Arena** | Batalhas contra bosses temáticos — cada questão correta causa dano; a UI de pergunta/revelação do Simulado é reaproveitada |
+| **Trilhas** | Trilhas guiadas por tópico, com estágios que se desbloqueiam progressivamente |
 
 ### Gamificação
 
-- **XP & Níveis** — Cada atividade concede XP proporcional à dificuldade
+- **XP & Níveis** — Cada atividade concede XP proporcional à dificuldade (`XpWeightConfig`), com 6 tiers de nível
 - **Badges por nível** — Artes geradas via Pollinations API, exibidas no perfil e compartilháveis
-- **12 Conquistas** — Desbloqueadas automaticamente por marcos de desempenho
+- **12 Conquistas** — Desbloqueadas automaticamente por marcos de desempenho no histórico de sessões
 - **Leaderboard em tempo real** — Ranking ao vivo via Supabase Realtime
+- **Mentor IA** — Recomendações de estudo priorizadas (revisão de serviço fraco, flashcards vencidos, KC focado) calculadas de forma determinística a partir do histórico, sem chamadas de IA
+- **Biblioteca Contextual** — Materiais complementares (PDF, imagem, markdown, slides) vinculados a um serviço AWS ou trilha, sugeridos automaticamente no Mentor e nas telas de revisão de gap quando o aluno demonstra dificuldade naquele tema
 
 ---
 
@@ -58,7 +64,26 @@
       └─────────────┘
 ```
 
-O **app** serve o frontend e expõe as APIs REST. O **worker** roda separado, consome filas BullMQ e executa tarefas pesadas (geração de questões via Gemini, análise de feedback, envio de emails) sem bloquear a requisição do usuário.
+O **app** serve o frontend e expõe as APIs REST — tudo síncrono: páginas, rotas de API, autenticação. O **worker** roda separado e executa tudo que é lento ou assíncrono: geração de questões via IA, análise de áreas fracas, cálculo de métricas de desempenho, revisão de qualidade, email, ingestão de PDF. Os dois processos compartilham o mesmo schema Prisma (`packages/db/prisma/schema.prisma`) e o mesmo banco Postgres — não há API entre eles, a comunicação é via banco/fila.
+
+O app aciona o worker de duas formas: escrevendo uma linha em `WorkerTrigger` (lida a cada 30s pelo `trigger-poller.ts`) ou empurrando diretamente numa fila BullMQ.
+
+### O ciclo de conteúdo autoalimentado
+
+Este é o mecanismo central do produto — a atividade de estudo constantemente reavalia e regenera o banco de questões:
+
+```
+StudySessionHistory (respostas do usuário)
+  → feedback-analysis.worker    (marca áreas fracas, correctRate < 60%)
+  → question-generation.worker  (prompt Gemini ponderado por ExamBlueprintDomain)
+  → performance-compute.worker  (correctRate, índice de discriminação)
+  → quality-review.worker       (IA aposenta ou reescreve questões de baixa qualidade)
+  → de volta ao pool de estudo
+
+source-fetch.worker (em paralelo): baixa Exam Guides da AWS → extrai domínios do blueprint
+```
+
+Cada worker tem concorrência limitada (`concurrency: 1` para qualquer um que chame IA); jobs são idempotentes quando possível, e colisão de `usageHash` é o único caso em que um no-op silencioso é aceitável.
 
 ---
 
@@ -139,6 +164,8 @@ npm run db:migrate    # aplica as migrations
 npm run db:seed       # popula dados iniciais (badges, conquistas, serviços AWS)
 ```
 
+> Após qualquer alteração no schema, rode `npm run prisma:generate` também dentro de `awlq-worker/` — ele consome o mesmo `schema.prisma` mas mantém seu próprio client gerado.
+
 ### 5. Inicie os serviços
 
 Em terminais separados:
@@ -188,6 +215,32 @@ Crie os arquivos `.env` baseados no [`.env.example`](.env.example).
 
 ---
 
+## Autenticação e controle de acesso
+
+Better Auth 1.5 (email/senha) — config em `lib/auth.ts`, helpers de cliente em `lib/auth-client.ts`. Novos usuários nascem com `accessStatus: pending` e dependem de aprovação manual em `/admin/users` (ou de um bypass via `SystemConfig.auto_approve_users`). Toda rota `api/admin/*` chama `requireAdmin(request)`, que valida sessão **e** `role === "admin"`.
+
+---
+
+## Testes
+
+Vitest (`environment: "node"`, globals ligado), um `vitest.config.ts` por pacote. Os testes preferem exercitar o handler da rota de API diretamente (mockando `@/lib/prisma` e singletons adjacentes) a subir o dev server.
+
+```bash
+# awlq-app
+cd awlq-app
+npm run test                                   # roda toda a suíte
+npx vitest run src/__tests__/arena.test.ts     # um arquivo específico
+npx vitest run -t "nome do teste"              # filtra por nome
+
+# awlq-worker
+cd awlq-worker
+npm run test
+```
+
+Antes de abrir um PR, o mínimo exigido pelo `CONTRIBUTING.md` é `npm run lint`, `npx tsc --noEmit` e `npx next build` limpos em `awlq-app`, mais `npx tsc --noEmit` limpo em `awlq-worker`.
+
+---
+
 ## Deploy com Docker
 
 Para produção, suba todos os serviços de uma vez:
@@ -215,26 +268,29 @@ docker compose restart worker   # reiniciar só o worker
 ```
 aws-lab-quest/
 ├── awlq-app/               # Next.js app (frontend + API)
-│   ├── src/
-│   │   ├── app/            # App Router (páginas e API routes)
-│   │   ├── components/     # Componentes reutilizáveis (ui/, layout/)
-│   │   ├── features/       # Lógica por domínio (study/, admin/, user/)
-│   │   ├── hooks/          # Custom hooks React
-│   │   ├── lib/            # Utilitários, auth, prisma, AI
-│   │   └── stores/         # Zustand stores
-│   └── prisma/             # Schema, migrations, seed
+│   └── src/
+│       ├── app/            # App Router — routing fino + data fetching (páginas e API routes)
+│       ├── components/     # Componentes reutilizáveis (ui/, layout/)
+│       ├── features/       # Lógica por domínio, cada um com components/hooks/screens/services
+│       ├── hooks/          # Custom hooks React
+│       ├── lib/            # Singletons: auth, prisma, ai, storage, redis, levels, achievements
+│       └── stores/         # Zustand stores
 │
 ├── awlq-worker/            # Worker BullMQ (processamento em background)
 │   └── src/
-│       ├── workers/        # Processadores de fila (email, geração, análise)
-│       ├── services/       # Lógica de negócio (AI, email, blueprint)
-│       ├── cron/           # Jobs agendados
-│       └── queues/         # Definições de filas BullMQ
+│       ├── workers/        # Um processador por fila (source-fetch, question-generation, ...)
+│       ├── services/       # Lógica de negócio desacoplada da fila (blueprint-parser, weak-area-analyzer, ...)
+│       ├── shared/         # Compartilhado com o app: buildUsageHash, validateQuestion, persistQuestion
+│       ├── cron/           # Jobs recorrentes do BullMQ (padrões salvos em ScheduledJob)
+│       └── queues/         # As 5 filas BullMQ + tipos de payload
 │
+├── packages/db/prisma/     # Schema Prisma, migrations e client — compartilhado por app e worker
 ├── docs/                   # Documentação técnica complementar
 ├── docker-compose.yml
 └── .env.example
 ```
+
+Convenção de rotas no app: `src/app/` fica fino (roteamento + data fetch no servidor), a lógica de domínio mora em `src/features/<domínio>/`.
 
 ---
 
