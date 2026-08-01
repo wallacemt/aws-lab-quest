@@ -11,7 +11,7 @@ export default async function BossReviewPage({ params }: Props) {
 
   const boss = await prisma.boss.findUnique({
     where: { id: bossId, active: true },
-    select: { id: true, name: true, artworkUrl: true },
+    select: { id: true, name: true, artworkUrl: true, themeService: true },
   });
   if (!boss) notFound();
 
