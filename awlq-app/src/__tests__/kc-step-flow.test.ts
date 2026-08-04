@@ -12,14 +12,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks (must be set up before any module imports)
 // ---------------------------------------------------------------------------
 
-const { mockGetSession, mockPrisma } = vi.hoisted(() => {
-  const mockGetSession = vi.fn().mockResolvedValue(null);
+const { mockRequireApprovedUser, mockPrisma } = vi.hoisted(() => {
+  const mockRequireApprovedUser = vi.fn();
 
   const mockPrisma = {
     weakAreaReport: {
@@ -38,10 +38,10 @@ const { mockGetSession, mockPrisma } = vi.hoisted(() => {
     },
   };
 
-  return { mockGetSession, mockPrisma };
+  return { mockRequireApprovedUser, mockPrisma };
 });
 
-vi.mock("@/lib/auth", () => ({ auth: { api: { getSession: mockGetSession } } }));
+vi.mock("@/lib/user-auth", () => ({ requireApprovedUser: mockRequireApprovedUser }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/study-questions", () => ({
   mapDbQuestionToStudyQuestion: vi.fn((q: unknown) => q),
@@ -61,7 +61,7 @@ import { fetchGapServiceCodes, buildDifficultyAwareWhere } from "../app/api/stud
 // ---------------------------------------------------------------------------
 
 const SESSION_USER = { id: "user-kc", email: "kc@example.com" };
-const AUTHED_SESSION = { user: SESSION_USER };
+const AUTHED_RESULT = { user: SESSION_USER, response: null };
 
 const CERT_PROFILE = {
   certificationPresetId: "preset-1",
@@ -83,7 +83,7 @@ function makeStatusRequest(requestId: string, topics: string[]): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetSession.mockResolvedValue(AUTHED_SESSION);
+  mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
   mockPrisma.weakAreaReport.findFirst.mockResolvedValue(null);
   mockPrisma.userProfile.findUnique.mockResolvedValue(CERT_PROFILE);
   mockPrisma.studyQuestion.findMany.mockResolvedValue([]);
@@ -236,7 +236,10 @@ describe("TC-002 — buildDifficultyAwareWhere", () => {
 
 describe("TC-003 — POST /kc/questions: wizard start gating", () => {
   it("returns 401 when unauthenticated", async () => {
-    mockGetSession.mockResolvedValue(null);
+    mockRequireApprovedUser.mockResolvedValueOnce({
+      user: null,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
     const req = makeKcPostRequest({ topics: ["EC2"], count: 10 });
     const res = await kcQuestionsPost(req);
     expect(res.status).toBe(401);

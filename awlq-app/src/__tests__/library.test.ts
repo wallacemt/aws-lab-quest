@@ -249,6 +249,7 @@ describe("TC-034: requireAdmin — 401 without session, 403 for non-admin", () =
       id: "admin-1",
       email: "admin@test.com",
       role: "admin",
+      active: true,
     });
 
     const fakeRequest = { headers: new Headers() } as never;

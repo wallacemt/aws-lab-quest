@@ -6,15 +6,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Hoisted mock factories — vi.mock is hoisted to the top of the file by
 // Vitest's transformer, so any variables it references must be hoisted too.
 // ---------------------------------------------------------------------------
 
-const { mockGetSession, mockPrisma } = vi.hoisted(() => {
-  const mockGetSession = vi.fn().mockResolvedValue(null);
+const { mockRequireApprovedUser, mockPrisma } = vi.hoisted(() => {
+  const mockRequireApprovedUser = vi.fn();
 
   const mockPrisma = {
     user: {
@@ -57,7 +57,7 @@ const { mockGetSession, mockPrisma } = vi.hoisted(() => {
     $transaction: vi.fn(),
   };
 
-  return { mockGetSession, mockPrisma };
+  return { mockRequireApprovedUser, mockPrisma };
 });
 
 // ---------------------------------------------------------------------------
@@ -66,9 +66,7 @@ const { mockGetSession, mockPrisma } = vi.hoisted(() => {
 
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 
-vi.mock("@/lib/auth", () => ({
-  auth: { api: { getSession: mockGetSession } },
-}));
+vi.mock("@/lib/user-auth", () => ({ requireApprovedUser: mockRequireApprovedUser }));
 
 // Cache mock — pass-through to factory so route logic is fully exercised
 vi.mock("@/lib/cache", () => ({
@@ -114,12 +112,17 @@ function makeRequest(method: string, url: string, body?: unknown): NextRequest {
 }
 
 const SESSION_USER = { id: "user-123", name: "Test User", email: "test@example.com" };
-const AUTHED_SESSION = { user: SESSION_USER };
+const AUTHED_RESULT = { user: SESSION_USER, response: null };
+
+const UNAUTHENTICATED_RESULT = {
+  user: null,
+  response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+};
 
 // Reset all mocks before each test so state does not bleed between cases
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetSession.mockResolvedValue(null); // default: unauthenticated
+  mockRequireApprovedUser.mockResolvedValue(UNAUTHENTICATED_RESULT); // default: unauthenticated
 });
 
 // ---------------------------------------------------------------------------
@@ -143,7 +146,7 @@ describe("TC-001: DELETE /api/user/account without auth", () => {
 
 describe("TC-002: DELETE /api/user/account with auth", () => {
   beforeEach(() => {
-    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
     // $transaction receives an array of Prisma promises — resolve them all
     mockPrisma.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) => {
       return Promise.all(ops);
@@ -204,7 +207,7 @@ describe("TC-003: GET /api/user/data-export without auth", () => {
 
 describe("TC-004: GET /api/user/data-export with auth", () => {
   beforeEach(() => {
-    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
     mockPrisma.user.findUnique.mockResolvedValue({
       id: SESSION_USER.id,
       name: SESSION_USER.name,
@@ -274,7 +277,7 @@ describe("TC-005a: GET /api/users/[userId]?fullHistory=true without auth", () =>
 describe("TC-005b: GET /api/users/[userId]?fullHistory=true — other user, leaderboardVisible=false", () => {
   it("returns 403 when another user requests history of a private user", async () => {
     // session.user.id = user-123; requesting userId = user-456 (different user)
-    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
     mockPrisma.user.findUnique.mockResolvedValueOnce({
       id: "user-456",
       profile: { leaderboardVisible: false },
@@ -296,7 +299,7 @@ describe("TC-005b: GET /api/users/[userId]?fullHistory=true — other user, lead
 describe("TC-005c: GET /api/users/[userId]?fullHistory=true — owner with leaderboardVisible=false", () => {
   it("returns 200 with full history when the owner requests their own history", async () => {
     // session.user.id = user-123; requesting same userId = user-123 (owner)
-    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
     mockPrisma.user.findUnique.mockResolvedValueOnce({
       id: SESSION_USER.id,
       profile: { leaderboardVisible: false },
@@ -322,7 +325,7 @@ describe("TC-005c: GET /api/users/[userId]?fullHistory=true — owner with leade
 
 describe("TC-006: PATCH /api/user/privacy-settings", () => {
   it("returns 200 and persists leaderboardVisible=false", async () => {
-    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
     mockPrisma.userProfile.upsert.mockResolvedValueOnce({ leaderboardVisible: false });
 
     const req = makeRequest("PATCH", "http://localhost/api/user/privacy-settings", {
@@ -364,7 +367,7 @@ describe("TC-006: PATCH /api/user/privacy-settings", () => {
 
 describe("TC-051: PATCH /api/user/privacy-settings — granular email consent", () => {
   beforeEach(() => {
-    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
     mockPrisma.user.update.mockResolvedValue({});
   });
 
@@ -490,7 +493,7 @@ describe("TC-008: data-retention — anonymize study sessions older than 3 years
 
 describe("TC-049: GET /api/user/data-export — Phase 1–4 tables are included", () => {
   beforeEach(() => {
-    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
     mockPrisma.user.findUnique.mockResolvedValue({
       id: SESSION_USER.id,
       name: SESSION_USER.name,
@@ -568,7 +571,7 @@ describe("TC-050: DELETE /api/user/account — Phase 1–4 deletion verified", (
   const userId = SESSION_USER.id;
 
   beforeEach(() => {
-    mockGetSession.mockResolvedValue(AUTHED_SESSION);
+    mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
     // $transaction receives an array of Prisma promises — resolve them all
     mockPrisma.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) => {
       return Promise.all(ops);

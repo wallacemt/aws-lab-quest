@@ -12,16 +12,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — declared before any vi.mock calls
 // ---------------------------------------------------------------------------
 
-const { mockAuth, mockPrisma, mockCallAIWithSystem } = vi.hoisted(() => {
-  const mockAuth = {
-    api: { getSession: vi.fn() },
-  };
+const { mockRequireApprovedUser, mockPrisma, mockCallAIWithSystem } = vi.hoisted(() => {
+  const mockRequireApprovedUser = vi.fn();
 
   const mockPrisma = {
     user: {
@@ -34,10 +32,10 @@ const { mockAuth, mockPrisma, mockCallAIWithSystem } = vi.hoisted(() => {
   // callAIWithSystem returns a string directly (no .response.text() wrapper)
   const mockCallAIWithSystem = vi.fn().mockResolvedValue("AWS é incrível!");
 
-  return { mockAuth, mockPrisma, mockCallAIWithSystem };
+  return { mockRequireApprovedUser, mockPrisma, mockCallAIWithSystem };
 });
 
-vi.mock("@/lib/auth", () => ({ auth: mockAuth }));
+vi.mock("@/lib/user-auth", () => ({ requireApprovedUser: mockRequireApprovedUser }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/ai", () => ({ callAIWithSystem: mockCallAIWithSystem, AiNotConfiguredError: class AiNotConfiguredError extends Error {} }));
 
@@ -72,7 +70,7 @@ beforeEach(() => {
   vi.unstubAllGlobals();
 
   // Default happy path
-  mockAuth.api.getSession.mockResolvedValue({ user: SESSION_USER });
+  mockRequireApprovedUser.mockResolvedValue({ user: SESSION_USER, response: null });
   mockCallAIWithSystem.mockResolvedValue("AWS é incrível!");
   // Default: slot available (updateMany finds the user and updates)
   mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
@@ -331,13 +329,19 @@ describe("TC-006: Input validation → 400, no AI call, no slot consumed", () =>
 
 describe("TC-007: Unauthenticated requests → 401", () => {
   it("GET returns 401 without a session", async () => {
-    mockAuth.api.getSession.mockResolvedValueOnce(null);
+    mockRequireApprovedUser.mockResolvedValueOnce({
+      user: null,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(401);
   });
 
   it("POST returns 401 without a session", async () => {
-    mockAuth.api.getSession.mockResolvedValueOnce(null);
+    mockRequireApprovedUser.mockResolvedValueOnce({
+      user: null,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
     const res = await POST(makePostRequest({ question: "Teste?" }));
     expect(res.status).toBe(401);
     // No DB or AI should be touched

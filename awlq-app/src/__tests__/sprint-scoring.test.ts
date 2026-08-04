@@ -13,9 +13,9 @@ import { NextRequest } from "next/server";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-const { mockGetSession, mockPrisma, mockRecordStudyActivity, mockSyncAchievements, mockCacheDel, mockPublishLeaderboard } =
+const { mockRequireApprovedUser, mockPrisma, mockRecordStudyActivity, mockSyncAchievements, mockCacheDel, mockPublishLeaderboard } =
   vi.hoisted(() => {
-    const mockGetSession = vi.fn().mockResolvedValue(null);
+    const mockRequireApprovedUser = vi.fn();
 
     const mockPrisma = {
       studyQuestion: {
@@ -35,7 +35,7 @@ const { mockGetSession, mockPrisma, mockRecordStudyActivity, mockSyncAchievement
     const mockPublishLeaderboard = vi.fn().mockResolvedValue(undefined);
 
     return {
-      mockGetSession,
+      mockRequireApprovedUser,
       mockPrisma,
       mockRecordStudyActivity,
       mockSyncAchievements,
@@ -45,7 +45,7 @@ const { mockGetSession, mockPrisma, mockRecordStudyActivity, mockSyncAchievement
   });
 
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
-vi.mock("@/lib/auth", () => ({ auth: { api: { getSession: mockGetSession } } }));
+vi.mock("@/lib/user-auth", () => ({ requireApprovedUser: mockRequireApprovedUser }));
 vi.mock("@/lib/streak", () => ({ recordStudyActivity: mockRecordStudyActivity }));
 vi.mock("@/lib/achievements", () => ({ syncAndGetNewAchievements: mockSyncAchievements }));
 vi.mock("@/lib/cache", () => ({
@@ -70,7 +70,7 @@ import { POST as sprintPost } from "@/app/api/retention/sprint/route";
 // ---------------------------------------------------------------------------
 
 const SESSION_USER = { id: "user-sprint", email: "sprint@example.com" };
-const AUTHED_SESSION = { user: SESSION_USER };
+const AUTHED_RESULT = { user: SESSION_USER, response: null };
 
 function makePostRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/retention/sprint", {
@@ -82,7 +82,7 @@ function makePostRequest(body: unknown): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetSession.mockResolvedValue(AUTHED_SESSION);
+  mockRequireApprovedUser.mockResolvedValue(AUTHED_RESULT);
   mockPrisma.studySessionHistory.create.mockResolvedValue({ id: "hist-1" });
   mockRecordStudyActivity.mockResolvedValue({ streakDays: 1, incrementedToday: true });
   mockSyncAchievements.mockResolvedValue([]);

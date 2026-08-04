@@ -23,8 +23,8 @@ import { NextRequest } from "next/server";
 // Hoisted mocks (must be set up before any module imports)
 // ---------------------------------------------------------------------------
 
-const { mockGetSession, mockPrisma } = vi.hoisted(() => {
-  const mockGetSession = vi.fn();
+const { mockRequireApprovedUser, mockPrisma } = vi.hoisted(() => {
+  const mockRequireApprovedUser = vi.fn();
   const mockPrisma = {
     flashcardTemplate: { findMany: vi.fn() },
     flashcard: {
@@ -35,10 +35,10 @@ const { mockGetSession, mockPrisma } = vi.hoisted(() => {
       delete: vi.fn(),
     },
   };
-  return { mockGetSession, mockPrisma };
+  return { mockRequireApprovedUser, mockPrisma };
 });
 
-vi.mock("@/lib/auth", () => ({ auth: { api: { getSession: mockGetSession } } }));
+vi.mock("@/lib/user-auth", () => ({ requireApprovedUser: mockRequireApprovedUser }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ function paramsFor(flashcardId: string) {
 
 describe("TC-103: manage route IDOR guard", () => {
   beforeEach(() => {
-    mockGetSession.mockResolvedValue({ user: { id: OWNER_ID } });
+    mockRequireApprovedUser.mockResolvedValue({ user: { id: OWNER_ID }, response: null });
   });
 
   it("returns 404 when the flashcard does not exist", async () => {

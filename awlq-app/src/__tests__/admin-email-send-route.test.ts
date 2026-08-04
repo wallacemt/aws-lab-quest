@@ -65,6 +65,7 @@ describe("POST /api/admin/email/send — template mode (existing behavior)", () 
     expect(mockPrisma.workerTrigger.create).toHaveBeenCalledWith({
       data: {
         action: "email-send",
+        scheduledFor: null,
         payload: {
           templateId: "t1",
           subject: null,
@@ -98,6 +99,7 @@ describe("POST /api/admin/email/send — raw compose mode (new)", () => {
     expect(mockPrisma.workerTrigger.create).toHaveBeenCalledWith({
       data: {
         action: "email-send",
+        scheduledFor: null,
         payload: {
           templateId: null,
           subject: "Assunto avulso",
@@ -140,6 +142,7 @@ describe("POST /api/admin/email/send — specific-users target mode (new)", () =
     expect(mockPrisma.workerTrigger.create).toHaveBeenCalledWith({
       data: {
         action: "email-send",
+        scheduledFor: null,
         payload: {
           templateId: null,
           subject: "Oi",
@@ -155,6 +158,54 @@ describe("POST /api/admin/email/send — specific-users target mode (new)", () =
   it("returns 400 when specific-users mode has no userIds", async () => {
     const res = await sendEmail(
       makeRequest({ subject: "Oi", html: "<p>Oi</p>", targetMode: "specific-users", userIds: [] }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockPrisma.workerTrigger.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/admin/email/send — scheduledFor (new)", () => {
+  it("stores a future ISO instant on the WorkerTrigger and echoes it back", async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const res = await sendEmail(
+      makeRequest({ subject: "Oi", html: "<p>Oi</p>", targetMode: "all-users", scheduledFor: future }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { scheduledFor: string | null };
+    expect(body.scheduledFor).toBe(future);
+    expect(mockPrisma.workerTrigger.create).toHaveBeenCalledWith({
+      data: {
+        action: "email-send",
+        scheduledFor: new Date(future),
+        payload: {
+          templateId: null,
+          subject: "Oi",
+          html: "<p>Oi</p>",
+          targetMode: "all-users",
+          userId: null,
+          userIds: null,
+        },
+      },
+    });
+  });
+
+  it("rejects a scheduledFor in the past", async () => {
+    const past = new Date(Date.now() - 60 * 1000).toISOString();
+
+    const res = await sendEmail(
+      makeRequest({ subject: "Oi", html: "<p>Oi</p>", targetMode: "all-users", scheduledFor: past }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockPrisma.workerTrigger.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed scheduledFor string", async () => {
+    const res = await sendEmail(
+      makeRequest({ subject: "Oi", html: "<p>Oi</p>", targetMode: "all-users", scheduledFor: "not-a-date" }),
     );
 
     expect(res.status).toBe(400);

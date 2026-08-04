@@ -9,8 +9,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockGetSession, mockPrisma, mockCallAI } = vi.hoisted(() => ({
-  mockGetSession: vi.fn(),
+const { mockRequireApprovedUser, mockPrisma, mockCallAI } = vi.hoisted(() => ({
+  mockRequireApprovedUser: vi.fn(),
   mockPrisma: {
     questChainStage: { findFirst: vi.fn() },
     userProfile: { findUnique: vi.fn() },
@@ -18,7 +18,7 @@ const { mockGetSession, mockPrisma, mockCallAI } = vi.hoisted(() => ({
   mockCallAI: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ auth: { api: { getSession: mockGetSession } } }));
+vi.mock("@/lib/user-auth", () => ({ requireApprovedUser: mockRequireApprovedUser }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/ai")>();
@@ -53,7 +53,7 @@ function makeContext() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetSession.mockResolvedValue({ user: { id: "user-1" } });
+  mockRequireApprovedUser.mockResolvedValue({ user: { id: "user-1" }, response: null });
   mockPrisma.questChainStage.findFirst.mockResolvedValue({
     title: "S3",
     awsServiceId: "S3",
