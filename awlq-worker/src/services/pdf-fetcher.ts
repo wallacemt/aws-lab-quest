@@ -20,12 +20,19 @@ export async function fetchAndExtractText(
 ): Promise<FetchResult> {
   let response: Response;
   try {
+    // LSF-2026-201: don't auto-follow redirects — a redirect to an internal/IMDS
+    // address would bypass the SSRF allowlist check done at URL registration time.
     response = await fetch(url, {
       headers: { "User-Agent": "aws-quest-worker/1.0" },
       signal: AbortSignal.timeout(90_000),
+      redirect: "manual",
     });
   } catch (err) {
     return { ok: false, error: `Network error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+
+  if (response.status >= 300 && response.status < 400) {
+    return { ok: false, error: `Redirects are not followed (HTTP ${response.status})` };
   }
 
   if (!response.ok) {

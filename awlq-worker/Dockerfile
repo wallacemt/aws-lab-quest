@@ -51,9 +51,13 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Bundle is one file; only @prisma/client must live in node_modules.
-COPY --from=builder /app/awlq-worker/dist/index.js ./dist/index.js
-COPY --from=builder /app/awlq-worker/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --from=builder /app/packages/db/node_modules/@prisma/client-runtime-utils ./node_modules/@prisma/client-runtime-utils
+# LSF-2026-205: run as an unprivileged user, not the image default (root).
+RUN addgroup -S app && adduser -S app -G app
 
+# Bundle is one file; only @prisma/client must live in node_modules.
+COPY --from=builder --chown=app:app /app/awlq-worker/dist/index.js ./dist/index.js
+COPY --from=builder --chown=app:app /app/awlq-worker/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=builder --chown=app:app /app/packages/db/node_modules/@prisma/client-runtime-utils ./node_modules/@prisma/client-runtime-utils
+
+USER app
 CMD ["bun", "dist/index.js"]

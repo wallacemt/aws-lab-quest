@@ -43,35 +43,25 @@ export function createEmailSendWorker(): Worker {
         return;
       }
 
-      // For broadcast-style sends (all-users / admin-picked specific-users), only
-      // include users who have not opted out AND explicitly opted in to product
-      // update emails (LGPD Art. 8 — explicit, granular consent). single-user
-      // bypasses both — reserved for essential transactional sends (password
-      // reset, etc).
+      // Manual admin sends (all-users / single-user / admin-picked specific-users)
+      // are reserved for notices every user must receive (e.g. mandatory
+      // policy/service announcements), so they bypass the user's email
+      // notification preference — unlike the automated engagement emails
+      // (behavioral-email.worker.ts), which still honor opt-out/opt-in.
       const users =
         targetMode === "single-user"
           ? await prisma.user.findMany({
               where: { id: userId, active: true },
-              select: { id: true, email: true, name: true, emailNotifications: true },
+              select: { id: true, email: true, name: true },
             })
           : targetMode === "specific-users"
             ? await prisma.user.findMany({
-                where: {
-                  id: { in: userIds ?? [] },
-                  active: true,
-                  emailNotifications: true,
-                  notifyProductUpdateEmails: true,
-                },
-                select: { id: true, email: true, name: true, emailNotifications: true },
+                where: { id: { in: userIds ?? [] }, active: true },
+                select: { id: true, email: true, name: true },
               })
             : await prisma.user.findMany({
-                where: {
-                  accessStatus: "approved",
-                  active: true,
-                  emailNotifications: true,
-                  notifyProductUpdateEmails: true,
-                },
-                select: { id: true, email: true, name: true, emailNotifications: true },
+                where: { accessStatus: "approved", active: true },
+                select: { id: true, email: true, name: true },
               });
 
       const appUrl = config.app.url;
@@ -81,14 +71,6 @@ export function createEmailSendWorker(): Worker {
       let failed = 0;
 
       for (const user of users) {
-        // Single-user sends (e.g. transactional) bypass opt-out — they are
-        // essential system emails (password reset, account notices). Broadcast
-        // sends are always opt-out filtered by the query above, but we do a
-        // redundant check here as a safety net.
-        if (targetMode !== "single-user" && user.emailNotifications === false) {
-          continue;
-        }
-
         const unsubscribeToken = generateUnsubscribeToken(user.id);
         const unsubscribeUrl = `${appUrl}/api/user/unsubscribe?token=${unsubscribeToken}`;
 

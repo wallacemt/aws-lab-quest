@@ -19,8 +19,14 @@ import {
 import { config } from "../config.js";
 
 async function processOneTrigger(): Promise<void> {
+  // scheduledFor is an absolute UTC instant (Prisma DateTime), so this comparison
+  // against `new Date()` (current instant) is correct regardless of the VPS's
+  // configured system timezone — no naive local-time parsing happens here.
   const trigger = await prisma.workerTrigger.findFirst({
-    where: { processed: false },
+    where: {
+      processed: false,
+      OR: [{ scheduledFor: null }, { scheduledFor: { lte: new Date() } }],
+    },
     orderBy: { createdAt: "asc" },
   });
 

@@ -22,6 +22,29 @@ export type ParsedQuestion = {
 const MIN_OPTION_LENGTH = 10;
 const INGESTION_VERSION = 2;
 
+// ─── Prompt injection detection ──────────────────────────────────────────────
+// Ported from awlq-app/src/lib/input-validation.ts to flag likely injection
+// attempts embedded in ingested PDF/exam-guide text before it reaches an AI prompt.
+
+const INJECTION_PATTERNS = [
+  /ignore\s+(all|any|previous|prior)\s+instructions?/i,
+  /disregard\s+(all|any|previous|prior)\s+instructions?/i,
+  /you\s+are\s+now/i,
+  /system\s*prompt/i,
+  /developer\s*mode/i,
+  /jailbreak/i,
+  /act\s+as/i,
+  /bypass/i,
+  /override/i,
+  /<script/i,
+  /```/,
+];
+
+export function containsPromptInjection(input: string): boolean {
+  const normalized = input.toLowerCase();
+  return INJECTION_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 // ─── Text normalization ───────────────────────────────────────────────────────
 
 export function normalizeText(raw: string): string {
