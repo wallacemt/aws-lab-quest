@@ -67,14 +67,18 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000
 
+# LSF-2026-205: run as an unprivileged user, not the image default (root).
+RUN addgroup -S app && adduser -S app -G app
+
 # With turbopack root set to the monorepo root (..), Next.js standalone output
 # places server.js at awlq-app/server.js inside the standalone dir.
-COPY --from=builder /app/awlq-app/.next/standalone ./
-COPY --from=builder /app/awlq-app/.next/static ./awlq-app/.next/static
-COPY --from=builder /app/awlq-app/public ./awlq-app/public
+COPY --from=builder --chown=app:app /app/awlq-app/.next/standalone ./
+COPY --from=builder --chown=app:app /app/awlq-app/.next/static ./awlq-app/.next/static
+COPY --from=builder --chown=app:app /app/awlq-app/public ./awlq-app/public
 
 # Overwrite stub @prisma/client with the generated client in the right subdirectory.
-COPY --from=builder /app/awlq-app/node_modules/@prisma/client ./awlq-app/node_modules/@prisma/client
+COPY --from=builder --chown=app:app /app/awlq-app/node_modules/@prisma/client ./awlq-app/node_modules/@prisma/client
 
+USER app
 EXPOSE 3000
 CMD ["node", "awlq-app/server.js"]

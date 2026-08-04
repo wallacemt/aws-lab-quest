@@ -98,6 +98,18 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24, // refresh if older than 1 day
   },
   trustedOrigins: [process.env.BETTER_AUTH_URL ?? "http://localhost:3000"],
+  // LSF-2026-209: throttle credential-stuffing / brute-force attempts on auth endpoints
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+      "/sign-up/email": { window: 60, max: 5 },
+      "/forget-password": { window: 60, max: 3 },
+      "/reset-password": { window: 60, max: 5 },
+    },
+  },
 });
 
 export type Session = typeof auth.$Infer.Session;

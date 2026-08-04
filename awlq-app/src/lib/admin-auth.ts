@@ -25,10 +25,10 @@ export async function requireAdmin(request: NextRequest): Promise<AdminCheckResu
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, email: true, role: true },
+    select: { id: true, email: true, role: true, active: true },
   });
 
-  if (!user || user.role !== "admin") {
+  if (!user || !user.active || user.role !== "admin") {
     return {
       ok: false,
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),

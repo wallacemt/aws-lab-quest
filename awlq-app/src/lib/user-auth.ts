@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 type ApprovedUserResult =
-  | { user: { id: string; email: string }; response: null }
+  | { user: { id: string; email: string; name: string }; response: null }
   | { user: null; response: NextResponse };
 
 /**
@@ -27,15 +27,15 @@ export async function requireApprovedUser(request: NextRequest): Promise<Approve
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, email: true, accessStatus: true },
+    select: { id: true, email: true, name: true, accessStatus: true, active: true },
   });
 
-  if (!user || user.accessStatus !== "approved") {
+  if (!user || !user.active || user.accessStatus !== "approved") {
     return {
       user: null,
       response: NextResponse.json({ error: "Access pending approval" }, { status: 403 }),
     };
   }
 
-  return { user: { id: user.id, email: user.email }, response: null };
+  return { user: { id: user.id, email: user.email, name: user.name }, response: null };
 }
