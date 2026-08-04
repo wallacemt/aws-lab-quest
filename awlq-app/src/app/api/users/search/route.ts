@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim().toLowerCase();
   const take = Math.min(Number(request.nextUrl.searchParams.get("take") ?? 10), 20);
@@ -40,7 +38,7 @@ export async function GET(request: NextRequest) {
       id: user.id,
       name: user.name,
       username: user.username,
-      avatarUrl: user.profile?.avatarUrl ?? "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/avatars/49f46e8c-1062-4a9d-adbd-f92027e75e31.jpg",
+      avatarUrl: user.profile?.avatarUrl ?? "/default-avatar.png",
     })),
   });
 }

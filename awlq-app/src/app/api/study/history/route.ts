@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { GapAnswerResult, updateGapProgress } from "@/lib/gap-progress";
 import { getTaskXpByDifficulty } from "@/lib/levels";
@@ -45,16 +45,14 @@ function toTaskDifficulty(value: string | undefined): "easy" | "medium" | "hard"
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const history = await cacheGetOrSet(
-    CACHE_KEYS.userStudyHistory(session.user.id),
+    CACHE_KEYS.userStudyHistory(auth.user.id),
     async () => {
       const sessions = await prisma.studySessionHistory.findMany({
-        where: { userId: session.user.id },
+        where: { userId: auth.user.id },
         orderBy: { completedAt: "desc" },
         take: 50,
         include: { pack: { select: { name: true, artworkUrl: true } } },
@@ -73,115 +71,128 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as Body;
 
-  if (
-    !body.sessionType ||
-    !body.title ||
-    body.scorePercent == null ||
-    body.correctAnswers == null ||
-    body.totalQuestions == null
-  ) {
+  if (!body.sessionType || !body.title) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
   const snapshot = Array.isArray(body.answersSnapshot) ? body.answersSnapshot.slice(0, 120) : [];
+  if (snapshot.length === 0) {
+    return NextResponse.json({ error: "answersSnapshot is required." }, { status: 400 });
+  }
+
   const gapAnswers: GapAnswerResult[] = [];
 
-  let computedXp = Math.max(0, Math.round(body.gainedXp ?? 0));
-  if (snapshot.length > 0) {
-    const questionIds = snapshot
-      .map((item) => item.questionId)
-      .filter((id): id is string => typeof id === "string" && id.length > 0);
+  // LSF-2026-101: score and XP are derived only from server-held question data.
+  // The client's gainedXp/correctAnswers/totalQuestions/scorePercent and the
+  // per-answer correctOption(s) are never trusted — only selectedOption(s) (what
+  // the user actually picked) come from the body.
+  const questionIds = snapshot
+    .map((item) => item.questionId)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  const uniqueIds = Array.from(new Set(questionIds)).slice(0, 200);
 
-    const uniqueIds = Array.from(new Set(questionIds)).slice(0, 200);
-
-    if (uniqueIds.length > 0) {
-      const [questions, weights] = await Promise.all([
-        prisma.studyQuestion.findMany({
-          where: { id: { in: uniqueIds } },
+  const [questions, weights] = await Promise.all([
+    prisma.studyQuestion.findMany({
+      where: { id: { in: uniqueIds } },
+      select: {
+        id: true,
+        topic: true,
+        difficulty: true,
+        awsServiceId: true,
+        questionType: true,
+        correctOption: true,
+        correctOptions: true,
+        questionAwsServices: {
           select: {
-            id: true,
-            topic: true,
-            difficulty: true,
-            awsServiceId: true,
-            questionAwsServices: {
+            service: {
               select: {
-                service: {
-                  select: {
-                    id: true,
-                    code: true,
-                  },
-                },
+                id: true,
+                code: true,
               },
             },
           },
-        }),
-        listXpWeightsByActivity(body.sessionType),
-      ]);
+        },
+      },
+    }),
+    listXpWeightsByActivity(body.sessionType),
+  ]);
 
-      const questionMap = new Map(questions.map((question) => [question.id, question]));
+  const questionMap = new Map(questions.map((question) => [question.id, question]));
 
-      computedXp = snapshot.reduce((total, answer) => {
-        const isCorrect = isCorrectAnswer({
-          questionType: normalizeQuestionType(answer.questionType),
-          selectedOption: answer.selectedOption,
-          selectedOptions: answer.selectedOptions,
-          correctOption: answer.correctOption,
-          correctOptions: answer.correctOptions,
-        });
+  let correctAnswers = 0;
+  let computedXp = 0;
+  let scoredQuestions = 0;
 
-        const question = questionMap.get(answer.questionId);
+  for (const answer of snapshot) {
+    const question = questionMap.get(answer.questionId);
+    if (!question) continue; // unknown question id — not part of the scored set
 
-        if (body.sessionType === "SIMULADO" && question) {
-          gapAnswers.push({
-            awsServiceId: question.questionAwsServices?.[0]?.service?.id ?? question.awsServiceId ?? null,
-            topic: question.topic,
-            isCorrect,
-          });
-        }
+    scoredQuestions += 1;
 
-        if (!isCorrect) {
-          return total;
-        }
+    const isCorrect = isCorrectAnswer({
+      questionType: normalizeQuestionType(question.questionType),
+      selectedOption: answer.selectedOption,
+      selectedOptions: answer.selectedOptions,
+      correctOption: question.correctOption,
+      correctOptions: question.correctOptions,
+    });
 
-        const difficulty = toTaskDifficulty(question?.difficulty);
-        const normalizedTopic = question?.questionAwsServices?.[0]?.service?.code;
-        const topic = normalizedTopic ?? question?.topic ?? "*";
-
-        const basePerCorrect = Math.max(20, Math.round(getTaskXpByDifficulty(difficulty) / 4));
-        const resolvedWeight = resolveXpWeight(weights, {
-          activityType: body.sessionType as XpActivityType,
-          topic,
-          difficulty,
-        });
-
-        return total + applyWeightedXp(basePerCorrect, resolvedWeight);
-      }, 0);
+    if (body.sessionType === "SIMULADO") {
+      gapAnswers.push({
+        awsServiceId: question.questionAwsServices?.[0]?.service?.id ?? question.awsServiceId ?? null,
+        topic: question.topic,
+        isCorrect,
+      });
     }
+
+    if (!isCorrect) {
+      continue;
+    }
+
+    correctAnswers += 1;
+
+    const difficulty = toTaskDifficulty(question.difficulty);
+    const normalizedTopic = question.questionAwsServices?.[0]?.service?.code;
+    const topic = normalizedTopic ?? question.topic ?? "*";
+
+    const basePerCorrect = Math.max(20, Math.round(getTaskXpByDifficulty(difficulty) / 4));
+    const resolvedWeight = resolveXpWeight(weights, {
+      activityType: body.sessionType as XpActivityType,
+      topic,
+      difficulty,
+    });
+
+    computedXp += applyWeightedXp(basePerCorrect, resolvedWeight);
   }
 
+  if (scoredQuestions === 0) {
+    return NextResponse.json({ error: "No valid questions in answersSnapshot." }, { status: 400 });
+  }
+
+  const totalQuestions = scoredQuestions;
+  const scorePercent = Math.round((correctAnswers / totalQuestions) * 100);
+
   const [prevQuestXp, prevStudyXp] = await Promise.all([
-    prisma.questHistory.aggregate({ where: { userId: session.user.id }, _sum: { xp: true } }),
-    prisma.studySessionHistory.aggregate({ where: { userId: session.user.id }, _sum: { gainedXp: true } }),
+    prisma.questHistory.aggregate({ where: { userId: auth.user.id }, _sum: { xp: true } }),
+    prisma.studySessionHistory.aggregate({ where: { userId: auth.user.id }, _sum: { gainedXp: true } }),
   ]);
   const prevXp = (prevQuestXp._sum.xp ?? 0) + (prevStudyXp._sum.gainedXp ?? 0);
 
   const item = await prisma.studySessionHistory.create({
     data: {
-      userId: session.user.id,
+      userId: auth.user.id,
       sessionType: body.sessionType,
       title: body.title,
       certificationCode: body.certificationCode ?? null,
       gainedXp: computedXp,
-      scorePercent: Math.max(0, Math.min(100, Math.round(body.scorePercent))),
-      correctAnswers: Math.max(0, Math.round(body.correctAnswers)),
-      totalQuestions: Math.max(1, Math.round(body.totalQuestions)),
+      scorePercent,
+      correctAnswers,
+      totalQuestions,
       durationSeconds: body.durationSeconds == null ? null : Math.max(0, Math.round(body.durationSeconds)),
       answersSnapshot: snapshot,
       packId: typeof body.packId === "string" && body.packId.length > 0 ? body.packId : null,
@@ -193,17 +204,17 @@ export async function POST(request: NextRequest) {
   const syncSince = new Date();
 
   void publishLeaderboardUpdatedEvent({
-    userId: session.user.id,
+    userId: auth.user.id,
     source: body.sessionType,
     gainedXp: item.gainedXp,
   });
 
   const [newAchievements] = await Promise.all([
-    syncAndGetNewAchievements(session.user.id, syncSince),
+    syncAndGetNewAchievements(auth.user.id, syncSince),
     cacheDel(
-      CACHE_KEYS.userStudyHistory(session.user.id),
-      CACHE_KEYS.userPublicProfile(session.user.id),
-      CACHE_KEYS.userAchievements(session.user.id),
+      CACHE_KEYS.userStudyHistory(auth.user.id),
+      CACHE_KEYS.userPublicProfile(auth.user.id),
+      CACHE_KEYS.userAchievements(auth.user.id),
       CACHE_KEYS.leaderboard(),
     ),
     // Enqueue flashcard generation for wrong/slow/flagged answers in this session.
@@ -212,7 +223,7 @@ export async function POST(request: NextRequest) {
       data: {
         action: "generate-flashcards",
         source: "session_save",
-        payload: { userId: session.user.id, sinceSessionId: item.id },
+        payload: { userId: auth.user.id, sinceSessionId: item.id },
       },
     }),
     // Enqueue mentor recompute so recommendations are fresh after each session.
@@ -221,13 +232,13 @@ export async function POST(request: NextRequest) {
       data: {
         action: "compute-mentor",
         source: "session_save",
-        payload: { userId: session.user.id },
+        payload: { userId: auth.user.id },
       },
     }),
     // Record streak for questions activity.
-    recordStudyActivity(session.user.id, "questions", item.totalQuestions),
+    recordStudyActivity(auth.user.id, "questions", item.totalQuestions),
     // Update gap-clearing streaks for Simulado answers (EPIC-03 #20).
-    updateGapProgress(session.user.id, gapAnswers),
+    updateGapProgress(auth.user.id, gapAnswers),
   ]);
 
   return NextResponse.json({ item, prevXp, newXp, newAchievements }, { status: 201 });

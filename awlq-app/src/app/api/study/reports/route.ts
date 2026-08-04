@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 const VALID_REASONS = new Set([
@@ -19,10 +19,8 @@ type Body = {
 };
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as Body;
   const questionId = body.questionId?.trim();
@@ -50,7 +48,7 @@ export async function POST(request: NextRequest) {
   const alreadyReported = await prisma.questionReport.findFirst({
     where: {
       questionId,
-      userId: session.user.id,
+      userId: auth.user.id,
       reportedAt: {
         gte: duplicateWindowStart,
       },
@@ -70,7 +68,7 @@ export async function POST(request: NextRequest) {
   const report = await prisma.questionReport.create({
     data: {
       questionId,
-      userId: session.user.id,
+      userId: auth.user.id,
       reason: reason as
         | "INCORRECT_ANSWER"
         | "UNCLEAR_STATEMENT"

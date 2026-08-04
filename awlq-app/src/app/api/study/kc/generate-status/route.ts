@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { fetchGapServiceCodes, buildDifficultyAwareWhere } from "../_kc-helpers";
 
@@ -18,10 +18,8 @@ import { fetchGapServiceCodes, buildDifficultyAwareWhere } from "../_kc-helpers"
  *   topics     — comma-separated service codes (e.g. "EC2,S3")
  */
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { searchParams } = request.nextUrl;
   const requestId = searchParams.get("requestId");
@@ -42,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const profile = await prisma.userProfile.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     select: { certificationPresetId: true },
   });
 

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const profile = await prisma.userProfile.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     select: { certificationPresetId: true, certificationPreset: { select: { code: true, name: true } } },
   });
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       _count: { select: { questions: true } },
       journeyNarrative:true,
       sessions: {
-        where: { userId: session.user.id, sessionType: "SIMULADO" },
+        where: { userId: auth.user.id, sessionType: "SIMULADO" },
         orderBy: { completedAt: "desc" },
         select: {
           id: true,

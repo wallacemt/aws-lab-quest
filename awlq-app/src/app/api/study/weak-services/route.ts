@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 
@@ -32,10 +32,8 @@ function toSnapshotAnswers(value: unknown): SnapshotAnswer[] {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const searchParams = request.nextUrl.searchParams;
   const take = Math.max(1, Math.min(20, Number(searchParams.get("take") ?? 10)));
@@ -43,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   const history = await prisma.studySessionHistory.findMany({
     where: {
-      userId: session.user.id,
+      userId: auth.user.id,
       sessionType: "SIMULADO",
     },
     orderBy: { completedAt: "desc" },
@@ -151,7 +149,7 @@ export async function GET(request: NextRequest) {
   }
 
   const gapProgress = await prisma.userGapProgress.findMany({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     select: { awsServiceId: true, topic: true, consecutiveCorrect: true, cleared: true },
   });
   const gapByKey = new Map(gapProgress.map((g) => [`${g.awsServiceId ?? ""}::${g.topic}`, g]));

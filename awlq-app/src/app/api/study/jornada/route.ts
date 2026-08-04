@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { sanitizeUserText } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
 import { callAIWithSystem, extractJsonObject } from "@/lib/ai";
@@ -78,14 +78,14 @@ Gere um JSON com exatamente estes campos:
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { searchParams } = new URL(request.url);
   const countOnly = searchParams.get("count") === "true";
 
   const profile = await prisma.userProfile.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     select: {
       certificationPresetId: true,
       certificationPreset: { select: { code: true, name: true } },
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
 
   // Fetch which packs this user has completed
   const completedSessions = await prisma.studySessionHistory.findMany({
-    where: { userId: session.user.id, sessionType: "SIMULADO", packId: { in: packs.map((p) => p.id) } },
+    where: { userId: auth.user.id, sessionType: "SIMULADO", packId: { in: packs.map((p) => p.id) } },
     select: { packId: true },
   });
   const completedPackIds = new Set(completedSessions.map((s) => s.packId).filter(Boolean) as string[]);

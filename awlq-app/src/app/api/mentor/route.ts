@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -12,14 +12,12 @@ import { prisma } from "@/lib/prisma";
  * If no recommendations exist yet, returns an empty list with null generatedAt.
  */
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   // Find the timestamp of the latest batch for this user
   const latest = await prisma.mentorRecommendation.findFirst({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     orderBy: { generatedAt: "desc" },
     select: { generatedAt: true },
   });
@@ -31,7 +29,7 @@ export async function GET(request: NextRequest) {
   // Fetch all recommendations from that same generation run (same generatedAt second)
   const rawRecommendations = await prisma.mentorRecommendation.findMany({
     where: {
-      userId: session.user.id,
+      userId: auth.user.id,
       generatedAt: latest.generatedAt,
     },
     orderBy: { rank: "asc" },

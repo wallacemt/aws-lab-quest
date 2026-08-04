@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 
@@ -14,10 +14,8 @@ type LeaderboardEntry = {
 };
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const leaderboardData = await cacheGetOrSet<LeaderboardEntry[]>(
     CACHE_KEYS.leaderboard(),
@@ -105,7 +103,7 @@ export async function GET(request: NextRequest) {
   // isCurrentUser é anotado pós-cache (depende da sessão do usuário)
   const leaderboard = leaderboardData.map((entry) => ({
     ...entry,
-    isCurrentUser: entry.userId === session.user.id,
+    isCurrentUser: entry.userId === auth.user.id,
   }));
 
   return NextResponse.json({ leaderboard });

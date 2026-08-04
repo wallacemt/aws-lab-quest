@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = { params: Promise<{ chainId: string }> };
@@ -23,10 +23,8 @@ type UnlockRule = {
  * if one exists.
  */
 export async function POST(request: NextRequest, context: RouteContext) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { chainId } = await context.params;
   const body = (await request.json()) as { stageId?: string };
@@ -35,7 +33,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "stageId is required" }, { status: 400 });
   }
 
-  const userId = session.user.id;
+  const userId = auth.user.id;
 
   // Verify chain exists and is active
   const chain = await prisma.questChain.findUnique({

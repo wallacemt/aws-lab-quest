@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 type Body = {
@@ -9,10 +9,8 @@ type Body = {
 };
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as Body;
 
@@ -25,8 +23,8 @@ export async function POST(request: NextRequest) {
       action: "QUESTION_SUGGESTION",
       source: "manual",
       payload: {
-        userId: session.user.id,
-        userEmail: session.user.email,
+        userId: auth.user.id,
+        userEmail: auth.user.email,
         serviceCode: body.serviceCode,
         serviceName: body.serviceName ?? body.serviceCode,
         difficulty: body.difficulty,

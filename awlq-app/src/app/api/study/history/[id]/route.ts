@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { QuestionOption } from "@/lib/types";
 
@@ -49,10 +49,8 @@ function normalizeExplanations(input: unknown): Partial<Record<QuestionOption, s
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const params = await context.params;
   const historyId = params.id?.trim();
@@ -64,7 +62,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const item = await prisma.studySessionHistory.findFirst({
     where: {
       id: historyId,
-      userId: session.user.id,
+      userId: auth.user.id,
     },
   });
 
@@ -76,10 +74,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const params = await context.params;
   const historyId = params.id?.trim();
@@ -104,7 +100,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const item = await prisma.studySessionHistory.findFirst({
     where: {
       id: historyId,
-      userId: session.user.id,
+      userId: auth.user.id,
     },
     select: {
       id: true,

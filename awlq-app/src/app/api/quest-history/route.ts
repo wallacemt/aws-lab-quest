@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
 import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { getLevel, getTaskXpByDifficulty } from "@/lib/levels";
@@ -34,16 +34,14 @@ function normalizeTaskSnapshot(tasks: unknown): Task[] {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const history = await cacheGetOrSet(
-    CACHE_KEYS.userQuestHistory(session.user.id),
+    CACHE_KEYS.userQuestHistory(auth.user.id),
     () =>
       prisma.questHistory.findMany({
-        where: { userId: session.user.id },
+        where: { userId: auth.user.id },
         orderBy: { completedAt: "desc" },
         take: 50,
       }),
@@ -54,10 +52,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as {
     title?: string;
@@ -101,7 +97,7 @@ export async function POST(request: NextRequest) {
 
   const item = await prisma.questHistory.create({
     data: {
-      userId: session.user.id,
+      userId: auth.user.id,
       title: body.title,
       theme: body.theme,
       xp: computedXp,
@@ -110,13 +106,13 @@ export async function POST(request: NextRequest) {
       sourceLabText: body.sourceLabText ? String(body.sourceLabText).slice(0, 30000) : null,
       completedAt: new Date(body.completedAt),
       certification: body.certification ?? "",
-      userName: body.userName ?? session.user.name,
+      userName: body.userName ?? auth.user.name,
     },
   });
 
   // Recalculate total XP and persist all earned badges up to current level.
   const totals = await prisma.questHistory.aggregate({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     _sum: { xp: true },
   });
   const totalXp = totals._sum.xp ?? 0;
@@ -133,12 +129,12 @@ export async function POST(request: NextRequest) {
         prisma.userBadge.upsert({
           where: {
             userId_badgeId: {
-              userId: session.user.id,
+              userId: auth.user.id,
               badgeId: badge.id,
             },
           },
           create: {
-            userId: session.user.id,
+            userId: auth.user.id,
             badgeId: badge.id,
           },
           update: {},
@@ -148,25 +144,25 @@ export async function POST(request: NextRequest) {
   }
 
   const [prevQuestXp, prevStudyXp] = await Promise.all([
-    prisma.questHistory.aggregate({ where: { userId: session.user.id, id: { not: item.id } }, _sum: { xp: true } }),
-    prisma.studySessionHistory.aggregate({ where: { userId: session.user.id }, _sum: { gainedXp: true } }),
+    prisma.questHistory.aggregate({ where: { userId: auth.user.id, id: { not: item.id } }, _sum: { xp: true } }),
+    prisma.studySessionHistory.aggregate({ where: { userId: auth.user.id }, _sum: { gainedXp: true } }),
   ]);
   const prevXp = (prevQuestXp._sum.xp ?? 0) + (prevStudyXp._sum.gainedXp ?? 0);
   const newXp = prevXp + item.xp;
   const syncSince = new Date();
 
   void publishLeaderboardUpdatedEvent({
-    userId: session.user.id,
+    userId: auth.user.id,
     source: "LAB",
     gainedXp: item.xp,
   });
 
   const [newAchievements] = await Promise.all([
-    syncAndGetNewAchievements(session.user.id, syncSince),
+    syncAndGetNewAchievements(auth.user.id, syncSince),
     cacheDel(
-      CACHE_KEYS.userQuestHistory(session.user.id),
-      CACHE_KEYS.userPublicProfile(session.user.id),
-      CACHE_KEYS.userAchievements(session.user.id),
+      CACHE_KEYS.userQuestHistory(auth.user.id),
+      CACHE_KEYS.userPublicProfile(auth.user.id),
+      CACHE_KEYS.userAchievements(auth.user.id),
       CACHE_KEYS.leaderboard(),
     ),
   ]);

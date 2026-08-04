@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { GAP_CLEAR_THRESHOLD } from "@/lib/gap-progress";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const searchParams = request.nextUrl.searchParams;
   const topic = searchParams.get("topic")?.trim();
@@ -18,7 +16,7 @@ export async function GET(request: NextRequest) {
   }
 
   const progress = await prisma.userGapProgress.findFirst({
-    where: { userId: session.user.id, awsServiceId, topic },
+    where: { userId: auth.user.id, awsServiceId, topic },
     select: { consecutiveCorrect: true, cleared: true },
   });
 

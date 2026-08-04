@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
 import { cacheDel, CACHE_KEYS } from "@/lib/cache";
@@ -61,10 +61,8 @@ const RECENT_SPRINTS_TO_AVOID = 5;
  * Returns a set of single-select questions for a sprint session.
  */
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const modeParam = request.nextUrl.searchParams.get("mode");
   if (!isSprintMode(modeParam)) {
@@ -79,7 +77,7 @@ export async function GET(request: NextRequest) {
   // share sessionType "KC" with regular Knowledge Checks (DEF-003). Add a
   // subtype column if another feature ever needs to distinguish them too.
   const recentSprints = await prisma.studySessionHistory.findMany({
-    where: { userId: session.user.id, sessionType: "KC", title: { startsWith: "Sprint " } },
+    where: { userId: auth.user.id, sessionType: "KC", title: { startsWith: "Sprint " } },
     orderBy: { completedAt: "desc" },
     take: RECENT_SPRINTS_TO_AVOID,
     select: { answersSnapshot: true },
@@ -91,7 +89,7 @@ export async function GET(request: NextRequest) {
   }
 
   // DEF-021: restrict to single-select questions so the client can score them.
-  const user = await prisma.userProfile.findUnique({ where: { userId: session.user.id } });
+  const user = await prisma.userProfile.findUnique({ where: { userId: auth.user.id } });
   const certWhere = user?.certificationPresetId ? { certificationPresetId: user.certificationPresetId } : {};
   const freshQuestions = await prisma.studyQuestion.findMany({
     where: { ...baseWhere, ...certWhere, id: { notIn: Array.from(recentIds) } },
@@ -128,10 +126,8 @@ export async function GET(request: NextRequest) {
  * the answer key for each submitted questionId and computes correctness itself.
  */
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   let body: PostBody;
   try {
@@ -144,7 +140,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "answers array is required." }, { status: 400 });
   }
 
-  const userId = session.user.id;
+  const userId = auth.user.id;
   const answers = body.answers.slice(0, 20); // cap
 
   // LSF-2026-007: fetch the authoritative answer key server-side.

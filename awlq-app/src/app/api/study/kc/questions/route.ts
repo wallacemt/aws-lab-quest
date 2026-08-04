@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
 import { fetchGapServiceCodes, buildDifficultyAwareWhere } from "../_kc-helpers";
@@ -12,10 +12,8 @@ type Body = {
 };
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as Body;
   const topics = (body.topics ?? []).map((topic) => topic.trim()).filter(Boolean);
@@ -30,7 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   const profile = await prisma.userProfile.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     select: {
       certificationPresetId: true,
       certificationPreset: { select: { id: true, code: true, name: true } },
@@ -103,7 +101,7 @@ export async function POST(request: NextRequest) {
           source: "kc_gap_fill",
           payload: {
             requestId: generationRequestId,
-            userId: session.user.id,
+            userId: auth.user.id,
             certificationPresetId: profile.certificationPresetId,
             serviceCode,
             topic,

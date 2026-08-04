@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAchievementSummary } from "@/lib/achievements";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { prisma } from "@/lib/prisma";
 
@@ -33,10 +33,8 @@ const STUDY_SELECT = {
 } as const;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { userId } = await params;
   const fullHistory = request.nextUrl.searchParams.get("fullHistory") === "true";
@@ -56,7 +54,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Owners always see their own history regardless of leaderboard opt-out.
     // The 403 only applies when a *different* authenticated user requests the
     // full history of someone who opted out of public visibility.
-    const isOwner = session.user.id === userId;
+    const isOwner = auth.user.id === userId;
     if (!isOwner && user.profile?.leaderboardVisible === false) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

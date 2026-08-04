@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { callAI, extractJsonObject, AiNotConfiguredError } from "@/lib/ai";
 import { cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
@@ -22,8 +22,8 @@ type RawQuestion = {
  * Returns: { questions: TrailQuestion[] }
  */
 export async function POST(request: NextRequest, context: RouteContext) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { chainId, stageId } = await context.params;
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!stage) return NextResponse.json({ error: "Stage not found" }, { status: 404 });
 
   const profile = await prisma.userProfile.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     select: { certificationPreset: { select: { name: true } } },
   });
 

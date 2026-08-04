@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 type QueueBody = {
@@ -18,10 +18,8 @@ type QueueBody = {
  *   action "remove" → suspended = true (drops out of all future due queries)
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ flashcardId: string }> }) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { flashcardId } = await params;
 
@@ -33,7 +31,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!existing) {
     return NextResponse.json({ error: "Flashcard not found." }, { status: 404 });
   }
-  if (existing.userId !== session.user.id) {
+  if (existing.userId !== auth.user.id) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 

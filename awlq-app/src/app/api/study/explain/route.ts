@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { callAI, extractJsonObject } from "@/lib/ai";
 import { sanitizeUserText } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
 import { normalizeOptionArray, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOption, QuestionOptionMapping } from "@/lib/types";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 type Body = {
   questionId?: string;
@@ -174,10 +175,12 @@ function resolveQuestionFrame(question: {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
+
+  // LSF-2026-209: throttle AI explanation generation per user
+  const limited = await checkRateLimit(auth.user.id, "study-explain", 20, 60);
+  if (limited) return limited;
 
   const body = (await request.json()) as Body;
   const selectedOptionsInput = normalizeOptionArray(body.selectedOptions);

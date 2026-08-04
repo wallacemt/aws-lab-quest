@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { computeNextReview } from "@/lib/spaced-repetition";
 import { recordStudyActivity } from "@/lib/streak";
@@ -22,19 +22,17 @@ type PostBody = {
  * Returns up to 20 cards due for review today (dueAt <= now, not suspended).
  */
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
-  await materializeDefaultDeck(session.user.id);
+  await materializeDefaultDeck(auth.user.id);
 
   const now = new Date();
 
   const [cards, dueTotal] = await Promise.all([
     prisma.flashcard.findMany({
       where: {
-        userId: session.user.id,
+        userId: auth.user.id,
         suspended: false,
         dueAt: { lte: now },
       },
@@ -43,7 +41,7 @@ export async function GET(request: NextRequest) {
     }),
     prisma.flashcard.count({
       where: {
-        userId: session.user.id,
+        userId: auth.user.id,
         suspended: false,
         dueAt: { lte: now },
       },
@@ -59,10 +57,8 @@ export async function GET(request: NextRequest) {
  * Body: { grades: { flashcardId, grade }[] }
  */
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   let body: PostBody;
   try {
@@ -75,7 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "grades array is required and must not be empty." }, { status: 400 });
   }
 
-  const userId = session.user.id;
+  const userId = auth.user.id;
 
   // Fetch the user's target exam date for SM-2 interval compression (RNF-08).
   const userProfile = await prisma.userProfile.findUnique({

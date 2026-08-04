@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 
@@ -22,10 +22,8 @@ function toSnapshotAnswers(value: unknown): SnapshotAnswer[] {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const searchParams = request.nextUrl.searchParams;
   const topic = searchParams.get("topic")?.trim();
@@ -36,7 +34,7 @@ export async function GET(request: NextRequest) {
   }
 
   const history = await prisma.studySessionHistory.findMany({
-    where: { userId: session.user.id, sessionType: "SIMULADO" },
+    where: { userId: auth.user.id, sessionType: "SIMULADO" },
     orderBy: { completedAt: "desc" },
     take: 100,
     select: { answersSnapshot: true },

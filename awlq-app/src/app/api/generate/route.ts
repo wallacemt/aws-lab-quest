@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { containsPromptInjection, isLikelyAwsLabText, sanitizeUserText } from "@/lib/input-validation";
 import { parseTasksFromText } from "@/lib/parser";
 import { GenerateQuestInput } from "@/lib/types";
 import { callAI, AiNotConfiguredError } from "@/lib/ai";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   // LSF-2026-001: require authenticated session before consuming AI quota
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
+
+  // LSF-2026-209: throttle AI generation per user
+  const limited = await checkRateLimit(auth.user.id, "generate", 10, 60);
+  if (limited) return limited;
 
   try {
     const body = (await request.json()) as Partial<GenerateQuestInput>;

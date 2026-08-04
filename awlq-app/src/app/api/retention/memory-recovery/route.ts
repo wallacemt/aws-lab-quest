@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 const DEFAULT_RECOVERY_WINDOW_DAYS = 45;
@@ -14,12 +14,10 @@ const MEMORY_RECOVERY_CONFIG_KEY = "memory_recovery_window_days";
  * These are candidates for the "Você acertou há X dias — ainda lembra?" flow (RF-07).
  */
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
-  const userId = session.user.id;
+  const userId = auth.user.id;
 
   // Read the recovery window from SystemConfig (admin-configurable, CA-18).
   const configRow = await prisma.systemConfig.findUnique({

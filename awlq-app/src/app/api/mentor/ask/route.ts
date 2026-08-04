@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { callAIWithSystem, AiNotConfiguredError } from "@/lib/ai";
 
@@ -37,13 +37,11 @@ function sanitizeAnswer(text: string): string {
  * Uses a rolling 24-hour window (not UTC calendar day).
  */
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: auth.user.id },
     select: { lastMentorQuestionAt: true, lastMentorQuestion: true, lastMentorAnswer: true },
   });
 
@@ -78,10 +76,8 @@ export async function GET(request: NextRequest) {
  * 502: { error: string }       — AI failure
  */
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   // 1. Validate input BEFORE reserving the slot — invalid requests must never
   //    consume the daily limit.
@@ -105,7 +101,7 @@ export async function POST(request: NextRequest) {
 
   // 2. Read the current slot value before reserving — needed to restore on AI failure.
   const currentUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: auth.user.id },
     select: { lastMentorQuestionAt: true },
   });
 
@@ -114,7 +110,7 @@ export async function POST(request: NextRequest) {
   const cutoff = new Date(Date.now() - WINDOW_MS);
   const reservation = await prisma.user.updateMany({
     where: {
-      id: session.user.id,
+      id: auth.user.id,
       OR: [
         { lastMentorQuestionAt: null },
         { lastMentorQuestionAt: { lt: cutoff } },
@@ -141,17 +137,18 @@ export async function POST(request: NextRequest) {
     );
   } catch (err) {
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: auth.user.id },
       data: { lastMentorQuestionAt: currentUser?.lastMentorQuestionAt ?? null },
     }).catch(() => {});
+    // LSF-2026-208: never forward the raw provider error (can include quota/org details) to the client.
+    console.error("[mentor/ask] AI failure:", err);
     const status = err instanceof AiNotConfiguredError ? 503 : 502;
-    const message = err instanceof Error ? err.message : "Erro desconhecido.";
-    return NextResponse.json({ error: `Falha ao contatar o Mestre: ${message}` }, { status });
+    return NextResponse.json({ error: "Falha ao contatar o Mestre. Tente novamente." }, { status });
   }
 
   // 5. Persist the Q&A so the user can read it again when they revisit the page.
   await prisma.user.update({
-    where: { id: session.user.id },
+    where: { id: auth.user.id },
     data: { lastMentorQuestion: question, lastMentorAnswer: answer },
   }).catch(() => {});
 

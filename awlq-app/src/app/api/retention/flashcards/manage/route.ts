@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { FlashcardSource } from "@prisma/client";
 
@@ -26,13 +26,11 @@ type CreateBody = {
  * queue — see GET /api/retention/flashcards for that.
  */
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const cards = await prisma.flashcard.findMany({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     orderBy: { createdAt: "desc" },
     take: MY_CARDS_LIMIT,
   });
@@ -46,10 +44,8 @@ export async function GET(request: NextRequest) {
  * schedule immediately via the model's defaults (dueAt = now).
  */
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   let body: CreateBody;
   try {
@@ -82,7 +78,7 @@ export async function POST(request: NextRequest) {
   try {
     const card = await prisma.flashcard.create({
       data: {
-        userId: session.user.id,
+        userId: auth.user.id,
         front,
         back,
         hint,

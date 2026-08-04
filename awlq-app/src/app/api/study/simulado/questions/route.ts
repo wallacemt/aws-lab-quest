@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { generateAndSaveVariant } from "@/lib/question-variant";
 import { mapDbQuestionToStudyQuestion, pickRandomItems } from "@/lib/study-questions";
@@ -63,12 +63,10 @@ function buildGuideErrorResponse() {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
-  const profile = await getUserCertificationContext(session.user.id);
+  const profile = await getUserCertificationContext(auth.user.id);
 
   if (!profile?.certificationPresetId || !profile.certificationPreset?.code) {
     return NextResponse.json(
@@ -89,10 +87,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as Body;
   const desiredCount = Math.max(10, Math.min(65, Number(body.count ?? 65)));
@@ -100,7 +96,7 @@ export async function POST(request: NextRequest) {
     "easy" | "medium" | "hard"
   >;
 
-  const profile = await getUserCertificationContext(session.user.id);
+  const profile = await getUserCertificationContext(auth.user.id);
 
   if (!profile?.certificationPresetId || !profile.certificationPreset?.code) {
     return NextResponse.json(
@@ -147,7 +143,7 @@ export async function POST(request: NextRequest) {
 
   // Buscar IDs de questões já respondidas nos últimos 5 simulados
   const recentHistory = await prisma.studySessionHistory.findMany({
-    where: { userId: session.user.id, sessionType: "SIMULADO" },
+    where: { userId: auth.user.id, sessionType: "SIMULADO" },
     select: { answersSnapshot: true },
     orderBy: { completedAt: "desc" },
     take: 5,

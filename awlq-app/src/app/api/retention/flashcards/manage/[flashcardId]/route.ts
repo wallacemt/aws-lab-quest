@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { FlashcardSource } from "@prisma/client";
 
@@ -46,14 +46,12 @@ async function loadOwnedUserCreatedCard(flashcardId: string, userId: string) {
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ flashcardId: string }> }) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { flashcardId } = await params;
 
-  const { error } = await loadOwnedUserCreatedCard(flashcardId, session.user.id);
+  const { error } = await loadOwnedUserCreatedCard(flashcardId, auth.user.id);
   if (error) return error;
 
   let body: UpdateBody;
@@ -107,14 +105,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ flashcardId: string }> }) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { flashcardId } = await params;
 
-  const { error } = await loadOwnedUserCreatedCard(flashcardId, session.user.id);
+  const { error } = await loadOwnedUserCreatedCard(flashcardId, auth.user.id);
   if (error) return error;
 
   await prisma.flashcard.delete({ where: { id: flashcardId } });

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { verifyImageMagicBytes } from "@/lib/input-validation";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { getSignedAvatarUrl } from "@/lib/storage-url";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -16,10 +17,12 @@ const EXT_MAP: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
+
+  // LSF-2026-209: throttle uploads per user
+  const limited = await checkRateLimit(auth.user.id, "upload-avatar", 10, 60);
+  if (limited) return limited;
 
   let formData: FormData;
   try {
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ext = EXT_MAP[detectedMime] ?? "png";
-  const path = `avatars/${session.user.id}/${Date.now()}.${ext}`;
+  const path = `avatars/${auth.user.id}/${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("aws-lab-quest")
@@ -65,8 +68,8 @@ export async function POST(request: NextRequest) {
   // Store the bare storage path so we can generate signed URLs at read time.
   // TODO: convert bucket to private in the Supabase dashboard after deploy.
   await prisma.userProfile.upsert({
-    where: { userId: session.user.id },
-    create: { userId: session.user.id, avatarUrl: path },
+    where: { userId: auth.user.id },
+    create: { userId: auth.user.id, avatarUrl: path },
     update: { avatarUrl: path },
   });
 
