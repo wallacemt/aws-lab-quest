@@ -40,13 +40,12 @@ type GapReviewScreenProps = {
 
 type GapChatPanelProps = {
   serviceCode: string;
-  questionStatement: string;
-  correctAnswerText: string;
+  questionId: string;
 };
 
 // Keyed by questionId in the parent so a fresh conversation starts per
 // question via remount, instead of resetting state inside an effect.
-function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: GapChatPanelProps) {
+function GapChatPanel({ serviceCode, questionId }: GapChatPanelProps) {
   const { avatarUrl, profile } = useUserProfile();
   const [chatOpen, setChatOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -73,9 +72,7 @@ function GapChatPanel({ serviceCode, questionStatement, correctAnswerText }: Gap
     try {
       const answer = await sendGapChatMessage({
         message,
-        serviceName: serviceCode,
-        questionStatement,
-        correctAnswerText,
+        questionId,
         history: chatMessages,
       });
       setChatMessages([...nextHistory, { role: "assistant", content: answer }]);
@@ -311,11 +308,6 @@ export function GapReviewScreen({ serviceCode, topic, awsServiceId }: GapReviewS
     }));
   }, [selectedQuestion]);
 
-  const correctAnswerText = useMemo(() => {
-    const correctOption = reviewOptions.find((item) => item.isCorrect);
-    return correctOption?.text ?? "";
-  }, [reviewOptions]);
-
   return (
     <AppLayout>
       <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
@@ -342,8 +334,7 @@ export function GapReviewScreen({ serviceCode, topic, awsServiceId }: GapReviewS
                   <GapChatPanel
                     key={selectedQuestion.questionId}
                     serviceCode={serviceCode}
-                    questionStatement={selectedQuestion.statement}
-                    correctAnswerText={correctAnswerText}
+                    questionId={selectedQuestion.questionId}
                   />
                 ) : (
                   <Tooltip>

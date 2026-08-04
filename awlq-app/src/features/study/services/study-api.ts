@@ -473,9 +473,7 @@ export type GapChatTurn = { role: "user" | "assistant"; content: string };
 
 export async function sendGapChatMessage(params: {
   message: string;
-  serviceName: string;
-  questionStatement: string;
-  correctAnswerText: string;
+  questionId: string;
   history: GapChatTurn[];
 }): Promise<string> {
   const response = await fetch("/api/study/gap/chat", {

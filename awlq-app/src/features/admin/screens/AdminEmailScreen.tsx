@@ -12,9 +12,16 @@ import {
   getBehavioralEmailStatus,
   toggleBehavioralEmail,
   triggerBehavioralEmailAnalysis,
+  listScheduledAdminEmails,
+  cancelScheduledAdminEmail,
 } from "@/features/admin/services/admin-api";
 import { CheckSquare, Square } from "lucide-react";
-import { AdminEmailTemplateItem, AdminUserListItem, BehavioralEmailStatus } from "@/features/admin/types";
+import {
+  AdminEmailTemplateItem,
+  AdminUserListItem,
+  BehavioralEmailStatus,
+  AdminScheduledEmailItem,
+} from "@/features/admin/types";
 
 type DraftState = {
   code: string;
@@ -110,6 +117,18 @@ export function AdminEmailScreen() {
   const [composeSending, setComposeSending] = useState(false);
   const [composeMessage, setComposeMessage] = useState<string | null>(null);
   const [composeError, setComposeError] = useState<string | null>(null);
+  const [composeScheduleEnabled, setComposeScheduleEnabled] = useState(false);
+  // Value of an <input type="datetime-local"> — a timezone-naive "YYYY-MM-DDTHH:mm"
+  // string interpreted by the browser as local wall-clock time. Converted to an
+  // absolute UTC instant only at submit time (see handleSendCompose).
+  const [composeScheduledForLocal, setComposeScheduledForLocal] = useState("");
+
+  // Pending scheduled sends (any target mode) — shown so an admin can review or
+  // cancel before the worker picks them up.
+  const [scheduledEmails, setScheduledEmails] = useState<AdminScheduledEmailItem[]>([]);
+  const [scheduledLoading, setScheduledLoading] = useState(false);
+  const [scheduledError, setScheduledError] = useState<string | null>(null);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   const selectedTemplateIdRef = useRef<string | null>(null);
 
@@ -215,6 +234,38 @@ export function AdminEmailScreen() {
     void loadComposeUsers();
     return () => { cancelled = true; };
   }, [activeTab, composeTargetMode, composeUserSearch]);
+
+  const loadScheduledEmails = useCallback(async () => {
+    setScheduledLoading(true);
+    setScheduledError(null);
+    try {
+      const data = await listScheduledAdminEmails();
+      setScheduledEmails(data);
+    } catch (err) {
+      setScheduledError(err instanceof Error ? err.message : "Falha ao carregar envios agendados.");
+    } finally {
+      setScheduledLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "compose") return;
+    void loadScheduledEmails();
+  }, [activeTab, loadScheduledEmails]);
+
+  async function handleCancelScheduled(triggerId: string) {
+    if (!window.confirm("Cancelar este envio agendado?")) return;
+
+    setCancelingId(triggerId);
+    try {
+      await cancelScheduledAdminEmail(triggerId);
+      await loadScheduledEmails();
+    } catch (err) {
+      setScheduledError(err instanceof Error ? err.message : "Falha ao cancelar envio agendado.");
+    } finally {
+      setCancelingId(null);
+    }
+  }
 
   useEffect(() => {
     if (activeTab !== "automaticos") return;
@@ -407,23 +458,52 @@ export function AdminEmailScreen() {
       return;
     }
 
+    // `composeScheduledForLocal` is a naive "YYYY-MM-DDTHH:mm" string with no
+    // timezone info. `new Date(...)` on it is parsed using THIS BROWSER's local
+    // timezone — exactly what the admin meant when picking the date/time — so
+    // converting to ISO here bakes in the correct absolute instant. The server
+    // (which may run in UTC or any other TZ on the VPS) never has to guess.
+    let scheduledForIso: string | undefined;
+    if (composeScheduleEnabled) {
+      if (!composeScheduledForLocal) {
+        setComposeError("Escolha a data e hora do agendamento.");
+        return;
+      }
+      const scheduledDate = new Date(composeScheduledForLocal);
+      if (Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) {
+        setComposeError("A data de agendamento deve ser valida e no futuro.");
+        return;
+      }
+      scheduledForIso = scheduledDate.toISOString();
+    }
+
     setComposeSending(true);
     setComposeMessage(null);
     setComposeError(null);
 
     try {
-      await sendAdminEmailTemplate({
+      const result = await sendAdminEmailTemplate({
         subject: composeSubject,
         html: composeHtml,
         targetMode: composeTargetMode,
         userIds: composeTargetMode === "specific-users" ? Array.from(composeSelectedUserIds) : undefined,
+        scheduledFor: scheduledForIso,
       });
 
-      setComposeMessage(
+      const audience =
         composeTargetMode === "specific-users"
-          ? `Email enfileirado para ${composeSelectedUserIds.size} usuario(s) selecionado(s).`
-          : "Email enfileirado para todos os usuarios aprovados. O worker processara o envio em segundo plano.",
+          ? `${composeSelectedUserIds.size} usuario(s) selecionado(s)`
+          : "todos os usuarios aprovados";
+
+      setComposeMessage(
+        result.scheduledFor
+          ? `Email agendado para ${audience}, sera enviado em ${new Date(result.scheduledFor).toLocaleString("pt-BR")} (seu horario local).`
+          : `Email enfileirado para ${audience}. O worker processara o envio em segundo plano.`,
       );
+
+      if (result.scheduledFor) {
+        await loadScheduledEmails();
+      }
     } catch (err) {
       setComposeError(err instanceof Error ? err.message : "Falha ao enviar email.");
     } finally {
@@ -653,11 +733,13 @@ export function AdminEmailScreen() {
                     </p>
                   </div>
                   <div className="max-h-[80vh] overflow-auto rounded border border-[#334155] bg-secondary p-2">
-                    <div
-                      className="min-h-[240px]"
-                      dangerouslySetInnerHTML={{
-                        __html: renderPreview(draft.html || "<p>Sem HTML para preview.</p>", previewName, previewAppUrl),
-                      }}
+                    {/* LSF-2026-301: sandboxed iframe (no allow-scripts/allow-same-origin) so a
+                        stored template can't execute script in an admin's browser. */}
+                    <iframe
+                      title="Preview do email"
+                      sandbox=""
+                      className="h-[480px] w-full border-0 bg-white"
+                      srcDoc={renderPreview(draft.html || "<p>Sem HTML para preview.</p>", previewName, previewAppUrl)}
                     />
                   </div>
                 </aside>
@@ -791,6 +873,55 @@ export function AdminEmailScreen() {
             aqui: {"{{name}}"}, {"{{app_url}}"}, {"{{logo_url}}"}, {"{{unsubscribe_url}}"}.
           </p>
 
+          {(scheduledLoading || scheduledEmails.length > 0 || scheduledError) && (
+            <div className="space-y-2 border border-[#1e293b] bg-[#111827] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-mono text-[10px] uppercase text-[#94a3b8]">Envios agendados pendentes</p>
+                <button
+                  type="button"
+                  onClick={() => void loadScheduledEmails()}
+                  className="border border-[#334155] px-2 py-1 text-[10px] uppercase text-[#cbd5e1]"
+                >
+                  {scheduledLoading ? "Atualizando..." : "Atualizar"}
+                </button>
+              </div>
+
+              {scheduledError && <p className="text-xs text-[#fca5a5]">{scheduledError}</p>}
+
+              {scheduledEmails.length === 0 && !scheduledLoading && !scheduledError && (
+                <p className="text-xs text-[#64748b]">Nenhum envio agendado no momento.</p>
+              )}
+
+              {scheduledEmails.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border border-[#334155] px-3 py-2"
+                >
+                  <div>
+                    <p className="text-xs text-[#e2e8f0]">{item.subject ?? "(email de template)"}</p>
+                    <p className="text-[10px] uppercase text-[#94a3b8]">
+                      {item.targetMode === "all-users"
+                        ? "Todos os usuarios aprovados"
+                        : item.targetMode === "specific-users"
+                          ? `${item.userIdsCount} usuario(s) selecionado(s)`
+                          : "Usuario especifico"}
+                      {" · "}
+                      Enviara em {new Date(item.scheduledFor).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleCancelScheduled(item.id)}
+                    disabled={cancelingId === item.id}
+                    className="border border-[#7f1d1d] px-2 py-1 text-[10px] uppercase text-[#fca5a5] disabled:opacity-40"
+                  >
+                    {cancelingId === item.id ? "Cancelando..." : "Cancelar"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
             <div className="space-y-4 border border-[#1e293b] bg-[#111827] p-4">
               <label className="space-y-1 text-xs uppercase text-[#94a3b8]">
@@ -872,13 +1003,48 @@ export function AdminEmailScreen() {
                 )}
               </div>
 
+              <div className="space-y-2 border border-[#1e293b] p-3">
+                <label className="flex items-center gap-2 text-xs uppercase text-[#cbd5e1]">
+                  <input
+                    type="checkbox"
+                    checked={composeScheduleEnabled}
+                    onChange={(event) => setComposeScheduleEnabled(event.target.checked)}
+                  />
+                  Agendar envio
+                </label>
+
+                {composeScheduleEnabled && (
+                  <div className="space-y-1">
+                    <input
+                      type="datetime-local"
+                      value={composeScheduledForLocal}
+                      onChange={(event) => setComposeScheduledForLocal(event.target.value)}
+                      className="w-full border border-[#334155] bg-[#0b1220] px-2 py-2 text-sm text-[#e2e8f0]"
+                    />
+                    <p className="text-[10px] text-[#64748b]">
+                      Horario do seu navegador ({Intl.DateTimeFormat().resolvedOptions().timeZone}). Convertido
+                      automaticamente para UTC — o servidor nao usa o fuso horario local para decidir quando enviar.
+                    </p>
+                    {composeScheduledForLocal && !Number.isNaN(new Date(composeScheduledForLocal).getTime()) && (
+                      <p className="text-[10px] text-[#94a3b8]">
+                        Sera enviado em: {new Date(composeScheduledForLocal).toLocaleString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => void handleSendCompose()}
                 disabled={composeSending}
                 className="border border-[#22c55e] px-4 py-2 text-xs uppercase text-[#86efac] disabled:opacity-40"
               >
-                {composeSending ? "Enfileirando..." : "Enfileirar Envio"}
+                {composeSending
+                  ? "Enfileirando..."
+                  : composeScheduleEnabled
+                    ? "Agendar Envio"
+                    : "Enfileirar Envio"}
               </button>
 
               {composeMessage && <p className="text-sm text-[#86efac]">{composeMessage}</p>}
@@ -900,11 +1066,13 @@ export function AdminEmailScreen() {
                 className="w-full border border-[#334155] bg-[#111827] px-2 py-2 text-sm text-[#e2e8f0]"
               />
               <div className="max-h-[80vh] overflow-auto rounded border border-[#334155] bg-secondary p-2">
-                <div
-                  className="min-h-[240px]"
-                  dangerouslySetInnerHTML={{
-                    __html: renderPreview(composeHtml || "<p>Sem HTML para preview.</p>", previewName, previewAppUrl),
-                  }}
+                {/* LSF-2026-301: sandboxed iframe (no allow-scripts/allow-same-origin) so a
+                    stored template can't execute script in an admin's browser. */}
+                <iframe
+                  title="Preview do email"
+                  sandbox=""
+                  className="h-[480px] w-full border-0 bg-white"
+                  srcDoc={renderPreview(composeHtml || "<p>Sem HTML para preview.</p>", previewName, previewAppUrl)}
                 />
               </div>
             </aside>

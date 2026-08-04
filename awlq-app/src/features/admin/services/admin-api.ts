@@ -23,6 +23,7 @@ import {
   AdminUploadsPayload,
   AdminStatus,
   AdminEmailSendPayload,
+  AdminScheduledEmailItem,
   AdminEmailTemplateCreatePayload,
   AdminEmailTemplateItem,
   AdminEmailTemplateUpdatePayload,
@@ -274,7 +275,9 @@ export async function deleteAdminEmailTemplate(templateId: string): Promise<void
   }
 }
 
-export async function sendAdminEmailTemplate(input: AdminEmailSendPayload): Promise<{ sent: number; failed: number }> {
+export async function sendAdminEmailTemplate(
+  input: AdminEmailSendPayload,
+): Promise<{ sent: number; failed: number; scheduledFor: string | null }> {
   const response = await fetch("/api/admin/email/send", {
     method: "POST",
     cache: "no-store",
@@ -288,7 +291,35 @@ export async function sendAdminEmailTemplate(input: AdminEmailSendPayload): Prom
     throw new Error(payload.error ?? "Nao foi possivel enviar email.");
   }
 
-  return (await response.json()) as { sent: number; failed: number };
+  return (await response.json()) as { sent: number; failed: number; scheduledFor: string | null };
+}
+
+export async function listScheduledAdminEmails(): Promise<AdminScheduledEmailItem[]> {
+  const response = await fetch("/api/admin/email/scheduled", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar os envios agendados.");
+  }
+
+  const payload = (await response.json()) as { scheduled: AdminScheduledEmailItem[] };
+  return payload.scheduled;
+}
+
+export async function cancelScheduledAdminEmail(triggerId: string): Promise<void> {
+  const response = await fetch(`/api/admin/email/scheduled/${triggerId}`, {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(payload.error ?? "Nao foi possivel cancelar o envio agendado.");
+  }
 }
 
 export async function listAdminQuestions(

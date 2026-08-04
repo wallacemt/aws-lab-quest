@@ -507,6 +507,16 @@ export type AdminEmailTemplateUpdatePayload = {
   active?: boolean;
 };
 
+export type AdminScheduledEmailItem = {
+  id: string;
+  scheduledFor: string;
+  createdAt: string;
+  subject: string | null;
+  templateId: string | null;
+  targetMode: "all-users" | "single-user" | "specific-users";
+  userIdsCount: number;
+};
+
 export type AdminEmailSendPayload = {
   templateId?: string;
   subject?: string;
@@ -514,6 +524,9 @@ export type AdminEmailSendPayload = {
   targetMode: "all-users" | "single-user" | "specific-users";
   userId?: string;
   userIds?: string[];
+  // Absolute instant as ISO 8601 (already converted from the admin's local
+  // time zone client-side, e.g. via `new Date(localValue).toISOString()`).
+  scheduledFor?: string;
 };
 
 export type CertificationOption = {
