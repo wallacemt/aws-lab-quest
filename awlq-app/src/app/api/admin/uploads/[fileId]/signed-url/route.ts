@@ -50,12 +50,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     });
 
   if (signed.error || !signed.data?.signedUrl) {
-    return NextResponse.json(
-      {
-        error: signed.error?.message ?? "Falha ao gerar URL assinada.",
-      },
-      { status: 422 },
-    );
+    // LSF-2026-208: don't forward the raw Supabase Storage error to the client.
+    console.error("[admin/uploads/signed-url] Supabase Storage error:", signed.error);
+    return NextResponse.json({ error: "Falha ao gerar URL assinada." }, { status: 422 });
   }
 
   return NextResponse.json({

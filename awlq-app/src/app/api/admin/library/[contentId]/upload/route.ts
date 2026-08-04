@@ -89,11 +89,9 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     });
 
   if (uploadError) {
+    // LSF-2026-208: don't forward the raw Supabase Storage error to the client.
     console.error("[library-upload] storage upload failed:", uploadError.message);
-    return NextResponse.json(
-      { error: `Falha ao enviar arquivo: ${uploadError.message}` },
-      { status: 502 },
-    );
+    return NextResponse.json({ error: "Falha ao enviar arquivo." }, { status: 502 });
   }
 
   await prisma.libraryContent.update({

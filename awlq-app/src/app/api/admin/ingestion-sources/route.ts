@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { isAllowedFeedUrl } from "@/lib/url-validation";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,10 +21,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "displayName e url são obrigatórios" }, { status: 422 });
     }
 
-    try {
-      new URL(url);
-    } catch {
-      return NextResponse.json({ error: "URL inválida" }, { status: 422 });
+    if (!isAllowedFeedUrl(url.trim())) {
+      return NextResponse.json({ error: "URL deve ser HTTP/HTTPS pública" }, { status: 422 });
     }
 
     const source = await prisma.ingestionSource.create({

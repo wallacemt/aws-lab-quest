@@ -10,6 +10,10 @@ type SendBody = {
   targetMode?: "all-users" | "single-user" | "specific-users";
   userId?: string;
   userIds?: string[];
+  // Absolute instant as an ISO 8601 string (e.g. "2026-08-05T17:30:00.000Z").
+  // Must already be converted from the admin's local time to UTC client-side —
+  // this route never interprets it against the server's timezone.
+  scheduledFor?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -52,9 +56,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Selecione ao menos um usuario." }, { status: 400 });
   }
 
+  let scheduledFor: Date | null = null;
+  if (body.scheduledFor) {
+    const parsed = new Date(body.scheduledFor);
+    // Client must send an absolute instant (ISO string with offset/Z), never a
+    // naive "local" datetime — this route has no idea what timezone the admin
+    // is in and must not guess using the server's own timezone.
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json({ error: "Data de agendamento invalida." }, { status: 400 });
+    }
+    if (parsed.getTime() <= Date.now()) {
+      return NextResponse.json({ error: "A data de agendamento deve ser no futuro." }, { status: 400 });
+    }
+    scheduledFor = parsed;
+  }
+
   await prisma.workerTrigger.create({
     data: {
       action: "email-send",
+      scheduledFor,
       payload: {
         templateId: templateId ?? null,
         subject: templateId ? null : subject,
@@ -70,7 +90,8 @@ export async function POST(request: NextRequest) {
     adminUserId: adminCheck.userId,
     templateId: templateId ?? "raw",
     targetMode,
+    scheduledFor: scheduledFor ? scheduledFor.toISOString() : "immediate",
   });
 
-  return NextResponse.json({ queued: true, sent: 0, failed: 0 });
+  return NextResponse.json({ queued: true, sent: 0, failed: 0, scheduledFor: scheduledFor?.toISOString() ?? null });
 }

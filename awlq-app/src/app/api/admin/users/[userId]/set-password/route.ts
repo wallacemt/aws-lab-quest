@@ -48,6 +48,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
   }
 
+  // LSF-2026-302: a password reset (often issued in response to a suspected
+  // compromise) must invalidate any session an attacker already holds.
+  await prisma.session.deleteMany({ where: { userId } });
+
   devAuditLog("admin.users.set-password", { adminUserId: adminCheck.userId, userId });
 
   return NextResponse.json({ ok: true });
