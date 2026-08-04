@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { verifyImageMagicBytes } from "@/lib/input-validation";
 import { supabase } from "@/lib/supabase";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 4 * 1024 * 1024; // 4 MB
@@ -13,8 +14,12 @@ const EXT_MAP: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
+
+  // LSF-2026-209: throttle uploads per user
+  const limited = await checkRateLimit(auth.user.id, "badge-image", 10, 60);
+  if (limited) return limited;
 
   let formData: FormData;
   try {
@@ -45,7 +50,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ext = EXT_MAP[detectedMime] ?? "png";
-  const path = `cert-badges/${session.user.id}/${Date.now()}.${ext}`;
+  const path = `cert-badges/${auth.user.id}/${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("aws-lab-quest")

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { generateUniqueUsername, isValidUsername, normalizeUsername } from "@/lib/username";
 
@@ -19,10 +19,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as { username?: string; random?: boolean };
   let username = normalizeUsername(body.username ?? "").toLowerCase();
@@ -36,7 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   const owner = await prisma.user.findFirst({
-    where: { username, NOT: { id: session.user.id } },
+    where: { username, NOT: { id: auth.user.id } },
     select: { id: true },
   });
 
@@ -45,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   const user = await prisma.user.update({
-    where: { id: session.user.id },
+    where: { id: auth.user.id },
     data: { username, lastSeen: new Date() },
     select: { username: true },
   });

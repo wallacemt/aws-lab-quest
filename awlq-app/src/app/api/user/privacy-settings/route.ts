@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { cacheDel, CACHE_KEYS } from "@/lib/cache";
 
@@ -13,10 +13,8 @@ type PrivacySettingsBody = {
 const EMAIL_PREF_KEYS = ["notifyFlashcardEmails", "notifyEngagementEmails", "notifyProductUpdateEmails"] as const;
 
 export async function PATCH(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json().catch(() => ({}))) as PrivacySettingsBody;
 
@@ -33,8 +31,8 @@ export async function PATCH(request: NextRequest) {
 
   if (body.leaderboardVisible !== undefined) {
     await prisma.userProfile.upsert({
-      where: { userId: session.user.id },
-      create: { userId: session.user.id, leaderboardVisible: body.leaderboardVisible },
+      where: { userId: auth.user.id },
+      create: { userId: auth.user.id, leaderboardVisible: body.leaderboardVisible },
       update: { leaderboardVisible: body.leaderboardVisible },
     });
 
@@ -48,8 +46,8 @@ export async function PATCH(request: NextRequest) {
   );
 
   if (Object.keys(emailPrefUpdate).length > 0) {
-    await prisma.user.update({ where: { id: session.user.id }, data: emailPrefUpdate });
-    await cacheDel(CACHE_KEYS.userProfile(session.user.id));
+    await prisma.user.update({ where: { id: auth.user.id }, data: emailPrefUpdate });
+    await cacheDel(CACHE_KEYS.userProfile(auth.user.id));
   }
 
   return NextResponse.json({ ok: true });

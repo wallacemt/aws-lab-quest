@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 
@@ -7,12 +7,10 @@ import { randomUUID } from "crypto";
 // Account data is anonymized rather than hard-deleted so that
 // relational integrity is preserved for aggregate analytics.
 export async function DELETE(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
-  const userId = session.user.id;
+  const userId = auth.user.id;
 
   const deletedEmail = `${randomUUID()}@deleted.invalid`;
   const deletedUsername = randomUUID();

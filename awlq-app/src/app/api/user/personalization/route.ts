@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
-import { headers } from "next/headers";
 import { THEME_PRESETS } from "@/lib/themes";
 import { cacheDel, CACHE_KEYS } from "@/lib/cache";
 import { BG_PRESETS } from "@/lib/backgrounds";
@@ -22,13 +21,8 @@ function isValidBgImageUrl(value: unknown): value is string | null {
 }
 
 export async function PATCH(request: NextRequest) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Nao autenticado." }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   let body: unknown;
   try {
@@ -62,8 +56,8 @@ export async function PATCH(request: NextRequest) {
   }
 
   const updated = await prisma.userProfile.upsert({
-    where: { userId: session.user.id },
-    create: { userId: session.user.id, ...data },
+    where: { userId: auth.user.id },
+    create: { userId: auth.user.id, ...data },
     update: data,
     select: { bgImageUrl: true, themePreset: true },
   });
@@ -71,8 +65,8 @@ export async function PATCH(request: NextRequest) {
   // Invalidate the user profile cache so the next GET /api/user/profile
   // returns the updated theme/bg immediately (no stale 10-min window).
   await cacheDel(
-    CACHE_KEYS.userProfile(session.user.id),
-    CACHE_KEYS.userPublicProfile(session.user.id),
+    CACHE_KEYS.userProfile(auth.user.id),
+    CACHE_KEYS.userPublicProfile(auth.user.id),
   );
 
   return NextResponse.json(updated);

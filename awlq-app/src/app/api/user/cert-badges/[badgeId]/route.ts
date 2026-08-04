@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 
 const SELECT = {
@@ -14,14 +14,14 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ badgeId: string }> },
 ) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { badgeId } = await params;
 
   const existing = await prisma.userCertBadge.findUnique({ where: { id: badgeId }, select: { userId: true } });
   if (!existing) return NextResponse.json({ error: "Badge not found." }, { status: 404 });
-  if (existing.userId !== session.user.id) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  if (existing.userId !== auth.user.id) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
   const body = (await request.json()) as {
     badgeUrl?: string;
@@ -58,14 +58,14 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ badgeId: string }> },
 ) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const { badgeId } = await params;
 
   const existing = await prisma.userCertBadge.findUnique({ where: { id: badgeId }, select: { userId: true } });
   if (!existing) return NextResponse.json({ error: "Badge not found." }, { status: 404 });
-  if (existing.userId !== session.user.id) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  if (existing.userId !== auth.user.id) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
   await prisma.userCertBadge.delete({ where: { id: badgeId } });
 

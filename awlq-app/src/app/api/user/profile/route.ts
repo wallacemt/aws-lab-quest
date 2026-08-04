@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { inferCertificationCode } from "@/lib/certification-presets";
 import { listActiveCertificationPresets } from "@/lib/certification-service";
 import { cacheGetOrSet, cacheDel, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
@@ -62,12 +62,10 @@ async function maybeMigrateCertificationPreset(userId: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
-  const userId = session.user.id;
+  const userId = auth.user.id;
 
   const profileData = await cacheGetOrSet(
     CACHE_KEYS.userProfile(userId),
@@ -109,8 +107,8 @@ export async function GET(request: NextRequest) {
         notifyEngagementEmails: user?.notifyEngagementEmails ?? false,
         notifyProductUpdateEmails: user?.notifyProductUpdateEmails ?? false,
         user: {
-          name: user?.name ?? session.user.name,
-          email: user?.email ?? session.user.email,
+          name: user?.name ?? auth.user.name,
+          email: user?.email ?? auth.user.email,
           username: user?.username ?? username,
         },
         certificationPresetCode: profile.certificationPreset?.code ?? "",
@@ -124,10 +122,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as {
     name?: string;
@@ -155,7 +151,7 @@ export async function PUT(request: NextRequest) {
   const usernameOwner = await prisma.user.findFirst({
     where: {
       username: sanitizedProfile.username,
-      NOT: { id: session.user.id },
+      NOT: { id: auth.user.id },
     },
     select: { id: true },
   });
@@ -166,7 +162,7 @@ export async function PUT(request: NextRequest) {
 
   const [updatedUser, updatedProfile] = await prisma.$transaction([
     prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: auth.user.id },
       data: {
         name: sanitizedProfile.name,
         username: sanitizedProfile.username,
@@ -174,9 +170,9 @@ export async function PUT(request: NextRequest) {
       },
     }),
     prisma.userProfile.upsert({
-      where: { userId: session.user.id },
+      where: { userId: auth.user.id },
       create: {
-        userId: session.user.id,
+        userId: auth.user.id,
         certification: certificationPreset.name,
         certificationPresetId: certificationPreset.id,
         favoriteTheme: sanitizedProfile.favoriteTheme,
@@ -198,8 +194,8 @@ export async function PUT(request: NextRequest) {
   ]);
 
   await cacheDel(
-    CACHE_KEYS.userProfile(session.user.id),
-    CACHE_KEYS.userPublicProfile(session.user.id),
+    CACHE_KEYS.userProfile(auth.user.id),
+    CACHE_KEYS.userPublicProfile(auth.user.id),
   );
 
   return NextResponse.json({

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { syncUserAchievements } from "@/lib/achievements";
 
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const badges = await prisma.userCertBadge.findMany({
-    where: { userId: session.user.id },
+    where: { userId: auth.user.id },
     orderBy: { earnedAt: "desc" },
     select: {
       id: true,
@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireApprovedUser(request);
+  if (auth.response) return auth.response;
 
   const body = (await request.json()) as {
     badgeUrl?: string;
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     ? body.badgeImageUrl.trim()
     : null;
 
-  const userId = session.user.id;
+  const userId = auth.user.id;
 
   const prevCount = await prisma.userCertBadge.count({ where: { userId } });
 
