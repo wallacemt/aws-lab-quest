@@ -8,6 +8,10 @@ docs
 simulados
 awlq-extractor
 
+# Root env (LSF-2026-204: was missing, so it entered the Docker build context)
+.env
+.env.*
+
 # App-specific ignores
 awlq-app/.next
 awlq-app/node_modules

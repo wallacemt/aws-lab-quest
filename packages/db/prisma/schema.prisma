@@ -662,6 +662,7 @@ model WorkerTrigger {
   payload               Json?
   processed             Boolean   @default(false)
   processedAt           DateTime?
+  scheduledFor          DateTime? // absolute UTC instant; null = process ASAP
   createdAt             DateTime  @default(now())
 
   @@index([processed, createdAt])

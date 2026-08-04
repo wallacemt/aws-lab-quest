@@ -43,6 +43,10 @@ jobs:
         working-directory: awlq-app
         run: bun run lint
 
+      - name: Audit app dependencies
+        working-directory: awlq-app
+        run: bun audit --audit-level=high
+
       # ── Worker ───────────────────────────────────────────────────────────────
       - name: Install worker deps
         working-directory: awlq-worker
@@ -57,6 +61,10 @@ jobs:
       - name: Type-check worker
         working-directory: awlq-worker
         run: bunx tsc --noEmit
+
+      - name: Audit worker dependencies
+        working-directory: awlq-worker
+        run: bun audit --audit-level=high
 
   # ──────────────────────────────────────────────────────────────────────────────
   # 2. Build Docker images (only on push to main)
