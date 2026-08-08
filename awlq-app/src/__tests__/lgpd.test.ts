@@ -89,6 +89,11 @@ vi.mock("@/lib/achievements", () => ({
   getUserAchievementSummary: vi.fn().mockResolvedValue({ items: [], unlockedCount: 0 }),
 }));
 
+vi.mock("@/lib/certification-journey", () => ({
+  getOrCreateActiveJourney: vi.fn().mockResolvedValue({ id: "journey-1" }),
+  resolveJourneyFilter: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ---------------------------------------------------------------------------
 // Route handlers under test (imported after mocks are registered)
 // ---------------------------------------------------------------------------

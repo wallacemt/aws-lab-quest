@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
-import { getOrCreateActiveJourney } from "@/lib/certification-journey";
+import { getOrCreateActiveJourney, resolveJourneyFilter } from "@/lib/certification-journey";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { GapAnswerResult, updateGapProgress } from "@/lib/gap-progress";
@@ -52,8 +52,9 @@ export async function GET(request: NextRequest) {
   const history = await cacheGetOrSet(
     CACHE_KEYS.userStudyHistory(auth.user.id),
     async () => {
+      const journeyId = await resolveJourneyFilter(auth.user.id);
       const sessions = await prisma.studySessionHistory.findMany({
-        where: { userId: auth.user.id },
+        where: { userId: auth.user.id, journeyId },
         orderBy: { completedAt: "desc" },
         take: 50,
         include: { pack: { select: { name: true, artworkUrl: true } } },

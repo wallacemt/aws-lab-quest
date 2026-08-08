@@ -36,6 +36,26 @@ export async function getOrCreateActiveJourney(userId: string): Promise<Certific
   });
 }
 
+// Read-path counterpart of getOrCreateActiveJourney: never creates a row, just
+// resolves which journeyId a history/stats query should scope to. Returns
+// undefined when the user has no journey yet (fresh account, no activity) so
+// callers can drop the filter from their `where` clause entirely.
+export async function resolveJourneyFilter(
+  userId: string,
+  requestedJourneyId?: string | null
+): Promise<string | undefined> {
+  if (requestedJourneyId) {
+    const requested = await prisma.certificationJourney.findFirst({
+      where: { id: requestedJourneyId, userId },
+      select: { id: true },
+    });
+    if (requested) return requested.id;
+  }
+
+  const active = await getActiveJourney(userId);
+  return active?.id;
+}
+
 export async function startNewJourney(
   userId: string,
   params: { certificationPresetId?: string | null; certificationLabel?: string }

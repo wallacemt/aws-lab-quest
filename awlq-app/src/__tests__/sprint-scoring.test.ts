@@ -48,6 +48,10 @@ vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/user-auth", () => ({ requireApprovedUser: mockRequireApprovedUser }));
 vi.mock("@/lib/streak", () => ({ recordStudyActivity: mockRecordStudyActivity }));
 vi.mock("@/lib/achievements", () => ({ syncAndGetNewAchievements: mockSyncAchievements }));
+vi.mock("@/lib/certification-journey", () => ({
+  getOrCreateActiveJourney: vi.fn().mockResolvedValue({ id: "journey-1" }),
+  resolveJourneyFilter: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/lib/cache", () => ({
   cacheDel: mockCacheDel,
   CACHE_KEYS: {
