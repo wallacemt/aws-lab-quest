@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
+import { getOrCreateActiveJourney } from "@/lib/certification-journey";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { publishWeeklyChallengeUpdatedEvent } from "@/lib/realtime-events";
@@ -280,6 +281,8 @@ export async function POST(request: NextRequest) {
     })
     .filter((item) => item !== null);
 
+  const activeJourney = await getOrCreateActiveJourney(user.id);
+
   const historyItem = await prisma.studySessionHistory.create({
     data: {
       userId: user.id,
@@ -290,6 +293,7 @@ export async function POST(request: NextRequest) {
       correctAnswers: correctCount,
       totalQuestions: totalCount,
       answersSnapshot,
+      journeyId: activeJourney.id,
       completedAt: new Date(),
     },
     select: { id: true },

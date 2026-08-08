@@ -3,6 +3,7 @@ import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { buildBossQuestionPoolWhere } from "@/lib/arena-question-pool";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
+import { getOrCreateActiveJourney } from "@/lib/certification-journey";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight } from "@/lib/xp-weights";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { recordStudyActivity } from "@/lib/streak";
@@ -253,6 +254,7 @@ export async function POST(request: NextRequest) {
 
   if (victory) {
     const since = new Date();
+    const activeJourney = await getOrCreateActiveJourney(user.id);
 
     // Award XP via StudySessionHistory so leaderboard/achievements see it.
     await prisma.studySessionHistory.create({
@@ -265,6 +267,7 @@ export async function POST(request: NextRequest) {
         correctAnswers: correctCount,
         totalQuestions: totalAnswered,
         answersSnapshot,
+        journeyId: activeJourney.id,
         completedAt: new Date(),
       },
     });

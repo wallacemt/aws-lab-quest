@@ -20,28 +20,28 @@ enum UserAccessStatus {
 // ─── Better Auth required tables ──────────────────────────────────────────────
 
 model User {
-  id                   String           @id @default(cuid())
-  name                 String
-  email                String           @unique
-  username             String?          @unique
-  role                 String           @default("user")
-  accessStatus         UserAccessStatus @default(pending)
-  active               Boolean          @default(true)
-  accessDecisionAt     DateTime?
-  accessDecisionReason String?
-  lastSeen             DateTime         @default(now())
-  emailVerified        Boolean          @default(false)
-  image                String?
+  id                        String           @id @default(cuid())
+  name                      String
+  email                     String           @unique
+  username                  String?          @unique
+  role                      String           @default("user")
+  accessStatus              UserAccessStatus @default(pending)
+  active                    Boolean          @default(true)
+  accessDecisionAt          DateTime?
+  accessDecisionReason      String?
+  lastSeen                  DateTime         @default(now())
+  emailVerified             Boolean          @default(false)
+  image                     String?
   // Master kill-switch: false suppresses every email regardless of the
   // granular flags below (set by the LGPD Art. 18 one-click unsubscribe link).
-  emailNotifications   Boolean          @default(true)
+  emailNotifications        Boolean          @default(true)
   // Granular, opt-in consent per LGPD Art. 8 (explicit, informed, specific) —
   // each defaults to false so no category is sent unless the user turns it on.
-  notifyFlashcardEmails     Boolean     @default(false)
-  notifyEngagementEmails    Boolean     @default(false)
-  notifyProductUpdateEmails Boolean     @default(false)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  notifyFlashcardEmails     Boolean          @default(false)
+  notifyEngagementEmails    Boolean          @default(false)
+  notifyProductUpdateEmails Boolean          @default(false)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
 
   sessions                Session[]
   accounts                Account[]
@@ -66,6 +66,7 @@ model User {
   weeklyChallengeEntries  WeeklyChallengeEntry[]
   dailyQuizAttempts       DailyQuizAttempt[]
   gapProgress             UserGapProgress[]
+  certificationJourneys   CertificationJourney[]
   lastMentorQuestionAt    DateTime?
   lastMentorQuestion      String?
   lastMentorAnswer        String?
@@ -141,14 +142,14 @@ model UserProfile {
 }
 
 model CertificationPreset {
-  id               String                @id @default(cuid())
-  code             String                @unique
+  id               String                 @id @default(cuid())
+  code             String                 @unique
   name             String
   description      String
   examGuide        String?
-  examMinutes      Int                   @default(90)
-  active           Boolean               @default(true)
-  displayOrder     Int                   @default(0)
+  examMinutes      Int                    @default(90)
+  active           Boolean                @default(true)
+  displayOrder     Int                    @default(0)
   userProfiles     UserProfile[]
   questions        StudyQuestion[]
   uploadedFiles    AdminUploadedFile[]
@@ -158,8 +159,42 @@ model CertificationPreset {
   weakAreaReports  WeakAreaReport[]
   certBadges       UserCertBadge[]
   simuladoPacks    SimuladoPack[]
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  journeys         CertificationJourney[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+}
+
+enum CertificationJourneyStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// A dedicated period of study toward one certification. XP/level/history shown
+// on the profile scope to the ACTIVE journey; switching certifications archives
+// the current one and opens a new one instead of mixing progress together.
+model CertificationJourney {
+  id                    String                     @id @default(cuid())
+  userId                String
+  user                  User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certificationPresetId String?
+  certificationPreset   CertificationPreset?       @relation(fields: [certificationPresetId], references: [id], onDelete: SetNull)
+  // Free-text fallback label (mirrors UserProfile.certification) for journeys
+  // started before/without picking a CertificationPreset.
+  certificationLabel    String                     @default("")
+  status                CertificationJourneyStatus @default(ACTIVE)
+  startedAt             DateTime                   @default(now())
+  endedAt               DateTime?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  studySessions StudySessionHistory[]
+  questHistory  QuestHistory[]
+
+  // ponytail: "only one ACTIVE journey per user" is enforced in the service layer
+  // (archive-then-create in a transaction), not a DB constraint — Prisma has no
+  // partial unique index. Add one via raw SQL migration if a race surfaces.
+  @@index([userId, status])
+  @@index([certificationPresetId])
 }
 
 model AwsService {
@@ -339,31 +374,36 @@ model QuestionTopic {
 }
 
 model StudySessionHistory {
-  id                String           @id @default(cuid())
+  id                String                @id @default(cuid())
   userId            String
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionType       StudySessionType
   title             String
   certificationCode String?
-  gainedXp          Int              @default(0)
+  gainedXp          Int                   @default(0)
   scorePercent      Int
   correctAnswers    Int
   totalQuestions    Int
   durationSeconds   Int?
   answersSnapshot   Json
   completedAt       DateTime
-  createdAt         DateTime         @default(now())
+  createdAt         DateTime              @default(now())
   // LGPD retention: set to true when session is older than the retention window.
   // userId is preserved (FK cannot be nulled) but the record is excluded from
   // any user-facing queries so no PII is exposed post-anonymization.
-  anonymized        Boolean          @default(false)
+  anonymized        Boolean               @default(false)
   packId            String?
-  pack              SimuladoPack?    @relation(fields: [packId], references: [id], onDelete: SetNull)
+  pack              SimuladoPack?         @relation(fields: [packId], references: [id], onDelete: SetNull)
+  // Journey the session counted toward at completion time. Nullable so pre-journeys
+  // history stays valid; backfill assigns every existing row to a retroactive journey.
+  journeyId         String?
+  journey           CertificationJourney? @relation(fields: [journeyId], references: [id], onDelete: SetNull)
 
   @@index([userId, completedAt])
   @@index([sessionType])
   @@index([packId])
   @@index([anonymized, createdAt])
+  @@index([journeyId])
 }
 
 // Tracks per-user progress toward closing a knowledge gap on a service/topic.
@@ -409,9 +449,9 @@ model QuestionReport {
 }
 
 model QuestHistory {
-  id            String   @id @default(cuid())
+  id            String                @id @default(cuid())
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   title         String
   theme         String
   xp            Int
@@ -419,9 +459,13 @@ model QuestHistory {
   taskSnapshot  Json?
   sourceLabText String?
   completedAt   DateTime
-  certification String   @default("")
-  userName      String   @default("")
-  createdAt     DateTime @default(now())
+  certification String                @default("")
+  userName      String                @default("")
+  createdAt     DateTime              @default(now())
+  journeyId     String?
+  journey       CertificationJourney? @relation(fields: [journeyId], references: [id], onDelete: SetNull)
+
+  @@index([journeyId])
 }
 
 model LevelBadge {

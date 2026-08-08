@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
+import { getOrCreateActiveJourney } from "@/lib/certification-journey";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { GapAnswerResult, updateGapProgress } from "@/lib/gap-progress";
@@ -183,6 +184,8 @@ export async function POST(request: NextRequest) {
   ]);
   const prevXp = (prevQuestXp._sum.xp ?? 0) + (prevStudyXp._sum.gainedXp ?? 0);
 
+  const activeJourney = await getOrCreateActiveJourney(auth.user.id);
+
   const item = await prisma.studySessionHistory.create({
     data: {
       userId: auth.user.id,
@@ -196,6 +199,7 @@ export async function POST(request: NextRequest) {
       durationSeconds: body.durationSeconds == null ? null : Math.max(0, Math.round(body.durationSeconds)),
       answersSnapshot: snapshot,
       packId: typeof body.packId === "string" && body.packId.length > 0 ? body.packId : null,
+      journeyId: activeJourney.id,
       completedAt: new Date(),
     },
   });

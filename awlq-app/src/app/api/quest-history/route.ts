@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { syncAndGetNewAchievements } from "@/lib/achievements";
+import { getOrCreateActiveJourney } from "@/lib/certification-journey";
 import { cacheDel, cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { getLevel, getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
@@ -95,6 +96,8 @@ export async function POST(request: NextRequest) {
     }, 0);
   }
 
+  const activeJourney = await getOrCreateActiveJourney(auth.user.id);
+
   const item = await prisma.questHistory.create({
     data: {
       userId: auth.user.id,
@@ -107,6 +110,7 @@ export async function POST(request: NextRequest) {
       completedAt: new Date(body.completedAt),
       certification: body.certification ?? "",
       userName: body.userName ?? auth.user.name,
+      journeyId: activeJourney.id,
     },
   });
 
