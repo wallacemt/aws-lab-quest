@@ -21,6 +21,7 @@ import { clearOnboardingStep, getOnboardingStep, setOnboardingStep } from "@/lib
 import { AchievementItem } from "@/lib/achievements";
 import { CertificationAchievementModal } from "@/features/user/components/CertificationAchievementModal";
 import { CertBadgeEditModal } from "@/features/user/components/CertBadgeEditModal";
+import { StartJourneyModal } from "@/features/user/components/StartJourneyModal";
 import { EvolutionTab } from "@/features/user/components/EvolutionTab";
 import { PersonalizationTab } from "@/features/user/components/PersonalizationTab";
 import { PrivacyTab } from "@/features/user/components/PrivacyTab";
@@ -64,6 +65,7 @@ export function ProfileScreen() {
   const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [certBadges, setCertBadges] = useState<CertBadge[]>([]);
   const [certAchievementOpen, setCertAchievementOpen] = useState(false);
+  const [startJourneyOpen, setStartJourneyOpen] = useState(false);
   const [editingBadge, setEditingBadge] = useState<CertBadge | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
@@ -447,6 +449,9 @@ export function ProfileScreen() {
                 >
                   Atualizar dados
                 </PixelButton>
+                <PixelButton variant="ghost" onClick={() => setStartJourneyOpen(true)} disabled={saving}>
+                  Iniciar nova certificação
+                </PixelButton>
                 {saveMsg && <span className="font-sans text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
               </div>
             </PixelCard>
@@ -597,6 +602,18 @@ export function ProfileScreen() {
           onClose={() => setCertAchievementOpen(false)}
           certificationOptions={certificationOptions}
           onBadgeAdded={(badge) => setCertBadges((prev) => [badge, ...prev])}
+        />
+
+        <StartJourneyModal
+          open={startJourneyOpen}
+          onClose={() => setStartJourneyOpen(false)}
+          certificationOptions={certificationOptions}
+          currentCertification={profile.certification}
+          onStarted={() => {
+            setSaveMsg("Nova jornada iniciada!");
+            setTimeout(() => setSaveMsg(null), 2500);
+            void reloadProfile();
+          }}
         />
 
         <CertBadgeEditModal

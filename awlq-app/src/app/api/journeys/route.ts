@@ -45,19 +45,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let certificationLabel = body.certificationLabel ?? "";
+
   if (body.certificationPresetId) {
     const preset = await prisma.certificationPreset.findUnique({
       where: { id: body.certificationPresetId },
-      select: { id: true, active: true },
+      select: { id: true, name: true, active: true },
     });
     if (!preset || !preset.active) {
       return NextResponse.json({ error: "Certification preset not found." }, { status: 404 });
     }
+    certificationLabel = certificationLabel || preset.name;
   }
 
   const journey = await startNewJourney(user.id, {
     certificationPresetId: body.certificationPresetId ?? null,
-    certificationLabel: body.certificationLabel ?? "",
+    certificationLabel,
   });
 
   return NextResponse.json({ journey }, { status: 201 });

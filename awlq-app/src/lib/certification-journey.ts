@@ -66,12 +66,25 @@ export async function startNewJourney(
       data: { status: "ARCHIVED", endedAt: new Date() },
     });
 
-    return tx.certificationJourney.create({
+    const journey = await tx.certificationJourney.create({
       data: {
         userId,
         certificationPresetId: params.certificationPresetId ?? null,
         certificationLabel: params.certificationLabel ?? "",
       },
     });
+
+    // Keep UserProfile.certification in sync so the rest of the app (which
+    // reads it directly, e.g. the "Certificação alvo" field) shows the new
+    // journey's certification without every consumer needing a rewrite.
+    await tx.userProfile.updateMany({
+      where: { userId },
+      data: {
+        certificationPresetId: params.certificationPresetId ?? null,
+        certification: params.certificationLabel ?? "",
+      },
+    });
+
+    return journey;
   });
 }
