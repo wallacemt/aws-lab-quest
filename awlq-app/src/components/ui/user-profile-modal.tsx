@@ -12,6 +12,7 @@ export function UserProfileModal({
   onClose,
   certificationOptions,
   currentUsername,
+  certificationLocked = false,
 }: {
   profile: UserProfile;
   onSave: (profile: UserProfile) => Promise<void>;
@@ -19,6 +20,7 @@ export function UserProfileModal({
   onClose: () => void;
   certificationOptions: Array<{ id: string; code: string; name: string }>;
   currentUsername: string;
+  certificationLocked?: boolean;
 }) {
   const [draft, setDraft] = useState<UserProfile>(profile);
   const [saving, setSaving] = useState(false);
@@ -158,8 +160,9 @@ export function UserProfileModal({
         <label className="block text-sm">
           Certificacao AWS alvo
           <select
-            className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)]"
+            className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)] disabled:cursor-not-allowed disabled:opacity-60"
             value={draft.certificationPresetCode}
+            disabled={certificationLocked}
             onChange={(e) => {
               const code = e.target.value;
               const selected = certificationOptions.find((option) => option.code === code);
@@ -178,6 +181,11 @@ export function UserProfileModal({
               </option>
             ))}
           </select>
+          {certificationLocked && (
+            <p className="mt-1 font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
+              Para trocar, use &quot;Iniciar nova certificacao&quot; no seu perfil.
+            </p>
+          )}
         </label>
         <label className="block text-sm">
           Tema favorito

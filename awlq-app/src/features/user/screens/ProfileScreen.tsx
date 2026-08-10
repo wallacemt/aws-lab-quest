@@ -434,21 +434,23 @@ export function ProfileScreen() {
                 </PixelCard>
               )}
 
-              <div className="flex items-center gap-3">
-                <PixelButton id="edit-profile-btn" onClick={() => setEditProfileOpen(true)} disabled={saving}>
-                  {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
-                </PixelButton>
-                <PixelButton
-                  variant="ghost"
-                  onClick={() => {
-                    setSaveMsg(null);
-                    setSaveError(null);
-                    void reloadProfile();
-                  }}
-                  disabled={saving}
-                >
-                  Atualizar dados
-                </PixelButton>
+              <div className="flex flex-col   gap-3">
+                <div className="flex items-center justify-evenly flex-wrap gap-2">
+                  <PixelButton id="edit-profile-btn" onClick={() => setEditProfileOpen(true)} disabled={saving}>
+                    {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
+                  </PixelButton>
+                  <PixelButton
+                    variant="ghost"
+                    onClick={() => {
+                      setSaveMsg(null);
+                      setSaveError(null);
+                      void reloadProfile();
+                    }}
+                    disabled={saving}
+                  >
+                    Atualizar dados
+                  </PixelButton>
+                </div>
                 <PixelButton variant="ghost" onClick={() => setStartJourneyOpen(true)} disabled={saving}>
                   Iniciar nova certificação
                 </PixelButton>
@@ -594,6 +596,7 @@ export function ProfileScreen() {
           profile={profile}
           currentUsername={profile.username}
           certificationOptions={certificationOptions}
+          certificationLocked={!isOnboardingProfile && !needsCertificationReview}
           onSave={handleSave}
         />
 
