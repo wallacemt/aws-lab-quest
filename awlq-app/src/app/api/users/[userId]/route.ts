@@ -60,10 +60,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Only the owner can browse into a specific (possibly archived) journey via
-    // ?journeyId=; everyone else always sees the current active journey.
+    // This public/leaderboard-facing history is account-wide by default (same
+    // as the leaderboard's own XP sum and achievements — see issue #56). Only
+    // the owner can narrow it to one specific (possibly archived) journey via
+    // an explicit ?journeyId=, e.g. a future "Minhas Jornadas" browser.
     const requestedJourneyId = isOwner ? request.nextUrl.searchParams.get("journeyId") : null;
-    const journeyId = await resolveJourneyFilter(userId, requestedJourneyId);
+    const journeyId = requestedJourneyId ? await resolveJourneyFilter(userId, requestedJourneyId) : undefined;
 
     const [labHistory, studyHistoryRaw] = await Promise.all([
       prisma.questHistory.findMany({
@@ -192,6 +194,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const isOwner = auth.user.id === userId;
   const requestedJourneyId = isOwner ? request.nextUrl.searchParams.get("journeyId") : null;
 
+  // This public/leaderboard-facing profile is account-wide by default (same
+  // as the leaderboard's own XP sum and achievements — see issue #56).
   // Browsing a specific (possibly archived) journey is an explicit, infrequent
   // owner action — skip the cache rather than teach every invalidation call
   // site about journey-scoped keys for a rarely-hit path.
@@ -199,7 +203,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     ? await buildProfileData(await resolveJourneyFilter(userId, requestedJourneyId))
     : await cacheGetOrSet(
         CACHE_KEYS.userPublicProfile(userId),
-        async () => buildProfileData(await resolveJourneyFilter(userId)),
+        async () => buildProfileData(undefined),
         CACHE_TTL.USER_PUBLIC_PROFILE,
       );
 
