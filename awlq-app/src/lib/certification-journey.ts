@@ -66,13 +66,28 @@ export async function startNewJourney(
       data: { status: "ARCHIVED", endedAt: new Date() },
     });
 
-    const journey = await tx.certificationJourney.create({
-      data: {
-        userId,
-        certificationPresetId: params.certificationPresetId ?? null,
-        certificationLabel: params.certificationLabel ?? "",
-      },
-    });
+    // Reopen a previous journey for the same preset instead of creating a
+    // duplicate row — otherwise switching back to a certification you already
+    // studied splits its XP/history across two "DVA-C02"-looking entries.
+    const existingForPreset = params.certificationPresetId
+      ? await tx.certificationJourney.findFirst({
+          where: { userId, certificationPresetId: params.certificationPresetId },
+          orderBy: { startedAt: "desc" },
+        })
+      : null;
+
+    const journey = existingForPreset
+      ? await tx.certificationJourney.update({
+          where: { id: existingForPreset.id },
+          data: { status: "ACTIVE", startedAt: new Date(), endedAt: null },
+        })
+      : await tx.certificationJourney.create({
+          data: {
+            userId,
+            certificationPresetId: params.certificationPresetId ?? null,
+            certificationLabel: params.certificationLabel ?? "",
+          },
+        });
 
     // Keep UserProfile.certification in sync so the rest of the app (which
     // reads it directly, e.g. the "Certificação alvo" field) shows the new
