@@ -22,6 +22,7 @@ import { AchievementItem } from "@/lib/achievements";
 import { CertificationAchievementModal } from "@/features/user/components/CertificationAchievementModal";
 import { CertBadgeEditModal } from "@/features/user/components/CertBadgeEditModal";
 import { StartJourneyModal } from "@/features/user/components/StartJourneyModal";
+import { PastJourneysCard } from "@/features/user/components/PastJourneysCard";
 import { EvolutionTab } from "@/features/user/components/EvolutionTab";
 import { PersonalizationTab } from "@/features/user/components/PersonalizationTab";
 import { PrivacyTab } from "@/features/user/components/PrivacyTab";
@@ -457,6 +458,8 @@ export function ProfileScreen() {
                 {saveMsg && <span className="font-sans text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
               </div>
             </PixelCard>
+
+            {user?.id && <PastJourneysCard userId={user.id} />}
 
             {/* Badges collection */}
             <PixelCard>
