@@ -5,9 +5,11 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 import { AchievementsView } from "@/components/ui/achievements-view";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { BadgesView } from "@/components/ui/badges-view";
+import { InfoToast } from "@/components/ui/info-toast";
 import { UserProfileModal } from "@/components/ui/user-profile-modal";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
@@ -616,8 +618,7 @@ export function ProfileScreen() {
           certificationOptions={certificationOptions}
           currentCertification={profile.certification}
           onStarted={() => {
-            setSaveMsg("Nova jornada iniciada!");
-            setTimeout(() => setSaveMsg(null), 2500);
+            toast.custom(() => <InfoToast message="Nova jornada iniciada!" icon="🚀" />, { duration: 3000 });
             void reloadProfile();
           }}
         />

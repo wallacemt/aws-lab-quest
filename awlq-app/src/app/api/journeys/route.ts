@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/user-auth";
+import { cacheDel, CACHE_KEYS } from "@/lib/cache";
 import { prisma } from "@/lib/prisma";
 import { listJourneys, startNewJourney } from "@/lib/certification-journey";
 
@@ -62,6 +63,17 @@ export async function POST(request: NextRequest) {
     certificationPresetId: body.certificationPresetId ?? null,
     certificationLabel,
   });
+
+  // Every cache below is keyed by userId only and scoped implicitly to
+  // "whatever journey is active right now" — switching journeys changes what
+  // that means, so the stale entries must go or the UI keeps showing the
+  // journey that was just archived.
+  await cacheDel(
+    CACHE_KEYS.userProfile(user.id),
+    CACHE_KEYS.userPublicProfile(user.id),
+    CACHE_KEYS.userQuestHistory(user.id),
+    CACHE_KEYS.userStudyHistory(user.id),
+  );
 
   return NextResponse.json({ journey }, { status: 201 });
 }
