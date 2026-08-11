@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
@@ -157,7 +157,10 @@ function TiltBadgeCard({ badge }: { badge: CertBadge }) {
 export function PublicProfileScreen() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const userId = params.userId as string;
+  const journeyId = searchParams.get("journeyId");
+  const journeyLabel = searchParams.get("journeyLabel");
 
   const [user, setUser] = useState<PublicUser | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -174,7 +177,12 @@ export function PublicProfileScreen() {
   useEffect(() => {
     if (!userId) return;
 
-    Promise.all([fetch(`/api/users/${userId}`).then((r) => r.json()), fetch("/api/badges").then((r) => r.json())])
+    const journeyQuery = journeyId ? `journeyId=${encodeURIComponent(journeyId)}` : "";
+
+    Promise.all([
+      fetch(`/api/users/${userId}${journeyQuery ? `?${journeyQuery}` : ""}`).then((r) => r.json()),
+      fetch("/api/badges").then((r) => r.json()),
+    ])
       .then(([userData, badgesData]) => {
         if (userData.error) {
           setNotFound(true);
@@ -189,7 +197,7 @@ export function PublicProfileScreen() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
 
-    fetch(`/api/users/${userId}?fullHistory=true`)
+    fetch(`/api/users/${userId}?fullHistory=true${journeyQuery ? `&${journeyQuery}` : ""}`)
       .then((r) => r.json() as Promise<{ labHistory?: QuestHistoryItem[]; studyHistory?: StudyHistoryItem[] }>)
       .then((data) => {
         setLabHistory(data.labHistory ?? []);
@@ -197,7 +205,7 @@ export function PublicProfileScreen() {
       })
       .catch(() => {})
       .finally(() => setHistoryLoading(false));
-  }, [userId]);
+  }, [userId, journeyId]);
 
   if (loading) {
     return (
@@ -235,6 +243,21 @@ export function PublicProfileScreen() {
             ← Voltar
           </PixelButton>
         </motion.div>
+
+        {journeyId && (
+          <PixelCard className="border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
+            <p className="font-sans text-sm text-[var(--pixel-text)]">
+              Vendo o desempenho da jornada arquivada{journeyLabel ? <> de <strong>{journeyLabel}</strong></> : ""}.{" "}
+              <button
+                type="button"
+                onClick={() => router.push(`/players/${userId}`)}
+                className="underline hover:text-[var(--pixel-primary)]"
+              >
+                Voltar para o perfil atual
+              </button>
+            </p>
+          </PixelCard>
+        )}
 
         {/* Player card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>

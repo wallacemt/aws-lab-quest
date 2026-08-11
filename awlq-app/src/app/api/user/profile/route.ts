@@ -148,6 +148,22 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Certificacao selecionada nao encontrada." }, { status: 400 });
   }
 
+  // Once a certification is set, trocar de alvo tem que passar por
+  // POST /api/journeys (arquiva a jornada atual e abre uma nova) para manter
+  // XP/historico separados por certificacao. Aqui so permitimos a primeira
+  // definicao (onboarding / migracao de contas antigas sem preset resolvido).
+  const existingProfile = await prisma.userProfile.findUnique({
+    where: { userId: auth.user.id },
+    select: { certificationPresetId: true },
+  });
+
+  if (existingProfile?.certificationPresetId && existingProfile.certificationPresetId !== certificationPreset.id) {
+    return NextResponse.json(
+      { error: "Para trocar de certificacao alvo, inicie uma nova jornada no seu perfil." },
+      { status: 409 }
+    );
+  }
+
   const usernameOwner = await prisma.user.findFirst({
     where: {
       username: sanitizedProfile.username,

@@ -5,9 +5,11 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 import { AchievementsView } from "@/components/ui/achievements-view";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { BadgesView } from "@/components/ui/badges-view";
+import { InfoToast } from "@/components/ui/info-toast";
 import { UserProfileModal } from "@/components/ui/user-profile-modal";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
@@ -21,6 +23,8 @@ import { clearOnboardingStep, getOnboardingStep, setOnboardingStep } from "@/lib
 import { AchievementItem } from "@/lib/achievements";
 import { CertificationAchievementModal } from "@/features/user/components/CertificationAchievementModal";
 import { CertBadgeEditModal } from "@/features/user/components/CertBadgeEditModal";
+import { StartJourneyModal } from "@/features/user/components/StartJourneyModal";
+import { PastJourneysCard } from "@/features/user/components/PastJourneysCard";
 import { EvolutionTab } from "@/features/user/components/EvolutionTab";
 import { PersonalizationTab } from "@/features/user/components/PersonalizationTab";
 import { PrivacyTab } from "@/features/user/components/PrivacyTab";
@@ -64,6 +68,7 @@ export function ProfileScreen() {
   const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [certBadges, setCertBadges] = useState<CertBadge[]>([]);
   const [certAchievementOpen, setCertAchievementOpen] = useState(false);
+  const [startJourneyOpen, setStartJourneyOpen] = useState(false);
   const [editingBadge, setEditingBadge] = useState<CertBadge | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboardingProfile = getOnboardingStep() === "profile";
@@ -432,24 +437,31 @@ export function ProfileScreen() {
                 </PixelCard>
               )}
 
-              <div className="flex items-center gap-3">
-                <PixelButton id="edit-profile-btn" onClick={() => setEditProfileOpen(true)} disabled={saving}>
-                  {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
-                </PixelButton>
-                <PixelButton
-                  variant="ghost"
-                  onClick={() => {
-                    setSaveMsg(null);
-                    setSaveError(null);
-                    void reloadProfile();
-                  }}
-                  disabled={saving}
-                >
-                  Atualizar dados
+              <div className="flex flex-col   gap-3">
+                <div className="flex items-center justify-evenly flex-wrap gap-2">
+                  <PixelButton id="edit-profile-btn" onClick={() => setEditProfileOpen(true)} disabled={saving}>
+                    {isOnboardingProfile ? "Completar perfil" : "Editar perfil"}
+                  </PixelButton>
+                  <PixelButton
+                    variant="ghost"
+                    onClick={() => {
+                      setSaveMsg(null);
+                      setSaveError(null);
+                      void reloadProfile();
+                    }}
+                    disabled={saving}
+                  >
+                    Atualizar dados
+                  </PixelButton>
+                </div>
+                <PixelButton variant="ghost" onClick={() => setStartJourneyOpen(true)} disabled={saving}>
+                  Iniciar nova certificação
                 </PixelButton>
                 {saveMsg && <span className="font-sans text-sm text-[var(--pixel-accent)]">{saveMsg}</span>}
               </div>
             </PixelCard>
+
+            {user?.id && <PastJourneysCard userId={user.id} />}
 
             {/* Badges collection */}
             <PixelCard>
@@ -589,6 +601,7 @@ export function ProfileScreen() {
           profile={profile}
           currentUsername={profile.username}
           certificationOptions={certificationOptions}
+          certificationLocked={!isOnboardingProfile && !needsCertificationReview}
           onSave={handleSave}
         />
 
@@ -597,6 +610,17 @@ export function ProfileScreen() {
           onClose={() => setCertAchievementOpen(false)}
           certificationOptions={certificationOptions}
           onBadgeAdded={(badge) => setCertBadges((prev) => [badge, ...prev])}
+        />
+
+        <StartJourneyModal
+          open={startJourneyOpen}
+          onClose={() => setStartJourneyOpen(false)}
+          certificationOptions={certificationOptions}
+          currentCertification={profile.certification}
+          onStarted={() => {
+            toast.custom(() => <InfoToast message="Nova jornada iniciada!" icon="🚀" />, { duration: 3000 });
+            void reloadProfile();
+          }}
         />
 
         <CertBadgeEditModal

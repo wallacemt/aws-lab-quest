@@ -52,6 +52,10 @@ const { mockRequireApprovedUser, mockPrisma } = vi.hoisted(() => {
 vi.mock("@/lib/user-auth", () => ({ requireApprovedUser: mockRequireApprovedUser }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/achievements", () => ({ syncAndGetNewAchievements: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/lib/certification-journey", () => ({
+  getOrCreateActiveJourney: vi.fn().mockResolvedValue({ id: "journey-1" }),
+  resolveJourneyFilter: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/lib/xp-weights", () => ({
   applyWeightedXp: vi.fn().mockReturnValue(50),
   listXpWeightsByActivity: vi.fn().mockResolvedValue([]),
