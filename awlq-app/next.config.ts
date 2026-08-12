@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Expose public Supabase vars to the browser (URL and anon key are not secrets).
-  allowedDevOrigins: ["192.168.248.202"],
+  
+  allowedDevOrigins: ["192.168.0.105"],
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
@@ -42,6 +43,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self'",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+              "frame-src 'self' https://www.youtube.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "object-src 'none'",

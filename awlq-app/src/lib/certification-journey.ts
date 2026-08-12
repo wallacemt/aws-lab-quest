@@ -22,17 +22,44 @@ export async function getOrCreateActiveJourney(userId: string): Promise<Certific
   const existing = await getActiveJourney(userId);
   if (existing) return existing;
 
-  const profile = await prisma.userProfile.findUnique({
-    where: { userId },
-    select: { certificationPresetId: true, certification: true },
-  });
+  return prisma.$transaction(async (tx) => {
+    // Re-check inside the transaction: two concurrent callers can both pass
+    // the check above, and without this we'd create two ACTIVE journeys.
+    const stillActive = await tx.certificationJourney.findFirst({ where: { userId, status: "ACTIVE" } });
+    if (stillActive) return stillActive;
 
-  return prisma.certificationJourney.create({
-    data: {
-      userId,
-      certificationPresetId: profile?.certificationPresetId ?? null,
-      certificationLabel: profile?.certification ?? "",
-    },
+    const profile = await tx.userProfile.findUnique({
+      where: { userId },
+      select: { certificationPresetId: true, certification: true },
+    });
+
+    // Reopen a previous journey for the current preset instead of creating a
+    // duplicate — same dedup startNewJourney does. Without this, the first
+    // activity write after a preset switch (e.g. a KC answer landing before
+    // the user ever opens "Nova Jornada" for it) forks a second, empty
+    // journey for a certification the user may already have an archived one
+    // for, instead of reopening it.
+    const existingForPreset = profile?.certificationPresetId
+      ? await tx.certificationJourney.findFirst({
+          where: { userId, certificationPresetId: profile.certificationPresetId },
+          orderBy: { startedAt: "desc" },
+        })
+      : null;
+
+    if (existingForPreset) {
+      return tx.certificationJourney.update({
+        where: { id: existingForPreset.id },
+        data: { status: "ACTIVE", startedAt: new Date(), endedAt: null },
+      });
+    }
+
+    return tx.certificationJourney.create({
+      data: {
+        userId,
+        certificationPresetId: profile?.certificationPresetId ?? null,
+        certificationLabel: profile?.certification ?? "",
+      },
+    });
   });
 }
 
