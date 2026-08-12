@@ -14,6 +14,7 @@ import { SprintQuestion } from "@/features/retention/services/retention-api";
 import { QuestionOption } from "@/lib/types";
 import { triggerConfetti } from "@/features/utils/funcs/simulado-utils";
 import { SparklesIcon } from "lucide-react";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 
 type SprintMode = "s3" | "s5" | "s10";
 
@@ -139,6 +140,10 @@ export function SprintScreen() {
             <div className="flex items-center gap-2">
               <SparklesIcon size={36} />
               <h1 className="font-mono text-sm uppercase tracking-wide text-pixel-text">Sprint Mode</h1>
+              <FeatureHelpButton
+                title="Sprint Mode"
+                description="Sessões ultra-rápidas de questões para manter o ritmo de estudo em poucos minutos. Escolha o modo de sprint que melhor se encaixa no tempo que você tem disponível agora."
+              />
             </div>
             <p className="font-mono text-xs text-pixel-subtext">
               Sessões ultra-rápidas para manter o ritmo. Escolha o modo:

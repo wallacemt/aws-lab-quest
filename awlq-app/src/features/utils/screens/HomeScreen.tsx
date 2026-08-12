@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import GameCard from "../../../components/ui/game-card";
@@ -14,6 +14,8 @@ import type { AppEntry, HomeConfig } from "@/app/api/admin/home-config/route";
 import { fetchDailyQuiz } from "@/features/daily-quiz/services/daily-quiz-api";
 import { useRealtimeChannel } from "@/hooks/useRealtimeLeaderboard";
 import { HOME_CONFIG_REALTIME_CHANNEL, HOME_CONFIG_REALTIME_EVENT } from "@/lib/realtime-constants";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { getCertWelcomeHeadline } from "@/features/utils/data/cert-welcome-messages";
 
 const DAILY_QUIZ_MODE: GameMode = {
   id: "quiz-diario",
@@ -132,9 +134,15 @@ type DailyQuizHomeState = "hidden" | "available" | "done";
 
 export function HomeScreen() {
   const router = useRouter();
+  const { profile } = useUserProfile();
   const [showJornada, setShowJornada] = useState(false);
   const [config, setConfig] = useState<AppEntry[]>([]);
   const [dailyQuizState, setDailyQuizState] = useState<DailyQuizHomeState>("hidden");
+
+  const welcomeHeadline = useMemo(
+    () => getCertWelcomeHeadline(profile.certificationPresetCode),
+    [profile.certificationPresetCode],
+  );
 
   const fetchConfig = useCallback(() => {
     void fetch("/api/admin/home-config")
@@ -209,9 +217,10 @@ export function HomeScreen() {
             <div className="inline-block px-3 py-1 border-2 border-green-900 bg-green-800/20 retro-shadow text-accent font-mono font-bold text-xs md:text-sm rounded-full mb-4 uppercase tracking-wider">
               Subindo de level ate a certificação AWS
             </div>
-            <h2 className="font-mono text-3xl md:text-4xl font-bold text-pixel-text mb-4 uppercase tracking-tight">
-              Selecione seu <span className="text-primary animate-pulse">Desafio</span>
+            <h2 className="font-mono text-3xl md:text-4xl font-bold text-pixel-text mb-2 uppercase tracking-tight">
+              Bem-vindo{profile.name ? `, ${profile.name}` : ""}!
             </h2>
+            <p className="font-mono text-lg md:text-xl font-bold text-primary mb-4">{welcomeHeadline}</p>
             <p className="text-pixel-subtext text-base md:text-lg max-w-2xl">
               Escolha um modo abaixo para iniciar seu treinamento. Ganhe XP, conquiste badges e prepare-se para a
               certificação AWS.

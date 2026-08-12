@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { FlashcardDeck } from "@/features/retention/components/FlashcardDeck";
 import { FlashcardManager } from "@/features/retention/components/FlashcardManager";
 import { FlashcardGradeLegend } from "@/features/retention/components/FlashcardGradeLegend";
@@ -93,7 +94,13 @@ export function FlashcardsScreen() {
           ← Voltar
         </PixelButton>
         <PixelCard className="flex flex-col items-center justify-between gap-3">
-          <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)] ">Flashcards</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-sm uppercase tracking-wide text-[var(--pixel-text)] ">Flashcards</h1>
+            <FeatureHelpButton
+              title="Flashcards"
+              description="Revise conceitos AWS com repetição espaçada: cada carta que você avalia reaparece em um intervalo calculado com base na sua nota, priorizando o que você mais precisa reforçar."
+            />
+          </div>
           <div className="flex flex-col-reverse items-center gap-3">
             <p className="font-mono text-xs text-[var(--pixel-subtext)]">{dueTotal} para hoje</p>
             <div className="flex gap-2">

@@ -7,6 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MentorActionList } from "@/features/mentor/components/MentorActionList";
@@ -193,7 +194,13 @@ export function MentorScreen() {
               <p className="font-mono text-[8px] uppercase text-[var(--pixel-subtext)] tracking-widest mb-1">
                 Mestre AWS — IA Mentor
               </p>
-              <h1 className="font-mono text-md font-bold uppercase text-[var(--pixel-text)]">Guia do Jedi AWS</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-mono text-md font-bold uppercase text-[var(--pixel-text)]">Guia do Jedi AWS</h1>
+                <FeatureHelpButton
+                  title="Mentor IA"
+                  description="Converse com o Mestre AWS, um mentor de IA que responde dúvidas sobre serviços e conceitos AWS e sugere recomendações de estudo personalizadas com base no seu histórico."
+                />
+              </div>
               <p className="font-mono text-[11px] text-[var(--pixel-subtext)] mt-1 italic">
                 &ldquo;Forte na Cloud, você deve ser. O caminho da certificação, longo é — mas começar, o mais
                 importante.&rdquo;

@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { ContentCard } from "@/features/library/components/ContentCard";
 import type { LibraryContentLite } from "@/features/library/types";
 import type { LibraryContentType } from "@prisma/client";
 import { useRouter } from "next/navigation";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 const CATEGORIES = [
   "Todos",
@@ -19,6 +21,20 @@ const CATEGORIES = [
   "Database",
   "Serverless",
 ] as const;
+
+// Maps the user's target certification (profile.certificationPresetCode) to the closest
+// Library category, so opening the Library starts pre-filtered to what they're studying for.
+const CERT_CODE_TO_CATEGORY: Record<string, (typeof CATEGORIES)[number]> = {
+  "CLF-C02": "Practitioner",
+  "SAA-C03": "SAA",
+  "SAP-C02": "SAA",
+  "DVA-C02": "Developer",
+  "SOA-C02": "SysOps",
+  "DOP-C02": "SysOps",
+  "SCS-C02": "Security",
+  "ANS-C01": "Networking",
+  "DEA-C01": "Database",
+};
 
 const TYPE_OPTIONS: { label: string; value: LibraryContentType | "Todos"; tooltip: string }[] = [
   { label: "Todos", value: "Todos", tooltip: "Exibir todos os tipos de conteúdo" },
@@ -33,10 +49,22 @@ interface LibraryScreenProps {
 }
 
 export function LibraryScreen({ initialContent }: LibraryScreenProps) {
+  const { profile, hydrated } = useUserProfile();
   const [activeCategory, setActiveCategory] = useState<string>("Todos");
   const [activeType, setActiveType] = useState<LibraryContentType | "Todos">("Todos");
   const [searchQuery, setSearchQuery] = useState<string>("");
-const router = useRouter();
+  const router = useRouter();
+  const appliedDefaultCategory = useRef(false);
+
+  // Pre-select the category matching the user's target certification, once — after
+  // that the filter is fully manual so we never fight a selection the user made.
+  useEffect(() => {
+    if (appliedDefaultCategory.current || !hydrated) return;
+    appliedDefaultCategory.current = true;
+    const suggested = CERT_CODE_TO_CATEGORY[profile.certificationPresetCode];
+    if (suggested) setActiveCategory(suggested);
+  }, [hydrated, profile.certificationPresetCode]);
+
   const filtered = useMemo(() => {
     return initialContent.filter((item) => {
       if (activeCategory !== "Todos" && item.category !== activeCategory) return false;
@@ -72,7 +100,13 @@ const router = useRouter();
 
       {/* Header */}
       <PixelCard>
-        <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Biblioteca</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Biblioteca</h1>
+          <FeatureHelpButton
+            title="Biblioteca"
+            description="Materiais de estudo, artigos e infográficos selecionados para complementar sua preparação AWS. Filtre por categoria ou tipo de conteúdo para encontrar o material certo."
+          />
+        </div>
         <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
           Materiais de estudo, artigos e infográficos selecionados para sua jornada AWS.
         </p>

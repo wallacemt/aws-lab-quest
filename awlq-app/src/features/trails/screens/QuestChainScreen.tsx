@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { QuestChainMap } from "@/features/trails/components/QuestChainMap";
 import { fetchTrails, type QuestChain, type QuestStage } from "@/features/trails/services/trails-api";
 
@@ -138,7 +139,13 @@ export function QuestChainScreen() {
           ← Voltar
         </PixelButton>
 
-        <h1 className="font-mono text-sm uppercase tracking-wide text-primary">Trilhas de Aprendizagem</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="font-mono text-sm uppercase tracking-wide text-primary">Trilhas de Aprendizagem</h1>
+          <FeatureHelpButton
+            title="Trilhas de Aprendizagem"
+            description="Percursos guiados por tópico AWS, organizados em etapas progressivas. Avance pelas etapas de cada trilha para reforçar um serviço ou área específica antes de seguir para a próxima."
+          />
+        </div>
 
         {/* Progress tabs */}
         <div className="flex border-2 border-[var(--pixel-border)]">

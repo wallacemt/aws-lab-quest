@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { JornadaMap, type JornadaStage } from "@/features/jornada/components/JornadaMap";
 
 type JornadaData = {
@@ -42,7 +43,13 @@ export function JornadaScreen() {
     <AppLayout>
       <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-8 xl:px-8">
         <PixelCard className="space-y-1">
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Jornada do Heroi</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Jornada do Heroi</h1>
+            <FeatureHelpButton
+              title="Jornada do Herói"
+              description="Sua trilha de simulados rumo à certificação AWS escolhida, do nível iniciante até o simulado BOSS final. Cada etapa concluída libera a próxima."
+            />
+          </div>
           <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Sua trilha de simulados rumo a certificacao AWS, do iniciante ao BOSS.
           </p>

@@ -1,130 +1,44 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { getOnboardingStep, setOnboardingStep } from "@/lib/onboarding";
 import { CreatorCredits } from "@/components/ui/creator-credits";
-
-const manualSections = [
-  {
-    title: "1. Comece pelo perfil",
-    objective: "Preencha nome, certificacao AWS alvo e tema favorito para destravar a experiencia completa.",
-    howTo: [
-      "Acesse a aba de perfil assim que terminar este manual.",
-      "Informe o nome que vai aparecer no ranking e no historico.",
-      "Escolha a certificacao que voce esta perseguindo para deixar sua jornada contextualizada.",
-      "Defina um tema favorito para gerar quests mais alinhadas ao seu estilo.",
-    ],
-    bestExperience:
-      "Quanto mais claro estiver seu perfil, mais consistente fica a experiencia entre quests, badges e historico.",
-  },
-  {
-    title: "2. Gere quests com contexto real",
-    objective: "Transforme um lab AWS em uma sequencia de tarefas gamificadas.",
-    howTo: [
-      "Na Home, cole um texto de laboratorio AWS com objetivos, etapas e servicos envolvidos.",
-      "Use um tema que faca sentido para voce ou mantenha o tema favorito salvo no perfil.",
-      "Revise o texto antes de enviar para evitar entradas vagas ou incompletas.",
-    ],
-    bestExperience:
-      "Use labs com passos claros e servicos especificos. Isso gera quests mais coerentes e evita desperdicio de tokens.",
-  },
-  {
-    title: "3. Execute uma quest por vez",
-    objective: "Concluir cada jornada sem perder progresso nem contexto.",
-    howTo: [
-      "Abra a quest gerada e avance tarefa por tarefa.",
-      "Se precisar interromper, volte depois e continue a quest atual em vez de gerar outra.",
-      "Marque as tarefas conforme concluir para acumular XP corretamente.",
-    ],
-    bestExperience:
-      "Terminar a quest em andamento antes de criar outra evita retrabalho e reduz consumo desnecessario de geracao.",
-  },
-  {
-    title: "4. Acompanhe sua evolucao",
-    objective: "Usar historico, leaderboard em tempo real, badges e conquistas para medir progresso.",
-    howTo: [
-      "Consulte o historico para revisar quests concluidas e XP acumulado.",
-      "Use o leaderboard para comparar consistencia de estudo com outros jogadores em tempo real.",
-      "Acompanhe o contador de usuarios online no cabecalho quando houver mais de 1 jogador ativo.",
-      "Confira badges e a pagina de conquistas para planejar os proximos desbloqueios.",
-      "Compartilhe badges e conquistas desbloqueadas com links publicos.",
-    ],
-    bestExperience:
-      "Volte ao historico depois de cada sessao de estudo para identificar temas recorrentes e manter ritmo de pratica.",
-  },
-  {
-    title: "5. Simulado com guia oficial",
-    objective: "Garantir que os simulados sigam o exam guide oficial da certificacao alvo.",
-    howTo: [
-      "No admin, envie primeiro o PDF do Exam Guide da certificacao.",
-      "Se o PDF for escaneado e sem texto selecionavel, use o campo de fallback manual.",
-      "Somente apos salvar o exam guide, envie os PDFs de simulados para gerar questoes.",
-      "No fim do simulado, revise os pontos de fraqueza por servico para evolucao direcionada.",
-    ],
-    bestExperience:
-      "Sempre mantenha o exam guide atualizado para que a geracao de questoes continue aderente aos topicos e pesos oficiais.",
-  },
-  {
-    title: "6. Ajuste a experiencia ao seu ritmo",
-    objective: "Aproveitar recursos de acessibilidade e personalizacao sem perder foco.",
-    howTo: [
-      "Use o controle de fonte no cabecalho para melhorar leitura durante labs longos.",
-      "Alterne entre temas claro e escuro conforme seu ambiente.",
-      "Atualize avatar e perfil quando quiser manter sua identidade de jogador consistente.",
-    ],
-    bestExperience: "Pequenos ajustes de leitura e contraste aumentam a qualidade das sessoes mais longas.",
-  },
-];
-
-const tutorialShowcase = [
-  {
-    id: "lab-quest-v1",
-    title: "Tutorial: Criando uma Lab Quest",
-    videoUrl: "https://youtu.be/QdR2LqiS4sQ",
-    summary:
-      "Mostra o fluxo completo para gerar uma quest a partir de um texto de laboratorio, concluir tarefas e finalizar com XP salvo no historico.",
-    highlights: [
-      "Entradas de tema e texto do lab com boas praticas",
-      "Execucao tarefa por tarefa com progresso",
-      "Finalizacao da jornada e validacao de XP/historico",
-    ],
-  },
-  {
-    id: "kc-v1",
-    title: "Tutorial: Criando uma sessao de KC",
-    videoUrl: "https://youtu.be/6Ij6GgQjoLQ",
-    summary:
-      "Explica como configurar topicos e dificuldade, responder com revisao por alternativa e concluir a sessao de Knowledge Check.",
-    highlights: [
-      "Selecao de servicos AWS e dificuldade",
-      "Revisao de resposta com explicacao por alternativa",
-      "Resultado final com score, XP e persistencia no historico",
-    ],
-  },
-  {
-    id: "simulado-v1",
-    title: "Tutorial: Criando uma sessao de Simulado",
-    videoUrl: "https://youtu.be/f1vfjb_ZEJs",
-    summary:
-      "Cobre o gate de regras, prova cronometrada, envio do simulado e revisao dos pontos fracos para orientar os proximos estudos.",
-    highlights: [
-      "Aceite de regras e inicio da prova",
-      "Execucao do simulado com timer e navegacao por questao",
-      "Overview de desempenho e revisao de fraquezas",
-    ],
-  },
-] as const;
+import { FAQ_ITEMS, FaqItem, getYoutubeEmbedUrl, matchesQuery, TOPICS, tutorialShowcase } from "../data/faq-help-data";
 
 export function HelpScreen() {
   const router = useRouter();
   const isOnboardingManual = getOnboardingStep() === "manual";
+  const [query, setQuery] = useState("");
+  const [activeTopic, setActiveTopic] = useState<string>("Todos");
 
   function handleContinue() {
     setOnboardingStep("profile");
     router.replace("/profile");
+  }
+
+  const filtersActive = query.trim().length > 0 || activeTopic !== "Todos";
+
+  const filteredItems = useMemo(() => {
+    return FAQ_ITEMS.filter(
+      (item) => (activeTopic === "Todos" || item.topic === activeTopic) && (!query.trim() || matchesQuery(item, query)),
+    );
+  }, [query, activeTopic]);
+
+  const groupedByTopic = useMemo(() => {
+    const map = new Map<string, FaqItem[]>();
+    for (const item of filteredItems) {
+      map.set(item.topic, [...(map.get(item.topic) ?? []), item]);
+    }
+    return TOPICS.filter((topic) => map.has(topic)).map((topic) => ({ topic, items: map.get(topic)! }));
+  }, [filteredItems]);
+
+  function clearFilters() {
+    setQuery("");
+    setActiveTopic("Todos");
   }
 
   return (
@@ -132,13 +46,13 @@ export function HelpScreen() {
       <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 xl:px-8">
         <PixelCard className="overflow-hidden bg-[linear-gradient(135deg,var(--pixel-card)_0%,var(--pixel-bg)_100%)]">
           <div className="space-y-4">
-            <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Manual do jogador</p>
+            <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Central de ajuda</p>
             <h1 className="font-mono text-sm uppercase leading-6 text-[var(--pixel-primary)] sm:text-base">
-              Como usar o AWS Quest do jeito certo
+              Perguntas frequentes e tutoriais do AWS Quest
             </h1>
             <p className="max-w-3xl font-[var(--font-body)] text-base leading-7 text-[var(--pixel-text)]">
-              Este manual mostra o que fazer em cada parte do app e como configurar sua rotina para ter a melhor
-              experiencia ao estudar laboratorios AWS em formato de quest.
+              Busque pela sua dúvida ou filtre por tópico abaixo. Cada modo do app (Lab, KC, Simulado, Arena, Trilhas e
+              mais) tem suas principais perguntas respondidas aqui.
             </p>
           </div>
         </PixelCard>
@@ -147,8 +61,8 @@ export function HelpScreen() {
           <PixelCard className="space-y-3 border-[var(--pixel-primary)] bg-[var(--pixel-primary)]/10">
             <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Primeiro acesso</p>
             <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-              Leia os pontos principais abaixo. Quando terminar, confirme para seguir direto para o perfil e completar
-              nome, certificacao e tema favorito.
+              Dê uma olhada nas perguntas principais abaixo. Quando terminar, confirme para seguir direto para o perfil
+              e completar nome, certificação e tema favorito.
             </p>
             <div className="flex flex-wrap gap-3">
               <PixelButton onClick={handleContinue}>Li e continuar</PixelButton>
@@ -156,38 +70,94 @@ export function HelpScreen() {
           </PixelCard>
         )}
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          {manualSections.map((section) => (
-            <PixelCard key={section.title} className="space-y-4">
-              <div className="space-y-2">
-                <h2 className="font-mono text-[10px] uppercase leading-5 text-[var(--pixel-primary)]">
-                  {section.title}
-                </h2>
-                <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-                  {section.objective}
-                </p>
-              </div>
+        <section className="space-y-4">
+          <PixelCard className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--pixel-accent)]">
+                Buscar dúvida
+              </p>
+              {filtersActive && (
+                <PixelButton variant="ghost" className="text-[10px]" onClick={clearFilters}>
+                  Limpar filtros
+                </PixelButton>
+              )}
+            </div>
 
-              <div className="space-y-2">
-                <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Como fazer</p>
-                <ul className="space-y-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-                  {section.howTo.map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <span className="pt-[2px] font-mono text-[8px] text-[var(--pixel-accent)]">■</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <input
+              type="search"
+              placeholder="Ex.: como funciona o simulado, conquista, boss..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full border border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-xs text-[var(--pixel-text)] placeholder-[var(--pixel-subtext)] focus:border-[var(--pixel-text)] focus:outline-none"
+              aria-label="Buscar dúvida"
+            />
 
-              <div className="border-t-2 border-dashed border-[var(--pixel-border)] pt-3">
-                <p className="font-mono text-[9px] uppercase text-[var(--pixel-subtext)]">Melhor experiencia</p>
-                <p className="mt-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-                  {section.bestExperience}
-                </p>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTopic("Todos")}
+                className={`border px-3 py-1 font-mono text-xs transition-colors ${
+                  activeTopic === "Todos"
+                    ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)] text-[var(--pixel-bg)]"
+                    : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-accent)] hover:text-[var(--pixel-accent)]"
+                }`}
+              >
+                Todos
+              </button>
+              {TOPICS.map((topic) => (
+                <button
+                  key={topic}
+                  type="button"
+                  onClick={() => setActiveTopic(topic)}
+                  className={`border px-3 py-1 font-mono text-xs transition-colors ${
+                    activeTopic === topic
+                      ? "border-[var(--pixel-accent)] bg-[var(--pixel-accent)] text-[var(--pixel-bg)]"
+                      : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-accent)] hover:text-[var(--pixel-accent)]"
+                  }`}
+                >
+                  {topic}
+                </button>
+              ))}
+            </div>
+          </PixelCard>
+
+          <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">
+            {filteredItems.length} {filteredItems.length === 1 ? "dúvida encontrada" : "dúvidas encontradas"}
+            {filtersActive ? " (com filtros ativos)" : ""}
+          </p>
+
+          {groupedByTopic.length === 0 ? (
+            <PixelCard className="py-8 text-center">
+              <p className="font-mono text-sm text-[var(--pixel-subtext)]">
+                Nenhuma dúvida encontrada com os filtros selecionados.
+              </p>
+              <PixelButton variant="ghost" className="mt-3 text-xs" onClick={clearFilters}>
+                Limpar filtros
+              </PixelButton>
             </PixelCard>
-          ))}
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {groupedByTopic.map(({ topic, items }) => (
+                <PixelCard key={topic} className="space-y-3">
+                  <h2 className="font-mono text-[10px] uppercase tracking-widest text-[var(--pixel-accent)]">
+                    {topic}
+                  </h2>
+                  <div className="divide-y-2 divide-dashed divide-[var(--pixel-border)]">
+                    {items.map((item) => (
+                      <details key={item.id} className="py-3 first:pt-0 last:pb-0" open={filtersActive}>
+                        <summary className="cursor-pointer font-[var(--font-body)] text-sm font-semibold leading-6 text-[var(--pixel-text)] hover:text-[var(--pixel-primary)]">
+                          {item.question}
+                        </summary>
+                        <p className="mt-2 font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-subtext)]">
+                          {item.answer}
+                        </p>
+                      </details>
+                    ))}
+                  </div>
+                </PixelCard>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="space-y-3">
@@ -195,41 +165,60 @@ export function HelpScreen() {
             <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Tutoriais em video</p>
             <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Showcase de fluxos guiados</h2>
             <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-              Acesse os videos oficiais de LAB, KC e Simulado com um resumo rapido de cada jornada.
+              Assista direto aqui aos videos oficiais de novidades da V2, Lab, KC e Simulado.
             </p>
           </PixelCard>
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            {tutorialShowcase.map((tutorial) => (
-              <PixelCard key={tutorial.id} className="space-y-3">
-                <div className="space-y-2">
-                  <h3 className="font-mono text-[10px] uppercase leading-5 text-[var(--pixel-primary)]">
-                    {tutorial.title}
-                  </h3>
-                  <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
-                    {tutorial.summary}
-                  </p>
-                </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {tutorialShowcase.map((tutorial) => {
+              const embedUrl = getYoutubeEmbedUrl(tutorial.videoUrl);
+              return (
+                <PixelCard key={tutorial.id} className="space-y-3">
+                  <div className="space-y-2">
+                    <h3 className="font-mono text-[10px] uppercase leading-5 text-[var(--pixel-primary)]">
+                      {tutorial.title}
+                    </h3>
+                    <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
+                      {tutorial.summary}
+                    </p>
+                  </div>
 
-                <ul className="space-y-1 font-[var(--font-body)] text-xs leading-5 text-[var(--pixel-text)]">
-                  {tutorial.highlights.map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <span className="pt-[2px] font-mono text-[8px] text-[var(--pixel-accent)]">■</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+                  {embedUrl && (
+                    <div
+                      className="relative w-full overflow-hidden border-2 border-[var(--pixel-border)]"
+                      style={{ paddingTop: "56.25%" }}
+                    >
+                      <iframe
+                        src={embedUrl}
+                        title={tutorial.title}
+                        className="absolute inset-0 h-full w-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
 
-                <a
-                  href={tutorial.videoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
-                >
-                  Assistir tutorial
-                </a>
-              </PixelCard>
-            ))}
+                  <ul className="space-y-1 font-[var(--font-body)] text-xs leading-5 text-[var(--pixel-text)]">
+                    {tutorial.highlights.map((item) => (
+                      <li key={item} className="flex gap-2">
+                        <span className="pt-[2px] font-mono text-[8px] text-[var(--pixel-accent)]">■</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <a
+                    href={tutorial.videoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-3 py-2 font-mono text-[10px] uppercase hover:bg-[var(--pixel-muted)]"
+                  >
+                    Abrir no YouTube
+                  </a>
+                </PixelCard>
+              );
+            })}
           </div>
         </section>
         <CreatorCredits compact={false} />
