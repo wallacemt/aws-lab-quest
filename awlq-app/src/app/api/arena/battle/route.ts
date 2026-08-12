@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
     : [];
   const answersSnapshot = [...existingSnapshot, ...roundSnapshotEntries];
 
-  let newAchievements: { code: string; name: string }[] = [];
+  let newAchievements: Awaited<ReturnType<typeof syncAndGetNewAchievements>> = [];
 
   await prisma.bossBattle.update({
     where: { id: battle.id },
