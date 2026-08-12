@@ -25,7 +25,7 @@ export type BattleResult = {
   streak: number;
   victory: boolean;
   gainedXp?: number;
-  newAchievements?: { code: string; name: string }[];
+  newAchievements?: { code: string; name: string; description: string; rarity: string; imageUrl: string | null }[];
 };
 
 export type WeeklyChallengeData = {

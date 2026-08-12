@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchBosses, type BossWithBattle } from "@/features/arena/services/arena-api";
 import Image from "next/image";
@@ -75,7 +76,13 @@ export function BattleScreen() {
       <AppLayout>
         <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
           <PixelCard>
-            <h1 className="font-mono text-sm uppercase text-primary">Arena de Batalha</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-mono text-sm uppercase text-primary">Arena de Batalha</h1>
+              <FeatureHelpButton
+                title="Arena de Batalha"
+                description="Escolha um boss para enfrentar em um duelo de questões: cada resposta correta desfere um ataque que reduz o HP do boss. Vença antes de errar demais para desbloquear a recompensa."
+              />
+            </div>
             <p className="mt-1 font-[var(--font-body)] text-sm text-pixel-subtext">
               Escolha um boss para enfrentar e responda questões para reduzir seu HP.
             </p>
@@ -105,7 +112,13 @@ export function BattleScreen() {
           ← Voltar
         </PixelButton>
         <PixelCard>
-          <h1 className="font-mono text-sm uppercase text-primary">Arena de Batalha</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-sm uppercase text-primary">Arena de Batalha</h1>
+            <FeatureHelpButton
+              title="Arena de Batalha"
+              description="Escolha um boss para enfrentar em um duelo de questões: cada resposta correta desfere um ataque que reduz o HP do boss. Vença antes de errar demais para desbloquear a recompensa."
+            />
+          </div>
           <p className="mt-1 font-[var(--font-body)] text-sm text-pixel-subtext">
             Escolha um boss para enfrentar e responda questões para reduzir seu HP.
           </p>

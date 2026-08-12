@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { ArenaLoading } from "@/features/arena/components/ArenaLoading";
 import { ArenaScenarioPicker } from "@/features/arena/components/ArenaScenarioPicker";
 import { BossBattleStage, type BattleFeedback } from "@/features/arena/components/BossBattleStage";
 import { submitBattle, type BossWithBattle } from "@/features/arena/services/arena-api";
+import { AchievementToast } from "@/features/study/components/notifications/AchievementToast";
 import { playDefeatSound, playSuccessSound, triggerConfetti } from "@/features/utils/funcs/simulado-utils";
 import { useArenaBattleStore } from "@/stores/arenaBattleStore";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -125,6 +127,14 @@ export function BattleStageScreen({ boss }: Props) {
           setVictory(true);
           void triggerConfetti();
           playSuccessSound();
+          result.newAchievements?.forEach((achievement, index) => {
+            setTimeout(() => {
+              toast.custom(() => AchievementToast({ achievement }), {
+                duration: 6000,
+                position: "top-center",
+              });
+            }, (index + 1) * 700);
+          });
         } else if (isDefeated) {
           setDefeated(true);
           playDefeatSound();

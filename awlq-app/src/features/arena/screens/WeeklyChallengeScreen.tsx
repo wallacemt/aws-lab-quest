@@ -7,6 +7,7 @@ import { ErrorForScreens } from "@/components/ui/error-screens";
 import { LoadingForScreens } from "@/components/ui/loading-screens";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { QuestionCardQuestion, QuestionOptionsCard } from "@/features/study/components/QuestionOptionsCard";
 import { QuestionSideNav } from "@/features/study/components/QuestionSideNav";
 import { useWeeklyChallenge } from "@/features/arena/hooks/useWeeklyChallenge";
@@ -55,7 +56,13 @@ export function WeeklyChallengeScreen() {
         <div className="mx-auto max-w-2xl space-y-6 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="font-mono text-lg font-bold uppercase text-primary">Desafio Semanal</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-mono text-lg font-bold uppercase text-primary">Desafio Semanal</h1>
+                <FeatureHelpButton
+                  title="Desafio Semanal"
+                  description="Um novo conjunto de questões liberado toda semana, igual para todos os jogadores. Responda enquanto o desafio estiver ativo para competir e ganhar XP extra."
+                />
+              </div>
               <p className="mt-1 font-mono text-xs text-pixel-subtext">Compita com todos os usuários</p>
             </div>
             <PixelButton variant="ghost" onClick={() => router.back()}>
