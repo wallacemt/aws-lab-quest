@@ -5,6 +5,7 @@ import Image from "next/image";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { useAuth } from "@/hooks/useAuth";
 import { AchievementItem } from "@/lib/achievements";
 
@@ -78,9 +79,15 @@ export function AchievementsScreen() {
       <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 xl:px-8">
         <PixelCard className="space-y-3">
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Conquistas</p>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">
-            Galeria de conquistas AWS
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">
+              Galeria de conquistas AWS
+            </h1>
+            <FeatureHelpButton
+              title="Conquistas"
+              description="Metas de estudo desbloqueadas automaticamente com base no seu histórico de sessões (labs, KC, simulados, sequências de estudo e mais). Acompanhe o progresso de cada uma e compartilhe as conquistas liberadas com um link público."
+            />
+          </div>
           <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Desbloqueie metas de estudo, acompanhe progresso e compartilhe as conquistas liberadas.
           </p>

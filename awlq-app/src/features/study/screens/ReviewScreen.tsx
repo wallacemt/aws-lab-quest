@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchWeakServices, WeakServiceItem } from "@/features/study/services";
@@ -97,7 +98,13 @@ export function ReviewScreen() {
         </PixelButton>
 
         <PixelCard>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Revisao</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Revisao</h1>
+            <FeatureHelpButton
+              title="Modo Revisão"
+              description="Sessão de questões guiada pelos gaps de conhecimento detectados nos seus simulados — foca nos serviços AWS onde seu desempenho foi mais fraco, para acelerar sua preparação."
+            />
+          </div>
           <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Revisao guiada por gaps de conhecimento detectados nos simulados para acelerar sua preparacao.
           </p>

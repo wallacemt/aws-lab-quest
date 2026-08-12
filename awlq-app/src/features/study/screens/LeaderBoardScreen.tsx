@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { LeaderboardList, type LeaderboardListEntry } from "@/components/leaderboard/LeaderboardList";
 import { useAuth } from "@/hooks/useAuth";
 import { useRealtimeLeaderboard } from "@/hooks/useRealtimeLeaderboard";
@@ -102,7 +103,13 @@ export function LeaderBoardScreen() {
     <AppLayout>
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 xl:px-8">
         <div>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Leaderboard</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Leaderboard</h1>
+            <FeatureHelpButton
+              title="Leaderboard"
+              description="Ranking em tempo real dos jogadores com mais XP acumulado. Use para comparar sua consistência de estudo com outros usuários e buscar jogadores específicos pelo nome."
+            />
+          </div>
           <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Top 10 jogadores com mais XP acumulado
           </p>

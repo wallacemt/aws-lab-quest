@@ -31,6 +31,7 @@ import { normalizeOptionText } from "@/lib/study-option-text";
 import { QuestionOption, StudyQuestion } from "@/lib/types";
 import { STUDY_OPTIONS } from "@/features/study/constants";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 
 const OPTIONS: QuestionOption[] = STUDY_OPTIONS;
 const SERVICES_PAGE_SIZE = 12;
@@ -558,7 +559,13 @@ export function KCScreen() {
           ← Voltar
         </PixelButton>
         <PixelCard>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">KC - Knowledge Check</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">KC - Knowledge Check</h1>
+            <FeatureHelpButton
+              title="KC - Knowledge Check"
+              description="Escolha um serviço AWS e a quantidade de questões para uma revisão rápida e focada. A dificuldade é ajustada automaticamente com base nos seus gaps de aprendizado detectados em sessões anteriores."
+            />
+          </div>
           <p className="mt-2 font-sans text-sm text-[var(--pixel-subtext)]">
             Configure a sessao e inicie. A dificuldade e ajustada automaticamente com base nos seus gaps de aprendizado.
           </p>

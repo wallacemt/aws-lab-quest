@@ -35,6 +35,7 @@ import { normalizeOptionText } from "@/lib/study-option-text";
 import { STORAGE_KEYS, safeLocalStorageGet, safeLocalStorageRemove, safeLocalStorageSet } from "@/lib/storage";
 import {  SimuladoDraft, StudyQuestion, TaskDifficulty } from "@/lib/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { GAP_TOP_N, OPTIONS, RulesConsentMap, ScoreOverviewData, SimuladoPackListItem } from "@/types/questions";
 import { buildScoreOverview, buildTopicPerformance, formatTime, playAlarmBeep, playSuccessSound, triggerConfetti } from "@/features/utils/funcs/simulado-utils";
 
@@ -965,7 +966,13 @@ export function SimuladoScreen() {
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
             <PixelCard>
-              <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Simulado AWS</h1>
+                <FeatureHelpButton
+                  title="Modo Simulado AWS"
+                  description="Prova cronometrada e fiel ao exam guide oficial da sua certificação, com 65 questões e 90 minutos. Você pode marcar questões para revisão, ver uma tela de revisão antes de enviar e, ao final, conferir seus pontos fracos por serviço."
+                />
+              </div>
               <p className="mt-2 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
                 Simulado aderente a sua certificacao alvo, com 65 questoes e cronometro de 90 minutos.
               </p>

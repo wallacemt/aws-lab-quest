@@ -11,6 +11,7 @@ import { extractBoardTitle } from "@/lib/retro";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { Task } from "@/lib/types";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 
 type QuestDraft = {
   theme: string;
@@ -140,7 +141,13 @@ export function LabScreen() {
           ← Voltar
         </PixelButton>
         <PixelCard>
-          <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Lab</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Modo Lab</h1>
+            <FeatureHelpButton
+              title="Modo Lab"
+              description="Cole o enunciado de um laboratório AWS (objetivos, etapas e serviços envolvidos) e escolha um tema — a IA transforma o conteúdo em uma quest gamificada, dividida em tarefas que você completa uma a uma para ganhar XP."
+            />
+          </div>
           <p className="mt-2 font-[var(--font-body)] text-base text-[var(--pixel-subtext)]">
             Configure e gere quests a partir do conteúdo do seu laboratório AWS.
           </p>

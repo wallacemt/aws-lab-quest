@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { ACTIVE_TABS, ActiveTab, HistoryTabs } from "@/features/study/components/history/HistoryTabs";
 import { fetchQuestHistory, fetchStudyHistory, QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 
@@ -42,7 +43,13 @@ export function HistoryScreen() {
       <main className="mx-auto w-fit max-w-4xl space-y-6 px-2 py-4 xl:px-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Historico</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-mono text-sm uppercase text-[var(--pixel-primary)]">Historico</h1>
+              <FeatureHelpButton
+                title="Historico"
+                description="Consulte todas as suas quests de Lab finalizadas e sessões de estudo (KC, Sprint, Simulado, Arena e Quiz Diário). Use para identificar temas recorrentes e revisar o desempenho de cada sessão."
+              />
+            </div>
             <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
               Labs finalizados e sessoes de estudo (KC, Sprint, Simulado, Arena e Quiz Diario)
             </p>
