@@ -33,18 +33,20 @@ export function ThemeApplier() {
   useEffect(() => {
     if (!hydrated) return;
 
-    const preset = findThemePreset(profile.themePreset ?? "default");
+    // A custom theme's colors (from "Meus Temas" or the community gallery)
+    // take precedence over the builtin preset when active.
+    const vars = profile.customColors ?? findThemePreset(profile.themePreset ?? "default").vars;
     const root = document.documentElement;
 
-    if (Object.keys(preset.vars).length > 0) {
-      // Apply all pixel vars from the preset
-      for (const [key, value] of Object.entries(preset.vars)) {
+    if (Object.keys(vars).length > 0) {
+      // Apply all pixel vars from the preset/custom theme
+      for (const [key, value] of Object.entries(vars)) {
         root.style.setProperty(key, value);
       }
       // Mirror into shadcn vars so components using text-foreground / bg-background
       // stay consistent regardless of the .dark class state.
       for (const [shadcnVar, pixelVar] of Object.entries(SHADCN_SYNC_MAP)) {
-        const val = preset.vars[pixelVar];
+        const val = vars[pixelVar];
         if (val) root.style.setProperty(shadcnVar, val);
       }
     } else {
@@ -56,7 +58,7 @@ export function ThemeApplier() {
         root.style.removeProperty(key);
       }
     }
-  }, [hydrated, profile.themePreset]);
+  }, [hydrated, profile.themePreset, profile.customColors]);
 
   // Apply background image to body and signal data-has-bg on <html> so
   // CSS adaptive shell rules (.pixel-shell, .pixel-bg-adaptive) can react.

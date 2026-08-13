@@ -17,6 +17,31 @@ export const ALL_PIXEL_VARS = [
   "--pixel-muted",
 ] as const;
 
+/** Mirrors the :root default values in globals.css — used to seed the custom-theme color editor. */
+export const DEFAULT_PIXEL_VARS: Record<string, string> = {
+  "--pixel-bg": "#efe8d6",
+  "--pixel-card": "#fff8ea",
+  "--pixel-border": "#2f2a23",
+  "--pixel-shadow": "#2f2a23",
+  "--pixel-text": "#14141f",
+  "--pixel-subtext": "#544f46",
+  "--pixel-primary": "#e06700",
+  "--pixel-accent": "#008f52",
+  "--pixel-muted": "#e0d7c6",
+};
+
+export const PIXEL_VAR_LABELS: Record<string, string> = {
+  "--pixel-primary": "Primária",
+  "--pixel-accent": "Destaque",
+  "--pixel-bg": "Fundo",
+  "--pixel-card": "Cartão",
+  "--pixel-border": "Borda",
+  "--pixel-shadow": "Sombra",
+  "--pixel-text": "Texto",
+  "--pixel-subtext": "Subtexto",
+  "--pixel-muted": "Neutro",
+};
+
 export const THEME_PRESETS: ThemePreset[] = [
   {
     id: "default",
@@ -124,4 +149,19 @@ export const THEME_PRESETS: ThemePreset[] = [
 
 export function findThemePreset(id: string): ThemePreset {
   return THEME_PRESETS.find((t) => t.id === id) ?? THEME_PRESETS[0]!;
+}
+
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{3,8}$/;
+
+/** Validates a user-submitted color map: keys must be known --pixel-* vars, values must be hex colors. */
+export function isValidColorMap(value: unknown): value is Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) return false;
+  return entries.every(
+    ([key, val]) =>
+      (ALL_PIXEL_VARS as readonly string[]).includes(key) &&
+      typeof val === "string" &&
+      HEX_COLOR_REGEX.test(val),
+  );
 }

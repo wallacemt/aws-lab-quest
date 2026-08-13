@@ -43,7 +43,8 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self'",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
-              "frame-src 'self' https://www.youtube.com",
+              // https://*.supabase.co: PdfViewer embeds signed Storage URLs (PDF/SLIDES library content) in an <iframe>.
+              "frame-src 'self' https://www.youtube.com https://*.supabase.co",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "object-src 'none'",

@@ -13,6 +13,7 @@ type ApiProfileResponse = {
   avatarUrl: string | null;
   bgImageUrl?: string | null;
   themePreset?: string | null;
+  customColors?: Record<string, string> | null;
   needsCertificationReview?: boolean;
   user: { name: string; email: string; username?: string | null };
 };
@@ -39,7 +40,11 @@ type UserProfileState = {
   setProfile: (next: UserProfile) => Promise<ApiProfileResponse>;
   setNeedsCertificationReview: (next: boolean) => void;
   setAvatarUrl: (next: string | null) => void;
-  patchPersonalization: (patch: { themePreset?: string; bgImageUrl?: string | null }) => void;
+  patchPersonalization: (patch: {
+    themePreset?: string;
+    bgImageUrl?: string | null;
+    customColors?: Record<string, string> | null;
+  }) => void;
 };
 
 let inFlightLoad: Promise<void> | null = null;
@@ -136,6 +141,7 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
           totalXp,
           bgImageUrl: profileData.bgImageUrl ?? null,
           themePreset: profileData.themePreset ?? "default",
+          customColors: profileData.customColors ?? null,
         },
         needsCertificationReview: Boolean(profileData.needsCertificationReview),
         avatarUrl: profileData.avatarUrl,

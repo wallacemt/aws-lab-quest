@@ -11,6 +11,7 @@ export const CACHE_TTL = {
   USER_HISTORY: 300,
   USER_ACHIEVEMENTS: 300,
   TRAIL_QUESTIONS: 86_400,
+  COMMUNITY_THEMES: 300,
 } as const;
 
 export const CACHE_KEYS = {
@@ -26,6 +27,7 @@ export const CACHE_KEYS = {
   userStudyHistory:  (userId: string): string => `user:study-history:${userId}`,
   userAchievements:  (userId: string): string => `user:achievements:${userId}`,
   trailQuestions:    (stageId: string): string => `trail:questions:${stageId}`,
+  communityThemes:   (): string => "global:community-themes",
 };
 
 export async function cacheGet<T>(key: string): Promise<T | null> {

@@ -32,6 +32,7 @@ export type UserProfile = {
   role?: string;
   bgImageUrl?: string | null;
   themePreset?: string | null;
+  customColors?: Record<string, string> | null;
 };
 
 export type CertificationPreset = {
