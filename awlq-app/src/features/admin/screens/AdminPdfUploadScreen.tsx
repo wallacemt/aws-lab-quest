@@ -28,6 +28,13 @@ export function AdminPdfUploadScreen() {
         <p className="font-[var(--font-body)] text-sm leading-6 text-[var(--pixel-text)]">
           Fluxo unico: envie arquivos, clique em processar e visualize as questoes extraidas.
         </p>
+        <p className="font-[var(--font-body)] text-xs leading-6 text-[var(--pixel-subtext)]">
+          Procurando o upload de Exam Guide? Ele agora fica na tela de{" "}
+          <Link href="/admin/certificacoes" className="underline hover:text-[var(--pixel-accent)]">
+            Certificacoes
+          </Link>
+          , dentro dos detalhes de cada certificacao.
+        </p>
         <div className="flex flex-wrap gap-3">
           <Link href="/admin">
             <PixelButton variant="ghost">Voltar</PixelButton>
@@ -62,13 +69,12 @@ export function AdminPdfUploadScreen() {
             <span className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Tipo de Documento</span>
             <select
               value={uploadType}
-              onChange={(e) => setUploadType(e.target.value as "simulado_generation" | "simulate_pdf" | "exam_guide")}
+              onChange={(e) => setUploadType(e.target.value as "simulado_generation" | "simulate_pdf")}
               className="w-full rounded border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 text-sm"
               required
             >
               <option value="simulado_generation">Geracao de Simulado</option>
               <option value="simulate_pdf">Simulado PDF</option>
-              <option value="exam_guide">Exam Guide</option>
             </select>
           </label>
 

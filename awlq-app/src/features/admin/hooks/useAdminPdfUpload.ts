@@ -6,7 +6,7 @@ import { CertificationOption, IngestResponse } from "@/features/admin/types";
 export const useAdminPdfUpload = () => {
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [selectedCertificationCode, setSelectedCertificationCode] = useState("");
-  const [uploadType, setUploadType] = useState<"simulado_generation" | "simulate_pdf" | "exam_guide">("simulado_generation");
+  const [uploadType, setUploadType] = useState<"simulado_generation" | "simulate_pdf">("simulado_generation");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IngestResponse | null>(null);
@@ -41,6 +41,9 @@ export const useAdminPdfUpload = () => {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // React nulls out event.currentTarget once the synchronous dispatch ends —
+    // capture the form element now, before the awaits below, so .reset() below is safe.
+    const formEl = event.currentTarget;
     setError(null);
     setResult(null);
 
@@ -49,7 +52,7 @@ export const useAdminPdfUpload = () => {
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(formEl);
     formData.delete("certificationCode");
     formData.set("certificationCode", selectedCertificationCode);
     formData.set("uploadType", uploadType);
@@ -78,7 +81,7 @@ export const useAdminPdfUpload = () => {
       }
 
       setResult(payload);
-      event.currentTarget.reset();
+      formEl.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha inesperada na ingestao.");
     } finally {

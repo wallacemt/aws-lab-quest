@@ -63,6 +63,62 @@ export type AdminUsersListParams = {
   sortOrder?: AdminListSortOrder;
 };
 
+export type AdminThemeListItem = {
+  id: string;
+  name: string;
+  colors: Record<string, string>;
+  bgImageUrl: string | null;
+  isPublic: boolean;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    username: string | null;
+    email: string;
+  };
+};
+
+export type AdminThemesListParams = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  isPublic?: "true" | "false";
+};
+
+export type AdminCertificationListItem = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  examMinutes: number;
+  active: boolean;
+  displayOrder: number;
+  hasExamGuide: boolean;
+  updatedAt: string;
+  _count: {
+    questions: number;
+    userProfiles: number;
+  };
+};
+
+export type AdminCertificationDetail = AdminCertificationListItem & {
+  createdAt: string;
+  latestExamGuideUpload: {
+    id: string;
+    fileName: string;
+    createdAt: string;
+    uploadedBy: { name: string; email: string } | null;
+  } | null;
+};
+
+export type AdminCertificationUpdatePayload = {
+  name?: string;
+  description?: string;
+  examMinutes?: number;
+  active?: boolean;
+  displayOrder?: number;
+};
+
 export type AdminUserUpdatePayload = {
   name?: string;
   username?: string;

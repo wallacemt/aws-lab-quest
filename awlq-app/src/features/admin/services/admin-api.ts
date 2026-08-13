@@ -31,6 +31,11 @@ import {
   AdminUsersListParams,
   AdminUserListItem,
   AdminQuestionsStats,
+  AdminThemeListItem,
+  AdminThemesListParams,
+  AdminCertificationListItem,
+  AdminCertificationDetail,
+  AdminCertificationUpdatePayload,
   PaginatedResult,
 } from "@/features/admin/types";
 
@@ -121,6 +126,142 @@ export async function listAdminUsers(input: AdminUsersListParams): Promise<Pagin
   }
 
   return (await response.json()) as PaginatedResult<AdminUserListItem>;
+}
+
+export async function listAdminThemes(input: AdminThemesListParams): Promise<PaginatedResult<AdminThemeListItem>> {
+  const qs = toQueryString(input);
+  const response = await fetch(`/api/admin/themes?${qs}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar temas.");
+  }
+
+  return (await response.json()) as PaginatedResult<AdminThemeListItem>;
+}
+
+export async function setAdminThemePublic(themeId: string, isPublic: boolean): Promise<AdminThemeListItem> {
+  const response = await fetch(`/api/admin/themes/${themeId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    credentials: "include",
+    body: JSON.stringify({ isPublic }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel atualizar o tema.");
+  }
+
+  const data = (await response.json()) as { theme: AdminThemeListItem };
+  return data.theme;
+}
+
+export async function deleteAdminTheme(themeId: string): Promise<void> {
+  const response = await fetch(`/api/admin/themes/${themeId}`, {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel excluir o tema.");
+  }
+}
+
+export async function listAdminCertifications(): Promise<{ items: AdminCertificationListItem[] }> {
+  const response = await fetch("/api/admin/certifications", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar certificacoes.");
+  }
+
+  return (await response.json()) as { items: AdminCertificationListItem[] };
+}
+
+export async function fetchAdminCertificationDetail(certificationId: string): Promise<AdminCertificationDetail> {
+  const response = await fetch(`/api/admin/certifications/${certificationId}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar a certificacao.");
+  }
+
+  return (await response.json()) as AdminCertificationDetail;
+}
+
+export async function updateAdminCertification(
+  certificationId: string,
+  payload: AdminCertificationUpdatePayload,
+): Promise<void> {
+  const response = await fetch(`/api/admin/certifications/${certificationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(data.error ?? "Nao foi possivel atualizar a certificacao.");
+  }
+}
+
+export type ExamGuideUploadResult = {
+  fileName: string;
+  characters: number;
+  preview: string;
+  message: string;
+};
+
+export type ExamGuideUploadConflict = {
+  certificationCode: string;
+  certificationName: string;
+  updatedAt: string;
+};
+
+/** Wraps POST /api/admin/pdf/exam-guide. Throws with `.conflict` attached on a 409 (guide already exists). */
+export async function uploadExamGuide(input: {
+  certificationCode: string;
+  file?: File;
+  manualText?: string;
+  overwriteConfirmed?: boolean;
+}): Promise<ExamGuideUploadResult> {
+  const formData = new FormData();
+  formData.set("certificationCode", input.certificationCode);
+  if (input.file) formData.set("file", input.file);
+  if (input.manualText) formData.set("manualText", input.manualText);
+  if (input.overwriteConfirmed) formData.set("overwriteConfirmed", "true");
+
+  const response = await fetch("/api/admin/pdf/exam-guide", {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+  });
+
+  const data = (await response.json()) as
+    | ExamGuideUploadResult
+    | { error: string; conflict?: ExamGuideUploadConflict };
+
+  if (!response.ok || "error" in data) {
+    const message = "error" in data ? data.error : "Falha ao salvar o Exam Guide.";
+    const error = new Error(message) as Error & { conflict?: ExamGuideUploadConflict };
+    if ("conflict" in data) error.conflict = data.conflict;
+    throw error;
+  }
+
+  return data;
 }
 
 export async function approveAdminUser(userId: string): Promise<void> {
