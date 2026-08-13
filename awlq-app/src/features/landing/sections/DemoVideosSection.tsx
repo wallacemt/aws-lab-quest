@@ -51,7 +51,7 @@ export function DemoVideosSection() {
               </div>
               <div className="crt-frame overflow-hidden" style={{ aspectRatio: "16/9" }}>
                 <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${demo.id}?rel=0`}
+                  src={`https://www.youtube.com/embed/${demo.id}?rel=0`}
                   title={demo.title}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
