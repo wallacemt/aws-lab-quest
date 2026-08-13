@@ -32,8 +32,9 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const certificationCode = String(formData.get("certificationCode") ?? "").trim();
   const rawUploadType = String(formData.get("uploadType") ?? "simulado_generation");
-  const uploadTypeMap: Record<string, "EXAM_GUIDE" | "SIMULADO_PDF" | "SIMULADO_GENERATION"> = {
-    exam_guide: "EXAM_GUIDE",
+  // EXAM_GUIDE intentionally excluded: exam-guide PDFs don't contain question
+  // blocks and are handled by the dedicated /api/admin/pdf/exam-guide route instead.
+  const uploadTypeMap: Record<string, "SIMULADO_PDF" | "SIMULADO_GENERATION"> = {
     simulate_pdf: "SIMULADO_PDF",
     simulado_generation: "SIMULADO_GENERATION",
   };

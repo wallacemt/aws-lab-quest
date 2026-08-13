@@ -1,24 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { THEME_PRESETS } from "@/lib/themes";
 import { cacheDel, CACHE_KEYS } from "@/lib/cache";
-import { BG_PRESETS } from "@/lib/backgrounds";
+import { isValidBgImageUrl } from "@/lib/backgrounds";
 
 const KNOWN_THEME_IDS = new Set(THEME_PRESETS.map((t) => t.id));
-
-// Accept HTTPS URLs (user-provided) and same-origin static paths (preset BGs in /public).
-const PRESET_BG_URLS = new Set(BG_PRESETS.map((b) => b.url).filter(Boolean));
-
-function isValidBgImageUrl(value: unknown): value is string | null {
-  if (value === null || value === undefined) return true;
-  if (typeof value !== "string") return false;
-  if (value === "") return true;
-  if (value.startsWith("https://")) return true;
-  // Allow same-origin preset paths (e.g. /backgrounds/px-city-1.png)
-  if (value.startsWith("/") && PRESET_BG_URLS.has(value)) return true;
-  return false;
-}
 
 export async function PATCH(request: NextRequest) {
   const auth = await requireApprovedUser(request);
@@ -31,9 +19,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "JSON invalido." }, { status: 400 });
   }
 
-  const { bgImageUrl, themePreset } = body as {
+  const { bgImageUrl, themePreset, customThemeId } = body as {
     bgImageUrl?: string | null;
     themePreset?: string;
+    customThemeId?: string | null;
   };
 
   if (bgImageUrl !== undefined && !isValidBgImageUrl(bgImageUrl)) {
@@ -47,9 +36,34 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "themePreset invalido." }, { status: 422 });
   }
 
-  const data: { bgImageUrl?: string | null; themePreset?: string } = {};
+  const data: {
+    bgImageUrl?: string | null;
+    themePreset?: string;
+    customColors?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+  } = {};
   if (bgImageUrl !== undefined) data.bgImageUrl = bgImageUrl || null;
-  if (themePreset !== undefined) data.themePreset = themePreset;
+  if (themePreset !== undefined) {
+    data.themePreset = themePreset;
+    // Picking a builtin preset clears any active custom theme.
+    data.customColors = Prisma.JsonNull;
+  }
+
+  if (customThemeId !== undefined) {
+    if (customThemeId === null) {
+      data.customColors = Prisma.JsonNull;
+    } else {
+      // Own theme or a published community theme — both applyable.
+      const theme = await prisma.userTheme.findFirst({
+        where: { id: customThemeId, OR: [{ userId: auth.user.id }, { isPublic: true }] },
+        select: { colors: true, bgImageUrl: true },
+      });
+      if (!theme) {
+        return NextResponse.json({ error: "Tema nao encontrado." }, { status: 404 });
+      }
+      data.customColors = theme.colors as Prisma.InputJsonValue;
+      if (theme.bgImageUrl) data.bgImageUrl = theme.bgImageUrl;
+    }
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nenhum campo para atualizar." }, { status: 400 });
@@ -59,7 +73,7 @@ export async function PATCH(request: NextRequest) {
     where: { userId: auth.user.id },
     create: { userId: auth.user.id, ...data },
     update: data,
-    select: { bgImageUrl: true, themePreset: true },
+    select: { bgImageUrl: true, themePreset: true, customColors: true },
   });
 
   // Invalidate the user profile cache so the next GET /api/user/profile
