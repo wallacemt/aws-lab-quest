@@ -2,6 +2,7 @@
 
 import { PixelButton } from "@/components/ui/pixel-button";
 import { authClient } from "@/lib/auth-client";
+import Image from "next/image";
 
 type Provider = "google" | "github";
 
@@ -33,19 +34,31 @@ export function SocialLoginButtons({
         type="button"
         variant="ghost"
         disabled={disabled}
-        className="w-full"
+        className="w-full max-full justify-center gap-2"
         onClick={() => void handleClick("google")}
       >
-        Continuar com Google
+        Continuar com
+        <Image
+          width={20}
+          height={20}
+          src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/google/google-original.svg"
+          alt="Google"
+        />
       </PixelButton>
       <PixelButton
         type="button"
-        variant="ghost"
+        variant="secondary"
         disabled={disabled}
-        className="w-full"
+        className="w-full max-full justify-center gap-2"
         onClick={() => void handleClick("github")}
       >
-        Continuar com GitHub
+        Continuar com
+        <Image
+          width={20}
+          height={20}
+          src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/github/github-original.svg"
+          alt="GitHub"
+        />
       </PixelButton>
     </div>
   );

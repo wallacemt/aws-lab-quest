@@ -19,6 +19,16 @@ export function getMissingProfileFields(profile: UserProfile): MissingProfileFie
   return REQUIRED_PROFILE_FIELDS.filter((field) => !profile[field.key]?.trim());
 }
 
+export type OnboardingImage = { src: string; alt: string };
+
+/** Welcome-carousel art shown in UserProfileModal while onboarding — one beat per screen: greeting, choose a mode, battle, level up. */
+export const ONBOARDING_IMAGES: OnboardingImage[] = [
+  { src: "/onboarding/onboarding-1.png", alt: "Astronauta acenando ao lado de um painel de controle na nuvem" },
+  { src: "/onboarding/onboarding-2.png", alt: "Astronauta escolhendo entre os portais de Lab, Arena e Simulado" },
+  { src: "/onboarding/onboarding-3.png", alt: "Astronauta batalhando contra um chefe na Arena" },
+  { src: "/onboarding/onboarding-4.png", alt: "Astronauta comemorando um level up com a badge AWS Cloud Practitioner" },
+];
+
 const ONBOARDING_STORAGE_KEY = "awlq_onboarding_step";
 
 function canUseStorage() {
