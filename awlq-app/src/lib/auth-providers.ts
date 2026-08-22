@@ -27,3 +27,27 @@ export function resolveSocialProviders(env: SocialProviderEnv): SocialProvidersC
 
   return providers;
 }
+
+/**
+ * Better Auth refuses to auto-link a social sign-in to an existing
+ * email/password account unless the provider is trusted AND the *local*
+ * account already has `emailVerified: true`. This app has no email
+ * verification flow at all (access control is the admin `accessStatus`
+ * approval gate instead), so every email/password user is permanently
+ * emailVerified:false — leaving `requireLocalEmailVerified` at its default
+ * (true) would make linking silently 403 with "account not linked" for
+ * every existing user, which is the bug this fixes.
+ *
+ * Google/GitHub already vouch for the email before OAuth completes, so
+ * that's the trust anchor here instead.
+ */
+export const socialAccountLinking: {
+  enabled: boolean;
+  trustedProviders: string[];
+  requireLocalEmailVerified: boolean;
+  disableImplicitLinking?: boolean;
+} = {
+  enabled: true,
+  trustedProviders: ["google", "github"],
+  requireLocalEmailVerified: false,
+};

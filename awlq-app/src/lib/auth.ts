@@ -7,7 +7,7 @@ import {
 } from "@/lib/admin-email-templates";
 import { sendEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
-import { resolveSocialProviders } from "@/lib/auth-providers";
+import { resolveSocialProviders, socialAccountLinking } from "@/lib/auth-providers";
 
 function buildPasswordResetFallbackHtml(input: { name: string; url: string }) {
   return `
@@ -59,6 +59,7 @@ export const auth = betterAuth({
     },
   },
   socialProviders: resolveSocialProviders(process.env),
+  account: { accountLinking: socialAccountLinking },
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
