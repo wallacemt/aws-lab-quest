@@ -7,6 +7,7 @@ import Image from "next/image";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { authClient } from "@/lib/auth-client";
+import { SocialLoginButtons } from "@/features/auth/components/SocialLoginButtons";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { EyeClosed, EyeIcon, HomeIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -219,6 +220,7 @@ function LoginScreenBase({ mode }: { mode: "user" | "admin" }) {
               {loading ? "Entrando..." : "Entrar no Jogo"}
             </PixelButton>
           </form>
+          {mode !== "admin" && <SocialLoginButtons disabled={loading} onError={setError} />}
           {mode !== "admin" && (
             <p className="text-center font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
               Não tem conta?{" "}

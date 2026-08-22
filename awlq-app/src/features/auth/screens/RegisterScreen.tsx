@@ -7,6 +7,7 @@ import Image from "next/image";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { authClient } from "@/lib/auth-client";
+import { SocialLoginButtons } from "@/features/auth/components/SocialLoginButtons";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { EyeClosed, EyeIcon } from "lucide-react";
 
@@ -276,6 +277,13 @@ export function RegisterScreen() {
               {loading ? "Criando conta..." : "Criar Conta"}
             </PixelButton>
           </form>
+
+          <SocialLoginButtons disabled={loading || !ageConfirmed || !privacyAccepted} onError={setError} />
+          {!(ageConfirmed && privacyAccepted) && (
+            <p className="text-center font-mono text-[8px] uppercase text-[var(--pixel-subtext)]">
+              Marque as confirmações acima para usar o login social.
+            </p>
+          )}
 
           <p className="text-center font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
             Já tem conta?{" "}

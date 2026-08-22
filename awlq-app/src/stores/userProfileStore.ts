@@ -34,7 +34,12 @@ type UserProfileState = {
   avatarUrl: string | null;
   hydrated: boolean;
   loading: boolean;
+  // `undefined` = no session observed yet; `null` = confirmed logged out.
+  // Lets syncSession tell "first call after page load" apart from "the
+  // logged-in user actually changed", see syncSession below.
+  loadedUserId: string | null | undefined;
   loadProfile: () => Promise<void>;
+  syncSession: (userId: string | null) => void;
   reloadProfile: () => Promise<void>;
   refreshTotalXp: () => Promise<void>;
   setProfile: (next: UserProfile) => Promise<ApiProfileResponse>;
@@ -84,6 +89,33 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
   avatarUrl: null,
   hydrated: false,
   loading: false,
+  loadedUserId: undefined,
+  syncSession: (userId) => {
+    const { loadedUserId } = get();
+
+    if (loadedUserId === undefined) {
+      // First observation of the session — whatever is already loaded (or
+      // loading) belongs to this user, nothing to discard.
+      set({ loadedUserId: userId });
+      return;
+    }
+
+    if (userId === loadedUserId) {
+      return;
+    }
+
+    // The logged-in user changed (login after logout, or a straight switch
+    // between accounts) — the previous account's profile is no longer valid.
+    set({
+      profile: defaultProfile,
+      certificationOptions: [],
+      needsCertificationReview: false,
+      avatarUrl: null,
+      hydrated: false,
+      loading: false,
+      loadedUserId: userId,
+    });
+  },
   loadProfile: async () => {
     if (get().hydrated || get().loading) {
       return;

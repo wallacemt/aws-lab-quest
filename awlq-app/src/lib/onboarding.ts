@@ -1,4 +1,23 @@
+import type { UserProfile } from "@/lib/types";
+
 export type OnboardingStep = "manual" | "profile";
+
+export type MissingProfileField = {
+  key: "name" | "username" | "certificationPresetCode" | "favoriteTheme";
+  label: string;
+};
+
+const REQUIRED_PROFILE_FIELDS: MissingProfileField[] = [
+  { key: "name", label: "Nome de exibição" },
+  { key: "username", label: "Nome de usuário" },
+  { key: "certificationPresetCode", label: "Certificação AWS alvo" },
+  { key: "favoriteTheme", label: "Tema favorito" },
+];
+
+/** Fields still needed before the app is unlocked — used to give the onboarding UI something concrete to point at instead of a generic "complete your profile". */
+export function getMissingProfileFields(profile: UserProfile): MissingProfileField[] {
+  return REQUIRED_PROFILE_FIELDS.filter((field) => !profile[field.key]?.trim());
+}
 
 const ONBOARDING_STORAGE_KEY = "awlq_onboarding_step";
 
