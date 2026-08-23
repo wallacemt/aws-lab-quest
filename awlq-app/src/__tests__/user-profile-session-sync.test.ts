@@ -130,3 +130,74 @@ describe("TC-005 — full account-switch flow: no stale profile leaks into the n
     expect(state.profile.name).toBe("Beto");
   });
 });
+
+/**
+ * TC-006 — loadProfile race across an account switch
+ *
+ * Sourcery review (PR #59): `inFlightLoad` is a module-level promise, not
+ * scoped to a session. If A's loadProfile() is still in flight when
+ * syncSession() resets the store for a logout+login into B, the store's
+ * `loading`/`hydrated` flags get reset but the *promise itself* keeps
+ * running — and once it resolves, its `.then()` unconditionally calls
+ * `set()`, overwriting B's already-loaded profile with A's stale data.
+ */
+describe("TC-006 — loadProfile race: a stale in-flight fetch must not clobber the new account", () => {
+  it("discards a late-resolving fetch that was started before an account switch", async () => {
+    let resolveAProfile!: (value: Response) => void;
+    const aProfilePromise = new Promise<Response>((resolve) => {
+      resolveAProfile = resolve;
+    });
+
+    let profileCallCount = 0;
+    vi.spyOn(global, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url.includes("/api/user/profile")) {
+        profileCallCount += 1;
+        // First call (account A) hangs until resolveAProfile() below fires.
+        // Every subsequent call (account B) resolves immediately.
+        return profileCallCount === 1 ? aProfilePromise : jsonResponse({
+          certification: "AWS Solutions Architect",
+          certificationPresetCode: "SAA-C03",
+          favoriteTheme: "default",
+          avatarUrl: null,
+          themePreset: "default",
+          user: { name: "Beto", username: "beto" },
+        });
+      }
+      if (url.includes("/api/certifications")) return jsonResponse({ certifications: [] });
+      if (url.includes("/api/quest-history")) return jsonResponse({ history: [] });
+      if (url.includes("/api/study/history")) return jsonResponse({ history: [] });
+
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    // A's load starts and hangs on the profile fetch.
+    const loadA = useUserProfileStore.getState().loadProfile();
+    useUserProfileStore.getState().syncSession("user-a");
+
+    // A logs out, B logs in — both before A's fetch ever resolves.
+    useUserProfileStore.getState().syncSession(null);
+    useUserProfileStore.getState().syncSession("user-b");
+
+    // B's load resolves (fast mocked fetch).
+    await useUserProfileStore.getState().loadProfile();
+    expect(useUserProfileStore.getState().profile.name).toBe("Beto");
+
+    // A's original fetch finally resolves, late.
+    resolveAProfile(
+      jsonResponse({
+        certification: "x",
+        certificationPresetCode: "x",
+        favoriteTheme: "x",
+        avatarUrl: null,
+        themePreset: "default",
+        user: { name: "Ana", username: "ana" },
+      }),
+    );
+    await loadA;
+
+    // B's profile must survive — A's stale data must be discarded, not applied.
+    expect(useUserProfileStore.getState().profile.name).toBe("Beto");
+  });
+});

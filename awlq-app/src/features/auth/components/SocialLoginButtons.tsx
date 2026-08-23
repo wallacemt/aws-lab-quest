@@ -16,10 +16,14 @@ export function SocialLoginButtons({
   callbackURL?: string;
 }) {
   async function handleClick(provider: Provider) {
-    const { error } = await authClient.signIn.social({ provider, callbackURL });
+    try {
+      const { error } = await authClient.signIn.social({ provider, callbackURL });
 
-    if (error) {
-      onError(error.message ?? "Nao foi possivel continuar com login social.");
+      if (error) {
+        onError(error.message ?? "Nao foi possivel continuar com login social.");
+      }
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Nao foi possivel continuar com login social.");
     }
   }
 

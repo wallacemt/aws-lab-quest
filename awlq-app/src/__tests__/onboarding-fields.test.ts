@@ -69,3 +69,24 @@ describe("TC-004 — getMissingProfileFields: human-readable labels", () => {
     expect(missing.every((f) => typeof f.label === "string" && f.label.length > 0)).toBe(true);
   });
 });
+
+/**
+ * TC-005 — Sourcery review (PR #59): getMissingProfileFields only checked
+ * `certificationPresetCode`, but `useUserProfile.isProfileComplete` also
+ * requires `certification` to be non-empty. A profile with a preset code
+ * but no certification name showed an empty checklist (looks complete)
+ * while the app stayed locked as incomplete, with no explanation why.
+ */
+describe("TC-005 — getMissingProfileFields: certification must agree with certificationPresetCode", () => {
+  it("flags the certification field as missing when certificationPresetCode is set but certification is blank", () => {
+    const mismatched: UserProfile = { ...COMPLETE_PROFILE, certification: "" };
+    const missing = getMissingProfileFields(mismatched).map((f) => f.key);
+    expect(missing).toContain("certificationPresetCode");
+  });
+
+  it("flags it when certification is set but certificationPresetCode is blank", () => {
+    const mismatched: UserProfile = { ...COMPLETE_PROFILE, certificationPresetCode: "" };
+    const missing = getMissingProfileFields(mismatched).map((f) => f.key);
+    expect(missing).toContain("certificationPresetCode");
+  });
+});

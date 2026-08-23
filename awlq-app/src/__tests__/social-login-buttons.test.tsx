@@ -83,3 +83,21 @@ describe("TC-005 — SocialLoginButtons: disabled state", () => {
     expect((screen.getByRole("button", { name: /github/i }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+/**
+ * TC-006 — Sourcery review (PR #59): a rejected authClient.signIn.social()
+ * promise (network failure, unexpected client error) was never caught, so
+ * it became an unhandled promise rejection and onError was never called —
+ * the user would see no login error at all.
+ */
+describe("TC-006 — SocialLoginButtons: a rejected promise still surfaces an error", () => {
+  it("calls onError when authClient.signIn.social() throws instead of resolving with { error }", async () => {
+    mockSignInSocial.mockRejectedValue(new Error("Network request failed"));
+    const onError = vi.fn();
+
+    render(<SocialLoginButtons onError={onError} />);
+    fireEvent.click(screen.getByRole("button", { name: /google/i }));
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith("Network request failed"));
+  });
+});
