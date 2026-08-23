@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { UserProfile } from "@/lib/types";
+import { getMissingProfileFields } from "@/lib/onboarding";
+import { OnboardingGallery } from "@/components/ui/onboarding-gallery";
 
 export function UserProfileModal({
   profile,
@@ -98,10 +100,28 @@ export function UserProfileModal({
     return null;
   }
 
+  const missingFields = getMissingProfileFields(draft);
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
-      <PixelCard className="w-full max-w-xl space-y-4">
+      <PixelCard className="w-full max-w-xl space-y-4 max-h-[80%] overflow-auto">
         <h2 className="font-mono text-xs uppercase">Perfil do Jogador</h2>
+
+        {missingFields.length > 0 && <OnboardingGallery />}
+
+        {missingFields.length > 0 && (
+          <PixelCard className="border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10 py-2">
+            <p className="font-mono text-[9px] uppercase text-[var(--pixel-accent)]">
+              Complete estes campos para liberar o app:
+            </p>
+            <ul className="mt-1 list-inside list-disc font-[var(--font-body)] text-sm text-[var(--pixel-text)]">
+              {missingFields.map((field) => (
+                <li key={field.key}>{field.label}</li>
+              ))}
+            </ul>
+          </PixelCard>
+        )}
+
         <label className="block text-sm">
           Nome
           <input

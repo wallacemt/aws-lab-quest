@@ -34,7 +34,12 @@ type UserProfileState = {
   avatarUrl: string | null;
   hydrated: boolean;
   loading: boolean;
+  // `undefined` = no session observed yet; `null` = confirmed logged out.
+  // Lets syncSession tell "first call after page load" apart from "the
+  // logged-in user actually changed", see syncSession below.
+  loadedUserId: string | null | undefined;
   loadProfile: () => Promise<void>;
+  syncSession: (userId: string | null) => void;
   reloadProfile: () => Promise<void>;
   refreshTotalXp: () => Promise<void>;
   setProfile: (next: UserProfile) => Promise<ApiProfileResponse>;
@@ -48,6 +53,12 @@ type UserProfileState = {
 };
 
 let inFlightLoad: Promise<void> | null = null;
+// Bumped on every account switch so a fetch started for the previous
+// account can recognize itself as stale once it finally resolves — see
+// syncSession() and loadProfile() below (LSF: race found in PR #59 review,
+// a late-resolving fetch from account A was overwriting account B's
+// already-loaded profile after a logout+login).
+let loadGeneration = 0;
 
 async function fetchProfileSnapshot(): Promise<{
   profileData: ApiProfileResponse;
@@ -84,6 +95,38 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
   avatarUrl: null,
   hydrated: false,
   loading: false,
+  loadedUserId: undefined,
+  syncSession: (userId) => {
+    const { loadedUserId } = get();
+
+    if (loadedUserId === undefined) {
+      // First observation of the session — whatever is already loaded (or
+      // loading) belongs to this user, nothing to discard.
+      set({ loadedUserId: userId });
+      return;
+    }
+
+    if (userId === loadedUserId) {
+      return;
+    }
+
+    // The logged-in user changed (login after logout, or a straight switch
+    // between accounts) — the previous account's profile is no longer valid.
+    // Bump the generation so a fetch already in flight for the old account
+    // discards its own result instead of overwriting the new account's data.
+    loadGeneration += 1;
+    inFlightLoad = null;
+
+    set({
+      profile: defaultProfile,
+      certificationOptions: [],
+      needsCertificationReview: false,
+      avatarUrl: null,
+      hydrated: false,
+      loading: false,
+      loadedUserId: userId,
+    });
+  },
   loadProfile: async () => {
     if (get().hydrated || get().loading) {
       return;
@@ -93,10 +136,15 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
       return inFlightLoad;
     }
 
+    const generation = loadGeneration;
     set({ loading: true });
 
-    inFlightLoad = fetchProfileSnapshot()
+    const thisLoad: Promise<void> = fetchProfileSnapshot()
       .then(({ profileData, certData, totalXp }) => {
+        // A syncSession() reset happened while this fetch was in flight —
+        // its result belongs to a session that's no longer current.
+        if (generation !== loadGeneration) return;
+
         set({
           profile: {
             name: profileData.user?.name ?? "",
@@ -117,13 +165,20 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
         });
       })
       .catch(() => {
+        if (generation !== loadGeneration) return;
         set({ hydrated: true, loading: false });
       })
       .finally(() => {
-        inFlightLoad = null;
+        // Only clear the module-level slot if it's still pointing at this
+        // load — a stale load's finally must not drop a newer one that's
+        // still in flight.
+        if (inFlightLoad === thisLoad) {
+          inFlightLoad = null;
+        }
       });
 
-    return inFlightLoad;
+    inFlightLoad = thisLoad;
+    return thisLoad;
   },
   reloadProfile: async () => {
     set({ loading: true });

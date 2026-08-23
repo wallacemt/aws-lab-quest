@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useUserProfileStore } from "@/stores/userProfileStore";
 import { findThemePreset, ALL_PIXEL_VARS } from "@/lib/themes";
+import { authClient } from "@/lib/auth-client";
 
 // Shadcn vars that mirror the active pixel preset so light/dark mode
 // class changes don't create contrast conflicts with custom themes.
@@ -18,7 +19,18 @@ const SHADCN_SYNC_MAP: Record<string, string> = {
 const SHADCN_VARS = Object.keys(SHADCN_SYNC_MAP);
 
 export function ThemeApplier() {
-  const { profile, hydrated, loading, loadProfile } = useUserProfileStore();
+  const { profile, hydrated, loading, loadProfile, syncSession } = useUserProfileStore();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+
+  // ThemeApplier lives above AppRouteShell in the tree, so it's the single
+  // place that observes the Better Auth session for every route (auth,
+  // public, admin) — this is where account switches must be detected and
+  // the store reset, so a logout+login doesn't leak the previous account's
+  // profile/theme (LSF: `hydrated` used to never reset across accounts).
+  useEffect(() => {
+    if (sessionPending) return;
+    syncSession(session?.user?.id ?? null);
+  }, [sessionPending, session?.user?.id, syncSession]);
 
   // ThemeApplier lives above AppRouteShell in the tree, so it must trigger
   // profile loading itself to apply themes on all routes (auth, public, admin).
