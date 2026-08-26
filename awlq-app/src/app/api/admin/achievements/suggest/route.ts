@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
-import { callAI, extractJsonObject, AiNotConfiguredError } from "@/lib/ai";
+import { requestAiCandidates, aiSuggestionErrorResponse } from "@/lib/ai-suggestion";
 import { TRIGGER_TYPES, validateTriggerParams, type TriggerParams, type TriggerType } from "@/lib/achievement-triggers";
 
 type RawCandidate = {
@@ -23,7 +23,6 @@ export type AchievementSuggestion = {
 };
 
 const RARITIES = ["common", "uncommon", "rare", "epic", "legendary"];
-const MAX_ATTEMPTS = 3;
 
 function buildPrompt(catalog: { code: string; name: string; rarity: string; triggerType: string }[], count: number): string {
   const catalogLines = catalog
@@ -79,32 +78,18 @@ export async function POST(request: NextRequest) {
 
   const prompt = buildPrompt(catalog, count);
 
-  // ponytail: the model occasionally returns malformed JSON — retry a couple
-  // of times before giving up, same pattern as the trails question route.
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    try {
-      const rawText = (await callAI(prompt, "ACHIEVEMENT_SUGGESTION")).trim();
-      const jsonStr = extractJsonObject(rawText);
-      if (!jsonStr) throw new Error("Resposta da IA nao e JSON valido.");
-
-      const parsed = JSON.parse(jsonStr) as { candidates?: RawCandidate[] };
-      if (!Array.isArray(parsed.candidates) || parsed.candidates.length === 0) {
-        throw new Error("A IA nao retornou nenhuma sugestao.");
-      }
-
-      const candidates = parsed.candidates.map(sanitizeCandidate).filter((c): c is AchievementSuggestion => c !== null);
-      if (candidates.length === 0) {
-        throw new Error("Nenhuma sugestao da IA passou na validacao de triggerType/triggerParams.");
-      }
-
-      return NextResponse.json({ candidates });
-    } catch (err) {
-      lastError = err;
-    }
+  try {
+    const candidates = await requestAiCandidates({
+      context: "ACHIEVEMENT_SUGGESTION",
+      prompt,
+      parseCandidates: (parsed) => {
+        const raw = (parsed as { candidates?: RawCandidate[] }).candidates;
+        if (!Array.isArray(raw)) return [];
+        return raw.map(sanitizeCandidate).filter((c): c is AchievementSuggestion => c !== null);
+      },
+    });
+    return NextResponse.json({ candidates });
+  } catch (err) {
+    return aiSuggestionErrorResponse(err);
   }
-
-  const status = lastError instanceof AiNotConfiguredError ? 503 : 502;
-  const message = lastError instanceof Error ? lastError.message : "Erro ao gerar sugestoes.";
-  return NextResponse.json({ error: message }, { status });
 }

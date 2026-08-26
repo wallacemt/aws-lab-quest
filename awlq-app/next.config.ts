@@ -25,6 +25,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.supabase.co" },
       // SocialLoginButtons pulls the Google/GitHub glyphs from devicon's CDN.
       { protocol: "https", hostname: "cdn.jsdelivr.net" },
+      { protocol: "https", hostname: "avatars.githubusercontent.com" },
+      { protocol: "https", hostname: "googleusercontent.com" },
     ],
   },
   // LSF-2026-203: baseline security headers (no CSP nonce yet — tracked separately
@@ -42,7 +44,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "img-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net",
+              "img-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net https://avatars.githubusercontent.com https://www.google-analytics.com https://www.googletagmanager.com https://www.youtube.com https://googleusercontent.com https://www.gstatic.com https://www.google.com https://www.google.co.in https://www.google.co.uk https://www.google.ca https://www.google.com.au https://www.google.de https://www.google.fr https://www.google.it https://www.google.es https://www.google.nl https://www.google.be https://www.google.ch https://www.google.at https://www.google.se https://www.google.no https://www.google.dk https://www.google.fi https://www.google.ie",
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self'",
