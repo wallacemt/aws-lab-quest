@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { listAdminThemes, setAdminThemePublic, deleteAdminTheme } from "@/features/admin/services/admin-api";
 import type { AdminThemeListItem, PaginatedResult } from "@/features/admin/types";
+import Image from "next/image";
 
 const PAGE_SIZE = 20;
 const SWATCH_KEYS = ["--pixel-bg", "--pixel-primary", "--pixel-accent", "--pixel-card", "--pixel-border"];
@@ -65,7 +66,8 @@ export function AdminThemesScreen() {
         <p className="font-mono text-xs uppercase text-[#f97316]">Gamificacao</p>
         <h1 className="font-mono text-sm uppercase text-[#f8fafc]">Temas da Comunidade</h1>
         <p className="font-[var(--font-body)] text-sm text-[#94a3b8]">
-          Temas de personalizacao criados por usuarios. Publicados aparecem na galeria &ldquo;Comunidade&rdquo; para todos usarem.
+          Temas de personalizacao criados por usuarios. Publicados aparecem na galeria &ldquo;Comunidade&rdquo; para
+          todos usarem.
         </p>
       </header>
 
@@ -105,6 +107,7 @@ export function AdminThemesScreen() {
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="border-b border-[#1e293b] bg-[#0f172a] text-xs uppercase text-[#94a3b8]">
                 <tr>
+                  <th className="px-3 py-2">Background (Imagem)</th>
                   <th className="px-3 py-2">Cores</th>
                   <th className="px-3 py-2">Nome</th>
                   <th className="px-3 py-2">Criado por</th>
@@ -116,6 +119,13 @@ export function AdminThemesScreen() {
               <tbody>
                 {(result?.items ?? []).map((theme) => (
                   <tr key={theme.id} className="border-b border-[#1e293b] text-[#e2e8f0] hover:bg-white/[0.02]">
+                    {theme.bgImageUrl && (
+                      <td className="px-3 py-2">
+                        <div className="flex h-full w-full overflow-hidden border border-[#1e293b]">
+                          <Image src={theme.bgImageUrl} alt="Background" width={120} height={40} />
+                        </div>
+                      </td>
+                    )}
                     <td className="px-3 py-2">
                       <div className="flex h-6 w-24 overflow-hidden border border-[#1e293b]">
                         {SWATCH_KEYS.map((k) => (

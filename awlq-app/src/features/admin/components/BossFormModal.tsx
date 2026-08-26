@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AiArtworkGenerator } from "@/features/admin/components/AiArtworkGenerator";
+import { AiSuggestionPanel } from "@/features/admin/components/AiSuggestionPanel";
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
 import { ServiceMultiSelect, type ServiceOption } from "@/features/admin/components/ServiceMultiSelect";
+import type { BossSuggestion } from "@/app/api/admin/arena/bosses/suggest/route";
 
 export type Boss = {
   id: string;
@@ -77,6 +79,17 @@ export function BossFormModal({ boss, onClose, onSaved }: Props) {
     setError(null);
   }, [boss]);
 
+  function applySuggestion(suggestion: BossSuggestion) {
+    setForm((p) => ({
+      ...p,
+      name: suggestion.name,
+      code: suggestion.code,
+      themeService: suggestion.themeService,
+      maxHp: suggestion.maxHp,
+      damagePerCorrect: suggestion.damagePerCorrect,
+    }));
+  }
+
   async function handleSave() {
     setSaving(true);
     setError(null);
@@ -136,6 +149,21 @@ export function BossFormModal({ boss, onClose, onSaved }: Props) {
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
           {error && (
             <p className="border border-[#7f1d1d] bg-red-900/20 px-3 py-2 text-xs text-[#fca5a5]">{error}</p>
+          )}
+
+          {!isEdit && (
+            <AiSuggestionPanel<BossSuggestion>
+              endpoint="/api/admin/arena/bosses/suggest"
+              renderSuggestion={(suggestion) => ({
+                title: (
+                  <>
+                    {suggestion.name} <span className="text-[#64748b]">({suggestion.code})</span>
+                  </>
+                ),
+                subtitle: `Servico: ${suggestion.themeService} · HP ${suggestion.maxHp} · Dano ${suggestion.damagePerCorrect}`,
+              })}
+              onApply={applySuggestion}
+            />
           )}
 
           <section className="space-y-3">

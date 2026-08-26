@@ -9,6 +9,9 @@ export type AiContext =
   | "TRAIL_QUESTION_GENERATION"  // trails questions (formerly QUESTION_GENERATION)
   | "ACHIEVEMENT_SUGGESTION"     // achievement suggestion + badge artwork prompt
   | "ARENA_BOSS_ARTWORK"         // arena boss artwork prompt
+  | "TRAIL_SUGGESTION"           // quest chain (trilha) suggestion
+  | "ARENA_BOSS_SUGGESTION"      // arena boss concept suggestion
+  | "WEEKLY_CHALLENGE_SUGGESTION" // weekly challenge title suggestion
   // Worker contexts
   | "WORKER_KC_QUESTION"            // kc-question-builder
   | "WORKER_QUESTION_GENERATION"    // question-builder (PDF/blueprint)
@@ -26,6 +29,9 @@ export const AI_CONTEXTS: AiContext[] = [
   "TRAIL_QUESTION_GENERATION",
   "ACHIEVEMENT_SUGGESTION",
   "ARENA_BOSS_ARTWORK",
+  "TRAIL_SUGGESTION",
+  "ARENA_BOSS_SUGGESTION",
+  "WEEKLY_CHALLENGE_SUGGESTION",
   "WORKER_KC_QUESTION",
   "WORKER_QUESTION_GENERATION",
   "WORKER_QUALITY_REVIEW",
@@ -44,6 +50,9 @@ export const AI_CONTEXT_LABELS: Record<AiContext, string> = {
   TRAIL_QUESTION_GENERATION:   "Questoes de trilhas",
   ACHIEVEMENT_SUGGESTION:      "Conquistas: sugestao e arte",
   ARENA_BOSS_ARTWORK:          "Arena: arte de bosses",
+  TRAIL_SUGGESTION:            "Trilhas: sugestao de nova trilha",
+  ARENA_BOSS_SUGGESTION:       "Arena: sugestao de novo boss",
+  WEEKLY_CHALLENGE_SUGGESTION: "Desafio Semanal: sugestao de titulo",
   WORKER_KC_QUESTION:          "KC: Geracao de questoes",
   WORKER_QUESTION_GENERATION:  "Geracao via PDF/Blueprint",
   WORKER_QUALITY_REVIEW:       "Revisao de qualidade",
