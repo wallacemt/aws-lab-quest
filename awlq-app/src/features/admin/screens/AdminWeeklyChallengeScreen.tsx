@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Pencil, ToggleLeft, ToggleRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Sparkles, ToggleLeft, ToggleRight } from "lucide-react";
 
 interface TopEntry {
   userId: string;
@@ -47,6 +47,7 @@ export function AdminWeeklyChallengeScreen() {
   const [pausing, setPausing] = useState(false);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
+  const [suggestingTitle, setSuggestingTitle] = useState(false);
 
   const loadChallenges = useCallback(async () => {
     setLoading(true);
@@ -126,6 +127,25 @@ export function AdminWeeklyChallengeScreen() {
       void loadChallenges();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar titulo.");
+    }
+  }
+
+  async function handleSuggestTitle() {
+    setSuggestingTitle(true);
+    try {
+      const res = await fetch("/api/admin/weekly-challenge/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ count: 1 }),
+      });
+      const data = (await res.json()) as { candidates?: { title: string }[]; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Falha ao gerar sugestao");
+      if (data.candidates?.[0]) setTitleDraft(data.candidates[0].title);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao gerar sugestao.");
+    } finally {
+      setSuggestingTitle(false);
     }
   }
 
@@ -273,6 +293,15 @@ export function AdminWeeklyChallengeScreen() {
                             placeholder="Titulo do desafio"
                             className="border border-[#334155] bg-[#0f172a] px-2 py-1 text-xs text-[#e2e8f0]"
                           />
+                          <button
+                            type="button"
+                            onClick={() => void handleSuggestTitle()}
+                            disabled={suggestingTitle}
+                            title="Sugerir titulo com IA"
+                            className="border border-[#1e3a5f] px-2 py-1 text-[#38bdf8] disabled:opacity-40"
+                          >
+                            <Sparkles size={11} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => void handleSaveTitle(challenge.id)}

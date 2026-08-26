@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AiArtworkGenerator } from "@/features/admin/components/AiArtworkGenerator";
+import { AiSuggestionPanel } from "@/features/admin/components/AiSuggestionPanel";
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
 import { TRIGGER_TYPES, type TriggerParams, type TriggerType } from "@/lib/achievement-triggers";
 import Image from "next/image";
@@ -181,9 +182,6 @@ export function AchievementFormModal({ achievement, onClose, onSaved }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [suggestLoading, setSuggestLoading] = useState(false);
-  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   useEffect(() => {
     if (achievement) {
@@ -203,7 +201,6 @@ export function AchievementFormModal({ achievement, onClose, onSaved }: Props) {
       setForm(EMPTY_FORM);
     }
     setError(null);
-    setSuggestions([]);
   }, [achievement]);
 
   async function handleSave() {
@@ -237,26 +234,6 @@ export function AchievementFormModal({ achievement, onClose, onSaved }: Props) {
     }
   }
 
-  async function handleSuggest() {
-    setSuggestLoading(true);
-    setSuggestError(null);
-    try {
-      const res = await fetch("/api/admin/achievements/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ count: 3 }),
-      });
-      const data = (await res.json()) as { candidates?: Suggestion[]; error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Falha ao gerar sugestoes");
-      setSuggestions(data.candidates ?? []);
-    } catch (err) {
-      setSuggestError(err instanceof Error ? err.message : "Erro ao gerar sugestoes.");
-    } finally {
-      setSuggestLoading(false);
-    }
-  }
-
   function applySuggestion(suggestion: Suggestion) {
     setForm({
       code: slugifyCode(suggestion.name),
@@ -270,7 +247,6 @@ export function AchievementFormModal({ achievement, onClose, onSaved }: Props) {
       triggerParams: suggestion.triggerParams ?? {},
       imageUrl: null,
     });
-    setSuggestions([]);
   }
 
   return (
@@ -304,45 +280,21 @@ export function AchievementFormModal({ achievement, onClose, onSaved }: Props) {
             </div>
           )}
           {!isEdit && (
-            <section className="space-y-2 border border-dashed border-[#1e3a5f] bg-[#0b1220] p-3">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase text-[#38bdf8]">✦ Sugestao via IA</span>
-                <button
-                  type="button"
-                  onClick={() => void handleSuggest()}
-                  disabled={suggestLoading}
-                  className="border border-[#1e3a5f] bg-[#0f172a] px-3 py-1 font-mono text-[10px] uppercase text-[#38bdf8] hover:bg-[#1e3a5f]/30 disabled:opacity-40"
-                >
-                  {suggestLoading ? "Gerando..." : "Sugerir com IA"}
-                </button>
-              </div>
-
-              {suggestError && <p className="font-mono text-[10px] text-[#fca5a5]">{suggestError}</p>}
-
-              {suggestions.map((suggestion, index) => (
-                <div
-                  key={index}
-                  className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1e293b] py-2 last:border-0"
-                >
-                  <div>
-                    <p className="text-xs text-[#e2e8f0]">
-                      {suggestion.name}{" "}
-                      <span className="text-[#64748b]">
-                        ({suggestion.rarity}, {TRIGGER_TYPE_LABELS[suggestion.triggerType]})
-                      </span>
-                    </p>
-                    <p className="text-[10px] text-[#94a3b8]">{suggestion.description}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => applySuggestion(suggestion)}
-                    className="border border-[#334155] px-3 py-1 font-mono text-[10px] uppercase text-[#94a3b8] hover:border-[#f97316] hover:text-[#f97316]"
-                  >
-                    Usar
-                  </button>
-                </div>
-              ))}
-            </section>
+            <AiSuggestionPanel<Suggestion>
+              endpoint="/api/admin/achievements/suggest"
+              renderSuggestion={(suggestion) => ({
+                title: (
+                  <>
+                    {suggestion.name}{" "}
+                    <span className="text-[#64748b]">
+                      ({suggestion.rarity}, {TRIGGER_TYPE_LABELS[suggestion.triggerType]})
+                    </span>
+                  </>
+                ),
+                subtitle: suggestion.description,
+              })}
+              onApply={applySuggestion}
+            />
           )}
 
           {/* Identification */}
