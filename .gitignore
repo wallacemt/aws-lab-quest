@@ -20,7 +20,7 @@ generated
 .next
 .next/**
 /out/
-
+graphify-out
 # production
 /build
 

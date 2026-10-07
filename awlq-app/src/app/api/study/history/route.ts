@@ -7,8 +7,8 @@ import { GapAnswerResult, updateGapProgress } from "@/lib/gap-progress";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { prisma } from "@/lib/prisma";
 import { publishLeaderboardUpdatedEvent } from "@/lib/realtime-events";
-import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
-import { QuestionOptionMapping } from "@/lib/types";
+import { isCorrectAnswer, isOptionKey, normalizeQuestionType } from "@/lib/study-answer-utils";
+import { QuestionOption, QuestionOptionMapping } from "@/lib/types";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight, XpActivityType } from "@/lib/xp-weights";
 import { recordStudyActivity } from "@/lib/streak";
 
@@ -43,6 +43,34 @@ function toTaskDifficulty(value: string | undefined): "easy" | "medium" | "hard"
     return value;
   }
   return "medium";
+}
+
+// Options are re-shuffled every time a question is served (mapDbQuestionToStudyQuestion),
+// so the letter the user clicked ("display" letter, e.g. "D") only means something relative
+// to that session's optionMapping. The DB's correctOption/correctOptions are always in the
+// canonical (unshuffled) letters, so the user's pick must be translated back before compare.
+function toCanonicalOption(
+  value: unknown,
+  mapping: QuestionOptionMapping | undefined,
+): QuestionOption | undefined {
+  if (!isOptionKey(value)) {
+    return undefined;
+  }
+  return mapping?.displayToOriginal?.[value] ?? value;
+}
+
+function toCanonicalOptions(value: unknown, mapping: QuestionOptionMapping | undefined): QuestionOption[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const result: QuestionOption[] = [];
+  for (const item of value) {
+    const canonical = toCanonicalOption(item, mapping);
+    if (canonical) {
+      result.push(canonical);
+    }
+  }
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -138,8 +166,8 @@ export async function POST(request: NextRequest) {
 
     const isCorrect = isCorrectAnswer({
       questionType: normalizeQuestionType(question.questionType),
-      selectedOption: answer.selectedOption,
-      selectedOptions: answer.selectedOptions,
+      selectedOption: toCanonicalOption(answer.selectedOption, answer.optionMapping),
+      selectedOptions: toCanonicalOptions(answer.selectedOptions, answer.optionMapping),
       correctOption: question.correctOption,
       correctOptions: question.correctOptions,
     });
