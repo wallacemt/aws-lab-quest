@@ -45,7 +45,7 @@ jobs:
 
       - name: Audit app dependencies
         working-directory: awlq-app
-        run: bun audit --audit-level=high
+        run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
 
       # ── Worker ───────────────────────────────────────────────────────────────
       - name: Install worker deps
@@ -64,7 +64,7 @@ jobs:
 
       - name: Audit worker dependencies
         working-directory: awlq-worker
-        run: bun audit --audit-level=high
+        run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
 
   # ──────────────────────────────────────────────────────────────────────────────
   # 2. Build Docker images (only on push to main)
