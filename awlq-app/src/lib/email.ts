@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 
 type SendEmailInput = {
   to: string;
@@ -6,7 +7,7 @@ type SendEmailInput = {
   html: string;
 };
 
-let cachedTransporter: nodemailer.Transporter | null = null;
+let cachedTransporter: Transporter | null = null;
 
 function getRequiredEnv(name: "MAIL_USERNAME" | "MAIL_PASSWORD"): string {
   const value = process.env[name]?.trim();
@@ -25,7 +26,7 @@ function getEmailFromAddress(mailUsername: string): string {
   return `AWS Quest <${mailUsername}>`;
 }
 
-function getTransporter(): nodemailer.Transporter {
+function getTransporter(): Transporter {
   if (cachedTransporter) {
     return cachedTransporter;
   }

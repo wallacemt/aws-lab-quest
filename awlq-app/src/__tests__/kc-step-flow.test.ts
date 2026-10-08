@@ -406,7 +406,7 @@ describe("TC-007 — Multi-topic POST enqueues one trigger per service", () => {
 
     // Each trigger targets a different service code
     const serviceCodes = mockPrisma.workerTrigger.create.mock.calls.map(
-      (call: [{ data: { payload: { serviceCode: string } } }]) => call[0].data.payload.serviceCode,
+      (call) => (call[0] as { data: { payload: { serviceCode: string } } }).data.payload.serviceCode,
     );
     expect(serviceCodes).toContain("EC2");
     expect(serviceCodes).toContain("S3");
@@ -423,7 +423,7 @@ describe("TC-007 — Multi-topic POST enqueues one trigger per service", () => {
     const body = await res.json() as { generationRequestId: string };
 
     const requestIds = mockPrisma.workerTrigger.create.mock.calls.map(
-      (call: [{ data: { payload: { requestId: string } } }]) => call[0].data.payload.requestId,
+      (call) => (call[0] as { data: { payload: { requestId: string } } }).data.payload.requestId,
     );
     // Every trigger must carry the same requestId that was returned to the client
     expect(requestIds.every((id: string) => id === body.generationRequestId)).toBe(true);
@@ -436,7 +436,7 @@ describe("TC-007 — Multi-topic POST enqueues one trigger per service", () => {
     await kcQuestionsPost(req);
 
     const counts = mockPrisma.workerTrigger.create.mock.calls.map(
-      (call: [{ data: { payload: { count: number } } }]) => call[0].data.payload.count,
+      (call) => (call[0] as { data: { payload: { count: number } } }).data.payload.count,
     );
     // gap = 10, 2 topics → ceil(10/2) = 5 each
     expect(counts.every((c: number) => c === 5)).toBe(true);
