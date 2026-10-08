@@ -55,9 +55,12 @@ describe("TrailStudyFlow — review after failing (#37)", () => {
     render(
       <TrailStudyFlow
         chainId="chain-1"
+        chainName="Trilha S3"
         stage={{ id: "stage-1", title: "S3" }}
+        nextStage={null}
         onClose={vi.fn()}
         onCompleted={vi.fn()}
+        onGoToNext={vi.fn()}
       />,
     );
 
@@ -80,9 +83,12 @@ describe("TrailStudyFlow — review after failing (#37)", () => {
     render(
       <TrailStudyFlow
         chainId="chain-1"
+        chainName="Trilha S3"
         stage={{ id: "stage-1", title: "S3" }}
+        nextStage={null}
         onClose={vi.fn()}
         onCompleted={vi.fn()}
+        onGoToNext={vi.fn()}
       />,
     );
 
@@ -114,9 +120,12 @@ describe("TrailStudyFlow — topic sidebar", () => {
     render(
       <TrailStudyFlow
         chainId="chain-1"
+        chainName="Trilha S3"
         stage={{ id: "stage-1", title: "S3" }}
+        nextStage={null}
         onClose={vi.fn()}
         onCompleted={vi.fn()}
+        onGoToNext={vi.fn()}
       />,
     );
 
