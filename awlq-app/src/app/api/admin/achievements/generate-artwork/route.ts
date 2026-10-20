@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { callAI, AiNotConfiguredError } from "@/lib/ai";
+import { fetchPollinationsImage } from "@/lib/pollinations";
 
 type GenerateBody = {
   achievementName?: string;
@@ -8,12 +9,7 @@ type GenerateBody = {
   model?: string;
 };
 
-const POLLINATIONS_BASE = "https://gen.pollinations.ai/image";
 const DEFAULT_POLLINATIONS_MODEL = "flux";
-const IMAGE_WIDTH = 512;
-const IMAGE_HEIGHT = 512;
-const MAX_FETCH_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 4000;
 
 async function generateImagePromptFromName(achievementName: string): Promise<string> {
   const aiPrompt = [
@@ -41,34 +37,6 @@ async function generateImagePromptFromName(achievementName: string): Promise<str
   }
 
   return cleaned;
-}
-
-async function fetchPollinationsImage(prompt: string, seed: number, model: string): Promise<{ dataUrl: string }> {
-  const apiKey = process.env.POLLINATIONS_API_KEY;
-  if (!apiKey) {
-    throw new Error("POLLINATIONS_API_KEY nao configurada.");
-  }
-
-  const encoded = encodeURIComponent(prompt);
-  const url = `${POLLINATIONS_BASE}/${encoded}?model=${model}&width=${IMAGE_WIDTH}&height=${IMAGE_HEIGHT}&seed=${seed}&key=${apiKey}`;
-
-  let lastError = "";
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    const res = await fetch(url);
-    if (res.ok) {
-      const arrayBuffer = await res.arrayBuffer();
-      const contentType = (res.headers.get("content-type") ?? "image/jpeg").split(";")[0].trim();
-      const base64 = Buffer.from(arrayBuffer).toString("base64");
-      return { dataUrl: `data:${contentType};base64,${base64}` };
-    }
-
-    lastError = `${res.status} ${res.statusText}`;
-    if (attempt < MAX_FETCH_ATTEMPTS) {
-      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-    }
-  }
-
-  throw new Error(`Falha ao gerar imagem no Pollinations: ${lastError}`);
 }
 
 export async function POST(request: NextRequest) {

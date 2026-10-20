@@ -1,101 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { callAI } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
-import { getPackNameByIndex } from "@/lib/simulado-pack-names";
+import {
+  pickByDifficulty,
+  computeDifficultyScore,
+  resolveUniquePackIdentity,
+  type PriorStage,
+} from "@/lib/simulado-pack-generation";
 import { uploadArtworkDataUrl } from "@/lib/simulado-pack-artwork";
+import { fetchPollinationsImage, PIXEL_ART_STYLE_RULES } from "@/lib/pollinations";
 
 const MAX_PACK_SIZE = 65;
 const MIN_PACK_SIZE = 20;
-const DIFFICULTY_RATIOS = { easy: 0.3, medium: 0.5, hard: 0.2 };
-const POLLINATIONS_BASE = process.env.POLLINATIONS_BASE ?? "https://gen.pollinations.ai/image";
-const MAX_FETCH_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 3000;
 
-export const DEFAULT_IMAGE_PROMPT_TEMPLATE = `Cover art for AWS certification simulado pack "{{packName}}" ({{certCode}}). AWS cloud computing theme: data center, cloud infrastructure, server racks, digital circuits. Dark tech aesthetic with glowing orange (#f97316) accents on deep navy background (#0f172a). No text, no letters, no brand logos. Cinematic digital illustration, centered square composition, vibrant high quality.`;
-
-export const DEFAULT_NARRATIVE_PROMPT = `Voce e um escritor criativo que gera narrativas de jornada do heroi para simulados de certificacao AWS.
-Pack: "{{packName}}" — Certificacao: {{certCode}} ({{certName}}).
-Gere uma narrativa motivacional no estilo RPG retro.
-Retorne APENAS um JSON valido, sem markdown, sem explicacao adicional, com exatamente estes campos:
-{
-  "stageName": "nome dramatico do estagio (2-4 palavras em portugues)",
-  "storyText": "texto narrativo motivacional de 2-3 frases em portugues no estilo RPG de aventura",
-  "awsContext": "contexto tecnico AWS para este estagio em 1-2 frases em portugues"
-}`;
-
-function pickByDifficulty(
-  questions: { id: string; difficulty: string }[],
-  total: number,
-): string[] {
-  const pools = {
-    easy: questions.filter((q) => q.difficulty === "easy"),
-    medium: questions.filter((q) => q.difficulty === "medium"),
-    hard: questions.filter((q) => q.difficulty === "hard"),
-  };
-  const targets = {
-    easy: Math.round(total * DIFFICULTY_RATIOS.easy),
-    medium: Math.round(total * DIFFICULTY_RATIOS.medium),
-    hard: total - Math.round(total * DIFFICULTY_RATIOS.easy) - Math.round(total * DIFFICULTY_RATIOS.medium),
-  };
-  function shuffle<T>(arr: T[]): T[] { return [...arr].sort(() => Math.random() - 0.5); }
-  const picked: string[] = [
-    ...shuffle(pools.easy).slice(0, Math.min(targets.easy, pools.easy.length)).map((q) => q.id),
-    ...shuffle(pools.medium).slice(0, Math.min(targets.medium, pools.medium.length)).map((q) => q.id),
-    ...shuffle(pools.hard).slice(0, Math.min(targets.hard, pools.hard.length)).map((q) => q.id),
-  ];
-  if (picked.length < total) {
-    const pickedSet = new Set(picked);
-    shuffle(questions.filter((q) => !pickedSet.has(q.id))).slice(0, total - picked.length).forEach((q) => picked.push(q.id));
-  }
-  return shuffle(picked);
-}
+export const DEFAULT_IMAGE_PROMPT_TEMPLATE = `Cover art for AWS certification simulado pack "{{packName}}" ({{certCode}}). AWS cloud computing theme: data center, cloud infrastructure, server racks, digital circuits.\n\n${PIXEL_ART_STYLE_RULES}`;
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`);
-}
-
-function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
-
-async function generateNarrative(
-  packName: string, certCode: string, certName: string, promptTemplate: string,
-): Promise<{ stageName: string; storyText: string; awsContext: string } | null> {
-  try {
-    const prompt = renderTemplate(promptTemplate, { packName, certCode, certName });
-    const text = (await callAI(prompt, "SIMULADO_MESSAGE")).trim();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-    const stageName = typeof parsed.stageName === "string" ? parsed.stageName.trim() : "";
-    const storyText = typeof parsed.storyText === "string" ? parsed.storyText.trim() : "";
-    const awsContext = typeof parsed.awsContext === "string" ? parsed.awsContext.trim() : "";
-    if (!stageName && !storyText) return null;
-    return { stageName, storyText, awsContext };
-  } catch { return null; }
 }
 
 async function generateArtwork(
   packName: string, certCode: string, certName: string,
   promptTemplate: string, pollinationsModel: string, packId: string,
 ): Promise<string | null> {
-  const apiKey = process.env.POLLINATIONS_API_KEY;
-  if (!apiKey) return null;
   try {
     const prompt = renderTemplate(promptTemplate, { packName, certCode, certName });
     const seed = Math.floor(Math.random() * 999_999);
-    const url = `${POLLINATIONS_BASE}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(pollinationsModel)}&width=512&height=512&seed=${seed}&key=${apiKey}`;
-    let dataUrl: string | null = null;
-    for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
-      const res = await fetch(url);
-      if (res.ok) {
-        const buf = await res.arrayBuffer();
-        const mime = (res.headers.get("content-type") ?? "image/jpeg").split(";")[0].trim();
-        dataUrl = `data:${mime};base64,${Buffer.from(buf).toString("base64")}`;
-        break;
-      }
-      if (attempt < MAX_FETCH_ATTEMPTS) await sleep(RETRY_DELAY_MS);
-    }
-    if (!dataUrl) return null;
+    const { dataUrl } = await fetchPollinationsImage(prompt, seed, pollinationsModel);
     return await uploadArtworkDataUrl(dataUrl, packId);
   } catch { return null; }
 }
@@ -145,7 +76,11 @@ export async function GET(request: NextRequest) {
     totalPacksPossible: certifications.reduce((s, c) => s + c.packsPossible, 0),
     packSize,
     defaultImagePromptTemplate: DEFAULT_IMAGE_PROMPT_TEMPLATE,
-    defaultNarrativePrompt: DEFAULT_NARRATIVE_PROMPT,
+    // ponytail: narrative generation now needs structured context (stage index,
+    // prior stages, used names) to follow the Jornada do Heroi arc coherently —
+    // no longer a free-text template the admin can override. Kept in the
+    // response so the UI field stays informational without a frontend change.
+    defaultNarrativePrompt: "Gerado automaticamente seguindo o roteiro da Jornada do Heroi (nao customizavel).",
   });
 }
 
@@ -171,7 +106,6 @@ export async function POST(request: NextRequest) {
   const pollinationsModel = body.pollinationsModel?.trim() || "flux";
   const imagePromptTemplate = body.imagePromptTemplate?.trim() || DEFAULT_IMAGE_PROMPT_TEMPLATE;
   const generateNarrativeEnabled = body.generateNarrative === true;
-  const narrativePromptTemplate = body.narrativePrompt?.trim() || DEFAULT_NARRATIVE_PROMPT;
 
   const certs = await prisma.certificationPreset.findMany({
     where: certCode ? { code: certCode } : {},
@@ -209,15 +143,41 @@ export async function POST(request: NextRequest) {
       const existingCount = await prisma.simuladoPack.count({ where: { certificationPresetId: cert.id } });
       const packsToCreate = Math.floor(available.length / packSize);
       const remaining = [...available];
-      let certPackIndex = 0;
+      const stageTotal = existingCount + packsToCreate;
+
+      const priorStages: PriorStage[] = generateNarrativeEnabled
+        ? (
+            await prisma.simuladoPack.findMany({
+              where: { certificationPresetId: cert.id },
+              select: { journeyNarrative: true },
+              orderBy: { createdAt: "asc" },
+            })
+          )
+            .map((p) => p.journeyNarrative as PriorStage | null)
+            .filter((n): n is PriorStage => !!n?.stageName)
+        : [];
 
       for (let i = 0; i < packsToCreate; i++) {
-        const packName = getPackNameByIndex(existingCount + certPackIndex++);
+        const stageIndex = existingCount + i + 1;
         const selectedIds = pickByDifficulty(remaining, packSize);
         const selectedSet = new Set(selectedIds);
+        const selectedQuestions = remaining.filter((q) => selectedSet.has(q.id));
         for (let j = remaining.length - 1; j >= 0; j--) {
           if (selectedSet.has(remaining[j]!.id)) remaining.splice(j, 1);
         }
+
+        const identity = await resolveUniquePackIdentity({
+          certCode: cert.code,
+          certName: cert.name,
+          stageIndex,
+          stageTotal,
+          priorStages: generateNarrativeEnabled ? priorStages : [],
+          fallbackIndex: existingCount + i,
+        });
+        if (generateNarrativeEnabled && identity.stageName) {
+          priorStages.push({ stageName: identity.stageName, awsContext: identity.awsContext });
+        }
+        const packName = identity.packName;
 
         const pack = await prisma.simuladoPack.create({
           data: {
@@ -225,6 +185,7 @@ export async function POST(request: NextRequest) {
             certificationPresetId: cert.id,
             createdByUserId: adminResult.userId,
             questionCount: packSize,
+            difficultyScore: computeDifficultyScore(selectedQuestions),
             active: true,
             questions: { create: selectedIds.map((questionId, position) => ({ questionId, position })) },
           },
@@ -232,12 +193,11 @@ export async function POST(request: NextRequest) {
         });
 
         const update: Record<string, unknown> = {};
-        let hasNarrative = false;
+        const hasNarrative = generateNarrativeEnabled && !!identity.stageName;
         let hasArtwork = false;
 
-        if (generateNarrativeEnabled) {
-          const narrative = await generateNarrative(packName, cert.code, cert.name, narrativePromptTemplate);
-          if (narrative) { update.journeyNarrative = narrative; hasNarrative = true; }
+        if (hasNarrative) {
+          update.journeyNarrative = { stageName: identity.stageName, storyText: identity.storyText, awsContext: identity.awsContext };
         }
         if (generateArtworkEnabled) {
           const artworkUrl = await generateArtwork(packName, cert.code, cert.name, imagePromptTemplate, pollinationsModel, pack.id);

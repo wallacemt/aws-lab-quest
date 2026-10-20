@@ -1,51 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
-import { getPackNameByIndex } from "@/lib/simulado-pack-names";
+import {
+  pickByDifficulty,
+  computeDifficultyScore,
+  resolveUniquePackIdentity,
+  type PriorStage,
+} from "@/lib/simulado-pack-generation";
 
 const PACK_SIZE = 65;
-const DIFFICULTY_RATIOS = { easy: 0.3, medium: 0.5, hard: 0.2 };
 
 type GenerateBody = {
   certificationCode: string;
 };
-
-function pickByDifficulty(
-  questions: { id: string; difficulty: string }[],
-  total: number,
-): string[] {
-  const easy = questions.filter((q) => q.difficulty === "easy");
-  const medium = questions.filter((q) => q.difficulty === "medium");
-  const hard = questions.filter((q) => q.difficulty === "hard");
-
-  const targets = {
-    easy: Math.round(total * DIFFICULTY_RATIOS.easy),
-    medium: Math.round(total * DIFFICULTY_RATIOS.medium),
-    hard: total - Math.round(total * DIFFICULTY_RATIOS.easy) - Math.round(total * DIFFICULTY_RATIOS.medium),
-  };
-
-  function pick(pool: typeof questions, count: number): string[] {
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count).map((q) => q.id);
-  }
-
-  const picked: string[] = [
-    ...pick(easy, Math.min(targets.easy, easy.length)),
-    ...pick(medium, Math.min(targets.medium, medium.length)),
-    ...pick(hard, Math.min(targets.hard, hard.length)),
-  ];
-
-  if (picked.length < total) {
-    const remaining = questions
-      .filter((q) => !picked.includes(q.id))
-      .sort(() => Math.random() - 0.5)
-      .slice(0, total - picked.length)
-      .map((q) => q.id);
-    picked.push(...remaining);
-  }
-
-  return picked.sort(() => Math.random() - 0.5);
-}
 
 export async function POST(request: NextRequest) {
   const adminResult = await requireAdmin(request);
@@ -101,10 +68,23 @@ export async function POST(request: NextRequest) {
   const remaining = [...availableQuestions];
   const createdPacks: { id: string; name: string }[] = [];
 
+  const priorStages: PriorStage[] = (
+    await prisma.simuladoPack.findMany({
+      where: { certificationPresetId: certPreset.id },
+      select: { journeyNarrative: true },
+      orderBy: { createdAt: "asc" },
+    })
+  )
+    .map((p) => p.journeyNarrative as PriorStage | null)
+    .filter((n): n is PriorStage => !!n?.stageName);
+
+  const stageTotal = existingPackCount + packsToCreate;
+
   for (let i = 0; i < packsToCreate; i++) {
-    const packName = getPackNameByIndex(existingPackCount + i);
+    const stageIndex = existingPackCount + i + 1;
     const selectedIds = pickByDifficulty(remaining, PACK_SIZE);
     const selectedSet = new Set(selectedIds);
+    const selectedQuestions = remaining.filter((q) => selectedSet.has(q.id));
 
     for (let j = remaining.length - 1; j >= 0; j--) {
       if (selectedSet.has(remaining[j]!.id)) {
@@ -112,13 +92,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const identity = await resolveUniquePackIdentity({
+      certCode: certPreset.code,
+      certName: certPreset.name,
+      stageIndex,
+      stageTotal,
+      priorStages,
+      fallbackIndex: existingPackCount + i,
+    });
+    if (identity.stageName) priorStages.push({ stageName: identity.stageName, awsContext: identity.awsContext });
+
     const pack = await prisma.simuladoPack.create({
       data: {
-        name: packName,
+        name: identity.packName,
         certificationPresetId: certPreset.id,
         createdByUserId: adminSession.userId,
         questionCount: PACK_SIZE,
+        difficultyScore: computeDifficultyScore(selectedQuestions),
         active: true,
+        journeyNarrative: identity.stageName
+          ? { stageName: identity.stageName, storyText: identity.storyText, awsContext: identity.awsContext }
+          : undefined,
         questions: {
           create: selectedIds.map((questionId, position) => ({
             questionId,
