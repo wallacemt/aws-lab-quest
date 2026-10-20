@@ -9,7 +9,10 @@
 import { config } from "../config.js";
 import { callAI } from "../ai.js";
 
-const POLLINATIONS_BASE = "https://gen.pollinations.ai/image";
+// ponytail: image.pollinations.ai/prompt is the free tier (no API key/balance);
+// gen.pollinations.ai/image is the metered "pollen" tier that 402s once the
+// account balance runs out.
+const POLLINATIONS_BASE = "https://image.pollinations.ai/prompt";
 const DEFAULT_POLLINATIONS_MODEL = "flux";
 const IMAGE_WIDTH = 512;
 const IMAGE_HEIGHT = 512;
@@ -62,12 +65,8 @@ export async function fetchPollinationsImage(
   seed: number,
   model: string = DEFAULT_POLLINATIONS_MODEL
 ): Promise<{ buffer: Buffer; mimeType: string }> {
-  if (!config.pollinations.apiKey) {
-    throw new Error("POLLINATIONS_API_KEY nao configurada.");
-  }
-
   const encoded = encodeURIComponent(prompt);
-  const url = `${POLLINATIONS_BASE}/${encoded}?model=${model}&width=${IMAGE_WIDTH}&height=${IMAGE_HEIGHT}&seed=${seed}&key=${config.pollinations.apiKey}`;
+  const url = `${POLLINATIONS_BASE}/${encoded}?model=${model}&width=${IMAGE_WIDTH}&height=${IMAGE_HEIGHT}&seed=${seed}&nologo=true`;
 
   let lastError = "";
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
