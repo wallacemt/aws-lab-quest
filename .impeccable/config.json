@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "animate-bounce",
+        "createdAt": "2026-10-21T20:07:46.965Z",
+        "reason": "Intentional gentle vertical bob on retro loading, error, and empty-state art; ease-in-out motion fits this gamified interface."
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "bounce-slow",
+        "createdAt": "2026-10-21T20:07:47.039Z",
+        "reason": "Intentional gentle vertical bob on retro loading, error, and empty-state art; ease-in-out motion fits this gamified interface."
+      }
+    ]
+  }
+}
