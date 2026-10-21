@@ -5,8 +5,11 @@ import { Providers } from "@/stores/providers";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CookieBanner } from "@/components/ui/cookie-banner";
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
+const umamiScriptUrl = process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL || "https://analytics.wallacedev.com.br/script.js";
 
 const pixelFont = Press_Start_2P({
   variable: "--font-pixel",
@@ -119,6 +122,17 @@ export default function RootLayout({
           <Providers>{children}</Providers>
         </TooltipProvider>
         <CookieBanner />
+        {umamiWebsiteId && (
+          <Script
+            src={umamiScriptUrl}
+            data-website-id={umamiWebsiteId}
+            data-domains="awslabquest.com"
+            data-do-not-track="true"
+            data-exclude-search="true"
+            data-exclude-hash="true"
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );

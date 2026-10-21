@@ -89,6 +89,9 @@ jobs:
         with:
           context: .
           file: ./awlq-app/Dockerfile
+          build-args: |
+            NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ vars.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}
+            NEXT_PUBLIC_UMAMI_SCRIPT_URL=${{ vars.NEXT_PUBLIC_UMAMI_SCRIPT_URL }}
           push: false
           load: true
           tags: ${{ env.APP_IMAGE }}:${{ github.sha }}

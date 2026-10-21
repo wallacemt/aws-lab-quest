@@ -29,6 +29,9 @@ services:
     build:
       context: .
       dockerfile: awlq-app/Dockerfile
+      args:
+        NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
+        NEXT_PUBLIC_UMAMI_SCRIPT_URL: ${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-https://analytics.wallacedev.com.br/script.js}
     container_name: rt-awslq-app
     restart: unless-stopped
     environment:

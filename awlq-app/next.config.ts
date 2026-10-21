@@ -1,6 +1,10 @@
 import path from "path";
 import type { NextConfig } from "next";
 
+const umamiOrigin = new URL(
+  process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL || "https://analytics.wallacedev.com.br/script.js",
+).origin;
+
 const nextConfig: NextConfig = {
   // Expose public Supabase vars to the browser (URL and anon key are not secrets).
   
@@ -45,10 +49,10 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               "img-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net https://avatars.githubusercontent.com https://www.google-analytics.com https://www.googletagmanager.com https://www.youtube.com https://googleusercontent.com https://www.gstatic.com https://www.google.com https://www.google.co.in https://www.google.co.uk https://www.google.ca https://www.google.com.au https://www.google.de https://www.google.fr https://www.google.it https://www.google.es https://www.google.nl https://www.google.be https://www.google.ch https://www.google.at https://www.google.se https://www.google.no https://www.google.dk https://www.google.fi https://www.google.ie",
-              "script-src 'self' 'unsafe-inline'",
+              `script-src 'self' 'unsafe-inline' ${umamiOrigin}`,
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self'",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co ${umamiOrigin}`,
               // https://*.supabase.co: PdfViewer embeds signed Storage URLs (PDF/SLIDES library content) in an <iframe>.
               "frame-src 'self' https://www.youtube.com https://*.supabase.co",
               "frame-ancestors 'none'",
