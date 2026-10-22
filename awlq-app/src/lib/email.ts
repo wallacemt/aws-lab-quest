@@ -1,59 +1,15 @@
-import nodemailer from "nodemailer";
-import type { Transporter } from "nodemailer";
-
-type SendEmailInput = {
-  to: string;
-  subject: string;
-  html: string;
-};
-
-let cachedTransporter: Transporter | null = null;
-
-function getRequiredEnv(name: "MAIL_USERNAME" | "MAIL_PASSWORD"): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} nao configurada.`);
-  }
-  return value;
-}
-
-function getEmailFromAddress(mailUsername: string): string {
-  const explicitFrom = process.env.EMAIL_FROM?.trim();
-  if (explicitFrom) {
-    return explicitFrom;
-  }
-
-  return `AWS Quest <${mailUsername}>`;
-}
-
-function getTransporter(): Transporter {
-  if (cachedTransporter) {
-    return cachedTransporter;
-  }
-
-  const mailUsername = getRequiredEnv("MAIL_USERNAME");
-  const mailPassword = getRequiredEnv("MAIL_PASSWORD");
-
-  cachedTransporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: mailUsername,
-      pass: mailPassword,
-    },
+export async function sendEmail(input: { to: string; subject: string; html: string }): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  if (!apiKey || !from) throw new Error("RESEND_API_KEY e RESEND_FROM_EMAIL são obrigatórias para enviar e-mail.");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [input.to], subject: input.subject, html: input.html }),
+    signal: AbortSignal.timeout(15000),
   });
-
-  return cachedTransporter;
-}
-
-export async function sendEmail(input: SendEmailInput): Promise<void> {
-  const mailUsername = getRequiredEnv("MAIL_USERNAME");
-  const from = getEmailFromAddress(mailUsername);
-  const transporter = getTransporter();
-
-  await transporter.sendMail({
-    from,
-    to: input.to,
-    subject: input.subject,
-    html: input.html,
-  });
+  if (!response.ok) throw new Error(`Resend: falha no envio (HTTP ${response.status}).`);
+  const result: unknown = await response.json();
+  if (!result || typeof result !== "object" || !("id" in result) || typeof result.id !== "string" || !result.id)
+    throw new Error("Resend: resposta de envio inválida.");
 }
