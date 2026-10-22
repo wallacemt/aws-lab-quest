@@ -1,5 +1,7 @@
 "use client";
 
+import { QuestionJsonUpload } from "@/features/admin/components/QuestionJsonUpload";
+import { parseQuestionJson } from "@/lib/question-import";
 import { useEffect, useMemo, useState } from "react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -923,37 +925,17 @@ export function AdminQuestionsScreen() {
     }
   }
 
-  function handleJsonImportPreview() {
+  function handleJsonImportPreview(source = jsonImportText) {
     setJsonImportError(null);
     setJsonImportSuccess(null);
     setJsonImportPreviewList([]);
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonImportText.trim());
-    } catch {
-      setJsonImportError("JSON invalido. Verifique a sintaxe.");
-      return;
-    }
-
-    const questions = Array.isArray(parsed) ? parsed : (parsed as Record<string, unknown>)?.questions;
-    if (!Array.isArray(questions)) {
-      setJsonImportError("Esperado array de questoes ou { questions: [...] }");
-      return;
-    }
-
-    if (questions.length === 0) {
-      setJsonImportError("Lista de questoes vazia.");
-      return;
-    }
-
-    if (questions.length > 200) {
-      setJsonImportError("Maximo 200 questoes por importacao.");
-      return;
-    }
+    let questions;
+    try { questions = parseQuestionJson(source); }
+    catch (error) { setJsonImportError((error as Error).message); return; }
 
     const items = questions.map((q, i) => {
-      const item = (q ?? {}) as Record<string, unknown>;
+      const item = q as unknown as Record<string, unknown>;
       const statement = String(item.statement ?? "").trim();
       const difficulty = String(item.difficulty ?? "medium");
       const questionType = String(item.questionType ?? "single");
@@ -2358,7 +2340,7 @@ export function AdminQuestionsScreen() {
             <div className="space-y-1">
               <p className="font-mono text-xs uppercase text-[#38bdf8]">Importar questoes via JSON</p>
               <p className="text-xs text-[#94a3b8]">
-                Cole o JSON, clique em Preview para auditar, remova questoes indesejadas e importe.
+                Selecione um arquivo JSON ou cole o conteúdo, revise as questões e importe.
               </p>
             </div>
 
@@ -2379,6 +2361,11 @@ export function AdminQuestionsScreen() {
                 </select>
               </label>
 
+              <QuestionJsonUpload onChange={questions => {
+                setJsonImportPreviewList([]); setJsonImportError(null); setJsonImportSuccess(null);
+                setJsonImportText(questions ? JSON.stringify(questions, null, 2) : "");
+                if (questions) handleJsonImportPreview(JSON.stringify(questions));
+              }} />
               <label className="block space-y-1">
                 <span className="text-xs uppercase text-[#94a3b8]">JSON das questoes</span>
                 <textarea

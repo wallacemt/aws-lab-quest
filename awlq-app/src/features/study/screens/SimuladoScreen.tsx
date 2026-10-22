@@ -98,7 +98,7 @@ export function SimuladoScreen() {
   const [activeTab, setActiveTab] = useState<"examGuide" | "simulados">("simulados");
   const [packs, setPacks] = useState<SimuladoPackListItem[]>([]);
   const [packsLoading, setPacksLoading] = useState(false);
-  const [packsFilter, setPacksFilter] = useState<"all" | "todo" | "done">("all");
+  const [packsFilter, setPacksFilter] = useState<"all" | "todo" | "done" | "skill-builder">("all");
   const [packsDifficultyFilter, setPacksDifficultyFilter] = useState<"all" | "easy" | "medium" | "hard" | "boss">(
     "all",
   );

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { QuestionJsonUpload } from "@/features/admin/components/QuestionJsonUpload";
+import type { ImportItem } from "@/lib/question-import";
 import Link from "next/link";
 import { QuestionCreateModal, CreatedQuestion } from "@/features/admin/components/QuestionCreateModal";
 import { ArtworkUploadField } from "@/features/admin/components/ArtworkUploadField";
@@ -26,6 +28,9 @@ type AvailableQuestionsPayload = {
 export function AdminSimuladoMakerScreen() {
   const [certifications, setCertifications] = useState<CertificationOption[]>([]);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  const [importedQuestions, setImportedQuestions] = useState<ImportItem[] | null>(null);
+  const [isSkillBuilder, setIsSkillBuilder] = useState(false);
 
   // Step 1
   const [name, setName] = useState("");
@@ -137,7 +142,8 @@ export function AdminSimuladoMakerScreen() {
         body: JSON.stringify({
           name,
           certificationCode,
-          questionIds: Array.from(selectedIds),
+          ...(importedQuestions ? { questions: importedQuestions } : { questionIds: Array.from(selectedIds) }),
+          isSkillBuilder,
           artworkUrl: artworkUrl ?? undefined,
           difficultyScore,
         }),
@@ -177,6 +183,7 @@ export function AdminSimuladoMakerScreen() {
             <button
               onClick={() => {
                 setName(""); setCertificationCode(""); setArtworkUrl(null);
+                setImportedQuestions(null); setIsSkillBuilder(false);
                 setSelectedIds(new Set()); setSelectedQuestions([]);
                 setStep(1); setCreatedPack(null); setSubmitError(null);
               }}
@@ -230,7 +237,7 @@ export function AdminSimuladoMakerScreen() {
             <label className="block font-mono text-[10px] uppercase text-[#64748b]">Certificacao</label>
             <select
               value={certificationCode}
-              onChange={(e) => setCertificationCode(e.target.value)}
+              onChange={(e) => { setCertificationCode(e.target.value); setSelectedIds(new Set()); setSelectedQuestions([]); setImportedQuestions(null); }}
               className="w-full border border-[#334155] bg-[#111827] px-3 py-2 text-sm text-[#e2e8f0]"
             >
               <option value="">Selecionar...</option>
@@ -240,6 +247,21 @@ export function AdminSimuladoMakerScreen() {
             </select>
           </div>
 
+          <label className="flex items-center gap-2 text-sm text-[#e2e8f0]">
+            <input type="checkbox" checked={isSkillBuilder} onChange={e => setIsSkillBuilder(e.target.checked)} />
+            Origem: AWS Skill Builder
+          </label>
+          <p className="text-xs text-[#94a3b8]">Marque somente quando a origem foi conferida pela equipe. Esta marcação não representa certificação ou endosso da AWS.</p>
+          {certificationCode && <QuestionJsonUpload key={certificationCode} min={20} max={65} onChange={questions => {
+            setImportedQuestions(questions);
+            const preview = (questions ?? []).map((q, i) => ({
+              id: `import-${i}`, statement: q.statement, topic: q.topic ?? null,
+              difficulty: q.difficulty ?? "medium", questionType: q.questionType ?? ((q.correctOptions?.length ?? 0) > 1 ? "multi" : "single"),
+              createdAt: new Date().toISOString(),
+            }));
+            setSelectedQuestions(preview); setSelectedIds(new Set(preview.map(q => q.id)));
+          }} />}
+          {importedQuestions && <p className="text-xs text-[#94a3b8]">Todas as questões serão vinculadas a {certificationCode}. O arquivo substitui a seleção do banco neste simulado.</p>}
           <ArtworkUploadField value={artworkUrl} onChange={setArtworkUrl} />
 
           <AiArtworkGenerator
@@ -275,7 +297,7 @@ export function AdminSimuladoMakerScreen() {
           </div>
 
           <button
-            onClick={() => setStep(2)}
+            onClick={() => setStep(importedQuestions ? 3 : 2)}
             disabled={!name.trim() || !certificationCode}
             className="border border-[#f97316] px-6 py-2 font-mono text-xs uppercase text-[#f97316] hover:bg-[#f97316]/10 disabled:opacity-40"
           >
@@ -514,6 +536,8 @@ export function AdminSimuladoMakerScreen() {
                 </div>
                 <button
                   onClick={() => toggleSelect(q)}
+                  disabled={!!importedQuestions}
+                  aria-label="Remover questão"
                   className="text-[#64748b] hover:text-red-400 flex-shrink-0 text-[10px]"
                 >
                   ✕
@@ -528,14 +552,14 @@ export function AdminSimuladoMakerScreen() {
 
           <div className="flex gap-3">
             <button
-              onClick={() => setStep(2)}
+                onClick={() => setStep(importedQuestions ? 1 : 2)}
               className="border border-[#334155] px-4 py-2 font-mono text-xs uppercase text-[#94a3b8]"
             >
               Voltar
             </button>
             <button
               onClick={() => void handleSubmit()}
-              disabled={submitting}
+              disabled={submitting || selectedIds.size < 20 || selectedIds.size > 65}
               className="border border-[#f97316] px-6 py-2 font-mono text-xs uppercase text-[#f97316] hover:bg-[#f97316]/10 disabled:opacity-40"
             >
               {submitting ? "Criando..." : "Criar Pack"}

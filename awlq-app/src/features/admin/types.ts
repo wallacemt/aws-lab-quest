@@ -784,6 +784,7 @@ type JourneyNarrative = {
 };
 
 export type PackDetail = {
+  isSkillBuilder?: boolean;
   id: string;
   name: string;
   active: boolean;
@@ -805,6 +806,7 @@ export type AvailableQuestion = {
 };
 
 export type SimuladoPackItem = {
+  isSkillBuilder?: boolean;
   id: string;
   name: string;
   certificationCode: string | null;

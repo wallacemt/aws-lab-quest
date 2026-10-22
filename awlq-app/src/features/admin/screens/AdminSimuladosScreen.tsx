@@ -1,5 +1,6 @@
 "use client";
 
+import { SkillBuilderBadge } from "@/components/SkillBuilderBadge";
 import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
@@ -72,6 +73,7 @@ export function AdminSimuladosScreen() {
   const [editPack, setEditPack] = useState<PackDetail | null>(null);
   const [editTab, setEditTab] = useState<"geral" | "jornada">("geral");
   const [, setEditLoading] = useState(false);
+  const [editSkillBuilder, setEditSkillBuilder] = useState(false);
   const [editName, setEditName] = useState("");
   const [editArtworkUrl, setEditArtworkUrl] = useState<string | null>(null);
   const [editArtworkChanged, setEditArtworkChanged] = useState(false);
@@ -366,6 +368,7 @@ export function AdminSimuladosScreen() {
       if (!res.ok) throw new Error("Falha ao carregar pack");
       const data = (await res.json()) as PackDetail;
       setEditPack(data);
+      setEditSkillBuilder(data.isSkillBuilder ?? false);
       setEditName(data.name);
       setEditArtworkUrl(data.artworkUrl);
       setEditDifficultyScore(data.difficultyScore ?? 5);
@@ -420,7 +423,7 @@ export function AdminSimuladosScreen() {
     setEditSaving(true);
     setEditError(null);
     try {
-      const body: Record<string, unknown> = {};
+      const body: Record<string, unknown> = { isSkillBuilder: editSkillBuilder };
       if (editName.trim() !== editPack.name) body.name = editName.trim();
       if (editArtworkChanged) body.artworkUrl = editArtworkUrl;
       if (editDifficultyScore !== editPack.difficultyScore) body.difficultyScore = editDifficultyScore;
@@ -826,7 +829,7 @@ export function AdminSimuladosScreen() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs text-[#e2e8f0]">{pack.name}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-[#e2e8f0]">{pack.name} {pack.isSkillBuilder && <SkillBuilderBadge />}</td>
                     <td className="px-3 py-2">
                       <span className="border border-[#334155] px-2 py-0.5 font-mono text-[10px] uppercase text-[#94a3b8]">
                         {pack.certificationCode ?? "—"}
@@ -1027,6 +1030,10 @@ export function AdminSimuladosScreen() {
               {/* Tab: Geral */}
               {editTab === "geral" && (
                 <>
+                  <label className="flex items-center gap-2 text-sm text-[#e2e8f0]">
+                    <input type="checkbox" checked={editSkillBuilder} onChange={e => setEditSkillBuilder(e.target.checked)} />
+                    Origem AWS Skill Builder conferida pela equipe
+                  </label>
                   <label className="block space-y-1">
                     <span className="text-xs uppercase text-[#64748b]">Nome do Pack</span>
                     <input

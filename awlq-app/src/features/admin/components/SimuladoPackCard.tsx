@@ -1,11 +1,13 @@
 "use client";
 
+import { SkillBuilderBadge } from "@/components/SkillBuilderBadge";
 import Image from "next/image";
 import { Pencil, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 
 type SimuladoPackItem = {
   id: string;
   name: string;
+  isSkillBuilder?: boolean;
   certificationCode: string | null;
   certificationName: string | null;
   questionCount: number;
@@ -60,6 +62,7 @@ export function SimuladoPackCard({ pack, onEdit, onToggleActive, onDelete }: Pro
         </div>
       </div>
 
+      {pack.isSkillBuilder && <div className="px-3 pt-2"><SkillBuilderBadge /></div>}
       {/* Info */}
       <div className="flex flex-1 flex-col gap-2 p-3">
         <p className="font-mono text-xs font-bold leading-snug text-[#e2e8f0] line-clamp-2">{pack.name}</p>

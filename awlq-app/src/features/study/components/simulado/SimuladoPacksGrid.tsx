@@ -1,5 +1,6 @@
 "use client";
 
+import { SkillBuilderBadge } from "@/components/SkillBuilderBadge";
 import Image from "next/image";
 import {
   Tooltip,
@@ -18,6 +19,7 @@ type PackSession = {
 export type SimuladoPackListItem = {
   id: string;
   name: string;
+  isSkillBuilder?: boolean;
   questionCount: number;
   artworkUrl: string | null;
   difficultyScore: number;
@@ -28,7 +30,7 @@ export type SimuladoPackListItem = {
   sessions: PackSession[];
 };
 
-type PacksFilter = "all" | "todo" | "done";
+type PacksFilter = "all" | "todo" | "done" | "skill-builder";
 type DifficultyFilter = "all" | "easy" | "medium" | "hard" | "boss";
 type PacksSort = "newest" | "oldest" | "name_az" | "score_desc";
 type PacksView = "grid" | "list";
@@ -124,7 +126,7 @@ export function SimuladoPacksGrid({
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* Status filters */}
-          {(["all", "todo", "done"] as const).map((f) => (
+          {(["all", "todo", "done", "skill-builder"] as const).map((f) => (
             <button
               key={f}
               type="button"
@@ -136,7 +138,7 @@ export function SimuladoPacksGrid({
                   : "border-[var(--pixel-border)] text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)]/50",
               ].join(" ")}
             >
-              {f === "all" ? "Todos" : f === "todo" ? "Pend." : "Feitos"}
+              {f === "all" ? "Todos" : f === "todo" ? "Pend." : f === "done" ? "Feitos" : "AWS Skill Builder"}
             </button>
           ))}
 
@@ -283,6 +285,7 @@ export function SimuladoPacksGrid({
                     : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]",
               ].join(" ")}
             >
+              {pack.isSkillBuilder && <div className="p-2"><SkillBuilderBadge /></div>}
               {packsView === "list" ? (
                 /* List row layout */
                 <div className="flex min-h-[5.5rem] items-stretch">
