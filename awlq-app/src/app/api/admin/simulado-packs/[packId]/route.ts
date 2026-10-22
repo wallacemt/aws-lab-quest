@@ -21,6 +21,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       id: true,
       name: true,
       active: true,
+      isSkillBuilder: true,
       questionCount: true,
       difficultyScore: true,
       artworkUrl: true,
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     id: pack.id,
     name: pack.name,
     active: pack.active,
+    isSkillBuilder: pack.isSkillBuilder,
     questionCount: pack.questionCount,
     difficultyScore: pack.difficultyScore,
     artworkUrl: pack.artworkUrl ?? null,
@@ -73,6 +75,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const { packId } = await params;
   const body = (await request.json().catch(() => ({}))) as {
     active?: boolean;
+    isSkillBuilder?: boolean;
     name?: string;
     artworkUrl?: string | null;
     difficultyScore?: number;
@@ -89,12 +92,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const updateData: {
     active?: boolean;
+    isSkillBuilder?: boolean;
     name?: string;
     artworkUrl?: string | null;
     questionCount?: number;
     difficultyScore?: number;
     journeyNarrative?: Prisma.InputJsonValue | Prisma.NullTypes.DbNull;
   } = {};
+  if (body.isSkillBuilder !== undefined) {
+    if (typeof body.isSkillBuilder !== "boolean") return NextResponse.json({ error: "Origem inválida" }, { status: 400 });
+    updateData.isSkillBuilder = body.isSkillBuilder;
+  }
   if (body.active !== undefined) updateData.active = body.active;
   if (body.name !== undefined) updateData.name = body.name.trim();
   if (body.difficultyScore !== undefined) updateData.difficultyScore = Math.min(10, Math.max(1, body.difficultyScore));

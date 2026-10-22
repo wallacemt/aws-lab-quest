@@ -19,11 +19,12 @@ export async function GET(request: NextRequest) {
   const filterParam = searchParams.get("filter") ?? "all";
 
   const packs = await prisma.simuladoPack.findMany({
-    where: { certificationPresetId: profile.certificationPresetId, active: true },
+    where: { certificationPresetId: profile.certificationPresetId, active: true, ...(filterParam === "skill-builder" ? { isSkillBuilder: true } : {}) },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
       name: true,
+      isSkillBuilder: true,
       artworkUrl: true,
       difficultyScore: true,
       createdAt: true,
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
       return {
         id: pack.id,
         name: pack.name,
+        isSkillBuilder: pack.isSkillBuilder,
         // awsContext: pack.journeyNarrative.
         questionCount: pack._count.questions,
         artworkUrl: pack.artworkUrl ?? null,

@@ -1,3 +1,5 @@
+import { validateQuestionImport, MAX_IMPORT_BYTES, type ImportItem } from "@/lib/question-import";
+import { prepareQuestionImport } from "@/lib/question-import-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
@@ -58,6 +60,7 @@ export async function GET(request: NextRequest) {
     questionCount: p._count.questions,
     difficultyScore: p.difficultyScore,
     active: p.active,
+    isSkillBuilder: p.isSkillBuilder,
     artworkUrl: p.artworkUrl ?? null,
     createdAt: p.createdAt.toISOString(),
     createdByName: p.createdBy?.name ?? null,
@@ -74,6 +77,8 @@ type CreateBody = {
   name: string;
   certificationCode: string;
   questionIds: string[];
+  questions?: ImportItem[];
+  isSkillBuilder?: boolean;
   artworkUrl?: string;
   difficultyScore?: number;
 };
@@ -82,15 +87,30 @@ export async function POST(request: NextRequest) {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
-  const body = (await request.json().catch(() => ({}))) as Partial<CreateBody>;
-  const name = body.name?.trim();
-  const certificationCode = body.certificationCode?.trim();
+  const source = await request.text();
+  if (new TextEncoder().encode(source).length > MAX_IMPORT_BYTES) return NextResponse.json({ error: "Payload excede 2 MB" }, { status: 413 });
+  let body: Partial<CreateBody>;
+  try { body = JSON.parse(source); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Payload inválido" }, { status: 400 });
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const certificationCode = typeof body.certificationCode === "string" ? body.certificationCode.trim() : "";
+  if ((body.isSkillBuilder !== undefined && typeof body.isSkillBuilder !== "boolean") ||
+      (body.artworkUrl !== undefined && typeof body.artworkUrl !== "string") ||
+      (body.difficultyScore !== undefined && (typeof body.difficultyScore !== "number" || !Number.isFinite(body.difficultyScore))))
+    return NextResponse.json({ error: "Dados do pack inválidos" }, { status: 400 });
+  let imported: ImportItem[] | undefined;
+  try { if (body.questions !== undefined) imported = validateQuestionImport(body.questions); }
+  catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 422 }); }
   const questionIds = Array.isArray(body.questionIds) ? (body.questionIds as string[]) : [];
 
   if (!name || !certificationCode) {
     return NextResponse.json({ error: "name e certificationCode obrigatorios" }, { status: 400 });
   }
-  if (questionIds.length < 20 || questionIds.length > 65) {
+  if ((imported && questionIds.length) || questionIds.some(id => typeof id !== "string" || !id) || new Set(questionIds).size !== questionIds.length) {
+    return NextResponse.json({ error: "Use apenas o arquivo JSON ou IDs únicos do banco" }, { status: 400 });
+  }
+  const questionCount = imported?.length ?? questionIds.length;
+  if (questionCount < 20 || questionCount > 65) {
     return NextResponse.json({ error: "O pack deve ter entre 20 e 65 questoes" }, { status: 400 });
   }
 
@@ -101,6 +121,12 @@ export async function POST(request: NextRequest) {
   if (!certPreset) {
     return NextResponse.json({ error: "Certificacao nao encontrada" }, { status: 404 });
   }
+
+  if (!imported) {
+    const valid = await prisma.studyQuestion.count({ where: { id: { in: questionIds }, certificationPresetId: certPreset.id, active: true } });
+    if (valid !== questionIds.length) return NextResponse.json({ error: "Questões inválidas para esta certificação" }, { status: 422 });
+  }
+  const prepared = imported ? await prepareQuestionImport(imported.map(q => ({ ...q, certificationCode })), certificationCode) : null;
 
   const difficultyScore = Math.min(10, Math.max(1, typeof body.difficultyScore === "number" ? body.difficultyScore : 1));
 
@@ -118,21 +144,25 @@ export async function POST(request: NextRequest) {
     ?? "https://djitwkagdqgbhanenonk.supabase.co/storage/v1/object/public/aws-lab-quest/cert-badges/527007c2-c79f-4240-8a20-4b502c2f5b04.png";
 
   try {
-    const pack = await prisma.simuladoPack.create({
-      data: {
-        name,
-        certificationPresetId: certPreset.id,
-        createdByUserId: adminResult.userId,
-        questionCount: questionIds.length,
-        difficultyScore,
-        active: true,
-        artworkUrl: finalArtworkUrl,
-        questions: {
-          create: questionIds.map((questionId, position) => ({ questionId, position })),
+    const pack = await prisma.$transaction(async tx => {
+      const ids = prepared ? await prepared.create(tx, certPreset.id) : questionIds;
+      return tx.simuladoPack.create({
+        data: {
+          name,
+          certificationPresetId: certPreset.id,
+          createdByUserId: adminResult.userId,
+          questionCount,
+          isSkillBuilder: body.isSkillBuilder ?? false,
+          difficultyScore,
+          active: true,
+          artworkUrl: finalArtworkUrl,
+          questions: {
+            create: ids.map((questionId, position) => ({ questionId, position })),
+          },
         },
-      },
-      select: { id: true, name: true, questionCount: true, difficultyScore: true, artworkUrl: true },
-    });
+        select: { id: true, name: true, questionCount: true, difficultyScore: true, artworkUrl: true },
+      });
+    }, { timeout: 30000 });
 
     return NextResponse.json(pack, { status: 201 });
   } catch (err) {

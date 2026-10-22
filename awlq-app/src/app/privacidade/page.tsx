@@ -72,7 +72,7 @@ export default function PrivacidadePage() {
             nos EUA.
           </li>
           <li>
-            <strong>Gmail SMTP (Google Workspace):</strong> entrega de e-mails transacionais e de engajamento.
+            <strong>Resend:</strong> entrega de e-mails transacionais e de engajamento.
           </li>
         </ul>
         <p>Nao vendemos nem compartilhamos seus dados com terceiros para fins publicitarios.</p>
