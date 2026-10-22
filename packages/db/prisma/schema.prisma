@@ -769,6 +769,7 @@ model UserCertBadge {
 // ─── Simulado Pack models ─────────────────────────────────────────────────────
 
 model SimuladoPack {
+  isSkillBuilder Boolean @default(false)
   id                    String               @id @default(cuid())
   name                  String
   certificationPresetId String?

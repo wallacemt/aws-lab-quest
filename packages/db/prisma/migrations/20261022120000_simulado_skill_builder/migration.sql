@@ -1,0 +1,1 @@
+ALTER TABLE "SimuladoPack" ADD COLUMN "isSkillBuilder" BOOLEAN NOT NULL DEFAULT false;

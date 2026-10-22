@@ -1,0 +1,19 @@
+{
+  "questions": [
+    {
+      "statement": "Qual serviço armazena objetos?",
+      "options": {
+        "A": "Amazon S3",
+        "B": "Amazon EC2"
+      },
+      "correctOption": "A",
+      "difficulty": "easy",
+      "explanations": {
+        "A": "Amazon S3 oferece armazenamento de objetos."
+      },
+      "awsServiceCodes": [
+        "S3"
+      ]
+    }
+  ]
+}

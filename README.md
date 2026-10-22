@@ -101,7 +101,7 @@ Cada worker tem concorrência limitada (`concurrency: 1` para qualquer um que ch
 | AI | Google Gemini API (`@google/generative-ai`) |
 | Estado | Zustand 5 |
 | Animações | Framer Motion 12 |
-| Email | Nodemailer (Gmail SMTP) |
+| Email | Resend (HTTP API) |
 
 ### awlq-worker (Background Jobs)
 | Camada | Tecnologia |
@@ -120,7 +120,7 @@ Cada worker tem concorrência limitada (`concurrency: 1` para qualquer um que ch
 - Docker + Docker Compose
 - Conta Google Cloud com Gemini API habilitada
 - Projeto Supabase (Storage + Realtime)
-- Conta Gmail com App Password habilitado
+- Domínio de envio verificado no Resend
 
 ---
 
@@ -198,8 +198,8 @@ Crie os arquivos `.env` baseados no [`.env.example`](.env.example).
 | `SUPABASE_URL` | URL do projeto Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role JWT do Supabase |
 | `SUPABASE_ANON_KEY` | Anon key do Supabase |
-| `MAIL_USERNAME` | Email Gmail para envio |
-| `MAIL_PASSWORD` | App Password do Gmail |
+| `RESEND_API_KEY` | Chave da API do Resend (somente servidor) |
+| `RESEND_FROM_EMAIL` | Endereço remetente verificado no Resend |
 
 ### Opcionais
 

@@ -1,47 +1,17 @@
-import nodemailer from "nodemailer";
-import { config } from "../config.js";
-import { logger } from "../shared/logger.js";
-
-let transport: ReturnType<typeof nodemailer.createTransport> | null = null;
-
-function getTransport() {
-  if (!config.email.username || !config.email.password) {
-    throw new Error(
-      "Email credentials not configured. Set MAIL_USERNAME and MAIL_PASSWORD in the worker .env file. " +
-      "For Gmail with 2FA, generate an App Password at https://myaccount.google.com/apppasswords"
-    );
-  }
-  if (!transport) {
-    transport = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: config.email.username, pass: config.email.password },
-    });
-  }
-  return transport;
-}
-
-export async function sendEmail({
-  to,
-  subject,
-  html,
-}: {
-  to: string;
-  subject: string;
-  html: string;
-}): Promise<void> {
-  const transporter = getTransport();
-  try {
-    await transporter.sendMail({
-      from: config.email.from,
-      to,
-      subject,
-      html,
-    });
-  } catch (err) {
-    transport = null; // reset so next attempt re-creates transporter
-    logger.error({ err, to }, "sendEmail: SMTP error");
-    throw err;
-  }
+export async function sendEmail(input: { to: string; subject: string; html: string }): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  if (!apiKey || !from) throw new Error("RESEND_API_KEY e RESEND_FROM_EMAIL são obrigatórias para enviar e-mail.");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [input.to], subject: input.subject, html: input.html }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error(`Resend: falha no envio (HTTP ${response.status}).`);
+  const result: unknown = await response.json();
+  if (!result || typeof result !== "object" || !("id" in result) || typeof result.id !== "string" || !result.id)
+    throw new Error("Resend: resposta de envio inválida.");
 }
 
 function resolveVar(template: string, vars: Record<string, string>): string {

@@ -43,6 +43,14 @@ jobs:
         working-directory: awlq-app
         run: bun run lint
 
+      - name: Test app
+        working-directory: awlq-app
+        run: bun run test
+
+      - name: Type-check app
+        working-directory: awlq-app
+        run: bunx tsc --noEmit
+
       - name: Audit app dependencies
         working-directory: awlq-app
         run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
@@ -61,6 +69,10 @@ jobs:
       - name: Type-check worker
         working-directory: awlq-worker
         run: bunx tsc --noEmit
+
+      - name: Test worker
+        working-directory: awlq-worker
+        run: bun run test
 
       - name: Audit worker dependencies
         working-directory: awlq-worker
@@ -125,9 +137,9 @@ jobs:
             /tmp/worker-image.tar
           retention-days: 1
 
-  
+
   # ──────────────────────────────────────────────────────────────────────────────
-  # 4. Push to Docker Hub 
+  # 4. Push to Docker Hub
   # ──────────────────────────────────────────────────────────────────────────────
   push-images:
     name: Push to Docker Hub
