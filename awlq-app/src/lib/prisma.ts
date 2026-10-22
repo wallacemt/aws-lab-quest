@@ -15,10 +15,10 @@ function createClient() {
     throw new Error("DATABASE_URL nao configurada.");
   }
 
-  const defaultPoolMax = process.env.NODE_ENV === "production" ? 3 : 10;
+  const defaultPoolMax = process.env.NODE_ENV === "production" ? 3 : 20;
   const poolMax = parsePositiveInt(process.env.DATABASE_POOL_MAX, defaultPoolMax);
-  const idleTimeoutMillis = parsePositiveInt(process.env.DATABASE_POOL_IDLE_TIMEOUT_MS, 30_000);
-  const connectionTimeoutMillis = parsePositiveInt(process.env.DATABASE_POOL_CONNECTION_TIMEOUT_MS, 10_000);
+  const idleTimeoutMillis = parsePositiveInt(process.env.DATABASE_POOL_IDLE_TIMEOUT_MS, 40_000);
+  const connectionTimeoutMillis = parsePositiveInt(process.env.DATABASE_POOL_CONNECTION_TIMEOUT_MS, 20_000);
 
   const pool = new Pool({
     connectionString,
@@ -31,7 +31,7 @@ function createClient() {
   // @prisma/adapter-pg bundles its own @types/pg; cast to any to avoid version conflict
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const adapter = new PrismaPg(pool as any);
-  return new PrismaClient({ adapter });
+  return new PrismaClient({ adapter, transactionOptions: { timeout: 12_000 } });
 }
 
 export const prisma = globalForPrisma.prisma ?? createClient();

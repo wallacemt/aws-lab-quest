@@ -208,7 +208,7 @@ export function UserProfileModal({
           )}
         </label>
         <label className="block text-sm">
-          Tema favorito
+          Assunto favorito (usado para dar exemplo com analogias)
           <input
             className="mt-1 w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-[var(--font-body)]"
             value={draft.favoriteTheme}

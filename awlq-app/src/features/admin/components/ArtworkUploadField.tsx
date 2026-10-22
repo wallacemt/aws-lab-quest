@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { FileImage } from "lucide-react";
+import { useState } from "react";
 import { compressImageToDataUrl, validateImageFile } from "@/lib/image-utils";
+import { FileDropzone } from "./FileDropzone";
 
 type Props = {
   value: string | null;
@@ -11,7 +13,6 @@ type Props = {
 };
 
 export function ArtworkUploadField({ value, onChange, label = "Arte do pack" }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,28 +32,9 @@ export function ArtworkUploadField({ value, onChange, label = "Arte do pack" }: 
     }
   }
 
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) void handleFile(file);
-  }
-
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) void handleFile(file);
-    e.target.value = "";
-  }
-
   return (
-    <div className="space-y-2">
-      <span className="text-xs uppercase text-[#64748b]">{label} (opcional)</span>
-
-      <div
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
-        className="relative border border-dashed border-[#334155] bg-[#0b1220]"
-      >
-        {value ? (
+    <FileDropzone label={`${label} (opcional)`} accept="image/*" hint="PNG, JPG ou WebP · até 3 MB · comprimida para 640 px" busy={processing} error={error} onFile={file => void handleFile(file)}>
+      {({ openFilePicker }) => value ? (
           <div className="relative h-36">
             {value.startsWith("data:") ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -60,10 +42,10 @@ export function ArtworkUploadField({ value, onChange, label = "Arte do pack" }: 
             ) : (
               <Image src={value} alt="Arte do pack" fill sizes="640px" className="object-cover" />
             )}
-            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-opacity hover:bg-black/50 hover:opacity-100">
+            <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/90 to-transparent p-2 pt-8">
               <button
                 type="button"
-                onClick={() => inputRef.current?.click()}
+                onClick={openFilePicker}
                 className="border border-[#334155] bg-[#0f172a] px-3 py-1.5 text-[10px] uppercase text-[#e2e8f0]"
               >
                 Trocar
@@ -80,32 +62,22 @@ export function ArtworkUploadField({ value, onChange, label = "Arte do pack" }: 
         ) : (
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
+            onClick={openFilePicker}
             disabled={processing}
-            className="flex h-24 w-full flex-col items-center justify-center gap-1 text-center"
+            className="flex min-h-36 w-full flex-col items-center justify-center gap-2 px-4 py-6 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[#19e26d]"
           >
             {processing ? (
-              <span className="text-xs text-[#64748b]">Processando...</span>
+              <span className="text-xs text-[#94a3b8]">Processando imagem…</span>
             ) : (
               <>
-                <span className="text-2xl text-[#334155]">🖼</span>
-                <span className="text-[10px] uppercase text-[#64748b]">Clique ou arraste uma imagem</span>
-                <span className="text-[10px] text-[#475569]">PNG, JPG, WebP · max 3MB · comprimida para 640px</span>
+                <span className="grid size-11 place-items-center border border-[#334155] bg-[#111c2e] text-[#19e26d]"><FileImage size={21} /></span>
+                <span className="text-xs font-medium text-[#e2e8f0]">Solte a imagem aqui</span>
+                <span className="text-xs text-[#94a3b8]">ou <span className="text-[#19e26d] underline underline-offset-4">escolha no dispositivo</span></span>
               </>
             )}
           </button>
         )}
-      </div>
-
-      {error && <p className="text-[10px] text-red-400">{error}</p>}
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleInputChange}
-      />
-    </div>
+      
+    </FileDropzone>
   );
 }
