@@ -74,6 +74,7 @@ jobs:
         working-directory: awlq-worker
         env:
           DATABASE_URL: postgresql://ci:ci@localhost/ci
+          REDIS_URL: redis://localhost:6379
         run: bun run test
 
       - name: Audit worker dependencies
