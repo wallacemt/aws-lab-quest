@@ -38,7 +38,7 @@ import {  SimuladoDraft, StudyQuestion, TaskDifficulty } from "@/lib/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { GAP_TOP_N, OPTIONS, RulesConsentMap, ScoreOverviewData, SimuladoPackListItem } from "@/types/questions";
-import { buildScoreOverview, buildTopicPerformance, formatTime, playAlarmBeep, playSuccessSound, triggerConfetti } from "@/features/utils/funcs/simulado-utils";
+import { buildScoreOverview, buildTopicPerformance, formatTime, hasSubstantialStaticExplanation, playAlarmBeep, playSuccessSound, triggerConfetti } from "@/features/utils/funcs/simulado-utils";
 
 
 export function SimuladoScreen() {
@@ -561,7 +561,7 @@ export function SimuladoScreen() {
     const normalized = normalizeAnswerValue(answer);
 
     const staticCorrectExplanation = question.explanations[question.correctOption]?.trim() ?? "";
-    if (staticCorrectExplanation.length >= 40) {
+    if (hasSubstantialStaticExplanation(staticCorrectExplanation)) {
       const nextReview: StudyExplanationResult = {
         // Treat a substantial correct-answer explanation as a complete static review.
         summary: staticCorrectExplanation,

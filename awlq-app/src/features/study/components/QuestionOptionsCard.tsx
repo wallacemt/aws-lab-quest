@@ -67,11 +67,11 @@ export function QuestionOptionsCard({
         </div>
       )}
 
-      <p
+      <div
         className={`max-w-prose break-words font-[var(--font-body)] leading-relaxed ${large ? "text-lg" : "text-base"}`}
       >
         <StatementContent text={question.statement} />
-      </p>
+      </div>
       {question.questionType === "multi" && (
         <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
           Questao multipla: selecione todas as alternativas corretas.

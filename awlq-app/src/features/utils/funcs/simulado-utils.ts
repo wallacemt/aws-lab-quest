@@ -2,6 +2,40 @@ import { StudyAnswerMap } from "@/features/study";
 import { isAnswerCorrect } from "@/features/study/services";
 import { QuestionOption, StudyQuestion } from "@/lib/types";
 import { ScoreOverviewData, TopicPerformance } from "@/types/questions";
+import type { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
+
+export type SimuladoReviewFilters = {
+  result: "all" | "correct" | "wrong";
+  topic: string;
+  time: "all" | "fast" | "slow";
+  markedOnly: boolean;
+  confidence: "all" | "false-belief" | "lucky-guess";
+};
+
+export function getAverageQuestionTime(questions: StudyQuestion[], times: Record<string, number>): number {
+  return questions.length ? questions.reduce((sum, question) => sum + (times[question.id] ?? 0), 0) / questions.length : 0;
+}
+
+export function filterSimuladoReviewQuestions(
+  questions: StudyQuestion[], answers: StudyAnswerMap, times: Record<string, number>, marked: Set<string>,
+  confidenceByQuestion: Record<string, AnswerConfidence>, filters: SimuladoReviewFilters,
+): StudyQuestion[] {
+  const average = getAverageQuestionTime(questions, times);
+  return questions.filter((question) => {
+    const correct = isAnswerCorrect({ questionType: question.questionType, answer: answers[question.id], correctOption: question.correctOption, correctOptions: question.correctOptions });
+    const seconds = times[question.id] ?? 0;
+    const confidence = confidenceByQuestion[question.id];
+    return (filters.result === "all" || (filters.result === "correct") === correct) &&
+      (filters.topic === "all" || (question.topic?.trim() || "OUTROS") === filters.topic) &&
+      (filters.time === "all" || (filters.time === "fast" ? seconds < average * 0.5 : seconds > average * 1.5)) &&
+      (!filters.markedOnly || marked.has(question.id)) &&
+      (filters.confidence === "all" || (filters.confidence === "false-belief" ? !correct && confidence === "high" : correct && confidence === "low"));
+  });
+}
+
+export function hasSubstantialStaticExplanation(explanation: string | undefined): boolean {
+  return (explanation?.trim().length ?? 0) >= 40;
+}
 
 
 export function formatTime(seconds: number): string {

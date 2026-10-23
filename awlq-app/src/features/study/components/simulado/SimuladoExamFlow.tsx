@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
@@ -14,7 +14,7 @@ import { ReportQuestionModal } from "@/features/study/components/ReportQuestionM
 import { SimuladoPreSubmitModal } from "@/features/study/components/simulado/SimuladoPreSubmitModal";
 import { useSimuladoContext } from "@/features/study/context/SimuladoContext";
 import { isAnswerCorrect, normalizeAnswerValue } from "@/features/study/services";
-import { buildTopicPerformance } from "@/features/utils/funcs/simulado-utils";
+import { buildTopicPerformance, filterSimuladoReviewQuestions, getAverageQuestionTime } from "@/features/utils/funcs/simulado-utils";
 import { GAP_TOP_N } from "@/types/questions";
 
 export function SimuladoExamFlow() {
@@ -75,27 +75,17 @@ export function SimuladoExamFlow() {
   // someone still reading/thinking (user request: no inline step, no extra screen).
   const [confidencePromptOpen, setConfidencePromptOpen] = useState(false);
   const [resultTab, setResultTab] = useState<"score" | "review" | "gaps">("score");
+  const resultTabIndex = (["score", "review", "gaps"] as const).indexOf(resultTab);
   const [resultFilter, setResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [topicFilter, setTopicFilter] = useState("all");
   const [timeFilter, setTimeFilter] = useState<"all" | "fast" | "slow">("all");
+  const [markedOnly, setMarkedOnly] = useState(false);
+  const [confidenceFilter, setConfidenceFilter] = useState<"all" | "false-belief" | "lucky-guess">("all");
   const [expandedReviews, setExpandedReviews] = useState<Set<string>>(new Set());
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const topicPerformance = useMemo(() => buildTopicPerformance(questions, answers), [questions, answers]);
-  const averageQuestionTime = useMemo(() => {
-    const total = questions.reduce((sum, question) => sum + (timeSpentByQuestion[question.id] ?? 0), 0);
-    return questions.length ? total / questions.length : 0;
-  }, [questions, timeSpentByQuestion]);
-  const filteredQuestions = useMemo(() => questions.filter((question) => {
-    const correct = isAnswerCorrect({
-      questionType: question.questionType,
-      answer: answers[question.id],
-      correctOption: question.correctOption,
-      correctOptions: question.correctOptions,
-    });
-    const seconds = timeSpentByQuestion[question.id] ?? 0;
-    return (resultFilter === "all" || (resultFilter === "correct") === correct) &&
-      (topicFilter === "all" || (question.topic?.trim() || "OUTROS") === topicFilter) &&
-      (timeFilter === "all" || (timeFilter === "fast" ? seconds < averageQuestionTime * 0.5 : seconds > averageQuestionTime * 1.5));
-  }), [answers, questions, resultFilter, timeFilter, timeSpentByQuestion, topicFilter, averageQuestionTime]);
+  const averageQuestionTime = useMemo(() => getAverageQuestionTime(questions, timeSpentByQuestion), [questions, timeSpentByQuestion]);
+  const filteredQuestions = useMemo(() => filterSimuladoReviewQuestions(questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, { result: resultFilter, topic: topicFilter, time: timeFilter, markedOnly, confidence: confidenceFilter }), [answers, questions, resultFilter, timeFilter, timeSpentByQuestion, topicFilter, markedForReview, confidenceByQuestion, markedOnly, confidenceFilter]);
   const needsConfidencePrompt =
     inExamFlow &&
     !!currentQuestion &&
@@ -127,16 +117,16 @@ export function SimuladoExamFlow() {
     <>
       {inReviewFlow && scoreOverview && (
         <PixelCard className="space-y-4">
-          <div role="tablist" aria-label="Resultado do simulado" className="flex flex-wrap border-b border-[var(--pixel-border)]">
+          <div role="tablist" aria-label="Resultado do simulado" onKeyDown={(event) => { if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return; event.preventDefault(); const next = (resultTabIndex + (event.key === "ArrowRight" ? 1 : 2)) % 3; setResultTab((["score", "review", "gaps"] as const)[next]); tabRefs.current[next]?.focus(); }} className="flex flex-wrap border-b border-[var(--pixel-border)]">
             {([ ["score", "Score"], ["review", "Revisão"], ["gaps", "Pontos fortes e fracos"] ] as const).map(([tab, label]) => (
-              <button key={tab} type="button" role="tab" aria-selected={resultTab === tab} onClick={() => setResultTab(tab)}
+              <button key={tab} ref={(element) => { tabRefs.current[["score", "review", "gaps"].indexOf(tab)] = element; }} id={`simulado-tab-${tab}`} type="button" role="tab" aria-selected={resultTab === tab} aria-controls={`simulado-panel-${tab}`} tabIndex={resultTab === tab ? 0 : -1} onClick={() => setResultTab(tab)}
                 className={`border-b-2 px-4 py-3 font-mono text-[10px] uppercase ${resultTab === tab ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]" : "border-transparent text-[var(--pixel-subtext)]"}`}>
                 {label}
               </button>
             ))}
           </div>
-          {resultTab === "score" && <SimuladoResultOverview overview={scoreOverview} calculating={calculating} submitted loadingMotivationalMessage={loadingMotivationalMessage} motivationalMessage={motivationalMessage} />}
-          {resultTab === "review" && <div className="space-y-4">
+          {resultTab === "score" && <div id="simulado-panel-score" role="tabpanel" aria-labelledby="simulado-tab-score" tabIndex={0}><SimuladoResultOverview overview={scoreOverview} calculating={calculating} submitted loadingMotivationalMessage={loadingMotivationalMessage} motivationalMessage={motivationalMessage} /></div>}
+          {resultTab === "review" && <div id="simulado-panel-review" role="tabpanel" aria-labelledby="simulado-tab-review" tabIndex={0} className="space-y-4">
             <div className="flex flex-wrap gap-2">
               <select aria-label="Filtrar por resultado" value={resultFilter} onChange={(event) => setResultFilter(event.target.value as typeof resultFilter)} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs">
                 <option value="all">Todas</option><option value="correct">Certas</option><option value="wrong">Erradas</option>
@@ -147,7 +137,12 @@ export function SimuladoExamFlow() {
               <select aria-label="Filtrar por tempo" value={timeFilter} onChange={(event) => setTimeFilter(event.target.value as typeof timeFilter)} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs">
                 <option value="all">Qualquer tempo</option><option value="fast">Rápidas (&lt; 50% da média)</option><option value="slow">Demoradas (&gt; 150% da média)</option>
               </select>
+              <select aria-label="Filtrar por confiança" value={confidenceFilter} onChange={(event) => setConfidenceFilter(event.target.value as typeof confidenceFilter)} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs">
+                <option value="all">Todas as confianças</option><option value="false-belief">Alta confiança + errou</option><option value="lucky-guess">Baixa confiança + acertou</option>
+              </select>
+              <label className="flex items-center gap-2 border border-[var(--pixel-border)] px-3 py-2 font-mono text-xs"><input type="checkbox" checked={markedOnly} onChange={(event) => setMarkedOnly(event.target.checked)} />Marcadas para revisão</label>
             </div>
+            <p aria-live="polite" className="sr-only">{filteredQuestions.length} de {questions.length} questões</p>
             <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Média: {Math.round(averageQuestionTime)}s por questão. Limites relativos de 50% e 150% destacam extremos sem depender da duração do simulado.</p>
             {filteredQuestions.map((question) => {
               const index = questions.findIndex((item) => item.id === question.id);
@@ -166,7 +161,7 @@ export function SimuladoExamFlow() {
             {filteredQuestions.length === 0 && <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Nenhuma questão corresponde aos filtros.</p>}
             <div className="flex justify-end gap-2"><PixelButton variant="ghost" onClick={navigateHome}>Voltar ao início</PixelButton><PixelButton onClick={handleReset}>Novo Simulado</PixelButton></div>
           </div>}
-          {resultTab === "gaps" && <div className="space-y-4">
+          {resultTab === "gaps" && <div id="simulado-panel-gaps" role="tabpanel" aria-labelledby="simulado-tab-gaps" tabIndex={0} className="space-y-4">
             {loadingWeakServices && <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Atualizando pontos de fraqueza...</p>}
             {(historicalWeakServices.length ? historicalWeakServices : weakServicesCurrentExam).slice(0, GAP_TOP_N).map((item) => <p key={item.topic} className="font-[var(--font-body)] text-sm">{item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)</p>)}
             {strongestGapTopics.length > 0 && <div className="flex flex-wrap gap-2 border-t border-[var(--pixel-border)] pt-3"><PixelButton onClick={navigateToKcGaps}>Fazer KC dos gaps</PixelButton><PixelButton variant="ghost" onClick={navigateToLabGaps}>Criar Lab único dos gaps</PixelButton></div>}
