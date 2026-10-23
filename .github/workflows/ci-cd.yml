@@ -72,6 +72,8 @@ jobs:
 
       - name: Test worker
         working-directory: awlq-worker
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost/ci
         run: bun run test
 
       - name: Audit worker dependencies
