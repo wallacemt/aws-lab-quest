@@ -126,7 +126,7 @@ export default function RootLayout({
           <Script
             src={umamiScriptUrl}
             data-website-id={umamiWebsiteId}
-            data-domains="awslabquest.com"
+            data-domains="awslq.wallacedev.com.br"
             data-do-not-track="true"
             data-exclude-search="true"
             data-exclude-hash="true"
