@@ -1,17 +1,21 @@
 "use client";
 
+import { ReactNode, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { AnswerConfidence, ConfidenceSelector } from "@/features/retention/components/ConfidenceSelector";
 import { QuestionOptionsCard } from "@/features/study/components/QuestionOptionsCard";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
 import { QuestionSideNav } from "@/features/study/components/QuestionSideNav";
+import { SimuladoResultOverview } from "@/features/study/components/simulado/SimuladoResultOverview";
 import { ReportQuestionModal } from "@/features/study/components/ReportQuestionModal";
 import { SimuladoPreSubmitModal } from "@/features/study/components/simulado/SimuladoPreSubmitModal";
 import { useSimuladoContext } from "@/features/study/context/SimuladoContext";
-import { isAnswerCorrect } from "@/features/study/services";
-
-const GAP_TOP_N = 10;
+import { isAnswerCorrect, normalizeAnswerValue } from "@/features/study/services";
+import { buildTopicPerformance, filterSimuladoReviewQuestions, getAverageQuestionTime } from "@/features/utils/funcs/simulado-utils";
+import { GAP_TOP_N } from "@/types/questions";
 
 export function SimuladoExamFlow() {
   const {
@@ -19,6 +23,7 @@ export function SimuladoExamFlow() {
     answers,
     currentIndex,
     submitted,
+    reviewEachAnswer,
     inExamFlow,
     inReviewFlow,
     isActive,
@@ -30,6 +35,7 @@ export function SimuladoExamFlow() {
     session,
     markedForReview,
     allQuestionsAnswered,
+    confidenceByQuestion,
     reportModalOpen,
     reportMessage,
     reportSubmitting,
@@ -37,6 +43,12 @@ export function SimuladoExamFlow() {
     currentReview,
     currentReviewOptions,
     loadingReviewByQuestion,
+    reviewByQuestion,
+    timeSpentByQuestion,
+    scoreOverview,
+    calculating,
+    loadingMotivationalMessage,
+    motivationalMessage,
     historicalWeakServices,
     loadingWeakServices,
     weakServicesCurrentExam,
@@ -47,6 +59,7 @@ export function SimuladoExamFlow() {
     setShowPreSubmitSummary,
     goToQuestion,
     toggleMarkForReview,
+    setConfidenceForQuestion,
     handleForceExit,
     handleReset,
     handleSubmitExam,
@@ -58,9 +71,107 @@ export function SimuladoExamFlow() {
     navigateToLabGaps,
   } = useSimuladoContext();
 
+  // Non-blocking confidence prompt: opens on hover/click of the advance button, only when
+  // the current question has an answer and hasn't been rated yet, so it never interrupts
+  // someone still reading/thinking (user request: no inline step, no extra screen).
+  const [confidencePromptOpen, setConfidencePromptOpen] = useState(false);
+  const [resultTab, setResultTab] = useState<"score" | "review" | "gaps">("score");
+  const resultTabIndex = (["score", "review", "gaps"] as const).indexOf(resultTab);
+  const [resultFilter, setResultFilter] = useState<"all" | "correct" | "wrong">("all");
+  const [topicFilter, setTopicFilter] = useState("all");
+  const [timeFilter, setTimeFilter] = useState<"all" | "fast" | "slow">("all");
+  const [markedOnly, setMarkedOnly] = useState(false);
+  const [confidenceFilter, setConfidenceFilter] = useState<"all" | "false-belief" | "lucky-guess">("all");
+  const [expandedReviews, setExpandedReviews] = useState<Set<string>>(new Set());
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const topicPerformance = useMemo(() => buildTopicPerformance(questions, answers), [questions, answers]);
+  const averageQuestionTime = useMemo(() => getAverageQuestionTime(questions, timeSpentByQuestion), [questions, timeSpentByQuestion]);
+  const filteredQuestions = useMemo(() => filterSimuladoReviewQuestions(questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, { result: resultFilter, topic: topicFilter, time: timeFilter, markedOnly, confidence: confidenceFilter }), [answers, questions, resultFilter, timeFilter, timeSpentByQuestion, topicFilter, markedForReview, confidenceByQuestion, markedOnly, confidenceFilter]);
+  const needsConfidencePrompt =
+    inExamFlow &&
+    !!currentQuestion &&
+    normalizeAnswerValue(answers[currentQuestion.id]).length > 0 &&
+    !confidenceByQuestion[currentQuestion.id];
+
+  function openConfidencePromptIfNeeded() {
+    if (needsConfidencePrompt) setConfidencePromptOpen(true);
+  }
+
+  function advance(action: () => void) {
+    // First click (or hover) surfaces the prompt; clicking again while it's already open
+    // skips the rating and advances anyway, so it never traps the user.
+    if (needsConfidencePrompt && !confidencePromptOpen) {
+      setConfidencePromptOpen(true);
+      return;
+    }
+    setConfidencePromptOpen(false);
+    action();
+  }
+
+  function pickConfidenceAndAdvance(confidence: AnswerConfidence, action: () => void) {
+    if (currentQuestion) setConfidenceForQuestion(currentQuestion.id, confidence);
+    setConfidencePromptOpen(false);
+    action();
+  }
+
   return (
     <>
-      {(inExamFlow || inReviewFlow) && currentQuestion && (
+      {inReviewFlow && scoreOverview && (
+        <PixelCard className="space-y-4">
+          <div role="tablist" aria-label="Resultado do simulado" onKeyDown={(event) => { if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return; event.preventDefault(); const next = (resultTabIndex + (event.key === "ArrowRight" ? 1 : 2)) % 3; setResultTab((["score", "review", "gaps"] as const)[next]); tabRefs.current[next]?.focus(); }} className="flex flex-wrap border-b border-[var(--pixel-border)]">
+            {([ ["score", "Score"], ["review", "Revisão"], ["gaps", "Pontos fortes e fracos"] ] as const).map(([tab, label]) => (
+              <button key={tab} ref={(element) => { tabRefs.current[["score", "review", "gaps"].indexOf(tab)] = element; }} id={`simulado-tab-${tab}`} type="button" role="tab" aria-selected={resultTab === tab} aria-controls={`simulado-panel-${tab}`} tabIndex={resultTab === tab ? 0 : -1} onClick={() => setResultTab(tab)}
+                className={`border-b-2 px-4 py-3 font-mono text-[10px] uppercase ${resultTab === tab ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]" : "border-transparent text-[var(--pixel-subtext)]"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {resultTab === "score" && <div id="simulado-panel-score" role="tabpanel" aria-labelledby="simulado-tab-score" tabIndex={0}><SimuladoResultOverview overview={scoreOverview} calculating={calculating} submitted loadingMotivationalMessage={loadingMotivationalMessage} motivationalMessage={motivationalMessage} /></div>}
+          {resultTab === "review" && <div id="simulado-panel-review" role="tabpanel" aria-labelledby="simulado-tab-review" tabIndex={0} className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <select aria-label="Filtrar por resultado" value={resultFilter} onChange={(event) => setResultFilter(event.target.value as typeof resultFilter)} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs">
+                <option value="all">Todas</option><option value="correct">Certas</option><option value="wrong">Erradas</option>
+              </select>
+              <select aria-label="Filtrar por área" value={topicFilter} onChange={(event) => setTopicFilter(event.target.value)} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs">
+                <option value="all">Todas as áreas</option>{topicPerformance.map((topic) => <option key={topic.topic} value={topic.topic}>{topic.topic}</option>)}
+              </select>
+              <select aria-label="Filtrar por tempo" value={timeFilter} onChange={(event) => setTimeFilter(event.target.value as typeof timeFilter)} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs">
+                <option value="all">Qualquer tempo</option><option value="fast">Rápidas (&lt; 50% da média)</option><option value="slow">Demoradas (&gt; 150% da média)</option>
+              </select>
+              <select aria-label="Filtrar por confiança" value={confidenceFilter} onChange={(event) => setConfidenceFilter(event.target.value as typeof confidenceFilter)} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-2 font-mono text-xs">
+                <option value="all">Todas as confianças</option><option value="false-belief">Alta confiança + errou</option><option value="lucky-guess">Baixa confiança + acertou</option>
+              </select>
+              <label className="flex items-center gap-2 border border-[var(--pixel-border)] px-3 py-2 font-mono text-xs"><input type="checkbox" checked={markedOnly} onChange={(event) => setMarkedOnly(event.target.checked)} />Marcadas para revisão</label>
+            </div>
+            <p aria-live="polite" className="sr-only">{filteredQuestions.length} de {questions.length} questões</p>
+            <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Média: {Math.round(averageQuestionTime)}s por questão. Limites relativos de 50% e 150% destacam extremos sem depender da duração do simulado.</p>
+            {filteredQuestions.map((question) => {
+              const index = questions.findIndex((item) => item.id === question.id);
+              const correct = isAnswerCorrect({ questionType: question.questionType, answer: answers[question.id], correctOption: question.correctOption, correctOptions: question.correctOptions });
+              const selected = normalizeAnswerValue(answers[question.id]);
+              const review = reviewByQuestion[question.id];
+              const options = (["A", "B", "C", "D", "E"] as const).flatMap((option) => question.options[option] ? [{ option, text: question.options[option], explanation: review?.options[option] ?? question.explanations[option] ?? "Sem explicacao adicional.", isCorrect: question.correctOptions.includes(option), isSelected: selected.includes(option) }] : []);
+              const expanded = expandedReviews.has(question.id);
+              return <div key={question.id} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)]">
+                <button type="button" aria-expanded={expanded} onClick={() => { setExpandedReviews((previous) => { const next = new Set(previous); if (expanded) next.delete(question.id); else next.add(question.id); return next; }); void goToQuestion(index); }} className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-3 text-left">
+                  <span className="font-mono text-xs">Questão {index + 1} · {correct ? "Certa" : "Errada"} · {question.topic || "OUTROS"}</span><span className="font-mono text-[10px] text-[var(--pixel-subtext)]">{timeSpentByQuestion[question.id] ?? 0}s · {expanded ? "−" : "+"}</span>
+                </button>
+                {expanded && <div className="p-3"><QuestionReviewPanel isCorrect={correct} summary={review?.summary} loading={Boolean(loadingReviewByQuestion[question.id])} loadingText="Gerando revisão com IA..." options={options} questionStatement={question.statement} questionTypeLabel={question.questionType === "multi" ? "Tipo múltipla escolha" : "Tipo escolha única"} questionIndex={index + 1} questionCount={questions.length} /></div>}
+              </div>;
+            })}
+            {filteredQuestions.length === 0 && <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Nenhuma questão corresponde aos filtros.</p>}
+            <div className="flex justify-end gap-2"><PixelButton variant="ghost" onClick={navigateHome}>Voltar ao início</PixelButton><PixelButton onClick={handleReset}>Novo Simulado</PixelButton></div>
+          </div>}
+          {resultTab === "gaps" && <div id="simulado-panel-gaps" role="tabpanel" aria-labelledby="simulado-tab-gaps" tabIndex={0} className="space-y-4">
+            {loadingWeakServices && <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Atualizando pontos de fraqueza...</p>}
+            {(historicalWeakServices.length ? historicalWeakServices : weakServicesCurrentExam).slice(0, GAP_TOP_N).map((item) => <p key={item.topic} className="font-[var(--font-body)] text-sm">{item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)</p>)}
+            {strongestGapTopics.length > 0 && <div className="flex flex-wrap gap-2 border-t border-[var(--pixel-border)] pt-3"><PixelButton onClick={navigateToKcGaps}>Fazer KC dos gaps</PixelButton><PixelButton variant="ghost" onClick={navigateToLabGaps}>Criar Lab único dos gaps</PixelButton></div>}
+            <div className="flex justify-end gap-2"><PixelButton variant="ghost" onClick={navigateHome}>Voltar ao início</PixelButton><PixelButton onClick={handleReset}>Novo Simulado</PixelButton></div>
+          </div>}
+        </PixelCard>
+      )}
+
+      {inExamFlow && currentQuestion && (
         <div className={`grid gap-4 ${focusMode ? "" : "xl:grid-cols-[minmax(0,1fr)_340px]"}`}>
           <section className="space-y-4">
             {inExamFlow && (
@@ -76,7 +187,7 @@ export function SimuladoExamFlow() {
                     <div
                       className={`border-2 px-3 py-1 font-mono text-sm ${isPaused ? "border-yellow-400 text-yellow-300" : "border-red-400 text-red-300"}`}
                     >
-                      {timerLabel}
+                      {session?.timerMode === "COUNTUP_FREE" ? `Tempo decorrido · ${timerLabel}` : session?.timerMode === "NONE" ? "Sem cronometro" : timerLabel}
                     </div>
                   )}
                   <button
@@ -142,8 +253,10 @@ export function SimuladoExamFlow() {
               <QuestionOptionsCard
                 question={currentQuestion}
                 answer={answers[currentQuestion.id]}
-                onSelect={(value) => setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }))}
-                submitted={submitted}
+                onSelect={(value) => {
+                  setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
+                }}
+                submitted={submitted || (reviewEachAnswer && normalizeAnswerValue(answers[currentQuestion.id]).length > 0)}
                 large={focusMode}
                 questionLabel={`Questao ${currentIndex + 1} de ${questions.length}`}
                 headerActions={
@@ -244,19 +357,34 @@ export function SimuladoExamFlow() {
                         <PixelButton
                           variant="ghost"
                           onClick={() => void goToQuestion(currentIndex - 1)}
-                          disabled={currentIndex === 0}
+                          disabled={reviewEachAnswer || currentIndex === 0}
                         >
                           ← Anterior
                         </PixelButton>
                         <span className="font-mono text-[11px] text-[var(--pixel-subtext)]">
                           {currentIndex + 1} / {questions.length}
                         </span>
-                        <PixelButton
-                          onClick={() => void goToQuestion(currentIndex + 1)}
-                          disabled={currentIndex === questions.length - 1}
+                        <ConfidenceGate
+                          open={confidencePromptOpen}
+                          onOpenChange={setConfidencePromptOpen}
+                          onPick={(confidence) =>
+                            pickConfidenceAndAdvance(confidence, () => void goToQuestion(currentIndex + 1))
+                          }
                         >
-                          Proxima →
-                        </PixelButton>
+                          <PixelButton
+                            onClick={() => {
+                              if (reviewEachAnswer && !submitted && currentQuestion) {
+                                void goToQuestion(currentIndex);
+                                return;
+                              }
+                              advance(() => void goToQuestion(currentIndex + 1));
+                            }}
+                            onMouseEnter={openConfidencePromptIfNeeded}
+                            disabled={reviewEachAnswer ? (!normalizeAnswerValue(answers[currentQuestion.id]).length || (submitted && currentIndex === questions.length - 1)) : currentIndex === questions.length - 1}
+                          >
+                            {reviewEachAnswer && !submitted && !reviewByQuestion[currentQuestion.id] ? "Conferir resposta" : "Proxima →"}
+                          </PixelButton>
+                        </ConfidenceGate>
                       </div>
 
                       {inExamFlow && (
@@ -270,12 +398,20 @@ export function SimuladoExamFlow() {
                         </div>
                       )}
 
-                      {inReviewFlow && (
-                        <div className="flex justify-end gap-2">
-                          <PixelButton variant="ghost" onClick={navigateHome}>
-                            Voltar ao inicio
+                      {/* Focus mode hides the sidebar (and its "Enviar Simulado" button), so without this
+                          the only way to finish is to exit focus mode first — mirror it here. */}
+                      {inExamFlow && focusMode && (
+                        <div className="flex items-center justify-between gap-2">
+                          <PixelButton variant="ghost" onClick={handleForceExit} className="justify-center">
+                            Encerrar
                           </PixelButton>
-                          <PixelButton onClick={handleReset}>Novo Simulado</PixelButton>
+                          <PixelButton
+                            onClick={() => setShowPreSubmitSummary(true)}
+                            disabled={!allQuestionsAnswered}
+                            className="justify-center"
+                          >
+                            Enviar Simulado
+                          </PixelButton>
                         </div>
                       )}
                     </div>
@@ -322,61 +458,6 @@ export function SimuladoExamFlow() {
                     </div>
                   )}
                 </QuestionSideNav>
-
-                {inReviewFlow && (
-                  <PixelCard className="space-y-3 border-[var(--pixel-accent)] bg-[var(--pixel-accent)]/10">
-                    <p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
-                      Prioridades de revisao
-                    </p>
-                    {loadingWeakServices && (
-                      <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                        Atualizando pontos de fraqueza...
-                      </p>
-                    )}
-
-                    {!loadingWeakServices && historicalWeakServices.length > 0 && (
-                      <div className="space-y-2">
-                        {historicalWeakServices.map((item) => (
-                          <p
-                            key={`history-${item.topic}`}
-                            className="font-[var(--font-body)] text-xs text-[var(--pixel-text)]"
-                          >
-                            {item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)
-                          </p>
-                        ))}
-                      </div>
-                    )}
-
-                    {!loadingWeakServices &&
-                      historicalWeakServices.length === 0 &&
-                      weakServicesCurrentExam.length > 0 && (
-                        <div className="space-y-2">
-                          {weakServicesCurrentExam.slice(0, GAP_TOP_N).map((item) => (
-                            <p
-                              key={`fallback-${item.topic}`}
-                              className="font-[var(--font-body)] text-xs text-[var(--pixel-text)]"
-                            >
-                              {item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)
-                            </p>
-                          ))}
-                        </div>
-                      )}
-
-                    {!loadingWeakServices && strongestGapTopics.length > 0 && (
-                      <div className="space-y-3 border-t border-[var(--pixel-border)] pt-3">
-                        <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
-                          Plano de acao sugerido com base nos gaps detectados.
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <PixelButton onClick={navigateToKcGaps}>Fazer KC dos gaps</PixelButton>
-                          <PixelButton variant="ghost" onClick={navigateToLabGaps}>
-                            Criar Lab unico dos gaps
-                          </PixelButton>
-                        </div>
-                      </div>
-                    )}
-                  </PixelCard>
-                )}
               </motion.aside>
             )}
           </AnimatePresence>
@@ -438,5 +519,31 @@ export function SimuladoExamFlow() {
         </div>
       )}
     </>
+  );
+}
+
+/** Wraps a Proxima/Enviar trigger so clicking (or hovering) it surfaces a quick,
+ * non-blocking confidence prompt instead of the inline post-answer step used in KC. */
+function ConfidenceGate({
+  open,
+  onOpenChange,
+  onPick,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPick: (confidence: AnswerConfidence) => void;
+  children: ReactNode;
+}) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverAnchor asChild>{children}</PopoverAnchor>
+      <PopoverContent
+        side="top"
+        className="w-auto border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] p-3 shadow-[4px_4px_0_0_var(--pixel-shadow)]"
+      >
+        <ConfidenceSelector onSelect={onPick} />
+      </PopoverContent>
+    </Popover>
   );
 }

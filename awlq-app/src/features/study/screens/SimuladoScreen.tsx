@@ -10,9 +10,10 @@ import { SimuladoExamGuide } from "@/features/study/components/simulado/Simulado
 import { SimuladoPacksGrid } from "@/features/study/components/simulado/SimuladoPacksGrid";
 import { SimuladoResultOverview } from "@/features/study/components/simulado/SimuladoResultOverview";
 import { SimuladoResumeModal } from "@/features/study/components/simulado/SimuladoResumeModal";
-import { SimuladoRulesModal } from "@/features/study/components/simulado/SimuladoRulesModal";
+import { SimuladoRulesModal, type SimuladoConfig } from "@/features/study/components/simulado/SimuladoRulesModal";
 import { SimuladoContext } from "@/features/study/context/SimuladoContext";
 import type { WeakServiceMetric } from "@/features/study/context/SimuladoContext";
+import { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
 import {
   createSimuladoQuestions,
   createSimuladoQuestionsFromPack,
@@ -37,7 +38,7 @@ import {  SimuladoDraft, StudyQuestion, TaskDifficulty } from "@/lib/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FeatureHelpButton } from "@/components/ui/feature-help-button";
 import { GAP_TOP_N, OPTIONS, RulesConsentMap, ScoreOverviewData, SimuladoPackListItem } from "@/types/questions";
-import { buildScoreOverview, buildTopicPerformance, formatTime, playAlarmBeep, playSuccessSound, triggerConfetti } from "@/features/utils/funcs/simulado-utils";
+import { buildScoreOverview, buildTopicPerformance, formatTime, hasSubstantialStaticExplanation, playAlarmBeep, playSuccessSound, triggerConfetti } from "@/features/utils/funcs/simulado-utils";
 
 
 export function SimuladoScreen() {
@@ -61,6 +62,7 @@ export function SimuladoScreen() {
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
   const [answers, setAnswers] = useState<StudyAnswerMap>({});
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [timeSpentByQuestion, setTimeSpentByQuestion] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [reviewByQuestion, setReviewByQuestion] = useState<Record<string, StudyExplanationResult>>({});
@@ -69,6 +71,7 @@ export function SimuladoScreen() {
 
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [rulesAccepted, setRulesAccepted] = useState(false);
+  const [simuladoConfig, setSimuladoConfig] = useState<SimuladoConfig>({ examStyle: "EXAM", timerMode: "COUNTDOWN_LOCK", timerMinutes: null });
   const [examGuideInfo, setExamGuideInfo] = useState<{
     markdown: string;
     preview: string;
@@ -87,6 +90,9 @@ export function SimuladoScreen() {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
+  // Confidence rating per question, captured via a non-blocking prompt on "Proxima"/"Enviar"
+  // (RF-09, ADR-05) — feeds the false-belief-aggregator worker same as the KC flow.
+  const [confidenceByQuestion, setConfidenceByQuestion] = useState<Record<string, AnswerConfidence>>({});
   const [showPreSubmitSummary, setShowPreSubmitSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -112,15 +118,35 @@ export function SimuladoScreen() {
   const [certInfo, setCertInfo] = useState<{ code: string; name: string } | null>(null);
   const [pendingPackId, setPendingPackId] = useState<string | null>(null);
   const [pendingPackName, setPendingPackName] = useState<string | null>(null);
+  const [pendingExamMinutes, setPendingExamMinutes] = useState(90);
   const [currentPackId, setCurrentPackId] = useState<string | null>(null);
   const [expandedPackHistory, setExpandedPackHistory] = useState<string | null>(null);
 
   const confettiFiredRef = useRef(false);
   const prevRemainingRef = useRef(remainingSeconds);
-
   const inExamFlow = isActive && questions.length > 0 && !submitted;
   const inReviewFlow = submitted && questions.length > 0;
   const currentQuestion = questions[currentIndex] ?? null;
+  const questionEnteredAtRef = useRef(Date.now());
+  const lastPausedRef = useRef(isPaused);
+
+  useEffect(() => {
+    const now = Date.now();
+    if (inExamFlow && !isPaused && lastPausedRef.current) questionEnteredAtRef.current = now;
+    if (!inExamFlow) questionEnteredAtRef.current = now;
+    lastPausedRef.current = isPaused;
+  }, [inExamFlow, isPaused]);
+
+  function recordCurrentQuestionTime() {
+    if (!currentQuestion || isPaused) return;
+    const elapsed = Math.max(0, Math.floor((Date.now() - questionEnteredAtRef.current) / 1000));
+    setTimeSpentByQuestion((previous) => ({
+      ...previous,
+      [currentQuestion.id]: (previous[currentQuestion.id] ?? 0) + elapsed,
+    }));
+    questionEnteredAtRef.current = Date.now();
+  }
+
   const answeredCount = useMemo(
     () => questions.filter((question) => normalizeAnswerValue(answers[question.id]).length > 0).length,
     [answers, questions],
@@ -328,7 +354,7 @@ export function SimuladoScreen() {
   }, [hydrated, inExamFlow, inReviewFlow, packsFilter, packsRefreshKey]);
 
   useEffect(() => {
-    if (prevRemainingRef.current > 0 && remainingSeconds <= 0 && inExamFlow) {
+    if (session?.timerMode === "COUNTDOWN_LOCK" && prevRemainingRef.current > 0 && remainingSeconds <= 0 && inExamFlow) {
       playAlarmBeep();
       void handleSubmitExam();
     }
@@ -359,6 +385,7 @@ export function SimuladoScreen() {
     if (!inExamFlow) return;
     function handleVisibilityChange() {
       if (document.visibilityState === "hidden") {
+        recordCurrentQuestionTime();
         pauseSession();
       }
     }
@@ -398,12 +425,14 @@ export function SimuladoScreen() {
       setQuestions(data.questions);
       setAnswers({});
       setCurrentIndex(0);
+      setTimeSpentByQuestion({});
       setSubmitted(false);
       setSavedHistoryId(null);
       setReviewByQuestion({});
       setLoadingReviewByQuestion({});
       setExamGuideInfo(data.examGuide ?? null);
-      startSession(data.certificationCode, data.examMinutes ?? 90);
+      const minutes = simuladoConfig.timerMinutes ?? data.examMinutes ?? 90;
+      startSession(data.certificationCode, simuladoConfig.timerMode === "COUNTDOWN_LOCK" ? minutes : 0, { timerMode: simuladoConfig.timerMode, examStyle: simuladoConfig.examStyle });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Erro ao iniciar simulado.");
     } finally {
@@ -450,6 +479,7 @@ export function SimuladoScreen() {
     setQuestions([devQuestion]);
     setAnswers({});
     setCurrentIndex(0);
+    setTimeSpentByQuestion({});
     setSubmitted(false);
     setSavedHistoryId(null);
     setReviewByQuestion({});
@@ -497,6 +527,7 @@ export function SimuladoScreen() {
       setQuestions(data.questions);
       setAnswers({});
       setCurrentIndex(0);
+      setTimeSpentByQuestion({});
       setSubmitted(false);
       setSavedHistoryId(null);
       setReviewByQuestion({});
@@ -510,13 +541,11 @@ export function SimuladoScreen() {
     }
   }
 
-  function handleOpenPackRulesModal(packId: string, packName: string) {
-    if (hasValidRulesConsent(consentScope)) {
-      void handleStartFromPack(packId);
-      return;
-    }
+  async function handleOpenPackRulesModal(packId: string, packName: string, examMinutes = 90) {
+    setPendingExamMinutes(examMinutes);
     setPendingPackId(packId);
     setPendingPackName(packName);
+    setSimuladoConfig({ examStyle: "EXAM", timerMode: "COUNTDOWN_LOCK", timerMinutes: null });
     setRulesAccepted(false);
     setShowRulesModal(true);
   }
@@ -531,6 +560,17 @@ export function SimuladoScreen() {
     }
 
     const normalized = normalizeAnswerValue(answer);
+
+    const staticCorrectExplanation = question.explanations[question.correctOption]?.trim() ?? "";
+    if (hasSubstantialStaticExplanation(staticCorrectExplanation)) {
+      const nextReview: StudyExplanationResult = {
+        // Treat a substantial correct-answer explanation as a complete static review.
+        summary: staticCorrectExplanation,
+        options: question.explanations,
+      };
+      setReviewByQuestion((prev) => ({ ...prev, [question.id]: nextReview }));
+      return;
+    }
 
     setLoadingReviewByQuestion((prev) => ({ ...prev, [question.id]: true }));
 
@@ -626,6 +666,7 @@ export function SimuladoScreen() {
       return;
     }
 
+    recordCurrentQuestionTime();
     setCalculating(true);
     setShowPreSubmitSummary(false);
 
@@ -651,7 +692,9 @@ export function SimuladoScreen() {
       0,
       Math.floor((new Date(session.endsAt).getTime() - new Date(session.startedAt).getTime()) / 1000),
     );
-    const usedDurationSeconds = Math.max(0, totalDurationSeconds - remainingSeconds);
+    const usedDurationSeconds = session.timerMode === "COUNTUP_FREE"
+      ? Math.max(0, Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000))
+      : session.timerMode === "NONE" ? 0 : Math.max(0, totalDurationSeconds - remainingSeconds);
 
     safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
     submitSession();
@@ -678,6 +721,19 @@ export function SimuladoScreen() {
           selectedOptions: normalizeAnswerValue(answers[question.id]),
           correctOption: question.correctOption,
           correctOptions: normalizeCorrectOptions(question),
+          correct: isAnswerCorrect({
+            questionType: question.questionType,
+            answer: answers[question.id],
+            correctOption: question.correctOption,
+            correctOptions: question.correctOptions,
+          }),
+          // Confidence snapshot for the false-belief-aggregator worker (RF-09, ADR-05).
+          confidence: confidenceByQuestion[question.id] ?? null,
+          timeSpentSeconds:
+            (timeSpentByQuestion[question.id] ?? 0) +
+            (question.id === currentQuestion?.id && !isPaused
+              ? Math.max(0, Math.floor((Date.now() - questionEnteredAtRef.current) / 1000))
+              : 0),
           options: question.options,
           optionMapping: question.optionMapping,
           explanationSummary: reviewByQuestion[question.id]?.summary,
@@ -805,6 +861,7 @@ export function SimuladoScreen() {
     setQuestions([]);
     setAnswers({});
     setCurrentIndex(0);
+    setTimeSpentByQuestion({});
     setSubmitted(false);
     setSavedHistoryId(null);
     setReviewByQuestion({});
@@ -838,11 +895,17 @@ export function SimuladoScreen() {
     });
   }
 
+  function setConfidenceForQuestion(questionId: string, confidence: AnswerConfidence) {
+    setConfidenceByQuestion((prev) => ({ ...prev, [questionId]: confidence }));
+  }
+
   async function goToQuestion(index: number) {
     const clamped = Math.max(0, Math.min(questions.length - 1, index));
+    if (inExamFlow && clamped !== currentIndex) recordCurrentQuestionTime();
     setCurrentIndex(clamped);
+    questionEnteredAtRef.current = Date.now();
 
-    if (submitted) {
+    if (submitted || session?.examStyle === "EXPLAIN_EACH") {
       const target = questions[clamped];
       if (target) {
         await fetchReviewForQuestion(target, answers[target.id] ?? target.correctOption, savedHistoryId);
@@ -876,6 +939,12 @@ export function SimuladoScreen() {
     questions,
     answers,
     currentIndex,
+    timeSpentByQuestion,
+    reviewByQuestion,
+    scoreOverview,
+    calculating,
+    loadingMotivationalMessage,
+    motivationalMessage,
     submitted,
     inExamFlow,
     inReviewFlow,
@@ -883,11 +952,12 @@ export function SimuladoScreen() {
     currentQuestion,
     answeredCount,
     timerLabel,
-    session: session as { id: string; certificationCode: string; startedAt: string; endsAt: string } | null,
+    session: session as { id: string; certificationCode: string; startedAt: string; endsAt: string; timerMode?: "COUNTDOWN_LOCK" | "COUNTUP_FREE" | "NONE"; examStyle?: "EXAM" | "EXPLAIN_EACH" } | null,
     focusMode,
     isPaused,
     markedForReview,
     allQuestionsAnswered,
+    confidenceByQuestion,
     reportModalOpen,
     reportMessage,
     reportSubmitting,
@@ -905,9 +975,11 @@ export function SimuladoScreen() {
     setShowPreSubmitSummary,
     goToQuestion,
     toggleMarkForReview,
+    setConfidenceForQuestion,
     handleForceExit,
     handleReset,
     handleSubmitExam,
+    reviewEachAnswer: session?.examStyle === "EXPLAIN_EACH",
     submitQuestionReport,
     resumeSession,
     pauseSession,
@@ -979,7 +1051,7 @@ export function SimuladoScreen() {
             </PixelCard>
           </motion.div>
 
-          {(activeOverview ?? (calculating && !submitted)) && (
+          {!inReviewFlow && (activeOverview ?? (calculating && !submitted)) && (
             <SimuladoResultOverview
               overview={
                 activeOverview ?? {
@@ -1093,6 +1165,9 @@ export function SimuladoScreen() {
             onAcceptedChange={setRulesAccepted}
             onCancel={() => setShowRulesModal(false)}
             onConfirm={() => void confirmRulesAndStart()}
+            examMinutes={pendingExamMinutes}
+            config={simuladoConfig}
+            onConfigChange={setSimuladoConfig}
           />
 
           <SimuladoExamFlow />

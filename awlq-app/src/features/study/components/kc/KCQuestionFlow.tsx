@@ -3,6 +3,7 @@
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
+import { StatementContent } from "@/features/study/components/StatementContent";
 import { ReportQuestionModal } from "@/features/study/components/ReportQuestionModal";
 import { ConfidenceSelector, AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
 import { StudyAnswerMap, StudyExplanationResult } from "@/features/study";
@@ -106,7 +107,9 @@ export function KCQuestionFlow({
         <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">
           {currentQuestion.topic} · {currentQuestion.difficulty}
         </p>
-        <p className="font-[var(--font-body)] text-base">{currentQuestion.statement}</p>
+        <div className="font-[var(--font-body)] text-base">
+          <StatementContent text={currentQuestion.statement} />
+        </div>
         {currentQuestion.questionType === "multi" && (
           <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
             Questao multipla: selecione todas as alternativas corretas.

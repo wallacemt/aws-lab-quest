@@ -3,6 +3,7 @@
 import { PixelCard } from "@/components/ui/pixel-card";
 import { QuestionOption } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { StatementContent } from "@/features/study/components/StatementContent";
 
 export type QuestionReviewOption = {
   option: QuestionOption;
@@ -68,7 +69,9 @@ export function QuestionReviewPanel({
 
       {questionStatement && (
         <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-3">
-          <p className="font-[var(--font-body)] text-base leading-relaxed">{questionStatement}</p>
+          <div className="max-w-prose break-words font-[var(--font-body)] text-base leading-relaxed">
+            <StatementContent text={questionStatement} />
+          </div>
         </div>
       )}
 
@@ -84,7 +87,9 @@ export function QuestionReviewPanel({
       {summary && (
         <div className="border border-[var(--pixel-border)] bg-black/15 px-3 py-2">
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Resumo da revisao</p>
-          <p className="mt-1 font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{summary}</p>
+          <div className="mt-1 max-w-prose break-words font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+            <StatementContent text={summary} />
+          </div>
         </div>
       )}
 
@@ -104,7 +109,7 @@ export function QuestionReviewPanel({
             )}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-[var(--font-body)] text-sm leading-relaxed">
+              <p className="min-w-0 max-w-prose break-words font-[var(--font-body)] text-sm leading-relaxed">
                 <span className="mr-2 font-mono text-xs text-[var(--pixel-subtext)]">{item.option})</span>
                 {item.text}
               </p>
@@ -128,7 +133,9 @@ export function QuestionReviewPanel({
             </div>
 
             {showExplanations && item.explanation && (
-              <p className="font-[var(--font-body)] text-gray-400 text-sm leading-relaxed">{item.explanation}</p>
+              <p className="max-w-prose break-words font-[var(--font-body)] text-sm leading-relaxed text-gray-400">
+                {item.explanation}
+              </p>
             )}
             {!showExplanations && (
               <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Explicacao oculta.</p>

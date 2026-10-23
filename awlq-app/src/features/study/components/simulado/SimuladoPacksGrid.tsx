@@ -2,11 +2,7 @@
 
 import { SkillBuilderBadge } from "@/components/SkillBuilderBadge";
 import Image from "next/image";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type PackSession = {
   id: string;
@@ -21,6 +17,7 @@ export type SimuladoPackListItem = {
   name: string;
   isSkillBuilder?: boolean;
   questionCount: number;
+  examMinutes?: number;
   artworkUrl: string | null;
   difficultyScore: number;
   createdAt: string;
@@ -53,7 +50,7 @@ type Props = {
   onViewChange: (v: PacksView) => void;
   onRefresh: () => void;
   onToggleHistory: (id: string | null) => void;
-  onStartPack: (packId: string, packName: string) => void;
+  onStartPack: (packId: string, packName: string, examMinutes?: number) => void;
 };
 
 function timeAgo(dateStr: string): string {
@@ -185,9 +182,7 @@ export function SimuladoPacksGrid({
                     {v === "grid" ? "⊞" : "☰"}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  {v === "grid" ? "Visualização em grade" : "Visualização em lista"}
-                </TooltipContent>
+                <TooltipContent>{v === "grid" ? "Visualização em grade" : "Visualização em lista"}</TooltipContent>
               </Tooltip>
             ))}
             <Tooltip>
@@ -240,9 +235,7 @@ export function SimuladoPacksGrid({
 
       {error && <p className="font-[var(--font-body)] text-sm text-red-300">{error}</p>}
 
-      {packsLoading && (
-        <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando packs...</p>
-      )}
+      {packsLoading && <p className="font-mono text-xs uppercase text-[var(--pixel-subtext)]">Carregando packs...</p>}
 
       {!packsLoading && packs.length === 0 && (
         <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-6 text-center">
@@ -285,10 +278,10 @@ export function SimuladoPacksGrid({
                     : "border-[var(--pixel-border)] bg-[var(--pixel-bg)]",
               ].join(" ")}
             >
-              {pack.isSkillBuilder && <div className="p-2"><SkillBuilderBadge /></div>}
               {packsView === "list" ? (
                 /* List row layout */
-                <div className="flex min-h-[5.5rem] items-stretch">
+                <div className="flex min-h-[5.5rem] items-stretch relative">
+                   {pack.isSkillBuilder && <div className="p-2 absolute bottom-0 right-0"><SkillBuilderBadge /></div>}
                   <div className="relative w-24 h-[88px] shrink-0 overflow-hidden border-r border-[var(--pixel-border)]">
                     {pack.artworkUrl ? (
                       <Image src={pack.artworkUrl} alt={pack.name} fill sizes="96px" className="object-cover" />
@@ -308,7 +301,9 @@ export function SimuladoPacksGrid({
                         <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">
                           {pack.questionCount} questoes · {timeAgo(pack.createdAt)}
                           {" · "}
-                          <span className={pack.difficultyScore === 10 ? "text-yellow-400" : "text-[var(--pixel-subtext)]"}>
+                          <span
+                            className={pack.difficultyScore === 10 ? "text-yellow-400" : "text-[var(--pixel-subtext)]"}
+                          >
                             {pack.difficultyScore === 10 ? "BOSS ⚡" : `${pack.difficultyScore}/10`}
                           </span>
                         </p>
@@ -335,7 +330,7 @@ export function SimuladoPacksGrid({
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <button
                         type="button"
-                        onClick={() => onStartPack(pack.id, pack.name)}
+                        onClick={() => onStartPack(pack.id, pack.name, pack.examMinutes)}
                         disabled={loading}
                         className="border border-[var(--pixel-primary)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10 disabled:opacity-50"
                       >
@@ -365,8 +360,19 @@ export function SimuladoPacksGrid({
                 </div>
               ) : pack.artworkUrl ? (
                 /* Game-cover layout */
-                <div className="relative aspect-square w-full">
-                  <Image src={pack.artworkUrl} alt={pack.name} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
+                <div className="relative aspect-square w-full relative">
+                  <Image
+                    src={pack.artworkUrl}
+                    alt={pack.name}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover"
+                  />
+                  {pack.isSkillBuilder && (
+                    <div className="p-2 absolute z-20">
+                      <SkillBuilderBadge />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3">
                     <div className="flex items-end justify-between gap-2">
@@ -387,8 +393,12 @@ export function SimuladoPacksGrid({
 
                     {done && (
                       <div className="flex items-center gap-3 font-mono text-[10px] text-white/70">
-                        <span>Melhor: <span className="text-white">{pack.bestScore}%</span></span>
-                        <span>Tentativas: <span className="text-white">{pack.attempts}</span></span>
+                        <span>
+                          Melhor: <span className="text-white">{pack.bestScore}%</span>
+                        </span>
+                        <span>
+                          Tentativas: <span className="text-white">{pack.attempts}</span>
+                        </span>
                       </div>
                     )}
 
@@ -403,7 +413,7 @@ export function SimuladoPacksGrid({
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
-                        onClick={() => onStartPack(pack.id, pack.name)}
+                        onClick={() => onStartPack(pack.id, pack.name, pack.examMinutes)}
                         disabled={loading}
                         className="border border-white/50 bg-black/40 px-3 py-1.5 font-mono text-[10px] uppercase text-white backdrop-blur-sm hover:bg-white/10 disabled:opacity-50"
                       >
@@ -466,15 +476,19 @@ export function SimuladoPacksGrid({
 
                   {done && (
                     <div className="flex items-center gap-4 font-mono text-[10px] text-[var(--pixel-subtext)]">
-                      <span>Melhor: <span className="text-[var(--pixel-text)]">{pack.bestScore}%</span></span>
-                      <span>Tentativas: <span className="text-[var(--pixel-text)]">{pack.attempts}</span></span>
+                      <span>
+                        Melhor: <span className="text-[var(--pixel-text)]">{pack.bestScore}%</span>
+                      </span>
+                      <span>
+                        Tentativas: <span className="text-[var(--pixel-text)]">{pack.attempts}</span>
+                      </span>
                     </div>
                   )}
 
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => onStartPack(pack.id, pack.name)}
+                      onClick={() => onStartPack(pack.id, pack.name, pack.examMinutes)}
                       disabled={loading}
                       className="border border-[var(--pixel-primary)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10 disabled:opacity-50"
                     >

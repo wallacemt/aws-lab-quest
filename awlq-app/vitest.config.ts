@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    // e2e/ holds Playwright specs (run via `bun run test:e2e`), not Vitest ones —
+    // without this, vitest's default *.spec.ts glob picks them up too.
+    exclude: ["**/node_modules/**", "**/e2e/**"],
   },
   resolve: {
     alias: {

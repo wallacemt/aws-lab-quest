@@ -61,6 +61,7 @@ model User {
   flashcards              Flashcard[]
   falseBeliefSignals      FalseBeliefSignal[]
   themes                  UserTheme[]
+  simuladoConfigPresets   SimuladoConfigPreset[]
   mentorRecommendations   MentorRecommendation[]
   questChainProgress      QuestChainProgress[]
   bossBattles             BossBattle[]
@@ -157,6 +158,31 @@ model UserTheme {
 
   @@index([userId])
   @@index([isPublic])
+}
+
+enum SimuladoExamStyle {
+  EXAM
+  EXPLAIN_EACH
+}
+
+enum SimuladoTimerMode {
+  COUNTDOWN_LOCK
+  COUNTUP_FREE
+  NONE
+}
+
+model SimuladoConfigPreset {
+  id           String             @id @default(cuid())
+  userId       String
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  examStyle    SimuladoExamStyle  @default(EXAM)
+  timerMode    SimuladoTimerMode  @default(COUNTDOWN_LOCK)
+  timerMinutes Int?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model CertificationPreset {

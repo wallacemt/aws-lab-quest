@@ -34,7 +34,11 @@ export function FileDropzone({ label, accept, hint, busy = false, error, status,
         onDrop={event => { event.preventDefault(); setDragging(false); selectFile(event.dataTransfer.files[0]); }}
         className={`relative overflow-hidden border border-dashed bg-[#0b1220] transition-colors ${dragging ? "border-[#19e26d] bg-[#19e26d]/10" : "border-[#334155] hover:border-[#64748b]"} ${busy ? "opacity-70" : ""}`}
       >
-        {children ? children({ openFilePicker }) : (
+        {children ? (
+          // ponytail: false positive — openFilePicker is only invoked later by the consumer's event handler, never during this render.
+          // eslint-disable-next-line react-hooks/refs
+          children({ openFilePicker })
+        ) : (
           <button type="button" onClick={openFilePicker} disabled={busy} className="flex min-h-36 w-full flex-col items-center justify-center gap-2 px-4 py-6 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[#19e26d]">
             <span className="grid size-11 place-items-center border border-[#334155] bg-[#111c2e] text-[#19e26d]"><FileUp size={21} /></span>
             <span className="font-medium text-[#e2e8f0]">{busy ? "Processando arquivo…" : "Solte o arquivo aqui"}</span>

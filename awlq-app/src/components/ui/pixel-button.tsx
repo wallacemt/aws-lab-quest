@@ -1,6 +1,6 @@
 "use client";
 
-import { ButtonHTMLAttributes } from "react";
+import { ButtonHTMLAttributes, forwardRef } from "react";
 
 export type PixelButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "warning" | "info" | "default";
 
@@ -25,11 +25,15 @@ const variantClassMap: Record<PixelButtonVariant, string> = {
     "bg-pixel-card text-pixel-text/90 border-black shadow-[4px_4px_0_0_#000] hover:translate-y-[-1px] active:translate-y-[2px]",
 };
 
-export function PixelButton({ className = "", variant = "primary", ...props }: PixelButtonProps) {
+export const PixelButton = forwardRef<HTMLButtonElement, PixelButtonProps>(function PixelButton(
+  { className = "", variant = "primary", ...props },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       {...props}
       className={`inline-flex items-center justify-center gap-2 border-2 px-4 py-2 font-mono text-xs uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50 ${variantClassMap[variant]} ${className}`}
     />
   );
-}
+});

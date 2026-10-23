@@ -11,7 +11,7 @@ type SimulatedExamState = {
   nowMs: number;
   hydrate: () => void;
   setNowMs: (value: number) => void;
-  startSession: (certificationCode: string, minutes?: number) => void;
+  startSession: (certificationCode: string, minutes?: number, config?: { timerMode?: SimulatedExamSession["timerMode"]; examStyle?: SimulatedExamSession["examStyle"] }) => void;
   submitSession: () => void;
   clearSession: () => void;
   pauseSession: () => void;
@@ -48,7 +48,7 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
         const startedAtMs = new Date(parsed.startedAt).getTime();
         const hasValidDates = Number.isFinite(endsAtMs) && Number.isFinite(startedAtMs);
         const isPaused = Boolean(parsed.pausedAt) && (parsed.pausedRemainingSeconds ?? 0) > 0;
-        const isExpired = !hasValidDates || (!isPaused && endsAtMs <= Date.now());
+        const isExpired = !hasValidDates || (parsed.timerMode !== "COUNTUP_FREE" && parsed.timerMode !== "NONE" && !isPaused && endsAtMs <= Date.now());
         const isSubmitted = Boolean(parsed.submittedAt);
 
         if (isExpired || isSubmitted) {
@@ -66,9 +66,10 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
     set({ session: parsed, hydrated: true, restoredFromStorage, nowMs: Date.now() });
   },
   setNowMs: (value) => set({ nowMs: value }),
-  startSession: (certificationCode, minutes = 90) => {
+  startSession: (certificationCode, minutes = 90, config = {}) => {
     const startedAt = new Date();
-    const endsAt = new Date(startedAt.getTime() + minutes * 60 * 1000);
+    const timerMode = config.timerMode ?? "COUNTDOWN_LOCK";
+    const endsAt = new Date(startedAt.getTime() + (timerMode === "COUNTDOWN_LOCK" ? minutes * 60 * 1000 : 0));
 
     const nextSession: SimulatedExamSession = {
       id: `sim-${startedAt.getTime()}`,
@@ -76,6 +77,8 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
       endsAt: endsAt.toISOString(),
       certificationCode,
       locked: true,
+      timerMode,
+      examStyle: config.examStyle ?? "EXAM",
     };
 
     persistSession(nextSession);
@@ -92,6 +95,18 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
   pauseSession: () => {
     const { session } = get();
     if (!session || session.pausedAt || session.submittedAt) return;
+    if (session.timerMode === "NONE") {
+      const next: SimulatedExamSession = { ...session, pausedAt: new Date().toISOString(), pausedRemainingSeconds: 0 };
+      persistSession(next);
+      set({ session: next });
+      return;
+    }
+    if (session.timerMode === "COUNTUP_FREE") {
+      const next: SimulatedExamSession = { ...session, pausedAt: new Date().toISOString(), pausedRemainingSeconds: Math.max(0, Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000)) };
+      persistSession(next);
+      set({ session: next });
+      return;
+    }
     const endsAtMs = new Date(session.endsAt).getTime();
     const pausedRemainingSeconds = Math.max(0, Math.floor((endsAtMs - Date.now()) / 1000));
     const next: SimulatedExamSession = { ...session, pausedAt: new Date().toISOString(), pausedRemainingSeconds };
@@ -102,6 +117,22 @@ export const useSimulatedExamStore = create<SimulatedExamState>((set, get) => ({
     const { session } = get();
     if (!session || !session.pausedAt) return;
     const remaining = session.pausedRemainingSeconds ?? 0;
+    if (session.timerMode === "COUNTUP_FREE") {
+      const startedAt = new Date(Date.now() - remaining * 1000).toISOString();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { pausedAt, pausedRemainingSeconds, ...rest } = session;
+      const next: SimulatedExamSession = { ...rest, startedAt };
+      persistSession(next);
+      set({ session: next, nowMs: Date.now() });
+      return;
+    }
+    if (session.timerMode === "NONE") {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { pausedAt, pausedRemainingSeconds, ...rest } = session;
+      persistSession(rest);
+      set({ session: rest, nowMs: Date.now() });
+      return;
+    }
     const newEndsAt = new Date(Date.now() + remaining * 1000).toISOString();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { pausedAt, pausedRemainingSeconds, ...rest } = session;

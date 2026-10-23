@@ -3,6 +3,8 @@
 import { createContext, Dispatch, SetStateAction, useContext } from "react";
 import { StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import { QuestionOption, StudyQuestion } from "@/lib/types";
+import { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
+import { ScoreOverviewData } from "@/types/questions";
 
 export type WeakServiceMetric = {
   topic: string;
@@ -34,6 +36,8 @@ export type ExamSession = {
   certificationCode: string;
   startedAt: string;
   endsAt: string;
+  timerMode?: "COUNTDOWN_LOCK" | "COUNTUP_FREE" | "NONE";
+  examStyle?: "EXAM" | "EXPLAIN_EACH";
 };
 
 export type SimuladoContextType = {
@@ -42,6 +46,7 @@ export type SimuladoContextType = {
   answers: StudyAnswerMap;
   currentIndex: number;
   submitted: boolean;
+  reviewEachAnswer: boolean;
   inExamFlow: boolean;
   inReviewFlow: boolean;
   isActive: boolean;
@@ -57,6 +62,7 @@ export type SimuladoContextType = {
   isPaused: boolean;
   markedForReview: Set<string>;
   allQuestionsAnswered: boolean;
+  confidenceByQuestion: Record<string, AnswerConfidence>;
   reportModalOpen: boolean;
   reportMessage: string | null;
   reportSubmitting: boolean;
@@ -66,6 +72,12 @@ export type SimuladoContextType = {
   currentReview: StudyExplanationResult | undefined;
   currentReviewOptions: ReviewOption[];
   loadingReviewByQuestion: Record<string, boolean>;
+  timeSpentByQuestion: Record<string, number>;
+  reviewByQuestion: Record<string, StudyExplanationResult>;
+  scoreOverview: ScoreOverviewData | null;
+  calculating: boolean;
+  loadingMotivationalMessage: boolean;
+  motivationalMessage: string | null;
 
   // Weak-services sidebar
   historicalWeakServices: WeakServiceMetric[];
@@ -82,6 +94,7 @@ export type SimuladoContextType = {
   // Actions
   goToQuestion: (index: number) => Promise<void>;
   toggleMarkForReview: (questionId: string) => void;
+  setConfidenceForQuestion: (questionId: string, confidence: AnswerConfidence) => void;
   handleForceExit: () => void;
   handleReset: () => void;
   handleSubmitExam: () => Promise<void>;
