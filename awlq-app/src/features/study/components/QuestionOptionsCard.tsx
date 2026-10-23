@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { normalizeAnswerValue, normalizeCorrectOptions } from "@/features/study/services";
 import { normalizeOptionText } from "@/lib/study-option-text";
+import { StatementContent } from "@/features/study/components/StatementContent";
 import { QuestionOption, StudyAnswerValue, StudyQuestionType } from "@/lib/types";
 
 export type QuestionCardQuestion = {
@@ -69,7 +70,7 @@ export function QuestionOptionsCard({
       <p
         className={`max-w-prose break-words font-[var(--font-body)] leading-relaxed ${large ? "text-lg" : "text-base"}`}
       >
-        {question.statement}
+        <StatementContent text={question.statement} />
       </p>
       {question.questionType === "multi" && (
         <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">

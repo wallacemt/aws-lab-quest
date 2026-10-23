@@ -3,6 +3,7 @@
 import { PixelCard } from "@/components/ui/pixel-card";
 import { QuestionOption } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { StatementContent } from "@/features/study/components/StatementContent";
 
 export type QuestionReviewOption = {
   option: QuestionOption;
@@ -69,7 +70,7 @@ export function QuestionReviewPanel({
       {questionStatement && (
         <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-3">
           <p className="max-w-prose break-words font-[var(--font-body)] text-base leading-relaxed">
-            {questionStatement}
+            <StatementContent text={questionStatement} />
           </p>
         </div>
       )}
@@ -87,7 +88,7 @@ export function QuestionReviewPanel({
         <div className="border border-[var(--pixel-border)] bg-black/15 px-3 py-2">
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Resumo da revisao</p>
           <p className="mt-1 max-w-prose break-words font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            {summary}
+            <StatementContent text={summary} />
           </p>
         </div>
       )}

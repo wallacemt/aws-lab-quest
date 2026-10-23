@@ -4,6 +4,7 @@ import { createContext, Dispatch, SetStateAction, useContext } from "react";
 import { StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import { QuestionOption, StudyQuestion } from "@/lib/types";
 import { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
+import { ScoreOverviewData } from "@/types/questions";
 
 export type WeakServiceMetric = {
   topic: string;
@@ -68,6 +69,12 @@ export type SimuladoContextType = {
   currentReview: StudyExplanationResult | undefined;
   currentReviewOptions: ReviewOption[];
   loadingReviewByQuestion: Record<string, boolean>;
+  timeSpentByQuestion: Record<string, number>;
+  reviewByQuestion: Record<string, StudyExplanationResult>;
+  scoreOverview: ScoreOverviewData | null;
+  calculating: boolean;
+  loadingMotivationalMessage: boolean;
+  motivationalMessage: string | null;
 
   // Weak-services sidebar
   historicalWeakServices: WeakServiceMetric[];
