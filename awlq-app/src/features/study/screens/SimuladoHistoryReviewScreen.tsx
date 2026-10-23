@@ -8,11 +8,14 @@ import { PixelCard } from "@/components/ui/pixel-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
 import { SimuladoScoreGauge } from "@/features/study/components/SimuladoScoreGauge";
+import { SimuladoResultOverview } from "@/features/study/components/simulado/SimuladoResultOverview";
 import {
   createStudyExplanation,
+  fetchWeakServices,
   fetchStudyHistoryItemById,
   saveStudyHistoryExplanation,
   StudyHistoryItem,
+  WeakServiceItem,
 } from "@/features/study/services";
 import { hasSubstantialStaticExplanation } from "@/features/utils/funcs/simulado-utils";
 import { normalizeOptionText } from "@/lib/study-option-text";
@@ -20,6 +23,7 @@ import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils
 import { QuestionOption } from "@/lib/types";
 
 type ReviewFilter = "all" | "wrong" | "correct";
+type ResultTab = "score" | "review" | "gaps";
 
 type ExplanationCacheItem = {
   summary: string;
@@ -34,6 +38,10 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
   const [session, setSession] = useState<StudyHistoryItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resultTab, setResultTab] = useState<ResultTab>("score");
+  const [historicalWeakServices, setHistoricalWeakServices] = useState<WeakServiceItem[]>([]);
+  const [nextStepsOpen, setNextStepsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [filter, setFilter] = useState<ReviewFilter>("all");
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [showExplanations, setShowExplanations] = useState(true);
@@ -44,6 +52,7 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
     {},
   );
   const isMountedRef = useRef(true);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const inFlightExplanationRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -381,6 +390,60 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
       ? Math.round((session.correctAnswers / session.totalQuestions) * 1000)
       : Math.round((session.scorePercent / 100) * 1000)
     : 0;
+  const exportPayload = useMemo(() => session ? ({
+    metadata: {
+      title: session.title,
+      certificationCode: session.certificationCode ?? null,
+      completedAt: session.completedAt,
+      durationSeconds: session.durationSeconds ?? null,
+      scorePercent: session.scorePercent,
+      correctAnswers: session.correctAnswers,
+      totalQuestions: session.totalQuestions,
+      packName: session.packName ?? null,
+    },
+    score: { points: scorePoints, maxPoints: 1000, minimumCertificationPoints: 700 },
+    metrics: { totalQuestions: snapshotsWithResult.length, correctAnswers: correctCount, wrongAnswers: wrongCount },
+    questions: snapshotsWithResult.map((item) => ({
+      questionId: item.questionId,
+      statement: item.statement,
+      questionType: item.questionType ?? null,
+      options: item.options,
+      correctOption: item.correctOption,
+      correctOptions: item.correctOptions ?? null,
+      userAnswer: item.selectedOptions ?? item.selectedOption,
+      isCorrect: item.correct,
+      explanationSummary: item.explanationSummary ?? null,
+      explanations: item.explanations,
+    })),
+  }) : null, [session, scorePoints, snapshotsWithResult, correctCount, wrongCount]);
+  const aiPrompt = session ? `Analise o resultado do meu simulado AWS usando o JSON exportado como fonte de verdade. Não invente dados ausentes. Revise cada questão errada, explique o gabarito e proponha um plano prático de estudo de 7 dias com revisão ativa e questões de acompanhamento. Considere o score e as explicações disponíveis.\n\nResumo: ${correctCount} acertos e ${wrongCount} erros em ${snapshotsWithResult.length} questões (${session.scorePercent}%). O histórico não contém tópico, confiança, marcações ou tempo por questão.` : "";
+
+  function exportResult() {
+    if (!exportPayload) return;
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `simulado-${session?.certificationCode ?? "resultado"}-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(aiPrompt);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch { setCopied(false); }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchWeakServices({ take: 8, sample: 35 }).then((items) => {
+      if (!cancelled) setHistoricalWeakServices(items);
+    }).catch(() => { if (!cancelled) setHistoricalWeakServices([]); });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <AppLayout>
@@ -424,13 +487,33 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
                 )}
               </div>
 
-              <SimuladoScoreGauge points={scorePoints} maxPoints={1000} minimumCertificationPoints={700} />
             </div>
           )}
         </PixelCard>
 
         {!loading && !error && session && (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <>
+          <PixelCard className="space-y-4">
+            <div className="flex flex-wrap justify-end gap-2">
+              <PixelButton variant="ghost" onClick={() => setNextStepsOpen(true)}>O que fazer agora?</PixelButton>
+              <PixelButton onClick={exportResult}>Exportar resultado</PixelButton>
+            </div>
+            <div role="tablist" aria-label="Resultado do simulado" onKeyDown={(event) => {
+              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+              event.preventDefault();
+              const tabs: ResultTab[] = ["score", "review", "gaps"];
+              const next = (tabs.indexOf(resultTab) + (event.key === "ArrowRight" ? 1 : 2)) % 3;
+              setResultTab(tabs[next]); tabRefs.current[next]?.focus();
+            }} className="flex flex-wrap border-b border-[var(--pixel-border)]">
+              {([["score", "Score"], ["review", "Revisão"], ["gaps", "Pontos fortes e fracos"]] as const).map(([tab, label], index) => <button key={tab} ref={(element) => { tabRefs.current[index] = element; }} id={`history-simulado-tab-${tab}`} type="button" role="tab" aria-selected={resultTab === tab} aria-controls={`history-simulado-panel-${tab}`} tabIndex={resultTab === tab ? 0 : -1} onClick={() => setResultTab(tab)} className={`border-b-2 px-4 py-3 font-mono text-[10px] uppercase ${resultTab === tab ? "border-[var(--pixel-primary)] text-[var(--pixel-primary)]" : "border-transparent text-[var(--pixel-subtext)]"}`}>{label}</button>)}
+            </div>
+            {resultTab === "score" && <div id="history-simulado-panel-score" role="tabpanel" aria-labelledby="history-simulado-tab-score" tabIndex={0}><SimuladoResultOverview overview={{ points: scorePoints, maxPoints: 1000, minimumCertificationPoints: 700, bestArea: null, weakestArea: null }} calculating={false} submitted loadingMotivationalMessage={false} motivationalMessage={null} /></div>}
+            {resultTab === "gaps" && <div id="history-simulado-panel-gaps" role="tabpanel" aria-labelledby="history-simulado-tab-gaps" tabIndex={0} className="space-y-3">
+              {historicalWeakServices.length ? historicalWeakServices.map((item) => <p key={`${item.serviceCode}-${item.topic}`} className="font-[var(--font-body)] text-sm">{item.topic}: {item.errors}/{item.attempts} erros ({item.errorRate}%)</p>) : <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Ainda não há pontos fracos históricos disponíveis.</p>}
+            </div>}
+          </PixelCard>
+
+          {resultTab === "review" && <div id="history-simulado-panel-review" role="tabpanel" aria-labelledby="history-simulado-tab-review" tabIndex={0} className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <section className="space-y-4">
               <PixelCard className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -554,9 +637,19 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
                 </ScrollArea>
               </PixelCard>
             </aside>
-          </div>
+          </div>}
+          </>
         )}
       </main>
+      {nextStepsOpen && <div role="dialog" aria-modal="true" aria-labelledby="history-next-title" className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/80 p-4">
+        <PixelCard className="my-6 w-full max-w-2xl space-y-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Próximo passo</p><h2 id="history-next-title" className="font-[var(--font-body)] text-2xl">O que fazer agora?</h2></div><button type="button" aria-label="Fechar" onClick={() => setNextStepsOpen(false)} className="border-2 border-[var(--pixel-border)] px-3 py-1 font-mono">×</button></div>
+          <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Resultado: {correctCount} acertos e {wrongCount} erros. Anexe o JSON exportado ou cole seu conteúdo depois do prompt em qualquer IA.</p>
+          <label htmlFor="history-ai-prompt" className="font-mono text-[10px] uppercase">Prompt para copiar</label>
+          <textarea id="history-ai-prompt" readOnly value={aiPrompt} className="min-h-48 w-full resize-y border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3 font-[var(--font-body)] text-sm text-[var(--pixel-text)]" />
+          <div className="flex flex-wrap justify-end gap-2"><PixelButton variant="ghost" onClick={() => setNextStepsOpen(false)}>Fechar</PixelButton><PixelButton onClick={() => void copyPrompt()}>{copied ? "Prompt copiado" : "Copiar prompt"}</PixelButton></div>
+        </PixelCard>
+      </div>}
     </AppLayout>
   );
 }
