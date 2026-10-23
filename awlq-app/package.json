@@ -13,7 +13,8 @@
     "db:studio": "prisma studio --schema=../packages/db/prisma/schema.prisma",
     "db:generate": "prisma generate --schema=../packages/db/prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema=../packages/db/prisma/schema.prisma",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "prisma": {
     "seed": "bun run prisma/seed.ts"
@@ -51,6 +52,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/react": "^16",
     "@types/bun": "latest",

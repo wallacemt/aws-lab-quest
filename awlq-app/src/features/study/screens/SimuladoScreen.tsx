@@ -13,6 +13,7 @@ import { SimuladoResumeModal } from "@/features/study/components/simulado/Simula
 import { SimuladoRulesModal } from "@/features/study/components/simulado/SimuladoRulesModal";
 import { SimuladoContext } from "@/features/study/context/SimuladoContext";
 import type { WeakServiceMetric } from "@/features/study/context/SimuladoContext";
+import { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
 import {
   createSimuladoQuestions,
   createSimuladoQuestionsFromPack,
@@ -87,6 +88,9 @@ export function SimuladoScreen() {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
+  // Confidence rating per question, captured via a non-blocking prompt on "Proxima"/"Enviar"
+  // (RF-09, ADR-05) — feeds the false-belief-aggregator worker same as the KC flow.
+  const [confidenceByQuestion, setConfidenceByQuestion] = useState<Record<string, AnswerConfidence>>({});
   const [showPreSubmitSummary, setShowPreSubmitSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -678,6 +682,14 @@ export function SimuladoScreen() {
           selectedOptions: normalizeAnswerValue(answers[question.id]),
           correctOption: question.correctOption,
           correctOptions: normalizeCorrectOptions(question),
+          correct: isAnswerCorrect({
+            questionType: question.questionType,
+            answer: answers[question.id],
+            correctOption: question.correctOption,
+            correctOptions: question.correctOptions,
+          }),
+          // Confidence snapshot for the false-belief-aggregator worker (RF-09, ADR-05).
+          confidence: confidenceByQuestion[question.id] ?? null,
           options: question.options,
           optionMapping: question.optionMapping,
           explanationSummary: reviewByQuestion[question.id]?.summary,
@@ -838,6 +850,10 @@ export function SimuladoScreen() {
     });
   }
 
+  function setConfidenceForQuestion(questionId: string, confidence: AnswerConfidence) {
+    setConfidenceByQuestion((prev) => ({ ...prev, [questionId]: confidence }));
+  }
+
   async function goToQuestion(index: number) {
     const clamped = Math.max(0, Math.min(questions.length - 1, index));
     setCurrentIndex(clamped);
@@ -888,6 +904,7 @@ export function SimuladoScreen() {
     isPaused,
     markedForReview,
     allQuestionsAnswered,
+    confidenceByQuestion,
     reportModalOpen,
     reportMessage,
     reportSubmitting,
@@ -905,6 +922,7 @@ export function SimuladoScreen() {
     setShowPreSubmitSummary,
     goToQuestion,
     toggleMarkForReview,
+    setConfidenceForQuestion,
     handleForceExit,
     handleReset,
     handleSubmitExam,

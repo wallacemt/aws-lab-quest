@@ -61,7 +61,7 @@ export function ReportQuestionModal({
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true">
       <PixelCard className="w-full max-w-xl space-y-4">
         <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">Denunciar questao</p>
-        <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{trimmedStatement}</p>
+        <p className="break-words font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">{trimmedStatement}</p>
 
         <label className="space-y-1 text-xs">
           <span className="font-mono uppercase text-[var(--pixel-subtext)]">Motivo</span>

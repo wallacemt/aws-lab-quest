@@ -66,7 +66,11 @@ export function QuestionOptionsCard({
         </div>
       )}
 
-      <p className={`font-[var(--font-body)] ${large ? "text-lg" : "text-base"}`}>{question.statement}</p>
+      <p
+        className={`max-w-prose break-words font-[var(--font-body)] leading-relaxed ${large ? "text-lg" : "text-base"}`}
+      >
+        {question.statement}
+      </p>
       {question.questionType === "multi" && (
         <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
           Questao multipla: selecione todas as alternativas corretas.
@@ -82,7 +86,7 @@ export function QuestionOptionsCard({
           return (
             <label
               key={`${question.id}-${option}`}
-              className={`flex items-start gap-2 border-2 px-3 py-2 ${
+              className={`flex min-w-0 items-start gap-2 border-2 px-3 py-2 ${
                 isCorrectOption
                   ? "border-[#2ecc71] bg-green-900/35"
                   : isSelectedWrong
@@ -97,7 +101,9 @@ export function QuestionOptionsCard({
                 onChange={() => handleChange(option)}
                 disabled={submitted || disabled}
               />
-              <span className={`font-[var(--font-body)] ${large ? "text-base" : "text-sm"}`}>
+              <span
+                className={`min-w-0 max-w-prose break-words font-[var(--font-body)] ${large ? "text-base" : "text-sm"}`}
+              >
                 {option}) {text}
               </span>
             </label>

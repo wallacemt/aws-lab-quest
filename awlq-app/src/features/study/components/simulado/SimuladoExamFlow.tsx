@@ -1,15 +1,18 @@
 "use client";
 
+import { ReactNode, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PixelButton } from "@/components/ui/pixel-button";
 import { PixelCard } from "@/components/ui/pixel-card";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { AnswerConfidence, ConfidenceSelector } from "@/features/retention/components/ConfidenceSelector";
 import { QuestionOptionsCard } from "@/features/study/components/QuestionOptionsCard";
 import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewPanel";
 import { QuestionSideNav } from "@/features/study/components/QuestionSideNav";
 import { ReportQuestionModal } from "@/features/study/components/ReportQuestionModal";
 import { SimuladoPreSubmitModal } from "@/features/study/components/simulado/SimuladoPreSubmitModal";
 import { useSimuladoContext } from "@/features/study/context/SimuladoContext";
-import { isAnswerCorrect } from "@/features/study/services";
+import { isAnswerCorrect, normalizeAnswerValue } from "@/features/study/services";
 
 const GAP_TOP_N = 10;
 
@@ -30,6 +33,7 @@ export function SimuladoExamFlow() {
     session,
     markedForReview,
     allQuestionsAnswered,
+    confidenceByQuestion,
     reportModalOpen,
     reportMessage,
     reportSubmitting,
@@ -47,6 +51,7 @@ export function SimuladoExamFlow() {
     setShowPreSubmitSummary,
     goToQuestion,
     toggleMarkForReview,
+    setConfidenceForQuestion,
     handleForceExit,
     handleReset,
     handleSubmitExam,
@@ -57,6 +62,37 @@ export function SimuladoExamFlow() {
     navigateToKcGaps,
     navigateToLabGaps,
   } = useSimuladoContext();
+
+  // Non-blocking confidence prompt: opens on hover/click of the advance button, only when
+  // the current question has an answer and hasn't been rated yet, so it never interrupts
+  // someone still reading/thinking (user request: no inline step, no extra screen).
+  const [confidencePromptOpen, setConfidencePromptOpen] = useState(false);
+  const needsConfidencePrompt =
+    inExamFlow &&
+    !!currentQuestion &&
+    normalizeAnswerValue(answers[currentQuestion.id]).length > 0 &&
+    !confidenceByQuestion[currentQuestion.id];
+
+  function openConfidencePromptIfNeeded() {
+    if (needsConfidencePrompt) setConfidencePromptOpen(true);
+  }
+
+  function advance(action: () => void) {
+    // First click (or hover) surfaces the prompt; clicking again while it's already open
+    // skips the rating and advances anyway, so it never traps the user.
+    if (needsConfidencePrompt && !confidencePromptOpen) {
+      setConfidencePromptOpen(true);
+      return;
+    }
+    setConfidencePromptOpen(false);
+    action();
+  }
+
+  function pickConfidenceAndAdvance(confidence: AnswerConfidence, action: () => void) {
+    if (currentQuestion) setConfidenceForQuestion(currentQuestion.id, confidence);
+    setConfidencePromptOpen(false);
+    action();
+  }
 
   return (
     <>
@@ -251,12 +287,21 @@ export function SimuladoExamFlow() {
                         <span className="font-mono text-[11px] text-[var(--pixel-subtext)]">
                           {currentIndex + 1} / {questions.length}
                         </span>
-                        <PixelButton
-                          onClick={() => void goToQuestion(currentIndex + 1)}
-                          disabled={currentIndex === questions.length - 1}
+                        <ConfidenceGate
+                          open={confidencePromptOpen}
+                          onOpenChange={setConfidencePromptOpen}
+                          onPick={(confidence) =>
+                            pickConfidenceAndAdvance(confidence, () => void goToQuestion(currentIndex + 1))
+                          }
                         >
-                          Proxima →
-                        </PixelButton>
+                          <PixelButton
+                            onClick={() => advance(() => void goToQuestion(currentIndex + 1))}
+                            onMouseEnter={openConfidencePromptIfNeeded}
+                            disabled={currentIndex === questions.length - 1}
+                          >
+                            Proxima →
+                          </PixelButton>
+                        </ConfidenceGate>
                       </div>
 
                       {inExamFlow && (
@@ -267,6 +312,23 @@ export function SimuladoExamFlow() {
                               width: `${questions.length > 0 ? (answeredCount / questions.length) * 100 : 0}%`,
                             }}
                           />
+                        </div>
+                      )}
+
+                      {/* Focus mode hides the sidebar (and its "Enviar Simulado" button), so without this
+                          the only way to finish is to exit focus mode first — mirror it here. */}
+                      {inExamFlow && focusMode && (
+                        <div className="flex items-center justify-between gap-2">
+                          <PixelButton variant="ghost" onClick={handleForceExit} className="justify-center">
+                            Encerrar
+                          </PixelButton>
+                          <PixelButton
+                            onClick={() => setShowPreSubmitSummary(true)}
+                            disabled={!allQuestionsAnswered}
+                            className="justify-center"
+                          >
+                            Enviar Simulado
+                          </PixelButton>
                         </div>
                       )}
 
@@ -438,5 +500,31 @@ export function SimuladoExamFlow() {
         </div>
       )}
     </>
+  );
+}
+
+/** Wraps a Proxima/Enviar trigger so clicking (or hovering) it surfaces a quick,
+ * non-blocking confidence prompt instead of the inline post-answer step used in KC. */
+function ConfidenceGate({
+  open,
+  onOpenChange,
+  onPick,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPick: (confidence: AnswerConfidence) => void;
+  children: ReactNode;
+}) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverAnchor asChild>{children}</PopoverAnchor>
+      <PopoverContent
+        side="top"
+        className="w-auto border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] p-3 shadow-[4px_4px_0_0_var(--pixel-shadow)]"
+      >
+        <ConfidenceSelector onSelect={onPick} />
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -3,6 +3,7 @@
 import { createContext, Dispatch, SetStateAction, useContext } from "react";
 import { StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import { QuestionOption, StudyQuestion } from "@/lib/types";
+import { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
 
 export type WeakServiceMetric = {
   topic: string;
@@ -57,6 +58,7 @@ export type SimuladoContextType = {
   isPaused: boolean;
   markedForReview: Set<string>;
   allQuestionsAnswered: boolean;
+  confidenceByQuestion: Record<string, AnswerConfidence>;
   reportModalOpen: boolean;
   reportMessage: string | null;
   reportSubmitting: boolean;
@@ -82,6 +84,7 @@ export type SimuladoContextType = {
   // Actions
   goToQuestion: (index: number) => Promise<void>;
   toggleMarkForReview: (questionId: string) => void;
+  setConfidenceForQuestion: (questionId: string, confidence: AnswerConfidence) => void;
   handleForceExit: () => void;
   handleReset: () => void;
   handleSubmitExam: () => Promise<void>;
