@@ -956,9 +956,11 @@ export function SimuladoScreen() {
     certificationName: certInfo?.name ?? null,
     packName: pendingPackName,
     packId: currentPackId,
-    durationSeconds: session?.timerMode === "COUNTUP_FREE"
-      ? Math.max(0, Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000))
-      : session?.timerMode === "NONE" ? 0 : Math.max(0, Math.floor((new Date(session.endsAt).getTime() - new Date(session.startedAt).getTime()) / 1000) - remainingSeconds),
+    durationSeconds: !session
+      ? 0
+      : session.timerMode === "COUNTUP_FREE"
+        ? Math.max(0, Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000))
+        : session.timerMode === "NONE" ? 0 : Math.max(0, Math.floor((new Date(session.endsAt).getTime() - new Date(session.startedAt).getTime()) / 1000) - remainingSeconds),
     focusMode,
     isPaused,
     markedForReview,
