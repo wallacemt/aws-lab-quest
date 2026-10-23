@@ -7,6 +7,56 @@ versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [2.2.0] — 2026-10-23
+
+### Features
+
+#### Simulado
+- feat(simulado): formatação inteligente de enunciados — blocos JSON/código dentro da questão são detectados e formatados em vez de exibidos como texto corrido
+- feat(simulado): tela de resultado pós-prova unificada, com filtros por acerto/erro, tempo de resposta, questões marcadas e nível de confiança; corrige overflow de texto longo e UX do modo foco
+- feat(simulado): configuração pré-simulado e presets reutilizáveis (`SimuladoConfigPreset`) — escolha entre estilo de prova real (revisão só no final) ou explicação a cada questão, e entre cronômetro regressivo com bloqueio, cronômetro livre ou sem cronômetro; CRUD de presets por usuário (limite 12) via `/api/user/simulado-presets`; comportamento padrão sem configuração permanece idêntico ao anterior
+- fix(simulado-packs): corrige erro 502 do Pollinations na geração de artwork e refaz a geração de imagens dos packs
+- feat(admin): wizard de geração automática de packs de simulado e rotas admin de simulado atualizadas
+
+#### Jornada de Certificação
+- feat(journeys): modelo de jornada de certificação com registro de atividade e UI para iniciar uma nova jornada
+- feat(journeys): histórico e perfil passam a ser escopados pela jornada ativa; é possível navegar o desempenho de jornadas passadas
+- fix(journeys): reabre a jornada existente em vez de duplicar; edição da certificação-alvo bloqueada fora do fluxo de jornada; XP do perfil público permanece global (consistente com o leaderboard); cache de perfil/histórico invalidado ao trocar de jornada
+
+#### Login social & Onboarding
+- feat(auth): login social via Google/GitHub com onboarding guiado por checklist e galeria de ilustrações
+- fix(auth): linking de conta social com conta email/senha já existente; correções de achados do Sourcery na PR de social login
+- fix(deps): vulnerabilidades high reportadas pelo `bun audit` (nanoid, deepmerge e outras)
+
+#### Admin
+- feat(admin): telas e rotas de gestão de certificações (CRUD)
+- feat(admin): sugestões via IA para Arena e outras áreas do painel admin
+- feat(admin): upload de documentos da biblioteca e edição de changelog refinados; UI do card de release aprimorada
+
+#### Arena & Estudo
+- feat(arena): conquistas (achievements) visíveis na tela de batalha de boss
+- feat(study): banners de ajuda contextual nas telas de estudo, com botão de ajuda reutilizável
+- feat(theming): extração de cor de tema a partir da imagem/artwork para background dinâmico
+
+#### Analytics
+- feat: tracking Umami adicionado ao app
+
+### Infraestrutura / Segurança
+- feat(security): hardening de configuração (Dockerfile, `next.config.ts`, layout e auth do admin)
+- feat(db): timeout maior para transações do Prisma
+- docs(security): auditoria de segurança registrada em `docs/SECURITY_AUDIT.md`
+- chore(deps): atualizações de dependências/lockfile para corrigir falhas de CI de lint, typecheck e audit
+- fix: erros de TypeScript que bloqueavam o build Docker da app
+
+### Bug Fixes
+- fix(lint): erro bloqueante `react-hooks/refs` em `FileDropzone`
+- fix(ci): variáveis `DATABASE_URL`/`REDIS_URL` ausentes no step de teste do worker — o job "Test worker" do CI/CD estava quebrado desde a introdução do worker de flashcard-reminder
+
+### Database
+- migration `20261023000000_simulado_config_presets` — tabela `SimuladoConfigPreset` e enums de estilo de prova/modo de cronômetro
+
+---
+
 ## [2.1.0] — 2026-06-23
 
 ### Features
