@@ -14,6 +14,7 @@ import {
   saveStudyHistoryExplanation,
   StudyHistoryItem,
 } from "@/features/study/services";
+import { hasSubstantialStaticExplanation } from "@/features/utils/funcs/simulado-utils";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOption } from "@/lib/types";
@@ -55,8 +56,8 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
     return value === "A" || value === "B" || value === "C" || value === "D" || value === "E";
   }
 
-  function hasSummaryOrExplanation(item: { explanationSummary?: string }): boolean {
-    return Boolean(item.explanationSummary?.trim());
+  function hasSummaryOrExplanation(item: { explanationSummary?: string; explanations: Record<string, string>; correctOption: string }): boolean {
+    return Boolean(item.explanationSummary?.trim()) || hasSubstantialStaticExplanation(item.explanations[item.correctOption]);
   }
 
   useEffect(() => {
