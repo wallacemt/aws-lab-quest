@@ -953,6 +953,12 @@ export function SimuladoScreen() {
     answeredCount,
     timerLabel,
     session: session as { id: string; certificationCode: string; startedAt: string; endsAt: string; timerMode?: "COUNTDOWN_LOCK" | "COUNTUP_FREE" | "NONE"; examStyle?: "EXAM" | "EXPLAIN_EACH" } | null,
+    certificationName: certInfo?.name ?? null,
+    packName: pendingPackName,
+    packId: currentPackId,
+    durationSeconds: session?.timerMode === "COUNTUP_FREE"
+      ? Math.max(0, Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000))
+      : session?.timerMode === "NONE" ? 0 : Math.max(0, Math.floor((new Date(session.endsAt).getTime() - new Date(session.startedAt).getTime()) / 1000) - remainingSeconds),
     focusMode,
     isPaused,
     markedForReview,

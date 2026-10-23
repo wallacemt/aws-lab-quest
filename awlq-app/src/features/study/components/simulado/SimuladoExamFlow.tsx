@@ -33,6 +33,10 @@ export function SimuladoExamFlow() {
     focusMode,
     isPaused,
     session,
+    certificationName,
+    packName,
+    packId,
+    durationSeconds,
     markedForReview,
     allQuestionsAnswered,
     confidenceByQuestion,
@@ -83,10 +87,73 @@ export function SimuladoExamFlow() {
   const [markedOnly, setMarkedOnly] = useState(false);
   const [confidenceFilter, setConfidenceFilter] = useState<"all" | "false-belief" | "lucky-guess">("all");
   const [expandedReviews, setExpandedReviews] = useState<Set<string>>(new Set());
+  const [nextStepsOpen, setNextStepsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const topicPerformance = useMemo(() => buildTopicPerformance(questions, answers), [questions, answers]);
   const averageQuestionTime = useMemo(() => getAverageQuestionTime(questions, timeSpentByQuestion), [questions, timeSpentByQuestion]);
   const filteredQuestions = useMemo(() => filterSimuladoReviewQuestions(questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, { result: resultFilter, topic: topicFilter, time: timeFilter, markedOnly, confidence: confidenceFilter }), [answers, questions, resultFilter, timeFilter, timeSpentByQuestion, topicFilter, markedForReview, confidenceByQuestion, markedOnly, confidenceFilter]);
+  const correctCount = useMemo(() => questions.filter((question) => isAnswerCorrect({ questionType: question.questionType, answer: answers[question.id], correctOption: question.correctOption, correctOptions: question.correctOptions })).length, [answers, questions]);
+  const exportPayload = useMemo(() => ({
+    metadata: {
+      certificationCode: session?.certificationCode ?? null,
+      certificationName,
+      packId,
+      packName,
+      startedAt: session?.startedAt ?? null,
+      completedAt: session ? new Date(new Date(session.startedAt).getTime() + durationSeconds * 1000).toISOString() : null,
+      durationSeconds,
+      examStyle: session?.examStyle ?? null,
+      timerMode: session?.timerMode ?? null,
+    },
+    score: {
+      points: scoreOverview?.points ?? 0,
+      maxPoints: scoreOverview?.maxPoints ?? 1000,
+      minimumCertificationPoints: scoreOverview?.minimumCertificationPoints ?? 700,
+      passed: (scoreOverview?.points ?? 0) >= (scoreOverview?.minimumCertificationPoints ?? 700),
+    },
+    performanceByTopic: topicPerformance,
+    bestArea: scoreOverview?.bestArea ?? null,
+    weakestArea: scoreOverview?.weakestArea ?? null,
+    metrics: { totalQuestions: questions.length, correctAnswers: correctCount, wrongAnswers: questions.length - correctCount },
+    questions: questions.map((question) => ({
+      questionId: question.id,
+      statement: question.statement,
+      topic: question.topic?.trim() || "OUTROS",
+      questionType: question.questionType,
+      options: question.options,
+      correctOptions: question.correctOptions,
+      userAnswer: normalizeAnswerValue(answers[question.id]),
+      isCorrect: isAnswerCorrect({ questionType: question.questionType, answer: answers[question.id], correctOption: question.correctOption, correctOptions: question.correctOptions }),
+      timeSpentSeconds: timeSpentByQuestion[question.id] ?? 0,
+      markedForReview: markedForReview.has(question.id),
+      confidence: confidenceByQuestion[question.id] ?? null,
+      explanationSummary: reviewByQuestion[question.id]?.summary ?? null,
+      explanations: { ...question.explanations, ...reviewByQuestion[question.id]?.options },
+    })),
+  }), [session, certificationName, packName, packId, durationSeconds, scoreOverview, topicPerformance, questions, correctCount, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, reviewByQuestion]);
+  const aiPrompt = `Analise o resultado do meu simulado AWS usando o JSON exportado que vou anexar ou colar depois deste prompt como fonte de verdade. Não invente dados e não ignore questões sem resposta.\n\nRevise cada questão errada, explique por que a resposta correta está certa e por que minha resposta falhou. Identifique padrões por tópico, priorize os pontos fracos (incluindo erros com alta confiança), destaque lacunas e acertos frágeis, e proponha um plano de estudo prático de 7 dias com objetivos diários, revisão ativa e questões de acompanhamento. Considere o score, o tempo por questão e as explicações incluídas.\n\nResumo: ${correctCount} acertos e ${questions.length - correctCount} erros em ${questions.length} questões. Área mais fraca: ${scoreOverview?.weakestArea?.topic ?? "sem dados"}.`;
+
+  function exportResult() {
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `simulado-${session?.certificationCode ?? "resultado"}-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setNextStepsOpen(true);
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(aiPrompt);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
   const needsConfidencePrompt =
     inExamFlow &&
     !!currentQuestion &&
@@ -118,6 +185,10 @@ export function SimuladoExamFlow() {
     <>
       {inReviewFlow && scoreOverview && (
         <PixelCard className="space-y-4">
+          <div className="flex flex-wrap justify-end gap-2">
+            <PixelButton variant="ghost" onClick={() => setNextStepsOpen(true)}>O que fazer agora?</PixelButton>
+            <PixelButton onClick={exportResult}>Exportar resultado</PixelButton>
+          </div>
           <div role="tablist" aria-label="Resultado do simulado" onKeyDown={(event) => { if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return; event.preventDefault(); const next = (resultTabIndex + (event.key === "ArrowRight" ? 1 : 2)) % 3; setResultTab((["score", "review", "gaps"] as const)[next]); tabRefs.current[next]?.focus(); }} className="flex flex-wrap border-b border-[var(--pixel-border)]">
             {([ ["score", "Score"], ["review", "Revisão"], ["gaps", "Pontos fortes e fracos"] ] as const).map(([tab, label]) => (
               <button key={tab} ref={(element) => { tabRefs.current[["score", "review", "gaps"].indexOf(tab)] = element; }} id={`simulado-tab-${tab}`} type="button" role="tab" aria-selected={resultTab === tab} aria-controls={`simulado-panel-${tab}`} tabIndex={resultTab === tab ? 0 : -1} onClick={() => setResultTab(tab)}
@@ -170,6 +241,15 @@ export function SimuladoExamFlow() {
           </div>}
         </PixelCard>
       )}
+      {nextStepsOpen && <div role="dialog" aria-modal="true" aria-labelledby="simulado-next-title" className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/80 p-4">
+        <PixelCard className="my-6 w-full max-w-2xl space-y-4">
+          <div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">Próximo passo</p><h2 id="simulado-next-title" className="font-[var(--font-body)] text-2xl">O que fazer agora?</h2></div><button type="button" aria-label="Fechar" onClick={() => setNextStepsOpen(false)} className="border-2 border-[var(--pixel-border)] px-3 py-1 font-mono">×</button></div>
+          <p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Exportamos {questions.length} questões, com {questions.length - correctCount} erros. Área mais fraca: {scoreOverview?.weakestArea?.topic ?? "sem dados"}. Anexe o JSON baixado ou cole o conteúdo depois do prompt em qualquer IA.</p>
+          <label htmlFor="simulado-ai-prompt" className="font-mono text-[10px] uppercase">Prompt para copiar</label>
+          <textarea id="simulado-ai-prompt" readOnly value={aiPrompt} className="min-h-48 w-full resize-y border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3 font-[var(--font-body)] text-sm text-[var(--pixel-text)]" />
+          <div className="flex flex-wrap justify-end gap-2"><PixelButton variant="ghost" onClick={() => setNextStepsOpen(false)}>Fechar</PixelButton><PixelButton onClick={() => void copyPrompt()}>{copied ? "Prompt copiado" : "Copiar prompt"}</PixelButton></div>
+        </PixelCard>
+      </div>}
 
       {inExamFlow && currentQuestion && (
         <div className={`grid gap-4 ${focusMode ? "" : "xl:grid-cols-[minmax(0,1fr)_340px]"}`}>

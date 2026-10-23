@@ -56,6 +56,10 @@ export type SimuladoContextType = {
   // Timer / session
   timerLabel: string;
   session: ExamSession | null;
+  certificationName: string | null;
+  packName: string | null;
+  packId: string | null;
+  durationSeconds: number;
 
   // UI state
   focusMode: boolean;
