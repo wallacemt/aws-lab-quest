@@ -23,6 +23,7 @@ export function SimuladoExamFlow() {
     answers,
     currentIndex,
     submitted,
+    reviewEachAnswer,
     inExamFlow,
     inReviewFlow,
     isActive,
@@ -186,7 +187,7 @@ export function SimuladoExamFlow() {
                     <div
                       className={`border-2 px-3 py-1 font-mono text-sm ${isPaused ? "border-yellow-400 text-yellow-300" : "border-red-400 text-red-300"}`}
                     >
-                      {timerLabel}
+                      {session?.timerMode === "COUNTUP_FREE" ? `Tempo decorrido · ${timerLabel}` : session?.timerMode === "NONE" ? "Sem cronometro" : timerLabel}
                     </div>
                   )}
                   <button
@@ -252,8 +253,10 @@ export function SimuladoExamFlow() {
               <QuestionOptionsCard
                 question={currentQuestion}
                 answer={answers[currentQuestion.id]}
-                onSelect={(value) => setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }))}
-                submitted={submitted}
+                onSelect={(value) => {
+                  setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
+                }}
+                submitted={submitted || (reviewEachAnswer && normalizeAnswerValue(answers[currentQuestion.id]).length > 0)}
                 large={focusMode}
                 questionLabel={`Questao ${currentIndex + 1} de ${questions.length}`}
                 headerActions={
@@ -354,7 +357,7 @@ export function SimuladoExamFlow() {
                         <PixelButton
                           variant="ghost"
                           onClick={() => void goToQuestion(currentIndex - 1)}
-                          disabled={currentIndex === 0}
+                          disabled={reviewEachAnswer || currentIndex === 0}
                         >
                           ← Anterior
                         </PixelButton>
@@ -369,11 +372,17 @@ export function SimuladoExamFlow() {
                           }
                         >
                           <PixelButton
-                            onClick={() => advance(() => void goToQuestion(currentIndex + 1))}
+                            onClick={() => {
+                              if (reviewEachAnswer && !submitted && currentQuestion) {
+                                void goToQuestion(currentIndex);
+                                return;
+                              }
+                              advance(() => void goToQuestion(currentIndex + 1));
+                            }}
                             onMouseEnter={openConfidencePromptIfNeeded}
-                            disabled={currentIndex === questions.length - 1}
+                            disabled={reviewEachAnswer ? (!normalizeAnswerValue(answers[currentQuestion.id]).length || (submitted && currentIndex === questions.length - 1)) : currentIndex === questions.length - 1}
                           >
-                            Proxima →
+                            {reviewEachAnswer && !submitted && !reviewByQuestion[currentQuestion.id] ? "Conferir resposta" : "Proxima →"}
                           </PixelButton>
                         </ConfidenceGate>
                       </div>

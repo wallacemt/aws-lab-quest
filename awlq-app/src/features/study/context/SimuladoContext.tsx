@@ -36,6 +36,8 @@ export type ExamSession = {
   certificationCode: string;
   startedAt: string;
   endsAt: string;
+  timerMode?: "COUNTDOWN_LOCK" | "COUNTUP_FREE" | "NONE";
+  examStyle?: "EXAM" | "EXPLAIN_EACH";
 };
 
 export type SimuladoContextType = {
@@ -44,6 +46,7 @@ export type SimuladoContextType = {
   answers: StudyAnswerMap;
   currentIndex: number;
   submitted: boolean;
+  reviewEachAnswer: boolean;
   inExamFlow: boolean;
   inReviewFlow: boolean;
   isActive: boolean;

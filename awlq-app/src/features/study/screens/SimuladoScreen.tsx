@@ -10,7 +10,7 @@ import { SimuladoExamGuide } from "@/features/study/components/simulado/Simulado
 import { SimuladoPacksGrid } from "@/features/study/components/simulado/SimuladoPacksGrid";
 import { SimuladoResultOverview } from "@/features/study/components/simulado/SimuladoResultOverview";
 import { SimuladoResumeModal } from "@/features/study/components/simulado/SimuladoResumeModal";
-import { SimuladoRulesModal } from "@/features/study/components/simulado/SimuladoRulesModal";
+import { SimuladoRulesModal, type SimuladoConfig } from "@/features/study/components/simulado/SimuladoRulesModal";
 import { SimuladoContext } from "@/features/study/context/SimuladoContext";
 import type { WeakServiceMetric } from "@/features/study/context/SimuladoContext";
 import { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
@@ -71,6 +71,7 @@ export function SimuladoScreen() {
 
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [rulesAccepted, setRulesAccepted] = useState(false);
+  const [simuladoConfig, setSimuladoConfig] = useState<SimuladoConfig>({ examStyle: "EXAM", timerMode: "COUNTDOWN_LOCK", timerMinutes: null });
   const [examGuideInfo, setExamGuideInfo] = useState<{
     markdown: string;
     preview: string;
@@ -117,6 +118,7 @@ export function SimuladoScreen() {
   const [certInfo, setCertInfo] = useState<{ code: string; name: string } | null>(null);
   const [pendingPackId, setPendingPackId] = useState<string | null>(null);
   const [pendingPackName, setPendingPackName] = useState<string | null>(null);
+  const [pendingExamMinutes, setPendingExamMinutes] = useState(90);
   const [currentPackId, setCurrentPackId] = useState<string | null>(null);
   const [expandedPackHistory, setExpandedPackHistory] = useState<string | null>(null);
 
@@ -352,7 +354,7 @@ export function SimuladoScreen() {
   }, [hydrated, inExamFlow, inReviewFlow, packsFilter, packsRefreshKey]);
 
   useEffect(() => {
-    if (prevRemainingRef.current > 0 && remainingSeconds <= 0 && inExamFlow) {
+    if (session?.timerMode === "COUNTDOWN_LOCK" && prevRemainingRef.current > 0 && remainingSeconds <= 0 && inExamFlow) {
       playAlarmBeep();
       void handleSubmitExam();
     }
@@ -429,7 +431,8 @@ export function SimuladoScreen() {
       setReviewByQuestion({});
       setLoadingReviewByQuestion({});
       setExamGuideInfo(data.examGuide ?? null);
-      startSession(data.certificationCode, data.examMinutes ?? 90);
+      const minutes = simuladoConfig.timerMinutes ?? data.examMinutes ?? 90;
+      startSession(data.certificationCode, simuladoConfig.timerMode === "COUNTDOWN_LOCK" ? minutes : 0, { timerMode: simuladoConfig.timerMode, examStyle: simuladoConfig.examStyle });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Erro ao iniciar simulado.");
     } finally {
@@ -538,13 +541,11 @@ export function SimuladoScreen() {
     }
   }
 
-  function handleOpenPackRulesModal(packId: string, packName: string) {
-    if (hasValidRulesConsent(consentScope)) {
-      void handleStartFromPack(packId);
-      return;
-    }
+  async function handleOpenPackRulesModal(packId: string, packName: string, examMinutes = 90) {
+    setPendingExamMinutes(examMinutes);
     setPendingPackId(packId);
     setPendingPackName(packName);
+    setSimuladoConfig({ examStyle: "EXAM", timerMode: "COUNTDOWN_LOCK", timerMinutes: null });
     setRulesAccepted(false);
     setShowRulesModal(true);
   }
@@ -691,7 +692,9 @@ export function SimuladoScreen() {
       0,
       Math.floor((new Date(session.endsAt).getTime() - new Date(session.startedAt).getTime()) / 1000),
     );
-    const usedDurationSeconds = Math.max(0, totalDurationSeconds - remainingSeconds);
+    const usedDurationSeconds = session.timerMode === "COUNTUP_FREE"
+      ? Math.max(0, Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000))
+      : session.timerMode === "NONE" ? 0 : Math.max(0, totalDurationSeconds - remainingSeconds);
 
     safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
     submitSession();
@@ -902,7 +905,7 @@ export function SimuladoScreen() {
     setCurrentIndex(clamped);
     questionEnteredAtRef.current = Date.now();
 
-    if (submitted) {
+    if (submitted || session?.examStyle === "EXPLAIN_EACH") {
       const target = questions[clamped];
       if (target) {
         await fetchReviewForQuestion(target, answers[target.id] ?? target.correctOption, savedHistoryId);
@@ -949,7 +952,7 @@ export function SimuladoScreen() {
     currentQuestion,
     answeredCount,
     timerLabel,
-    session: session as { id: string; certificationCode: string; startedAt: string; endsAt: string } | null,
+    session: session as { id: string; certificationCode: string; startedAt: string; endsAt: string; timerMode?: "COUNTDOWN_LOCK" | "COUNTUP_FREE" | "NONE"; examStyle?: "EXAM" | "EXPLAIN_EACH" } | null,
     focusMode,
     isPaused,
     markedForReview,
@@ -976,6 +979,7 @@ export function SimuladoScreen() {
     handleForceExit,
     handleReset,
     handleSubmitExam,
+    reviewEachAnswer: session?.examStyle === "EXPLAIN_EACH",
     submitQuestionReport,
     resumeSession,
     pauseSession,
@@ -1161,6 +1165,9 @@ export function SimuladoScreen() {
             onAcceptedChange={setRulesAccepted}
             onCancel={() => setShowRulesModal(false)}
             onConfirm={() => void confirmRulesAndStart()}
+            examMinutes={pendingExamMinutes}
+            config={simuladoConfig}
+            onConfigChange={setSimuladoConfig}
           />
 
           <SimuladoExamFlow />

@@ -17,6 +17,7 @@ export type SimuladoPackListItem = {
   name: string;
   isSkillBuilder?: boolean;
   questionCount: number;
+  examMinutes?: number;
   artworkUrl: string | null;
   difficultyScore: number;
   createdAt: string;
@@ -49,7 +50,7 @@ type Props = {
   onViewChange: (v: PacksView) => void;
   onRefresh: () => void;
   onToggleHistory: (id: string | null) => void;
-  onStartPack: (packId: string, packName: string) => void;
+  onStartPack: (packId: string, packName: string, examMinutes?: number) => void;
 };
 
 function timeAgo(dateStr: string): string {
@@ -329,7 +330,7 @@ export function SimuladoPacksGrid({
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <button
                         type="button"
-                        onClick={() => onStartPack(pack.id, pack.name)}
+                        onClick={() => onStartPack(pack.id, pack.name, pack.examMinutes)}
                         disabled={loading}
                         className="border border-[var(--pixel-primary)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10 disabled:opacity-50"
                       >
@@ -412,7 +413,7 @@ export function SimuladoPacksGrid({
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
-                        onClick={() => onStartPack(pack.id, pack.name)}
+                        onClick={() => onStartPack(pack.id, pack.name, pack.examMinutes)}
                         disabled={loading}
                         className="border border-white/50 bg-black/40 px-3 py-1.5 font-mono text-[10px] uppercase text-white backdrop-blur-sm hover:bg-white/10 disabled:opacity-50"
                       >
@@ -487,7 +488,7 @@ export function SimuladoPacksGrid({
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => onStartPack(pack.id, pack.name)}
+                      onClick={() => onStartPack(pack.id, pack.name, pack.examMinutes)}
                       disabled={loading}
                       className="border border-[var(--pixel-primary)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-primary)] hover:bg-[var(--pixel-primary)]/10 disabled:opacity-50"
                     >

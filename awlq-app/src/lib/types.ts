@@ -74,6 +74,8 @@ export type SimulatedExamSession = {
   endsAt: string;
   certificationCode: string;
   locked: boolean;
+  timerMode?: "COUNTDOWN_LOCK" | "COUNTUP_FREE" | "NONE";
+  examStyle?: "EXAM" | "EXPLAIN_EACH";
   submittedAt?: string;
   pausedAt?: string;
   pausedRemainingSeconds?: number;

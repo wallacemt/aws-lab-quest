@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
   const profile = await prisma.userProfile.findUnique({
     where: { userId: auth.user.id },
-    select: { certificationPresetId: true, certificationPreset: { select: { code: true, name: true } } },
+    select: { certificationPresetId: true, certificationPreset: { select: { code: true, name: true, examMinutes: true } } },
   });
 
   if (!profile?.certificationPresetId) {
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         isSkillBuilder: pack.isSkillBuilder,
         // awsContext: pack.journeyNarrative.
         questionCount: pack._count.questions,
+        examMinutes: profile.certificationPreset?.examMinutes ?? 90,
         artworkUrl: pack.artworkUrl ?? null,
         difficultyScore: pack.difficultyScore,
         createdAt: pack.createdAt.toISOString(),

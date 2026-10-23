@@ -52,7 +52,9 @@ export function useSimulatedExam() {
 
   const remainingSeconds = useMemo(() => {
     if (!session) return 0;
-    if (isPaused) return session.pausedRemainingSeconds ?? 0;
+    if (session.timerMode === "NONE") return 0;
+    if (isPaused && session.timerMode !== "COUNTUP_FREE") return session.pausedRemainingSeconds ?? 0;
+    if (session.timerMode === "COUNTUP_FREE") return Math.max(0, Math.floor(((isPaused ? new Date(session.pausedAt!).getTime() : nowMs) - new Date(session.startedAt).getTime()) / 1000));
     if (nowMs === 0) {
       const startedAtMs = new Date(session.startedAt).getTime();
       const endsAtMs = new Date(session.endsAt).getTime();
@@ -62,7 +64,7 @@ export function useSimulatedExam() {
     return Math.max(0, Math.floor((endsAtMs - nowMs) / 1000));
   }, [isPaused, nowMs, session]);
 
-  const isActive = Boolean(session && !session.submittedAt && remainingSeconds > 0);
+  const isActive = Boolean(session && !session.submittedAt && (session.timerMode !== "COUNTDOWN_LOCK" || remainingSeconds > 0));
 
   return {
     hydrated,
