@@ -38,6 +38,7 @@ export function SimuladoExamFlow() {
     packId,
     durationSeconds,
     markedForReview,
+    confirmedAnswers,
     allQuestionsAnswered,
     confidenceByQuestion,
     reportModalOpen,
@@ -63,6 +64,7 @@ export function SimuladoExamFlow() {
     setShowPreSubmitSummary,
     goToQuestion,
     toggleMarkForReview,
+    confirmAnswer,
     setConfidenceForQuestion,
     handleForceExit,
     handleReset,
@@ -94,6 +96,11 @@ export function SimuladoExamFlow() {
   const averageQuestionTime = useMemo(() => getAverageQuestionTime(questions, timeSpentByQuestion), [questions, timeSpentByQuestion]);
   const filteredQuestions = useMemo(() => filterSimuladoReviewQuestions(questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, { result: resultFilter, topic: topicFilter, time: timeFilter, markedOnly, confidence: confidenceFilter }), [answers, questions, resultFilter, timeFilter, timeSpentByQuestion, topicFilter, markedForReview, confidenceByQuestion, markedOnly, confidenceFilter]);
   const correctCount = useMemo(() => questions.filter((question) => isAnswerCorrect({ questionType: question.questionType, answer: answers[question.id], correctOption: question.correctOption, correctOptions: question.correctOptions })).length, [answers, questions]);
+  const timerModeColors = session?.timerMode === "COUNTUP_FREE"
+    ? { card: "border-blue-500 bg-blue-900/10", label: "text-blue-300", box: "border-blue-400 text-blue-300" }
+    : session?.timerMode === "NONE"
+      ? { card: "border-slate-500 bg-slate-900/10", label: "text-slate-300", box: "border-slate-400 text-slate-300" }
+      : { card: "border-red-500 bg-red-900/10", label: "text-red-300", box: "border-red-400 text-red-300" };
   const exportPayload = useMemo(() => ({
     metadata: {
       certificationCode: session?.certificationCode ?? null,
@@ -256,16 +263,16 @@ export function SimuladoExamFlow() {
           <section className="space-y-4">
             {inExamFlow && (
               <PixelCard
-                className={`flex flex-wrap items-center justify-between gap-2 ${isPaused ? "border-yellow-500 bg-yellow-900/10" : "border-red-500 bg-red-900/10"}`}
+                className={`flex flex-wrap items-center justify-between gap-2 ${isPaused ? "border-yellow-500 bg-yellow-900/10" : timerModeColors.card}`}
               >
-                <p className={`font-mono text-[10px] uppercase ${isPaused ? "text-yellow-300" : "text-red-300"}`}>
+                <p className={`font-mono text-[10px] uppercase ${isPaused ? "text-yellow-300" : timerModeColors.label}`}>
                   {isPaused ? "Simulado pausado · " : "Prova em andamento · "}Certificacao{" "}
                   {session?.certificationCode}
                 </p>
                 <div className="flex items-center gap-2">
                   {!focusMode && (
                     <div
-                      className={`border-2 px-3 py-1 font-mono text-sm ${isPaused ? "border-yellow-400 text-yellow-300" : "border-red-400 text-red-300"}`}
+                      className={`border-2 px-3 py-1 font-mono text-sm ${isPaused ? "border-yellow-400 text-yellow-300" : timerModeColors.box}`}
                     >
                       {session?.timerMode === "COUNTUP_FREE" ? `Tempo decorrido · ${timerLabel}` : session?.timerMode === "NONE" ? "Sem cronometro" : timerLabel}
                     </div>
@@ -336,7 +343,7 @@ export function SimuladoExamFlow() {
                 onSelect={(value) => {
                   setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
                 }}
-                submitted={submitted || (reviewEachAnswer && normalizeAnswerValue(answers[currentQuestion.id]).length > 0)}
+                submitted={submitted || (reviewEachAnswer && confirmedAnswers.has(currentQuestion.id))}
                 large={focusMode}
                 questionLabel={`Questao ${currentIndex + 1} de ${questions.length}`}
                 headerActions={
@@ -454,6 +461,7 @@ export function SimuladoExamFlow() {
                           <PixelButton
                             onClick={() => {
                               if (reviewEachAnswer && !submitted && currentQuestion) {
+                                confirmAnswer(currentQuestion.id);
                                 void goToQuestion(currentIndex);
                                 return;
                               }
@@ -462,7 +470,7 @@ export function SimuladoExamFlow() {
                             onMouseEnter={openConfidencePromptIfNeeded}
                             disabled={reviewEachAnswer ? (!normalizeAnswerValue(answers[currentQuestion.id]).length || (submitted && currentIndex === questions.length - 1)) : currentIndex === questions.length - 1}
                           >
-                            {reviewEachAnswer && !submitted && !reviewByQuestion[currentQuestion.id] ? "Conferir resposta" : "Proxima →"}
+                            {reviewEachAnswer && !submitted && !confirmedAnswers.has(currentQuestion.id) ? "Conferir resposta" : "Proxima →"}
                           </PixelButton>
                         </ConfidenceGate>
                       </div>
