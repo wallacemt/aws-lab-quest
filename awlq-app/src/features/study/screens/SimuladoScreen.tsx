@@ -10,12 +10,11 @@ import { SimuladoExamGuide } from "@/features/study/components/simulado/Simulado
 import { SimuladoPacksGrid } from "@/features/study/components/simulado/SimuladoPacksGrid";
 import { SimuladoResultOverview } from "@/features/study/components/simulado/SimuladoResultOverview";
 import { SimuladoResumeModal } from "@/features/study/components/simulado/SimuladoResumeModal";
-import { SimuladoRulesModal, type SimuladoConfig } from "@/features/study/components/simulado/SimuladoRulesModal";
+import type { SimuladoConfig } from "@/features/study/screens/SimuladoConfigScreen";
 import { SimuladoContext } from "@/features/study/context/SimuladoContext";
 import type { WeakServiceMetric } from "@/features/study/context/SimuladoContext";
 import { AnswerConfidence } from "@/features/retention/components/ConfidenceSelector";
 import {
-  createSimuladoQuestions,
   createSimuladoQuestionsFromPack,
   createStudyExplanation,
   fetchSimuladoExamGuide,
@@ -37,7 +36,7 @@ import { STORAGE_KEYS, safeLocalStorageGet, safeLocalStorageRemove, safeLocalSto
 import {  SimuladoDraft, StudyQuestion, TaskDifficulty } from "@/lib/types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FeatureHelpButton } from "@/components/ui/feature-help-button";
-import { GAP_TOP_N, OPTIONS, RulesConsentMap, ScoreOverviewData, SimuladoPackListItem } from "@/types/questions";
+import { GAP_TOP_N, OPTIONS, ScoreOverviewData, SimuladoPackListItem } from "@/types/questions";
 import { buildScoreOverview, buildTopicPerformance, formatTime, hasSubstantialStaticExplanation, playAlarmBeep, playSuccessSound, triggerConfetti } from "@/features/utils/funcs/simulado-utils";
 
 
@@ -57,8 +56,6 @@ export function SimuladoScreen() {
   } = useSimulatedExam();
   const { profile, refreshTotalXp } = useUserProfile();
   const notifyProgress = useProgressNotifications();
-  const rulesConsent = useLocalStorage<RulesConsentMap>(STORAGE_KEYS.simuladoRulesConsent, {});
-
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
   const [answers, setAnswers] = useState<StudyAnswerMap>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -69,9 +66,6 @@ export function SimuladoScreen() {
   const [loadingReviewByQuestion, setLoadingReviewByQuestion] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [rulesAccepted, setRulesAccepted] = useState(false);
-  const [simuladoConfig, setSimuladoConfig] = useState<SimuladoConfig>({ examStyle: "EXAM", timerMode: "COUNTDOWN_LOCK", timerMinutes: null });
   const [examGuideInfo, setExamGuideInfo] = useState<{
     markdown: string;
     preview: string;
@@ -115,11 +109,9 @@ export function SimuladoScreen() {
     STORAGE_KEYS.simuladoPacksView,
     "grid",
   );
-  const [certInfo, setCertInfo] = useState<{ code: string; name: string } | null>(null);
-  const [pendingPackId, setPendingPackId] = useState<string | null>(null);
-  const [pendingPackName, setPendingPackName] = useState<string | null>(null);
-  const [pendingExamMinutes, setPendingExamMinutes] = useState(90);
+  const [certInfo, setCertInfo] = useState<{ code: string; name: string; passingScorePercent: number } | null>(null);
   const [currentPackId, setCurrentPackId] = useState<string | null>(null);
+  const [currentPackName, setCurrentPackName] = useState<string | null>(null);
   const [expandedPackHistory, setExpandedPackHistory] = useState<string | null>(null);
 
   const confettiFiredRef = useRef(false);
@@ -269,6 +261,19 @@ export function SimuladoScreen() {
   }
 
   useEffect(() => {
+    if (!hydrated || isActive || loading) return;
+
+    const pending = safeLocalStorageGet<{ packId: string; config: SimuladoConfig } | null>(
+      STORAGE_KEYS.simuladoPendingStart,
+      null,
+    );
+    if (!pending) return;
+
+    safeLocalStorageRemove(STORAGE_KEYS.simuladoPendingStart);
+    void handleStartFromPack(pending.packId, pending.config);
+  }, [hydrated, isActive, loading]);
+
+  useEffect(() => {
     if (!hydrated) return;
 
     if (isActive && questions.length === 0 && !submitted && !loading) {
@@ -333,11 +338,12 @@ export function SimuladoScreen() {
           packs: SimuladoPackListItem[];
           certificationCode: string | null;
           certificationName: string | null;
+          passingScorePercent: number | null;
         };
         if (!cancelled) {
           setPacks(json.packs ?? []);
           if (json.certificationCode) {
-            setCertInfo({ code: json.certificationCode, name: json.certificationName ?? json.certificationCode });
+            setCertInfo({ code: json.certificationCode, name: json.certificationName ?? json.certificationCode, passingScorePercent: json.passingScorePercent ?? 70 });
           }
         }
       } catch {
@@ -392,53 +398,6 @@ export function SimuladoScreen() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [inExamFlow, pauseSession]);
-
-  function hasValidRulesConsent(scope: string): boolean {
-    const raw = rulesConsent.value[scope];
-    if (!raw) {
-      return false;
-    }
-
-    const expiresAt = new Date(raw).getTime();
-    return Number.isFinite(expiresAt) && expiresAt > Date.now();
-  }
-
-  function persistRulesConsent(scope: string) {
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    rulesConsent.setValue((prev) => ({
-      ...prev,
-      [scope]: expiresAt,
-    }));
-  }
-
-  async function handleStart() {
-    setError(null);
-    setHistoricalWeakServices([]);
-    safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
-    setShowResumeModal(false);
-    setResumeDraft(null);
-
-    setLoading(true);
-
-    try {
-      const data = await createSimuladoQuestions({ count: 65, difficulties: ["easy", "medium", "hard"] });
-      setQuestions(data.questions);
-      setAnswers({});
-      setCurrentIndex(0);
-      setTimeSpentByQuestion({});
-      setSubmitted(false);
-      setSavedHistoryId(null);
-      setReviewByQuestion({});
-      setLoadingReviewByQuestion({});
-      setExamGuideInfo(data.examGuide ?? null);
-      const minutes = simuladoConfig.timerMinutes ?? data.examMinutes ?? 90;
-      startSession(data.certificationCode, simuladoConfig.timerMode === "COUNTDOWN_LOCK" ? minutes : 0, { timerMode: simuladoConfig.timerMode, examStyle: simuladoConfig.examStyle });
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Erro ao iniciar simulado.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleStartDevTest() {
     setError(null);
@@ -496,24 +455,7 @@ export function SimuladoScreen() {
     startSession("DEV", 4 / 60);
   }
 
-  async function confirmRulesAndStart() {
-    if (!rulesAccepted) {
-      return;
-    }
-
-    persistRulesConsent(consentScope);
-    setShowRulesModal(false);
-
-    if (pendingPackId) {
-      await handleStartFromPack(pendingPackId);
-      setPendingPackId(null);
-      setPendingPackName(null);
-    } else {
-      await handleStart();
-    }
-  }
-
-  async function handleStartFromPack(packId: string) {
+  async function handleStartFromPack(packId: string, config: SimuladoConfig) {
     setError(null);
     setHistoricalWeakServices([]);
     safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
@@ -524,6 +466,7 @@ export function SimuladoScreen() {
     try {
       const data = await createSimuladoQuestionsFromPack(packId);
       setCurrentPackId(data.packId);
+      setCurrentPackName(data.packName);
       setQuestions(data.questions);
       setAnswers({});
       setCurrentIndex(0);
@@ -533,7 +476,11 @@ export function SimuladoScreen() {
       setReviewByQuestion({});
       setLoadingReviewByQuestion({});
       setExamGuideInfo(data.examGuide ?? null);
-      startSession(data.certificationCode, data.examMinutes ?? 90);
+      const minutes = config.timerMinutes ?? data.examMinutes ?? 90;
+      startSession(data.certificationCode, config.timerMode === "COUNTDOWN_LOCK" ? minutes : 0, {
+        timerMode: config.timerMode,
+        examStyle: config.examStyle,
+      });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Erro ao iniciar simulado.");
     } finally {
@@ -541,13 +488,10 @@ export function SimuladoScreen() {
     }
   }
 
-  async function handleOpenPackRulesModal(packId: string, packName: string, examMinutes = 90) {
-    setPendingExamMinutes(examMinutes);
-    setPendingPackId(packId);
-    setPendingPackName(packName);
-    setSimuladoConfig({ examStyle: "EXAM", timerMode: "COUNTDOWN_LOCK", timerMinutes: null });
-    setRulesAccepted(false);
-    setShowRulesModal(true);
+  function handleOpenPackConfig(packId: string, packName: string, examMinutes = 90) {
+    router.push(
+      `/simulado/configurar?packId=${encodeURIComponent(packId)}&packName=${encodeURIComponent(packName)}&examMinutes=${examMinutes}`,
+    );
   }
 
   async function fetchReviewForQuestion(
@@ -771,7 +715,7 @@ export function SimuladoScreen() {
     setShowPreSubmitSummary(false);
     setCurrentIndex(0);
     const performance = buildTopicPerformance(questions, answers);
-    const overview = buildScoreOverview(correctAnswers, totalQuestions, performance);
+    const overview = buildScoreOverview(correctAnswers, totalQuestions, performance, certInfo?.passingScorePercent ?? 70);
     setScoreOverview(overview);
     setShowScoreOverview(true);
     setCalculating(false);
@@ -954,7 +898,7 @@ export function SimuladoScreen() {
     timerLabel,
     session: session as { id: string; certificationCode: string; startedAt: string; endsAt: string; timerMode?: "COUNTDOWN_LOCK" | "COUNTUP_FREE" | "NONE"; examStyle?: "EXAM" | "EXPLAIN_EACH" } | null,
     certificationName: certInfo?.name ?? null,
-    packName: pendingPackName,
+    packName: currentPackName,
     packId: currentPackId,
     durationSeconds: !session
       ? 0
@@ -1146,7 +1090,7 @@ export function SimuladoScreen() {
                       onViewChange={setPacksView}
                       onRefresh={() => setPacksRefreshKey((k) => k + 1)}
                       onToggleHistory={(id) => setExpandedPackHistory(id)}
-                      onStartPack={handleOpenPackRulesModal}
+                      onStartPack={handleOpenPackConfig}
                     />
                   </div>
                 )}
@@ -1164,19 +1108,6 @@ export function SimuladoScreen() {
               </PixelCard>
             </motion.div>
           )}
-
-          <SimuladoRulesModal
-            open={showRulesModal}
-            packName={pendingPackName ?? null}
-            rulesAccepted={rulesAccepted}
-            loading={loading}
-            onAcceptedChange={setRulesAccepted}
-            onCancel={() => setShowRulesModal(false)}
-            onConfirm={() => void confirmRulesAndStart()}
-            examMinutes={pendingExamMinutes}
-            config={simuladoConfig}
-            onConfigChange={setSimuladoConfig}
-          />
 
           <SimuladoExamFlow />
 

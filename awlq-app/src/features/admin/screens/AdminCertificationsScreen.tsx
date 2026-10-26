@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { listAdminCertifications } from "@/features/admin/services/admin-api";
+import { createAdminCertification, listAdminCertifications } from "@/features/admin/services/admin-api";
 import type { AdminCertificationListItem } from "@/features/admin/types";
 
 export function AdminCertificationsScreen() {
@@ -11,6 +11,11 @@ export function AdminCertificationsScreen() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createMsg, setCreateMsg] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [newCert, setNewCert] = useState({ code: "", name: "", description: "", examMinutes: "90", passingScorePercent: "70", displayOrder: "" });
 
   const loadCertifications = useCallback(async () => {
     setLoading(true);
@@ -24,6 +29,28 @@ export function AdminCertificationsScreen() {
       setLoading(false);
     }
   }, []);
+
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newCert.code.trim() || !newCert.name.trim() || !newCert.description.trim()) {
+      setCreateError("Preencha codigo, nome e descricao.");
+      return;
+    }
+    setCreateSaving(true);
+    setCreateError(null);
+    setCreateMsg(null);
+    try {
+      await createAdminCertification({ code: newCert.code, name: newCert.name, description: newCert.description, examMinutes: Number(newCert.examMinutes), passingScorePercent: Number(newCert.passingScorePercent), ...(newCert.displayOrder.trim() ? { displayOrder: Number(newCert.displayOrder) } : {}) });
+      setShowCreate(false);
+      setNewCert({ code: "", name: "", description: "", examMinutes: "90", passingScorePercent: "70", displayOrder: "" });
+      setCreateMsg("Certificacao criada com sucesso.");
+      await loadCertifications();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Erro ao criar certificacao.");
+    } finally {
+      setCreateSaving(false);
+    }
+  }
 
   useEffect(() => {
     void loadCertifications();
@@ -47,8 +74,17 @@ export function AdminCertificationsScreen() {
           >
             Atualizar dados
           </button>
+          <button type="button" onClick={() => { setShowCreate((value) => !value); setCreateError(null); }} className="border border-[#f97316] px-3 py-1 text-xs uppercase text-[#f97316]">Nova certificação</button>
+          {createMsg && <p className="text-xs text-green-400">{createMsg}</p>}
         </div>
       </header>
+
+      {showCreate && <form onSubmit={(event) => void handleCreate(event)} className="space-y-3 border border-[#1e293b] bg-[#111827] p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([ ["code", "Codigo"], ["name", "Nome"], ["description", "Descricao"], ["examMinutes", "Duracao da prova (min)"], ["passingScorePercent", "Nota de corte (% de acertos)"], ["displayOrder", "Ordem de exibicao (vazio = fim da lista)" ] ] as const).map(([key, label]) => <label key={key} className="block space-y-1"><span className="text-[10px] uppercase text-[#64748b]">{label}</span>{key === "description" ? <textarea required value={newCert[key]} onChange={(e) => setNewCert({ ...newCert, [key]: e.target.value })} maxLength={500} className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0]" /> : <input required={key === "code" || key === "name"} type={key === "examMinutes" || key === "passingScorePercent" || key === "displayOrder" ? "number" : "text"} min={key === "examMinutes" ? 1 : key === "passingScorePercent" ? 1 : undefined} max={key === "passingScorePercent" ? 100 : undefined} maxLength={key === "name" ? 120 : undefined} value={newCert[key]} onChange={(e) => setNewCert({ ...newCert, [key]: e.target.value })} className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0]" />}</label>)}
+        </div>
+        <div className="flex items-center gap-3"><button disabled={createSaving} className="border border-[#f97316] px-3 py-1.5 text-xs uppercase text-[#f97316] disabled:opacity-50">{createSaving ? "Criando..." : "Criar certificacao"}</button>{createError && <p className="text-xs text-[#fca5a5]">{createError}</p>}</div>
+      </form>}
 
       <section className="border border-[#1e293b] bg-[#111827] p-4">
         <input

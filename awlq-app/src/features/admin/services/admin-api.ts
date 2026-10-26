@@ -36,6 +36,7 @@ import {
   AdminCertificationListItem,
   AdminCertificationDetail,
   AdminCertificationUpdatePayload,
+  AdminCertificationCreatePayload,
   PaginatedResult,
 } from "@/features/admin/types";
 
@@ -216,6 +217,15 @@ export async function updateAdminCertification(
     const data = (await response.json().catch(() => ({}))) as AdminApiError;
     throw new Error(data.error ?? "Nao foi possivel atualizar a certificacao.");
   }
+}
+
+export async function createAdminCertification(payload: AdminCertificationCreatePayload): Promise<{ certification: AdminCertificationListItem }> {
+  const response = await fetch("/api/admin/certifications", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", credentials: "include", body: JSON.stringify(payload) });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as AdminApiError;
+    throw new Error(data.error ?? "Nao foi possivel criar a certificacao.");
+  }
+  return (await response.json()) as { certification: AdminCertificationListItem };
 }
 
 export type ExamGuideUploadResult = {

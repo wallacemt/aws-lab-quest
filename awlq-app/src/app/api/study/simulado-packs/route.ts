@@ -8,11 +8,11 @@ export async function GET(request: NextRequest) {
 
   const profile = await prisma.userProfile.findUnique({
     where: { userId: auth.user.id },
-    select: { certificationPresetId: true, certificationPreset: { select: { code: true, name: true, examMinutes: true } } },
+    select: { certificationPresetId: true, certificationPreset: { select: { code: true, name: true, examMinutes: true, passingScorePercent: true } } },
   });
 
   if (!profile?.certificationPresetId) {
-    return NextResponse.json({ packs: [], certificationCode: null, certificationName: null });
+    return NextResponse.json({ packs: [], certificationCode: null, certificationName: null, passingScorePercent: null });
   }
 
   const { searchParams } = new URL(request.url);
@@ -87,5 +87,6 @@ export async function GET(request: NextRequest) {
     packs: items,
     certificationCode: profile.certificationPreset?.code ?? null,
     certificationName: profile.certificationPreset?.name ?? null,
+    passingScorePercent: profile.certificationPreset?.passingScorePercent ?? 70,
   });
 }

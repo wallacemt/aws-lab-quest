@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   simuladoDraft: "awlq_simulado_draft",
   kcAttempts: "awlq_kc_attempts",
   simuladoRulesConsent: "awlq_simulado_rules_consent",
+  simuladoPendingStart: "awlq_simulado_pending_start",
   simuladoPacksView: "awlq_simulado_packs_view",
   historyActiveTab: "awlq_history_active_tab",
   adminMode: "awlq_admin_mode",

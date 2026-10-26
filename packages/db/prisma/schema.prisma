@@ -192,6 +192,7 @@ model CertificationPreset {
   description      String
   examGuide        String?
   examMinutes      Int                    @default(90)
+  passingScorePercent Int                 @default(70)
   active           Boolean                @default(true)
   displayOrder     Int                    @default(0)
   userProfiles     UserProfile[]
