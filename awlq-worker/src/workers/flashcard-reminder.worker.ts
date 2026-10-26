@@ -170,7 +170,7 @@ export async function processFlashcardReminderJob(): Promise<void> {
     const { html, subject } = buildEmailContent(template.html, template.subject, vars);
 
     try {
-      await sendEmail({ to: user.email, subject, html });
+      await sendEmail({ to: user.email, subject, html, from: process.env.RESEND_FROM_ENGAGEMENT_EMAIL });
       await prisma.userEmailEvent.create({
         data: { userId, triggerCode: REMINDER_TRIGGER_CODE, subject, sentAt: now },
       });

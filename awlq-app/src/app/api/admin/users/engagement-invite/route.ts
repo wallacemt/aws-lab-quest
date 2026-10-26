@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
         to: user.email,
         subject: content.subject,
         html: content.html,
+        from: process.env.RESEND_FROM_ENGAGEMENT_EMAIL,
       });
       sent += 1;
     } catch {

@@ -93,7 +93,7 @@ export function createEmailSendWorker(): Worker {
         const html = renderedHtml + unsubscribeFooter;
 
         try {
-          await sendEmail({ to: user.email, subject, html });
+          await sendEmail({ to: user.email, subject, html, from: process.env.RESEND_FROM_ENGAGEMENT_EMAIL });
           sent++;
         } catch (err) {
           logger.warn({ err, email: user.email }, "email-send: failed to send to user");

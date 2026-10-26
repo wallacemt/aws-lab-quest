@@ -93,7 +93,12 @@ export function createBehavioralEmailWorker(): Worker<BehavioralEmailJobData> {
         sessionCountLast7Days: recentSessions.length,
       });
 
-      await sendEmail({ to: user.email, subject, html: htmlBody });
+      await sendEmail({
+        to: user.email,
+        subject,
+        html: htmlBody,
+        from: process.env.RESEND_FROM_ENGAGEMENT_EMAIL,
+      });
 
       // Record the event and update behavior profile
       await Promise.all([
