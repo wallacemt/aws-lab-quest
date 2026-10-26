@@ -23,6 +23,7 @@ export function AdminCertificationDetailScreen({ certificationId }: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [examMinutes, setExamMinutes] = useState(90);
+  const [passingScorePercent, setPassingScorePercent] = useState(70);
   const [active, setActive] = useState(true);
   const [displayOrder, setDisplayOrder] = useState(0);
   const [editSaving, setEditSaving] = useState(false);
@@ -45,6 +46,7 @@ export function AdminCertificationDetailScreen({ certificationId }: Props) {
       setName(detail.name);
       setDescription(detail.description);
       setExamMinutes(detail.examMinutes);
+      setPassingScorePercent(detail.passingScorePercent);
       setActive(detail.active);
       setDisplayOrder(detail.displayOrder);
     } catch (err) {
@@ -64,7 +66,7 @@ export function AdminCertificationDetailScreen({ certificationId }: Props) {
     setEditError(null);
     setEditMsg(null);
     try {
-      await updateAdminCertification(certificationId, { name, description, examMinutes, active, displayOrder });
+      await updateAdminCertification(certificationId, { name, description, examMinutes, passingScorePercent, active, displayOrder });
       setEditMsg("Certificacao atualizada.");
       await loadDetail();
     } catch (err) {
@@ -131,11 +133,12 @@ export function AdminCertificationDetailScreen({ certificationId }: Props) {
       </header>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
           { label: "Questoes", value: String(data._count.questions) },
           { label: "Usuarios alvo", value: String(data._count.userProfiles) },
           { label: "Duracao (min)", value: String(data.examMinutes) },
+          { label: "Nota de corte", value: `${data.passingScorePercent}%` },
           { label: "Exam Guide", value: data.hasExamGuide ? "Enviado" : "Pendente" },
         ].map(({ label, value }) => (
           <div key={label} className="border border-[#1e293b] bg-[#111827] p-3 text-center">
@@ -170,7 +173,7 @@ export function AdminCertificationDetailScreen({ certificationId }: Props) {
           />
         </label>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <label className="block space-y-1">
             <span className="font-mono text-[10px] uppercase text-[#64748b]">Duracao da prova (min)</span>
             <input
@@ -180,6 +183,10 @@ export function AdminCertificationDetailScreen({ certificationId }: Props) {
               onChange={(e) => setExamMinutes(Number(e.target.value))}
               className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none"
             />
+          </label>
+          <label className="block space-y-1">
+            <span className="font-mono text-[10px] uppercase text-[#64748b]">Nota de corte (% de acertos)</span>
+            <input type="number" min={1} max={100} value={passingScorePercent} onChange={(e) => setPassingScorePercent(Number(e.target.value))} className="w-full border border-[#334155] bg-[#0b1220] px-3 py-2 text-sm text-[#e2e8f0] outline-none" />
           </label>
           <label className="block space-y-1">
             <span className="font-mono text-[10px] uppercase text-[#64748b]">Ordem de exibicao</span>

@@ -91,6 +91,7 @@ export type AdminCertificationListItem = {
   name: string;
   description: string;
   examMinutes: number;
+  passingScorePercent: number;
   active: boolean;
   displayOrder: number;
   hasExamGuide: boolean;
@@ -115,7 +116,17 @@ export type AdminCertificationUpdatePayload = {
   name?: string;
   description?: string;
   examMinutes?: number;
+  passingScorePercent?: number;
   active?: boolean;
+  displayOrder?: number;
+};
+
+export type AdminCertificationCreatePayload = {
+  code: string;
+  name: string;
+  description: string;
+  examMinutes?: number;
+  passingScorePercent?: number;
   displayOrder?: number;
 };
 

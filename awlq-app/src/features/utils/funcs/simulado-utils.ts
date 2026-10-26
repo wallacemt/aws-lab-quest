@@ -160,9 +160,9 @@ export function buildTopicPerformance(questions: StudyQuestion[], answers: Study
     .sort((a, b) => b.accuracyPercent - a.accuracyPercent || b.correct - a.correct || b.attempts - a.attempts);
 }
 
-export function buildScoreOverview(correct: number, total: number, topicPerformance: TopicPerformance[]): ScoreOverviewData {
+export function buildScoreOverview(correct: number, total: number, topicPerformance: TopicPerformance[], passingScorePercent = 70): ScoreOverviewData {
   const maxPoints = 1000;
-  const minimumCertificationPoints = 700;
+  const minimumCertificationPoints = Math.round(passingScorePercent * 10);
   const points = total > 0 ? Math.round((correct / total) * maxPoints) : 0;
 
   const bestArea = topicPerformance.length > 0 ? topicPerformance[0] : null;

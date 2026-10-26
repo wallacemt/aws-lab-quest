@@ -32,6 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       name: true,
       description: true,
       examMinutes: true,
+      passingScorePercent: true,
       active: true,
       displayOrder: true,
       examGuide: true,
@@ -68,6 +69,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     name?: string;
     description?: string;
     examMinutes?: number;
+    passingScorePercent?: number;
     active?: boolean;
     displayOrder?: number;
   };
@@ -86,6 +88,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     name?: string;
     description?: string;
     examMinutes?: number;
+    passingScorePercent?: number;
     active?: boolean;
     displayOrder?: number;
   } = {};
@@ -114,6 +117,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "examMinutes deve ser um numero maior que 0." }, { status: 422 });
     }
     data.examMinutes = Math.floor(body.examMinutes);
+  }
+
+  if (body.passingScorePercent !== undefined) {
+    if (!Number.isInteger(body.passingScorePercent) || body.passingScorePercent < 1 || body.passingScorePercent > 100) {
+      return NextResponse.json({ error: "Nota de corte deve ser um numero inteiro entre 1 e 100." }, { status: 422 });
+    }
+    data.passingScorePercent = body.passingScorePercent;
   }
 
   if (body.active !== undefined) data.active = Boolean(body.active);
