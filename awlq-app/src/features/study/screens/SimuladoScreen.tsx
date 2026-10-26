@@ -84,6 +84,7 @@ export function SimuladoScreen() {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set());
+  const [confirmedAnswers, setConfirmedAnswers] = useState<Set<string>>(new Set());
   // Confidence rating per question, captured via a non-blocking prompt on "Proxima"/"Enviar"
   // (RF-09, ADR-05) — feeds the false-belief-aggregator worker same as the KC flow.
   const [confidenceByQuestion, setConfidenceByQuestion] = useState<Record<string, AnswerConfidence>>({});
@@ -450,6 +451,7 @@ export function SimuladoScreen() {
     setMotivationalMessage(null);
     setLoadingMotivationalMessage(false);
     setMarkedForReview(new Set());
+    setConfirmedAnswers(new Set());
     setShowPreSubmitSummary(false);
     confettiFiredRef.current = false;
     startSession("DEV", 4 / 60);
@@ -471,6 +473,8 @@ export function SimuladoScreen() {
       setAnswers({});
       setCurrentIndex(0);
       setTimeSpentByQuestion({});
+      setMarkedForReview(new Set());
+      setConfirmedAnswers(new Set());
       setSubmitted(false);
       setSavedHistoryId(null);
       setReviewByQuestion({});
@@ -817,6 +821,7 @@ export function SimuladoScreen() {
     setShowScoreOverview(false);
     setError(null);
     setMarkedForReview(new Set());
+    setConfirmedAnswers(new Set());
     setShowPreSubmitSummary(false);
     setFocusMode(false);
     setCalculating(false);
@@ -837,6 +842,10 @@ export function SimuladoScreen() {
       }
       return next;
     });
+  }
+
+  function confirmAnswer(questionId: string) {
+    setConfirmedAnswers((prev) => new Set(prev).add(questionId));
   }
 
   function setConfidenceForQuestion(questionId: string, confidence: AnswerConfidence) {
@@ -908,6 +917,7 @@ export function SimuladoScreen() {
     focusMode,
     isPaused,
     markedForReview,
+    confirmedAnswers,
     allQuestionsAnswered,
     confidenceByQuestion,
     reportModalOpen,
@@ -927,6 +937,7 @@ export function SimuladoScreen() {
     setShowPreSubmitSummary,
     goToQuestion,
     toggleMarkForReview,
+    confirmAnswer,
     setConfidenceForQuestion,
     handleForceExit,
     handleReset,

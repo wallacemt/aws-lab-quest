@@ -65,6 +65,7 @@ export type SimuladoContextType = {
   focusMode: boolean;
   isPaused: boolean;
   markedForReview: Set<string>;
+  confirmedAnswers: Set<string>;
   allQuestionsAnswered: boolean;
   confidenceByQuestion: Record<string, AnswerConfidence>;
   reportModalOpen: boolean;
@@ -98,6 +99,7 @@ export type SimuladoContextType = {
   // Actions
   goToQuestion: (index: number) => Promise<void>;
   toggleMarkForReview: (questionId: string) => void;
+  confirmAnswer: (questionId: string) => void;
   setConfidenceForQuestion: (questionId: string, confidence: AnswerConfidence) => void;
   handleForceExit: () => void;
   handleReset: () => void;

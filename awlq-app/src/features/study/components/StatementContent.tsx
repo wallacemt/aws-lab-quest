@@ -27,8 +27,8 @@ export function StatementContent({ text }: { text: string }) {
               {copied ? <Check size={12} /> : <Copy size={12} />}
               {copied ? "Copiado" : "Copiar"}
             </button>
-            <pre className="max-w-full overflow-x-auto p-3 pr-20 font-mono text-sm">
-              <code>{segment.text}</code>
+            <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-all p-3 pr-20 font-mono text-sm">
+              <code className="break-all">{segment.text}</code>
             </pre>
           </div>
         ) : (
