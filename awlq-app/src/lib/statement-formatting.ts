@@ -36,12 +36,13 @@ export function formatStatement(text: string): StatementSegment[] {
     const raw = text.slice(start, end);
     let json: string | undefined;
     try {
-      json = JSON.stringify(JSON.parse(raw), null, 2);
+      json = JSON.stringify(JSON.parse(raw.replace(/[“”]/g, '"').replace(/\u00a0/g, " ")), null, 2);
     } catch {
-      continue;
+      // Keep balanced malformed containers monospaced so they don't blend into prose.
+      json = raw.replace(/\u00a0/g, " ");
     }
     if (start > cursor) segments.push({ type: "prose", text: text.slice(cursor, start) });
-    segments.push({ type: "code", language: "json", text: json });
+    segments.push({ type: "code", language: json === raw.replace(/\u00a0/g, " ") ? "text" : "json", text: json });
     cursor = end;
     containerPattern.lastIndex = end;
   }

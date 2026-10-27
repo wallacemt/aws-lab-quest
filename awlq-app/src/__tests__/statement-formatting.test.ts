@@ -14,6 +14,38 @@ describe("formatStatement", () => {
     expect(segments[2]).toEqual({ type: "prose", text: after });
   });
 
+  it("formats the reported IAM policy question and preserves its trailing question", () => {
+    const statement = `Um desenvolvedor está criando um aplicativo web que processa e monitora votos. Um dispositivo de votação envia os votos a um bucket do Amazon S3 chamado DOC-EXAMPLE-BUCKET. O aplicativo precisa registrar os votos em uma tabela do Amazon DynamoDB chamada Example. O desenvolvedor escreve uma função do AWS Lambda para processar os objetos. Ele escreve a seguinte política para a função de execução da função do Lambda: {     "Version": "2012-10-17",     "Statement": [         {             "Effect": "Allow",             "Action": [                 "s3:GetObject",                 "dynamodb:PutItem",                 "dynamodb:UpdateItem"             ],             "Resource": [                 "arn:aws:dynamodb:us-west-2:XXXXXXXXXXXX:table/Example",                 "arn:aws:s3:::DOC-EXAMPLE-BUCKET/*"             ]         }     ] } O desenvolvedor executou um teste bem-sucedido na função do Lambda. No entanto, ele não conseguiu encontrar um registro da invocação nos logs. O que ele deve fazer para registrar as invocações dessa função nos logs?`;
+    const segments = formatStatement(statement);
+
+    expect(segments).toHaveLength(3);
+    expect(segments[1]).toMatchObject({ type: "code", language: "json" });
+    expect(segments[1].text).toContain('"dynamodb:PutItem"');
+    expect(segments[2].text).toBe(" O desenvolvedor executou um teste bem-sucedido na função do Lambda. No entanto, ele não conseguiu encontrar um registro da invocação nos logs. O que ele deve fazer para registrar as invocações dessa função nos logs?");
+  });
+
+  it("normalizes typographic quotes and non-breaking spaces in embedded JSON", () => {
+    const segments = formatStatement('Política: { “Version”: “2012-10-17”, “Statement”: []} Fim do enunciado.');
+
+    expect(segments).toEqual([
+      { type: "prose", text: "Política: " },
+      { type: "code", language: "json", text: '{\n  "Version": "2012-10-17",\n  "Statement": []\n}' },
+      { type: "prose", text: " Fim do enunciado." },
+    ]);
+  });
+
+  it("keeps a balanced malformed container as code and continues parsing afterward", () => {
+    const segments = formatStatement('Texto {“chave”: sem aspas} e depois {"ok": true} fim.');
+
+    expect(segments).toEqual([
+      { type: "prose", text: "Texto " },
+      { type: "code", language: "text", text: '{“chave”: sem aspas}' },
+      { type: "prose", text: " e depois " },
+      { type: "code", language: "json", text: '{\n  "ok": true\n}' },
+      { type: "prose", text: " fim." },
+    ]);
+  });
+
   it("keeps plain statements as a single prose segment", () => {
     expect(formatStatement("Uma pergunta comum sem código.")).toEqual([
       { type: "prose", text: "Uma pergunta comum sem código." },

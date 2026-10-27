@@ -163,6 +163,7 @@ export function SimuladoExamFlow() {
   }
   const needsConfidencePrompt =
     inExamFlow &&
+    !reviewEachAnswer &&
     !!currentQuestion &&
     normalizeAnswerValue(answers[currentQuestion.id]).length > 0 &&
     !confidenceByQuestion[currentQuestion.id];
@@ -399,7 +400,7 @@ export function SimuladoExamFlow() {
                 }
                 footer={
                   <>
-                    {submitted && (
+                    {(submitted || (reviewEachAnswer && confirmedAnswers.has(currentQuestion.id))) && (
                       <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
