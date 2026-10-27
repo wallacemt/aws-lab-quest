@@ -1,9 +1,10 @@
 # AWS Lab Quest
+
 <div align="center">
 
-<img src="./awlq-app/public/logo.png" alt="Critix Vault" width="280" />
+<img src="./awlq-app/public/logo.png" alt="Logo do AWS Lab Quest" width="280" />
 
-> Plataforma de preparação para certificações AWS com gamificação, modos de estudo adaptativos e pipeline de conteúdo via IA.
+**Plataforma de preparação para certificações AWS com gamificação, modos de estudo adaptativos e pipeline de conteúdo com IA.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://typescriptlang.org)
@@ -11,38 +12,68 @@
 [![BullMQ](https://img.shields.io/badge/BullMQ-5-red)](https://bullmq.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
+</div>
+
 ---
 
-## O que é
+## Sumário
 
-**AWS Lab Quest** é uma aplicação web em português voltada para quem está se preparando para certificações AWS. O app transforma o estudo em uma experiência de RPG: o aluno ganha XP, sobe de nível, desbloqueia conquistas e compete em um ranking em tempo real — tudo enquanto pratica questões e executa labs temáticos gerados com IA.
+- [Visão geral](#visão-geral)
+- [Principais diferenciais](#principais-diferenciais)
+- [Modos de estudo](#modos-de-estudo)
+- [Arquitetura](#arquitetura)
+- [Ciclo de conteúdo autoalimentado](#ciclo-de-conteúdo-autoalimentado)
+- [Stack](#stack)
+- [Pré-requisitos](#pré-requisitos)
+- [Configuração local](#configuração-local)
+- [Variáveis de ambiente](#variáveis-de-ambiente)
+- [Autenticação e controle de acesso](#autenticação-e-controle-de-acesso)
+- [Testes](#testes)
+- [Deploy com Docker](#deploy-com-docker)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Fluxos principais](#fluxos-principais)
+- [Documentação técnica](#documentação-técnica)
+- [Contribuindo](#contribuindo)
+- [Licença](#licença)
 
-### Modos de estudo
+---
 
-Três modos formam o núcleo (em ordem crescente de formalidade), e dois modos mais recentes reaproveitam a mesma máquina de perguntas/revelação de resposta:
+## Visão geral
+
+O **AWS Lab Quest** é uma aplicação web em português para preparação de certificações AWS. A experiência combina prática contínua de questões com elementos de RPG: o aluno ganha XP, sobe de nível, desbloqueia conquistas e evolui com base no próprio desempenho.
+
+A plataforma atende diferentes ritmos de estudo, de revisões rápidas a simulados completos, com geração e manutenção contínua de conteúdo por IA.
+
+---
+
+## Principais diferenciais
+
+- **Gamificação completa**: XP por dificuldade (`XpWeightConfig`), níveis, badges e 12 conquistas automáticas.
+- **Pipeline de questões com IA**: ingestão de materiais (Exam Guides e PDFs), deduplicação por `usageHash`, avaliação e regeneração contínua.
+- **Mentor IA (determinístico)**: recomendações priorizadas por histórico, sem chamadas de IA em tempo real.
+- **Biblioteca contextual**: materiais complementares (PDF, imagem, markdown e slides) sugeridos por tema e lacunas.
+- **Leaderboard em tempo real**: ranking atualizado via Supabase Realtime.
+- **Progressão em modos especializados**: Arena (boss battles), Trilhas (jornadas guiadas) e Simulado (prova formal com revisão).
+
+---
+
+## Modos de estudo
+
+Os três modos-base seguem uma progressão de formalidade. Arena e Trilhas reaproveitam a mesma mecânica de pergunta/revelação do Simulado.
 
 | Modo | Descrição |
 |---|---|
-| **Lab** | Quests temáticas geradas por IA com contexto personalizado (ex: musica, games, esporte) |
-| **KC (Knowledge Check)** | Bateria de questões por serviço ou tópico para revisão pontual |
-| **Simulado** | Prova completa com timer, detecção de questões marcadas, revisão pré-envio e score final |
-| **Arena** | Batalhas contra bosses temáticos — cada questão correta causa dano; a UI de pergunta/revelação do Simulado é reaproveitada |
-| **Trilhas** | Trilhas guiadas por tópico, com estágios que se desbloqueiam progressivamente |
-
-### Gamificação
-
-- **XP & Níveis** — Cada atividade concede XP proporcional à dificuldade (`XpWeightConfig`), com 6 tiers de nível
-- **Badges por nível** — Artes geradas via Pollinations API, exibidas no perfil e compartilháveis
-- **12 Conquistas** — Desbloqueadas automaticamente por marcos de desempenho no histórico de sessões
-- **Leaderboard em tempo real** — Ranking ao vivo via Supabase Realtime
-- **Mentor IA** — Recomendações de estudo priorizadas (revisão de serviço fraco, flashcards vencidos, KC focado) calculadas de forma determinística a partir do histórico, sem chamadas de IA
-- **Biblioteca Contextual** — Materiais complementares (PDF, imagem, markdown, slides) vinculados a um serviço AWS ou trilha, sugeridos automaticamente no Mentor e nas telas de revisão de gap quando o aluno demonstra dificuldade naquele tema
+| **Lab** | Quests temáticas geradas por IA com contexto personalizado (ex.: música, games, esporte). |
+| **KC (Knowledge Check)** | Bateria de questões por serviço/tópico para revisão pontual. |
+| **Simulado** | Prova completa com timer, marcação de questões, revisão pré-envio e score final. |
+| **Arena** | Batalhas contra bosses temáticos: cada acerto causa dano no boss. |
+| **Trilhas** | Trilhas guiadas por tópico, com estágios e progressão por desbloqueio. |
 
 ---
 
 ## Arquitetura
 
-```
+```text
 ┌─────────────────────────────────┐     ┌──────────────────────┐
 │          awlq-app               │     │     awlq-worker      │
 │        (Next.js 16)             │     │  (BullMQ + Node.js)  │
@@ -53,26 +84,31 @@ Três modos formam o núcleo (em ordem crescente de formalidade), e dois modos m
 │  Supabase Realtime              │◄────│  performance-compute │
 │                                 │     │  quality-review      │
 └────────────┬────────────────────┘     │  email-send          │
-             │                         └──────────┬───────────┘
-             ▼                                    ▼
-      ┌──────────────┐              ┌─────────────────────────┐
-      │  PostgreSQL  │              │  Redis (BullMQ queues)  │
-      └──────────────┘              └─────────────────────────┘
+             │                          └──────────┬───────────┘
+             ▼                                     ▼
+      ┌──────────────┐               ┌─────────────────────────┐
+      │  PostgreSQL  │               │  Redis (BullMQ queues)  │
+      └──────────────┘               └─────────────────────────┘
              │
       ┌──────┴──────┐
       │  Supabase   │  ← Storage (avatars, badges) + Realtime
       └─────────────┘
 ```
 
-O **app** serve o frontend e expõe as APIs REST — tudo síncrono: páginas, rotas de API, autenticação. O **worker** roda separado e executa tudo que é lento ou assíncrono: geração de questões via IA, análise de áreas fracas, cálculo de métricas de desempenho, revisão de qualidade, email, ingestão de PDF. Os dois processos compartilham o mesmo schema Prisma (`packages/db/prisma/schema.prisma`) e o mesmo banco Postgres — não há API entre eles, a comunicação é via banco/fila.
+- **`awlq-app`**: frontend, páginas, rotas de API e autenticação (operações síncronas).
+- **`awlq-worker`**: processamento em background (operações assíncronas e mais custosas).
+- **Banco compartilhado**: ambos usam o mesmo schema Prisma em `packages/db/prisma/schema.prisma`.
+- **Acionamento do worker**:
+  - via tabela `WorkerTrigger` (poll a cada 30s por `trigger-poller.ts`);
+  - via push direto em filas BullMQ.
 
-O app aciona o worker de duas formas: escrevendo uma linha em `WorkerTrigger` (lida a cada 30s pelo `trigger-poller.ts`) ou empurrando diretamente numa fila BullMQ.
+---
 
-### O ciclo de conteúdo autoalimentado
+## Ciclo de conteúdo autoalimentado
 
-Este é o mecanismo central do produto — a atividade de estudo constantemente reavalia e regenera o banco de questões:
+Mecanismo central do produto para manter o banco de questões atualizado e calibrado.
 
-```
+```text
 StudySessionHistory (respostas do usuário)
   → feedback-analysis.worker    (marca áreas fracas, correctRate < 60%)
   → question-generation.worker  (prompt Gemini ponderado por ExamBlueprintDomain)
@@ -83,13 +119,14 @@ StudySessionHistory (respostas do usuário)
 source-fetch.worker (em paralelo): baixa Exam Guides da AWS → extrai domínios do blueprint
 ```
 
-Cada worker tem concorrência limitada (`concurrency: 1` para qualquer um que chame IA); jobs são idempotentes quando possível, e colisão de `usageHash` é o único caso em que um no-op silencioso é aceitável.
+Cada worker possui concorrência limitada (`concurrency: 1` para jobs que usam IA). Jobs são idempotentes quando possível; colisão de `usageHash` é o único caso aceitável de no-op silencioso.
 
 ---
 
 ## Stack
 
 ### awlq-app (Frontend + API)
+
 | Camada | Tecnologia |
 |---|---|
 | Framework | Next.js 16 (App Router) + React 19 |
@@ -104,6 +141,7 @@ Cada worker tem concorrência limitada (`concurrency: 1` para qualquer um que ch
 | Email | Resend (HTTP API) |
 
 ### awlq-worker (Background Jobs)
+
 | Camada | Tecnologia |
 |---|---|
 | Filas | BullMQ 5 + IORedis |
@@ -124,49 +162,51 @@ Cada worker tem concorrência limitada (`concurrency: 1` para qualquer um que ch
 
 ---
 
-## Configuração Local
+## Configuração local
 
-### 1. Clone e instale dependências
+### 1) Clonar o repositório e instalar dependências
 
 ```bash
-git clone https://github.com/seu-usuario/aws-lab-quest.git
+git clone https://github.com/wallacemt/aws-lab-quest.git
 cd aws-lab-quest
 
 # App
 cd awlq-app && npm install
+
+# Worker
 cd ../awlq-worker && npm install
 cd ..
 ```
 
-### 2. Configure variáveis de ambiente
+### 2) Configurar variáveis de ambiente
 
 ```bash
 cp .env.example awlq-app/.env
 cp .env.example awlq-worker/.env
 ```
 
-Edite os arquivos `.env` preenchendo as variáveis descritas na seção abaixo.
+Edite os arquivos `.env` com base na seção [Variáveis de ambiente](#variáveis-de-ambiente).
 
-### 3. Suba os serviços de infraestrutura
+### 3) Subir infraestrutura local
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-> O `docker-compose.yml` na raiz orquestra todos os serviços. Para desenvolvimento, suba apenas `postgres` e `redis` e rode o app/worker localmente.
+> O `docker-compose.yml` da raiz orquestra todos os serviços. Para desenvolvimento local, suba apenas `postgres` e `redis` e execute app/worker fora do Docker.
 
-### 4. Configure o banco de dados
+### 4) Preparar banco de dados
 
 ```bash
 cd awlq-app
-npm run db:generate   # gera o Prisma Client
-npm run db:migrate    # aplica as migrations
-npm run db:seed       # popula dados iniciais (badges, conquistas, serviços AWS)
+npm run db:generate
+npm run db:migrate
+npm run db:seed
 ```
 
-> Após qualquer alteração no schema, rode `npm run prisma:generate` também dentro de `awlq-worker/` — ele consome o mesmo `schema.prisma` mas mantém seu próprio client gerado.
+> Após qualquer alteração de schema, execute `npm run prisma:generate` também em `awlq-worker/`, que usa o mesmo `schema.prisma` com client gerado próprio.
 
-### 5. Inicie os serviços
+### 5) Iniciar aplicação
 
 Em terminais separados:
 
@@ -182,17 +222,17 @@ Acesse: **http://localhost:3000**
 
 ---
 
-## Variáveis de Ambiente
+## Variáveis de ambiente
 
-Crie os arquivos `.env` baseados no [`.env.example`](.env.example).
+Crie os arquivos `.env` a partir de [`.env.example`](.env.example).
 
 ### Obrigatórias
 
 | Variável | Descrição |
 |---|---|
 | `DATABASE_URL` | URL de conexão PostgreSQL |
-| `REDIS_URL` | URL do Redis (ex: `redis://localhost:6379`) |
-| `BETTER_AUTH_SECRET` | String aleatória ≥ 32 caracteres |
+| `REDIS_URL` | URL do Redis (ex.: `redis://localhost:6379`) |
+| `BETTER_AUTH_SECRET` | String aleatória com pelo menos 32 caracteres |
 | `BETTER_AUTH_URL` | URL base da aplicação |
 | `GEMINI_API_KEY` | Chave da Google Generative AI |
 | `SUPABASE_URL` | URL do projeto Supabase |
@@ -217,109 +257,128 @@ Crie os arquivos `.env` baseados no [`.env.example`](.env.example).
 
 ## Autenticação e controle de acesso
 
-Better Auth 1.5 (email/senha) — config em `lib/auth.ts`, helpers de cliente em `lib/auth-client.ts`. Novos usuários nascem com `accessStatus: pending` e dependem de aprovação manual em `/admin/users` (ou de um bypass via `SystemConfig.auto_approve_users`). Toda rota `api/admin/*` chama `requireAdmin(request)`, que valida sessão **e** `role === "admin"`.
+A autenticação usa Better Auth 1.5 (email/senha), com configuração em `lib/auth.ts` e helpers de cliente em `lib/auth-client.ts`.
+
+- Novos usuários entram como `accessStatus: pending`.
+- A aprovação acontece em `/admin/users` (ou via `SystemConfig.auto_approve_users`).
+- Rotas `api/admin/*` usam `requireAdmin(request)` e validam sessão **e** `role === "admin"`.
 
 ---
 
 ## Testes
 
-Vitest (`environment: "node"`, globals ligado), um `vitest.config.ts` por pacote. Os testes preferem exercitar o handler da rota de API diretamente (mockando `@/lib/prisma` e singletons adjacentes) a subir o dev server.
+Vitest (`environment: "node"`, globals habilitado), com um `vitest.config.ts` por pacote.
 
 ```bash
 # awlq-app
 cd awlq-app
-npm run test                                   # roda toda a suíte
-npx vitest run src/__tests__/arena.test.ts     # um arquivo específico
-npx vitest run -t "nome do teste"              # filtra por nome
+npm run test
+npx vitest run src/__tests__/arena.test.ts
+npx vitest run -t "nome do teste"
 
 # awlq-worker
 cd awlq-worker
 npm run test
 ```
 
-Antes de abrir um PR, o mínimo exigido pelo `CONTRIBUTING.md` é `npm run lint`, `npx tsc --noEmit` e `npx next build` limpos em `awlq-app`, mais `npx tsc --noEmit` limpo em `awlq-worker`.
+Antes de abrir PR, o mínimo exigido em [CONTRIBUTING.md](CONTRIBUTING.md):
+
+```bash
+# awlq-app
+npm run lint
+npx tsc --noEmit
+npx next build
+
+# awlq-worker
+npx tsc --noEmit
+```
 
 ---
 
 ## Deploy com Docker
 
-Para produção, suba todos os serviços de uma vez:
+Para subir toda a stack em modo próximo de produção:
 
 ```bash
-# Crie a rede externa (apenas uma vez)
+# Uma vez
 docker network create rt-network
 
-# Build e start
+# Build + start
 docker compose up -d --build
 ```
 
-Os serviços `rt-awslq-app` (porta 3000) e `rt-awslq-worker` sobem na rede `rt-network`.
+Serviços principais:
+- `rt-awslq-app` (porta 3000)
+- `rt-awslq-worker` (rede `rt-network`)
+
+Comandos úteis:
 
 ```bash
-docker compose logs -f          # acompanhar logs
-docker compose down             # parar tudo
-docker compose restart worker   # reiniciar só o worker
+docker compose logs -f
+docker compose down
+docker compose restart worker
 ```
 
 ---
 
-## Estrutura do Projeto
+## Estrutura do projeto
 
-```
+```text
 aws-lab-quest/
 ├── awlq-app/               # Next.js app (frontend + API)
 │   └── src/
-│       ├── app/            # App Router — routing fino + data fetching (páginas e API routes)
+│       ├── app/            # App Router: páginas e API routes
 │       ├── components/     # Componentes reutilizáveis (ui/, layout/)
-│       ├── features/       # Lógica por domínio, cada um com components/hooks/screens/services
+│       ├── features/       # Domínios com components/hooks/screens/services
 │       ├── hooks/          # Custom hooks React
 │       ├── lib/            # Singletons: auth, prisma, ai, storage, redis, levels, achievements
 │       └── stores/         # Zustand stores
 │
-├── awlq-worker/            # Worker BullMQ (processamento em background)
+├── awlq-worker/            # Worker BullMQ (background)
 │   └── src/
-│       ├── workers/        # Um processador por fila (source-fetch, question-generation, ...)
-│       ├── services/       # Lógica de negócio desacoplada da fila (blueprint-parser, weak-area-analyzer, ...)
-│       ├── shared/         # Compartilhado com o app: buildUsageHash, validateQuestion, persistQuestion
-│       ├── cron/           # Jobs recorrentes do BullMQ (padrões salvos em ScheduledJob)
-│       └── queues/         # As 5 filas BullMQ + tipos de payload
+│       ├── workers/        # Processadores por fila (source-fetch, question-generation, ...)
+│       ├── services/       # Lógica de negócio desacoplada da fila
+│       ├── shared/         # Compartilhado com o app (buildUsageHash, validateQuestion, persistQuestion)
+│       ├── cron/           # Jobs recorrentes (ScheduledJob)
+│       └── queues/         # Filas BullMQ + tipos de payload
 │
-├── packages/db/prisma/     # Schema Prisma, migrations e client — compartilhado por app e worker
+├── packages/db/prisma/     # Schema Prisma, migrations e client compartilhado
 ├── docs/                   # Documentação técnica complementar
 ├── docker-compose.yml
 └── .env.example
 ```
 
-Convenção de rotas no app: `src/app/` fica fino (roteamento + data fetch no servidor), a lógica de domínio mora em `src/features/<domínio>/`.
+Convenção no app: `src/app/` permanece fino (roteamento + data fetch no servidor) e a lógica de domínio fica em `src/features/<domínio>/`.
 
 ---
 
-## Fluxos Principais
+## Fluxos principais
 
 ### Exam Guide e Simulado
 
-1. Admin envia o guia oficial em **`/admin/upload`** (tipo: Exam Guide)
-2. Sistema extrai blueprint de domínios e pesos automaticamente
-3. Sem Exam Guide, o endpoint de questões retorna erro de bloqueio
-4. Admin envia PDF de simulado para ingestão de questões
+1. Admin envia o guia oficial em **`/admin/upload`** (tipo: Exam Guide).
+2. O sistema extrai blueprint de domínios e pesos automaticamente.
+3. Sem Exam Guide, o endpoint de questões retorna erro de bloqueio.
+4. Admin envia PDF de simulado para ingestão de questões.
 
-### Pipeline de Questões via IA
+### Pipeline de questões via IA
 
-```
+```text
 PDF/Markdown → Extração → Segmentação de blocos → Gemini API
 → Validação (schema, mínimo de opções) → Deduplicação (usageHash)
 → Persistência no banco
 ```
 
-O worker também gera variantes mais difíceis de questões já respondidas automaticamente para evitar repetição em simulados futuros.
+O worker também gera variantes mais difíceis de questões já respondidas para reduzir repetição em simulados futuros.
 
 ### Conquistas
 
-Desbloqueadas automaticamente ao salvar histórico de lab/KC/simulado. A galeria em `/achievements` exibe progresso, unlock e link público de compartilhamento.
+As conquistas são desbloqueadas automaticamente ao salvar histórico de Lab/KC/Simulado.
+A galeria em `/achievements` mostra progresso, status de unlock e link público de compartilhamento.
 
 ---
 
-## Documentação Técnica
+## Documentação técnica
 
 | Documento | Descrição |
 |---|---|
@@ -334,7 +393,7 @@ Desbloqueadas automaticamente ao salvar histórico de lab/KC/simulado. A galeria
 
 ## Contribuindo
 
-Contribuições são bem-vindas! Leia o [guia de contribuição](CONTRIBUTING.md) para saber como reportar bugs, sugerir melhorias e enviar pull requests.
+Contribuições são bem-vindas. Consulte o [guia de contribuição](CONTRIBUTING.md) para reportar bugs, sugerir melhorias e enviar pull requests.
 
 ---
 
