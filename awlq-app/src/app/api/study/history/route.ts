@@ -11,6 +11,7 @@ import { isCorrectAnswer, isOptionKey, normalizeQuestionType } from "@/lib/study
 import { QuestionOption, QuestionOptionMapping } from "@/lib/types";
 import { applyWeightedXp, listXpWeightsByActivity, resolveXpWeight, XpActivityType } from "@/lib/xp-weights";
 import { recordStudyActivity } from "@/lib/streak";
+import { readJsonWithBodyLimit, sanitizeSnapshotItem } from "@/lib/study-snapshot";
 
 type StudyHistoryItem = {
   questionId: string;
@@ -104,13 +105,31 @@ export async function POST(request: NextRequest) {
   const auth = await requireApprovedUser(request);
   if (auth.response) return auth.response;
 
-  const body = (await request.json()) as Body;
+  const parsed = await readJsonWithBodyLimit(request);
+  if (parsed.error === "too-large") {
+    return NextResponse.json({ error: "Request body exceeds 1 MB." }, { status: 413 });
+  }
+  if (parsed.error || !parsed.body || typeof parsed.body !== "object" || Array.isArray(parsed.body)) {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  const body = parsed.body as Body;
 
-  if (!body.sessionType || !body.title) {
+  if (body.sessionType !== "KC" && body.sessionType !== "SIMULADO") {
+    return NextResponse.json({ error: "Invalid sessionType." }, { status: 400 });
+  }
+  if (!body.title) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  const snapshot = Array.isArray(body.answersSnapshot) ? body.answersSnapshot.slice(0, 120) : [];
+  const receivedSnapshot = Array.isArray(body.answersSnapshot) ? body.answersSnapshot.slice(0, 120) : [];
+  const snapshot = [] as StudyHistoryItem[];
+  for (const candidate of receivedSnapshot) {
+    const sanitized = sanitizeSnapshotItem(candidate);
+    if (sanitized.error) {
+      return NextResponse.json({ error: `Snapshot field exceeds its limit: ${sanitized.error}.` }, { status: 400 });
+    }
+    if (sanitized.item) snapshot.push(sanitized.item as unknown as StudyHistoryItem);
+  }
   if (snapshot.length === 0) {
     return NextResponse.json({ error: "answersSnapshot is required." }, { status: 400 });
   }
@@ -137,6 +156,12 @@ export async function POST(request: NextRequest) {
         questionType: true,
         correctOption: true,
         correctOptions: true,
+        statement: true,
+        optionA: true,
+        optionB: true,
+        optionC: true,
+        optionD: true,
+        optionE: true,
         questionAwsServices: {
           select: {
             service: {
@@ -153,6 +178,42 @@ export async function POST(request: NextRequest) {
   ]);
 
   const questionMap = new Map(questions.map((question) => [question.id, question]));
+  const persistedSnapshot = snapshot.map((answer) => {
+    const question = questionMap.get(answer.questionId);
+    if (!question) {
+      return {
+        questionId: answer.questionId,
+        selectedOption: answer.selectedOption,
+        ...(Array.isArray(answer.selectedOptions) ? { selectedOptions: answer.selectedOptions } : {}),
+      };
+    }
+
+    const canonicalOptions: Record<string, string> = {
+      A: question.optionA,
+      B: question.optionB,
+      C: question.optionC,
+      D: question.optionD,
+      ...(question.optionE ? { E: question.optionE } : {}),
+    };
+    const mapping = answer.optionMapping;
+    const options = Object.fromEntries(
+      Object.entries(canonicalOptions).map(([canonicalKey, text]) => {
+        const displayKey = mapping?.originalToDisplay?.[canonicalKey as QuestionOption] ?? canonicalKey;
+        return [displayKey, text];
+      }),
+    );
+    const correctOptions = Array.isArray(question.correctOptions)
+      ? question.correctOptions.filter((value): value is string => typeof value === "string")
+      : [question.correctOption];
+
+    return {
+      ...answer,
+      statement: question.statement,
+      options,
+      correctOption: mapping?.originalToDisplay?.[question.correctOption as QuestionOption] ?? question.correctOption,
+      correctOptions: correctOptions.map((option) => mapping?.originalToDisplay?.[option as QuestionOption] ?? option),
+    };
+  });
 
   let correctAnswers = 0;
   let computedXp = 0;
@@ -226,7 +287,7 @@ export async function POST(request: NextRequest) {
       correctAnswers,
       totalQuestions,
       durationSeconds: body.durationSeconds == null ? null : Math.max(0, Math.round(body.durationSeconds)),
-      answersSnapshot: snapshot,
+      answersSnapshot: persistedSnapshot,
       packId: typeof body.packId === "string" && body.packId.length > 0 ? body.packId : null,
       journeyId: activeJourney.id,
       completedAt: new Date(),
