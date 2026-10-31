@@ -15,7 +15,9 @@ import { SimuladoPreSubmitModal } from "@/features/study/components/simulado/Sim
 import { useSimuladoContext } from "@/features/study/context/SimuladoContext";
 import { resolvePrimaryAction } from "@/features/study/components/simulado/primary-action";
 import { isAnswerCorrect, normalizeAnswerValue } from "@/features/study/services";
-import { buildTopicPerformance, filterSimuladoReviewQuestions, getAverageQuestionTime } from "@/features/utils/funcs/simulado-utils";
+import { buildTopicPerformance, getAverageQuestionTime } from "@/features/utils/funcs/simulado-utils";
+import { fromLiveSimulado } from "@/features/study/review/adapters";
+import { filterReviewItems } from "@/features/study/review/review-filters";
 import { GAP_TOP_N } from "@/types/questions";
 
 export function SimuladoExamFlow() {
@@ -95,7 +97,9 @@ export function SimuladoExamFlow() {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const topicPerformance = useMemo(() => buildTopicPerformance(questions, answers), [questions, answers]);
   const averageQuestionTime = useMemo(() => getAverageQuestionTime(questions, timeSpentByQuestion), [questions, timeSpentByQuestion]);
-  const filteredQuestions = useMemo(() => filterSimuladoReviewQuestions(questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, { result: resultFilter, topic: topicFilter, time: timeFilter, markedOnly, confidence: confidenceFilter }), [answers, questions, resultFilter, timeFilter, timeSpentByQuestion, topicFilter, markedForReview, confidenceByQuestion, markedOnly, confidenceFilter]);
+  const reviewItems = useMemo(() => fromLiveSimulado({ questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, explanationsByQuestion: reviewByQuestion }).items, [questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, reviewByQuestion]);
+  const filteredReviewItems = useMemo(() => filterReviewItems(reviewItems, { outcome: resultFilter, topic: topicFilter, time: timeFilter, markedOnly, confidence: confidenceFilter }), [reviewItems, resultFilter, topicFilter, timeFilter, markedOnly, confidenceFilter]);
+  const filteredQuestions = filteredReviewItems.map((item) => questions[item.index]);
   const correctCount = useMemo(() => questions.filter((question) => isAnswerCorrect({ questionType: question.questionType, answer: answers[question.id], correctOption: question.correctOption, correctOptions: question.correctOptions })).length, [answers, questions]);
   const timerModeColors = session?.timerMode === "COUNTUP_FREE"
     ? { card: "border-blue-500 bg-blue-900/10", label: "text-blue-300", box: "border-blue-400 text-blue-300" }

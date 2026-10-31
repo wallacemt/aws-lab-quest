@@ -10,25 +10,18 @@ import { QuestionReviewPanel } from "@/features/study/components/QuestionReviewP
 import { SimuladoScoreGauge } from "@/features/study/components/SimuladoScoreGauge";
 import { SimuladoResultOverview } from "@/features/study/components/simulado/SimuladoResultOverview";
 import {
-  createStudyExplanation,
   fetchWeakServices,
   fetchStudyHistoryItemById,
-  saveStudyHistoryExplanation,
   StudyHistoryItem,
   WeakServiceItem,
 } from "@/features/study/services";
-import { hasSubstantialStaticExplanation } from "@/features/utils/funcs/simulado-utils";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
 import { QuestionOption } from "@/lib/types";
+import { useReviewExplanations } from "@/features/study/review/hooks/useReviewExplanations";
 
 type ReviewFilter = "all" | "wrong" | "correct";
 type ResultTab = "score" | "review" | "gaps";
-
-type ExplanationCacheItem = {
-  summary: string;
-  options: Partial<Record<QuestionOption, string>>;
-};
 
 type SimuladoHistoryReviewScreenProps = {
   historyId: string;
@@ -45,15 +38,17 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
   const [filter, setFilter] = useState<ReviewFilter>("all");
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [showExplanations, setShowExplanations] = useState(true);
-  const [loadingExplanationByQuestion, setLoadingExplanationByQuestion] = useState<Record<string, boolean>>({});
-  const [failedExplanationByQuestion, setFailedExplanationByQuestion] = useState<Record<string, boolean>>({});
-  const [removedFromDbByQuestion, setRemovedFromDbByQuestion] = useState<Record<string, boolean>>({});
-  const [explanationCacheByQuestion, setExplanationCacheByQuestion] = useState<Record<string, ExplanationCacheItem>>(
-    {},
-  );
+  const explanationState = useReviewExplanations({ historyId });
+  const {
+    loadingByQuestion: loadingExplanationByQuestion,
+    failedByQuestion: failedExplanationByQuestion,
+    removedFromBank: removedFromDbByQuestion,
+    cacheByQuestion: explanationCacheByQuestion,
+    generate: generateExplanation,
+    retry: retryExplanation,
+  } = explanationState;
   const isMountedRef = useRef(true);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const inFlightExplanationRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     return () => {
@@ -61,13 +56,6 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
     };
   }, []);
 
-  function isOptionKey(value: unknown): value is QuestionOption {
-    return value === "A" || value === "B" || value === "C" || value === "D" || value === "E";
-  }
-
-  function hasSummaryOrExplanation(item: { explanationSummary?: string; explanations: Record<string, string>; correctOption: string }): boolean {
-    return Boolean(item.explanationSummary?.trim()) || hasSubstantialStaticExplanation(item.explanations[item.correctOption]);
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -85,10 +73,6 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
         if (!cancelled) {
           setSession(payload);
           setSelectedQuestionId(payload.answersSnapshot[0]?.questionId ?? null);
-          setLoadingExplanationByQuestion({});
-          setFailedExplanationByQuestion({});
-          setExplanationCacheByQuestion({});
-          setRemovedFromDbByQuestion({});
         }
       } catch (requestError) {
         if (!cancelled) {
@@ -199,174 +183,28 @@ export function SimuladoHistoryReviewScreen({ historyId }: SimuladoHistoryReview
   }, [filteredSnapshots, selectedQuestionId]);
 
   useEffect(() => {
-    if (!selectedQuestion) {
-      return;
-    }
-
-    const questionId = selectedQuestion.questionId;
-
-    if (inFlightExplanationRef.current[questionId]) {
-      return;
-    }
-
-    if (failedExplanationByQuestion[questionId]) {
-      return;
-    }
-
-    if (selectedCachedExplanation?.summary?.trim()) {
-      return;
-    }
-
-    if (hasSummaryOrExplanation(selectedQuestion)) {
-      return;
-    }
-
-    const fallbackSummary = "Revisao local baseada no gabarito da questao.";
-
-    async function generateAndPersist() {
-      const selectedOptions = Array.isArray(selectedQuestion.selectedOptions)
-        ? selectedQuestion.selectedOptions.filter((option): option is QuestionOption => isOptionKey(option))
-        : [];
-
-      const selectedOption = isOptionKey(selectedQuestion.selectedOption)
-        ? selectedQuestion.selectedOption
-        : (selectedOptions[0] ?? "A");
-
-      inFlightExplanationRef.current[questionId] = true;
-      setLoadingExplanationByQuestion((prev) => ({
-        ...prev,
-        [questionId]: true,
-      }));
-
-      try {
-        const generated = await createStudyExplanation({
-          questionId,
-          selectedOption,
-          selectedOptions: selectedQuestion.questionType === "multi" ? selectedOptions : undefined,
-          optionMapping: selectedQuestion.optionMapping,
-        });
-
-        if (isMountedRef.current) {
-          setExplanationCacheByQuestion((prev) => ({
-            ...prev,
-            [questionId]: {
-              summary: generated.summary,
-              options: generated.options,
-            },
-          }));
-        }
-
-        if (isMountedRef.current) {
-          setSession((previous) => {
-            if (!previous) {
-              return previous;
-            }
-
-            return {
-              ...previous,
-              answersSnapshot: previous.answersSnapshot.map((answer) => {
-                if (answer.questionId !== questionId) {
-                  return answer;
-                }
-
-                return {
-                  ...answer,
-                  explanationSummary: generated.summary,
-                  explanations: {
-                    ...answer.explanations,
-                    ...generated.options,
-                  },
-                };
-              }),
-            };
-          });
-        }
-
-        await saveStudyHistoryExplanation({
-          historyId,
-          questionId,
-          explanationSummary: generated.summary,
-          explanations: generated.options,
-        });
-      } catch (explanationError: unknown) {
-        const isNotFound =
-          explanationError instanceof Error &&
-          (explanationError.message.toLowerCase().includes("nao encontrada") ||
-            explanationError.message.toLowerCase().includes("não encontrada") ||
-            explanationError.message.toLowerCase().includes("not found"));
-        if (isMountedRef.current && isNotFound) {
-          setRemovedFromDbByQuestion((prev) => ({ ...prev, [questionId]: true }));
-        }
-        if (isMountedRef.current) {
-          setFailedExplanationByQuestion((prev) => ({
-            ...prev,
-            [questionId]: true,
-          }));
-
-          setExplanationCacheByQuestion((prev) => ({
-            ...prev,
-            [questionId]: {
-              summary: fallbackSummary,
-              options: selectedQuestion.explanations,
-            },
-          }));
-
-          setSession((previous) => {
-            if (!previous) {
-              return previous;
-            }
-
-            return {
-              ...previous,
-              answersSnapshot: previous.answersSnapshot.map((answer) => {
-                if (answer.questionId !== questionId) {
-                  return answer;
-                }
-
-                return {
-                  ...answer,
-                  explanationSummary: answer.explanationSummary || fallbackSummary,
-                };
-              }),
-            };
-          });
-        }
-      } finally {
-        inFlightExplanationRef.current[questionId] = false;
-        if (isMountedRef.current) {
-          setLoadingExplanationByQuestion((prev) => ({
-            ...prev,
-            [questionId]: false,
-          }));
-        }
-      }
-    }
-
-    void generateAndPersist();
-  }, [failedExplanationByQuestion, historyId, selectedCachedExplanation, selectedQuestion]);
+    if (!selectedQuestion) return;
+    void generateExplanation(selectedQuestion, (questionId, summary, options) => {
+      setSession((previous) => {
+        if (!previous) return previous;
+        return {
+          ...previous,
+          answersSnapshot: previous.answersSnapshot.map((answer) => answer.questionId !== questionId ? answer : {
+            ...answer,
+            explanationSummary: summary,
+            explanations: { ...answer.explanations, ...options },
+          }),
+        };
+      });
+    });
+  }, [generateExplanation, selectedQuestion]);
 
   function handleRetryExplanation(questionId: string) {
-    inFlightExplanationRef.current[questionId] = false;
-    setFailedExplanationByQuestion((prev) => {
-      const next = { ...prev };
-      delete next[questionId];
-      return next;
-    });
-    setExplanationCacheByQuestion((prev) => {
-      const next = { ...prev };
-      delete next[questionId];
-      return next;
-    });
-    // Clear the fallback summary so hasSummaryOrExplanation returns false and the useEffect retries
-    setSession((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        answersSnapshot: prev.answersSnapshot.map((a) =>
-          a.questionId !== questionId ? a : { ...a, explanationSummary: "" },
-        ),
-      };
-    });
+    retryExplanation(questionId);
+    setSession((previous) => previous ? {
+      ...previous,
+      answersSnapshot: previous.answersSnapshot.map((answer) => answer.questionId !== questionId ? answer : { ...answer, explanationSummary: "" }),
+    } : previous);
   }
 
   function openNeighborQuestion(delta: number) {
