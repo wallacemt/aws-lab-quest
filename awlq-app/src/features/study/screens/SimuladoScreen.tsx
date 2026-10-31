@@ -786,10 +786,10 @@ export function SimuladoScreen() {
       setLoadingWeakServices(false);
     }
 
-    if (questions[0]) {
+    if (questions[0] && answers[questions[0].id] !== undefined) {
       await fetchReviewForQuestion(
         questions[0],
-        answers[questions[0].id] ?? questions[0].correctOption,
+        answers[questions[0].id],
         savedHistoryIdValue,
       );
     }
@@ -848,6 +848,15 @@ export function SimuladoScreen() {
     setConfirmedAnswers((prev) => new Set(prev).add(questionId));
   }
 
+  async function confirmAnswerAndReview(questionId: string) {
+    confirmAnswer(questionId);
+    const question = questions.find((item) => item.id === questionId);
+    const selectedAnswer = answers[questionId];
+    if (question && selectedAnswer !== undefined) {
+      await fetchReviewForQuestion(question, selectedAnswer, savedHistoryId);
+    }
+  }
+
   function setConfidenceForQuestion(questionId: string, confidence: AnswerConfidence) {
     setConfidenceByQuestion((prev) => ({ ...prev, [questionId]: confidence }));
   }
@@ -858,7 +867,7 @@ export function SimuladoScreen() {
     setCurrentIndex(clamped);
     questionEnteredAtRef.current = Date.now();
 
-    if (submitted || session?.examStyle === "EXPLAIN_EACH") {
+    if (submitted || confirmedAnswers.has(questions[clamped]?.id ?? "")) {
       const target = questions[clamped];
       if (target) {
         await fetchReviewForQuestion(target, answers[target.id] ?? target.correctOption, savedHistoryId);
@@ -938,6 +947,7 @@ export function SimuladoScreen() {
     goToQuestion,
     toggleMarkForReview,
     confirmAnswer,
+    confirmAnswerAndReview,
     setConfidenceForQuestion,
     handleForceExit,
     handleReset,
