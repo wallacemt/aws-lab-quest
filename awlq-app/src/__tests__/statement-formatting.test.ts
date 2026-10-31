@@ -34,16 +34,11 @@ describe("formatStatement", () => {
     ]);
   });
 
-  it("keeps a balanced malformed container as code and continues parsing afterward", () => {
+  it("keeps short malformed containers as prose and continues parsing afterward", () => {
     const segments = formatStatement('Texto {“chave”: sem aspas} e depois {"ok": true} fim.');
-
-    expect(segments).toEqual([
-      { type: "prose", text: "Texto " },
-      { type: "code", language: "text", text: '{“chave”: sem aspas}' },
-      { type: "prose", text: " e depois " },
-      { type: "code", language: "json", text: '{\n  "ok": true\n}' },
-      { type: "prose", text: " fim." },
-    ]);
+    expect(segments[0]).toEqual({ type: "prose", text: 'Texto {“chave”: sem aspas} e depois ' });
+    expect(segments[1]).toMatchObject({ type: "code", language: "json" });
+    expect(segments[2]).toEqual({ type: "prose", text: " fim." });
   });
 
   it("keeps plain statements as a single prose segment", () => {
@@ -64,7 +59,7 @@ describe("formatStatement", () => {
 
     expect(segments).toEqual([
       { type: "prose", text: "Mensagem de falha codificada: " },
-      { type: "code", language: "text", text: blob },
+      { type: "blob", text: blob },
       { type: "prose", text: question },
     ]);
   });
@@ -85,5 +80,25 @@ describe("formatStatement", () => {
       { type: "code", language: "text", text: command },
       { type: "prose", text: "Depois verifique a saída." },
     ]);
+  });
+});
+
+describe("segmentRichText", () => {
+  it("preserves template substitutions inside backticks", async () => {
+    const { segmentRichText } = await import("@/lib/statement-formatting");
+    const value = "usa-se `${stageVariables.ENV}` no sufixo (ex: `MinhaFuncao:${stageVariables.ENV}`).";
+    expect(segmentRichText(value)).toEqual([{ type: "prose", text: value }]);
+  });
+  it("leaves short malformed containers as prose and splits long blobs", async () => {
+    const { segmentRichText } = await import("@/lib/statement-formatting");
+    expect(segmentRichText("Texto {chave: valor} e mais")).toEqual([{ type: "prose", text: "Texto {chave: valor} e mais" }]);
+    expect(segmentRichText(`Mensagem de falha de autorização codificada: ${"A".repeat(300)} Como...`)).toEqual([
+      { type: "prose", text: "Mensagem de falha de autorização codificada: " },
+      { type: "blob", text: "A".repeat(300) }, { type: "prose", text: " Como..." },
+    ]);
+  });
+  it("keeps AWS wildcard notation in prose", async () => {
+    const { segmentRichText } = await import("@/lib/statement-formatting");
+    expect(segmentRichText('Ação "s3:*" em arn:aws:s3:::bucket/*')).toEqual([{ type: "prose", text: 'Ação "s3:*" em arn:aws:s3:::bucket/*' }]);
   });
 });
