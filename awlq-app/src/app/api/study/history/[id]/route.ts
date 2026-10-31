@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { requireApprovedUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/prisma";
 import { QuestionOption } from "@/lib/types";
+import { readJsonWithBodyLimit } from "@/lib/study-snapshot";
 
 type RouteContext = {
   params: Promise<{
@@ -41,7 +42,7 @@ function normalizeExplanations(input: unknown): Partial<Record<QuestionOption, s
     }
 
     if (typeof value === "string" && value.trim().length > 0) {
-      result[key] = value.trim().slice(0, 2000);
+      result[key] = value.trim();
     }
   }
 
@@ -84,9 +85,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "ID de historico invalido." }, { status: 400 });
   }
 
-  const body = (await request.json()) as PatchBody;
+  const parsed = await readJsonWithBodyLimit(request);
+  if (parsed.error === "too-large") {
+    return NextResponse.json({ error: "Request body exceeds 1 MB." }, { status: 413 });
+  }
+  if (parsed.error || !parsed.body || typeof parsed.body !== "object" || Array.isArray(parsed.body)) {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  const body = parsed.body as PatchBody;
   const questionId = body.questionId?.trim();
   const explanationSummary = body.explanationSummary?.trim();
+
+  if (typeof body.explanationSummary === "string" && body.explanationSummary.length > 8 * 1024) {
+    return NextResponse.json({ error: "Snapshot field exceeds its limit: explanationSummary." }, { status: 400 });
+  }
+  if (body.explanations && typeof body.explanations === "object") {
+    for (const [key, explanation] of Object.entries(body.explanations)) {
+      if (typeof explanation === "string" && explanation.length > 4 * 1024) {
+      return NextResponse.json({ error: `Snapshot field exceeds its limit: explanations.${key}.` }, { status: 400 });
+      }
+    }
+  }
   const explanations = normalizeExplanations(body.explanations);
 
   if (!questionId) {

@@ -4,6 +4,7 @@ import { requireApprovedUser } from "@/lib/user-auth";
 import { resolveJourneyFilter } from "@/lib/certification-journey";
 import { cacheGetOrSet, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { prisma } from "@/lib/prisma";
+import { projectSnapshotForViewer } from "@/lib/study-snapshot";
 
 const QUEST_SELECT = {
   id: true,
@@ -80,8 +81,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }),
     ]);
 
+    const viewer = isOwner ? "owner" : "public";
     const studyHistory = studyHistoryRaw.map((s) => ({
       ...s,
+      answersSnapshot: Array.isArray(s.answersSnapshot)
+        ? projectSnapshotForViewer(s.answersSnapshot as Record<string, unknown>[], viewer)
+        : s.answersSnapshot,
       pack: undefined,
       packName: s.pack?.name ?? null,
       packArtworkUrl: s.pack?.artworkUrl ?? null,
