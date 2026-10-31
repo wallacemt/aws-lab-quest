@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { normalizeAnswerValue, normalizeCorrectOptions } from "@/features/study/services";
 import { normalizeOptionText } from "@/lib/study-option-text";
-import { StatementContent } from "@/features/study/components/StatementContent";
+import { RichText } from "@/components/rich-text/RichText";
 import { QuestionOption, StudyAnswerValue, StudyQuestionType } from "@/lib/types";
 
 export type QuestionCardQuestion = {
@@ -68,9 +68,9 @@ export function QuestionOptionsCard({
       )}
 
       <div
-        className={`max-w-prose break-words font-[var(--font-body)] leading-relaxed ${large ? "text-lg" : "text-base"}`}
+        className={`min-w-0 max-w-prose [overflow-wrap:anywhere] font-[var(--font-body)] leading-relaxed ${large ? "text-lg" : "text-base"}`}
       >
-        <StatementContent text={question.statement} />
+        <RichText text={question.statement} />
       </div>
       {question.questionType === "multi" && (
         <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">
@@ -105,7 +105,7 @@ export function QuestionOptionsCard({
               <span
                 className={`min-w-0 max-w-prose break-words font-[var(--font-body)] ${large ? "text-base" : "text-sm"}`}
               >
-                {option}) {text}
+                {option}) <RichText inline text={text} />
               </span>
             </label>
           );
