@@ -249,7 +249,7 @@ describe("TC-106: FlashcardDeck remount resets to the front face", () => {
 
     expect(screen.queryByText("Como foi?")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /revelar a resposta/i }));
+    fireEvent.click(screen.getByRole("button", { name: /ver resposta/i }));
     expect(screen.getByText("Como foi?")).toBeTruthy();
 
     // FlashcardsScreen keys FlashcardDeck by card.id, so navigating to a new
