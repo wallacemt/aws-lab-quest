@@ -28,6 +28,11 @@ export type StudyAnswerSnapshotPayload = {
   explanations: Record<string, string>;
   explanationSummary?: string;
   optionMapping?: QuestionOptionMapping;
+  topic?: string;
+  timeSpentSeconds?: number;
+  confidence?: "high" | "medium" | "low";
+  markedForReview?: boolean;
+  removedFromBank?: boolean;
 };
 
 export type SaveStudyHistoryPayload = {
