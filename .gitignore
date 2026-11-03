@@ -23,7 +23,7 @@ generated
 graphify-out
 # production
 /build
-
+.impeccable
 # misc
 .DS_Store
 *.pem
