@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { clearOnboardingStep, getOnboardingStep } from "@/lib/onboarding";
@@ -26,6 +27,10 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { hydrated, isProfileComplete, profile } = useUserProfile();
+  const { isAuthenticated, isPending: authPending } = useAuth();
+  // Guests have no UserProfile row, so isProfileComplete is permanently false for
+  // them — the onboarding guard below only applies to logged-in users.
+  const isGuest = !authPending && !isAuthenticated;
   const { mode: adminMode, hydrated: adminModeHydrated, hydrate: hydrateAdminMode, setMode } = useAdminModeStore();
   const isAdmin = profile.role === "admin";
   const [disabledRoutes, setDisabledRoutes] = useState<Set<string>>(new Set());
@@ -48,8 +53,10 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   const onboardingStep = getOnboardingStep();
   const guardReady =
     hydrated &&
+    !authPending &&
     (!isAdmin || adminModeHydrated) &&
-    (isProfileComplete ||
+    (isGuest ||
+      isProfileComplete ||
       (onboardingStep === "manual" && pathname === "/help") ||
       (onboardingStep === "profile" && pathname === "/profile") ||
       (!onboardingStep && (pathname === "/profile" || pathname === "/help")));
@@ -117,7 +124,11 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
   }, [arenaBattleActive]);
 
   useEffect(() => {
-    if (!pathname || !hydrated) {
+    if (!pathname || !hydrated || authPending) {
+      return;
+    }
+
+    if (isGuest) {
       return;
     }
 
@@ -151,7 +162,7 @@ export function AppRouteShell({ children }: AppRouteShellProps) {
     }
 
     router.replace("/profile");
-  }, [hydrated, isProfileComplete, onboardingStep, pathname, router, simHydrated, simulatedExamActive]);
+  }, [authPending, hydrated, isGuest, isProfileComplete, onboardingStep, pathname, router, simHydrated, simulatedExamActive]);
 
   if (!guardReady) {
     return (
