@@ -8,6 +8,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { STORAGE_KEYS, safeLocalStorageSet } from "@/lib/storage";
 import type { RulesConsentMap } from "@/types/questions";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 export type SimuladoConfig = {
   examStyle: "EXAM" | "EXPLAIN_EACH";
@@ -52,6 +53,7 @@ export function SimuladoConfigScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useUserProfile();
+  const { requireAuth } = useRequireAuth();
   const rulesConsent = useLocalStorage<RulesConsentMap>(STORAGE_KEYS.simuladoRulesConsent, {});
   const consentScope = profile.certificationPresetCode?.trim() || "default";
 
@@ -107,6 +109,7 @@ export function SimuladoConfigScreen() {
 
   function handleConfirm() {
     if (!rulesAccepted || !packId) return;
+    if (!requireAuth()) return;
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     rulesConsent.setValue((prev) => ({ ...prev, [consentScope]: expiresAt }));

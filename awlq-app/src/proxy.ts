@@ -17,7 +17,7 @@ const PUBLIC_PREFIXES = [
 const PUBLIC_EXACT_PATHS = ["/", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/changelog"];
 
 // /api/changelog is public (RF-16) — served without session
-const PUBLIC_API_EXACT = ["/api/changelog"];
+const PUBLIC_API_EXACT = ["/api/changelog", "/api/certifications"];
 
 // Better Auth may prefix secure cookies in production environments.
 const SESSION_COOKIE_NAMES = [
@@ -50,11 +50,15 @@ export function proxy(request: NextRequest) {
   const isAuthPage = AUTH_PAGES.includes(pathname);
   const hasSession = hasSessionCookie(request);
 
-  if (!hasSession && !isAuthPage) {
+  if (!hasSession && !isAuthPage && pathname.startsWith("/admin")) {
     const loginPath = pathname.startsWith("/admin") ? "/admin/login" : "/login";
     const loginUrl = new URL(loginPath, request.url);
     loginUrl.searchParams.set("from", pathname !== "/login" ? pathname : "/");
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (!hasSession && !isAuthPage) {
+    return NextResponse.next();
   }
 
   if (hasSession && isAuthPage) {

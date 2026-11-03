@@ -22,6 +22,22 @@ function createRedisClient(): Redis | null {
 
 export const redis = globalForRedis._redis ?? createRedisClient();
 
+export async function scanKeys(pattern: string): Promise<string[]> {
+  if (!redis) return [];
+  try {
+    const keys: string[] = [];
+    let cursor = "0";
+    do {
+      const [nextCursor, batch] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
+      cursor = nextCursor;
+      keys.push(...batch);
+    } while (cursor !== "0");
+    return keys;
+  } catch {
+    return [];
+  }
+}
+
 if (process.env.NODE_ENV !== "production") {
   globalForRedis._redis = redis;
 }

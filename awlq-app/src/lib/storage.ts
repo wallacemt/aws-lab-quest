@@ -12,6 +12,7 @@ export const STORAGE_KEYS = {
   historyActiveTab: "awlq_history_active_tab",
   adminMode: "awlq_admin_mode",
   reviewViewMode: "awlq_review_view_mode",
+  guestCertificationCode: "awlq_guest_certification_code",
 } as const;
 
 export function safeLocalStorageGet<T>(key: string, fallback: T): T {

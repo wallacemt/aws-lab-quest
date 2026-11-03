@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { redis, scanKeys } from "@/lib/redis";
 
 const ONLINE_WINDOW_MINUTES = 5;
 
@@ -12,14 +13,12 @@ export async function GET() {
     where: { expiresAt: { gt: now } },
   });
 
-  if (activeSessions.length === 0) {
-    return NextResponse.json({ onlineCount: 0, windowMinutes: ONLINE_WINDOW_MINUTES });
-  }
-
   const activeUserIds = activeSessions.map((s) => s.userId);
-  const onlineCount = await prisma.user.count({
-    where: { id: { in: activeUserIds }, lastSeen: { gte: cutoff } },
-  });
+  const usersOnline = activeUserIds.length > 0
+    ? await prisma.user.count({ where: { id: { in: activeUserIds }, lastSeen: { gte: cutoff } } })
+    : 0;
+  const guestCount = redis ? (await scanKeys("online:guest:*")).length : 0;
+  const onlineCount = usersOnline + guestCount;
 
-  return NextResponse.json({ onlineCount, windowMinutes: ONLINE_WINDOW_MINUTES });
+  return NextResponse.json({ onlineCount, guestCount, windowMinutes: ONLINE_WINDOW_MINUTES });
 }
