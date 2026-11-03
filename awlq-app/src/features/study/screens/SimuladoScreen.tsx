@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PixelCard } from "@/components/ui/pixel-card";
 import {  StudyAnswerMap, StudyExplanationResult } from "@/features/study";
 import { SimuladoExamFlow } from "@/features/study/components/simulado/SimuladoExamFlow";
@@ -30,6 +30,7 @@ import { useProgressNotifications } from "@/features/study/components/notificati
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSimulatedExam } from "@/hooks/useSimulatedExam";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { STORAGE_KEYS, safeLocalStorageGet, safeLocalStorageRemove, safeLocalStorageSet } from "@/lib/storage";
@@ -42,6 +43,7 @@ import { buildScoreOverview, buildTopicPerformance, formatTime, hasSubstantialSt
 
 export function SimuladoScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     hydrated,
     isActive,
@@ -55,6 +57,7 @@ export function SimuladoScreen() {
     resumeSession,
   } = useSimulatedExam();
   const { profile, refreshTotalXp } = useUserProfile();
+  const { requireAuth } = useRequireAuth();
   const notifyProgress = useProgressNotifications();
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
   const [answers, setAnswers] = useState<StudyAnswerMap>({});
@@ -111,6 +114,11 @@ export function SimuladoScreen() {
     "grid",
   );
   const [certInfo, setCertInfo] = useState<{ code: string; name: string; passingScorePercent: number } | null>(null);
+  const [certifications, setCertifications] = useState<{ id: string; code: string; name: string }[]>([]);
+  const [guestCertCode, setGuestCertCode] = useState("");
+  const effectiveCertCode = profile.certificationPresetCode?.trim() || guestCertCode;
+  const deepLinkPackId = searchParams.get("packId");
+  const handledDeepLinkRef = useRef<string | null>(null);
   const [currentPackId, setCurrentPackId] = useState<string | null>(null);
   const [currentPackName, setCurrentPackName] = useState<string | null>(null);
   const [expandedPackHistory, setExpandedPackHistory] = useState<string | null>(null);
@@ -201,6 +209,16 @@ export function SimuladoScreen() {
 
   const currentReview = currentQuestion ? reviewByQuestion[currentQuestion.id] : undefined;
   const consentScope = profile.certificationPresetCode?.trim() || "default";
+
+  useEffect(() => {
+    const stored = safeLocalStorageGet<string>(STORAGE_KEYS.guestCertificationCode, "");
+    setGuestCertCode(stored);
+    fetch("/api/certifications", { cache: "no-store" })
+      .then(async (response) => {
+        if (response.ok) setCertifications((await response.json()).certifications ?? []);
+      })
+      .catch(() => {});
+  }, []);
 
   const strongestGapTopics = useMemo(() => {
     const source = historicalWeakServices.length > 0 ? historicalWeakServices : weakServicesCurrentExam;
@@ -333,7 +351,8 @@ export function SimuladoScreen() {
     async function loadPacks() {
       setPacksLoading(true);
       try {
-        const res = await fetch(`/api/study/simulado-packs?filter=${packsFilter}`);
+        const certQuery = effectiveCertCode ? `&certCode=${encodeURIComponent(effectiveCertCode)}` : "";
+        const res = await fetch(`/api/study/simulado-packs?filter=${packsFilter}${certQuery}`);
         if (!res.ok || cancelled) return;
         const json = (await res.json()) as {
           packs: SimuladoPackListItem[];
@@ -358,7 +377,16 @@ export function SimuladoScreen() {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, inExamFlow, inReviewFlow, packsFilter, packsRefreshKey]);
+  }, [hydrated, inExamFlow, inReviewFlow, packsFilter, packsRefreshKey, effectiveCertCode]);
+
+  useEffect(() => {
+    if (!deepLinkPackId || !packs.length || isActive || handledDeepLinkRef.current === deepLinkPackId) return;
+    const pack = packs.find((item) => item.id === deepLinkPackId);
+    if (pack) {
+      handledDeepLinkRef.current = deepLinkPackId;
+      handleOpenPackConfig(pack.id, pack.name);
+    }
+  }, [deepLinkPackId, packs, isActive]);
 
   useEffect(() => {
     if (session?.timerMode === "COUNTDOWN_LOCK" && prevRemainingRef.current > 0 && remainingSeconds <= 0 && inExamFlow) {
@@ -458,6 +486,7 @@ export function SimuladoScreen() {
   }
 
   async function handleStartFromPack(packId: string, config: SimuladoConfig) {
+    if (!requireAuth()) return;
     setError(null);
     setHistoricalWeakServices([]);
     safeLocalStorageRemove(STORAGE_KEYS.simuladoDraft);
@@ -1051,6 +1080,28 @@ export function SimuladoScreen() {
               className="space-y-4"
             >
               {/* Certification header */}
+              {!profile.certificationPresetCode?.trim() && (
+                <PixelCard className="space-y-2">
+                  <label htmlFor="guest-certification" className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">
+                    Escolha sua certificação alvo
+                  </label>
+                  <select
+                    id="guest-certification"
+                    value={guestCertCode}
+                    onChange={(event) => {
+                      setGuestCertCode(event.target.value);
+                      safeLocalStorageSet(STORAGE_KEYS.guestCertificationCode, event.target.value);
+                      setCertInfo(null);
+                    }}
+                    className="w-full border-2 border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-2 font-[var(--font-body)] text-[var(--pixel-text)]"
+                  >
+                    <option value="">Selecione uma certificação</option>
+                    {certifications.map((certification) => (
+                      <option key={certification.id} value={certification.code}>{certification.code} — {certification.name}</option>
+                    ))}
+                  </select>
+                </PixelCard>
+              )}
               {certInfo && (
                 <div className="flex flex-wrap items-center justify-between gap-2 border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-4 py-3">
                   <div>
