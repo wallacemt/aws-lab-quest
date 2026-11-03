@@ -192,9 +192,7 @@ export function HomeScreen() {
   }, [checkDailyQuiz]);
 
   function handleClick(id: string) {
-    if (id !== "simulado") {
-      router.push(`/${id}`);
-    }
+    router.push(`/${id}`);
   }
 
   const studyCards = getVisible(STUDY_MODES, config);

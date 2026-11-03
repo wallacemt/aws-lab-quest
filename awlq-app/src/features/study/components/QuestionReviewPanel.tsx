@@ -70,7 +70,7 @@ export function QuestionReviewPanel({
       {questionStatement && (
         <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-3">
           <div className="min-w-0 max-w-prose [overflow-wrap:anywhere] font-[var(--font-body)] text-base leading-relaxed">
-            <RichText text={questionStatement} />
+            <RichText text={questionStatement} showReferences />
           </div>
         </div>
       )}
@@ -88,7 +88,7 @@ export function QuestionReviewPanel({
         <div className="border border-[var(--pixel-border)] bg-black/15 px-3 py-2">
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Resumo da revisao</p>
           <div className="mt-1 min-w-0 max-w-prose [overflow-wrap:anywhere] font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            <RichText text={summary} />
+            <RichText text={summary} showReferences />
           </div>
         </div>
       )}
@@ -134,7 +134,7 @@ export function QuestionReviewPanel({
 
             {showExplanations && item.explanation && (
               <p className="min-w-0 max-w-prose [overflow-wrap:anywhere] font-[var(--font-body)] text-sm leading-relaxed text-gray-400">
-                <RichText text={item.explanation} />
+                <RichText text={item.explanation} showReferences />
               </p>
             )}
             {!showExplanations && (

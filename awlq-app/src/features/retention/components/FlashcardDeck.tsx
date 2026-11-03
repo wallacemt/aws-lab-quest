@@ -5,6 +5,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Lightbulb, RefreshCw } from "lucide-react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelButton } from "@/components/ui/pixel-button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { RichText } from "@/components/rich-text/RichText";
 import { FlashcardGradeBar } from "@/features/retention/components/FlashcardGradeBar";
 import { Flashcard, FlashcardGrade } from "@/features/retention/services/retention-api";
 
@@ -121,9 +123,11 @@ export function FlashcardDeck({
         >
           {isFront ? (
             <div className="flex min-w-0 flex-col gap-3">
-              <p className={`font-reading leading-relaxed text-[var(--pixel-text)] ${card.front.length <= 140 ? "text-xl font-semibold" : "text-base font-semibold"}`}>
-                {card.front}
-              </p>
+              <RichText
+                text={card.front}
+                trustLinks={true}
+                className={`font-reading leading-relaxed text-[var(--pixel-text)] ${card.front.length <= 140 ? "text-xl font-semibold" : "text-base font-semibold"}`}
+              />
               {card.hint && (
                 <div>
                   <PixelButton type="button" variant="ghost" aria-expanded={showHint} aria-controls="flashcard-hint" onClick={() => setShowHint((value) => !value)} className="min-h-11 px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--pixel-text)]">
@@ -137,7 +141,11 @@ export function FlashcardDeck({
               )}
             </div>
           ) : (
-            <p className="whitespace-pre-line font-reading text-base leading-relaxed text-[var(--pixel-text)] [overflow-wrap:anywhere]">{card.back}</p>
+            <RichText
+              text={card.back}
+              trustLinks={true}
+              className="whitespace-pre-line font-reading text-base leading-relaxed text-[var(--pixel-text)] [overflow-wrap:anywhere]"
+            />
           )}
           {more && <span aria-hidden="true" className="pixel-caret sticky bottom-0 float-right border-2 border-[var(--pixel-border)] bg-[var(--pixel-card)] px-1 font-mono text-[10px]">▼</span>}
         </div>
@@ -165,9 +173,19 @@ export function FlashcardDeck({
       <div className="flex flex-col items-center gap-2 pt-2">
         {!selectedGrade && <p className="text-center font-mono text-[8px] text-pixel-subtext">Avalie o card para avançar.</p>}
         <div className="flex items-center justify-center gap-6">
-          <PixelButton variant="ghost" onClick={onPrev} disabled={!canGoPrev} aria-label="Card anterior" className="min-h-11 min-w-11"><ChevronLeft className="h-4 w-4" /></PixelButton>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PixelButton variant="ghost" onClick={onPrev} disabled={!canGoPrev} aria-label="Card anterior" className="min-h-11 min-w-11"><ChevronLeft className="h-4 w-4" /></PixelButton>
+            </TooltipTrigger>
+            <TooltipContent>Card anterior</TooltipContent>
+          </Tooltip>
           <span className="font-mono text-xs text-[var(--pixel-subtext)]">Card {cardNumber} / {totalCards}</span>
-          <PixelButton variant="ghost" onClick={onNext} disabled={isSubmitting || !selectedGrade} aria-label="Próximo card" className="min-h-11 min-w-11"><ChevronRight className="h-4 w-4" /></PixelButton>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PixelButton variant="ghost" onClick={onNext} disabled={isSubmitting || !selectedGrade} aria-label="Próximo card" className="min-h-11 min-w-11"><ChevronRight className="h-4 w-4" /></PixelButton>
+            </TooltipTrigger>
+            <TooltipContent>Próximo card</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>

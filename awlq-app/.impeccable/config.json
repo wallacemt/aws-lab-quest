@@ -1,0 +1,23 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "src/components/ui/game-card.tsx"
+        ],
+        "createdAt": "2026-11-02T23:16:24.348Z",
+        "reason": "user confirmed: keep as designed"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "animate-bounce",
+        "createdAt": "2026-11-02T23:16:24.413Z",
+        "reason": "user confirmed: keep as designed"
+      }
+    ]
+  }
+}

@@ -17,7 +17,8 @@ function splitBlobs(text: string): StatementSegment[] {
   for (const match of text.matchAll(blobToken)) {
     const token = match[0];
     const start = match.index ?? 0;
-    if (token.includes("://")) continue;
+    const precedingContext = text.slice(Math.max(0, start - 8), start);
+    if (token.includes("://") || /https?:$/i.test(precedingContext)) continue;
     pushProse(out, text.slice(cursor, start));
     out.push({ type: "blob", text: token });
     cursor = start + token.length;
@@ -82,14 +83,14 @@ function classifyRemaining(segment: StatementSegment): StatementSegment[] {
   if (error) {
     const before = text.slice(0, error.index);
     const remainder = text.slice(error.index);
-    if (/^(?:A client error|An error occurred)/i.test(remainder)) return [{ type: "code", language: "text", text: remainder.trim() }];
+    const beforeSegments = before ? classifyRemaining({ type: "prose", text: before }) : [];
     const payload = /\b[A-Za-z0-9+/=_\-.]{64,}/.exec(remainder);
     if (payload && remainder.slice(payload.index + payload[0].length).length > 0) {
       const start = payload.index;
       const end = start + payload[0].length;
-      return [...splitBlobs(before + remainder.slice(0, start)), { type: "blob", text: payload[0] }, ...splitBlobs(remainder.slice(end))];
+      return [...beforeSegments, ...splitBlobs(remainder.slice(0, start)), { type: "blob", text: payload[0] }, ...splitBlobs(remainder.slice(end))];
     }
-    return [{ type: "code", language: "text", text: remainder.trim() }];
+    return [...beforeSegments, { type: "code", language: "text", text: remainder.trim() }];
   }
   const lines = text.split("\n");
   const out: StatementSegment[] = [];
