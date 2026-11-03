@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 // Days before anonymization kicks in for each account state
 const REJECTED_RETENTION_DAYS = 90;
 const PENDING_RETENTION_DAYS = 180;
+const ADMIN_AUDIT_RETENTION_DAYS = 180;
 const STUDY_HISTORY_RETENTION_YEARS = 3;
 
 function daysAgo(days: number): Date {
@@ -69,9 +70,18 @@ async function anonymizeExpiredSessions(cutoff: Date): Promise<number> {
   return count;
 }
 
+async function purgeOldAuditEvents(cutoff: Date): Promise<number> {
+  const { count } = await prisma.adminAuditEvent.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+
+  return count;
+}
+
 async function runRetention(): Promise<void> {
   const rejectedCutoff = daysAgo(REJECTED_RETENTION_DAYS);
   const pendingCutoff = daysAgo(PENDING_RETENTION_DAYS);
+  const auditCutoff = daysAgo(ADMIN_AUDIT_RETENTION_DAYS);
   const sessionCutoff = yearsAgo(STUDY_HISTORY_RETENTION_YEARS);
 
   // Anonymize rejected accounts older than 90 days
@@ -116,11 +126,17 @@ async function runRetention(): Promise<void> {
     logger.info({ count: sessionCount }, "data-retention: anonymized old study session user references");
   }
 
+  const auditEventsRemoved = await purgeOldAuditEvents(auditCutoff);
+  if (auditEventsRemoved > 0) {
+    logger.info({ count: auditEventsRemoved }, "data-retention: removed old admin audit events");
+  }
+
   logger.info(
     {
       rejectedAnonymized: rejectedUsers.length,
       pendingAnonymized: pendingUsers.length,
       sessionsAnonymized: sessionCount,
+      auditEventsRemoved,
     },
     "data-retention: run complete",
   );
