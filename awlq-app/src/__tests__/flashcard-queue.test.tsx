@@ -21,6 +21,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, renderHook, render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 // ---------------------------------------------------------------------------
 // TC-105: useFlashcardQueue
@@ -245,18 +246,26 @@ describe("TC-106: FlashcardDeck remount resets to the front face", () => {
   // the grade bar, which only renders `{isFlipped && ...}` — see
   // FlashcardDeck.tsx.
   it("hides the grade bar (i.e. resets isFlipped) after a key-based remount to a new card", () => {
-    const { rerender } = render(<FlashcardDeck key={DECK_CARD_1.id} card={DECK_CARD_1} {...DECK_PROPS} />);
+    const { rerender } = render(
+      <TooltipProvider>
+        <FlashcardDeck key={DECK_CARD_1.id} card={DECK_CARD_1} {...DECK_PROPS} />
+      </TooltipProvider>,
+    );
 
     expect(screen.queryByText("Como foi?")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /revelar a resposta/i }));
+    fireEvent.click(screen.getByRole("button", { name: /ver resposta/i }));
     expect(screen.getByText("Como foi?")).toBeTruthy();
 
     // FlashcardsScreen keys FlashcardDeck by card.id, so navigating to a new
     // card is a remount, not a prop update — isFlipped must reset to false,
     // hiding the grade bar again instead of leaking the previous card's
     // flipped state.
-    rerender(<FlashcardDeck key={DECK_CARD_2.id} card={DECK_CARD_2} {...DECK_PROPS} />);
+    rerender(
+      <TooltipProvider>
+        <FlashcardDeck key={DECK_CARD_2.id} card={DECK_CARD_2} {...DECK_PROPS} />
+      </TooltipProvider>,
+    );
 
     expect(screen.queryByText("Como foi?")).toBeNull();
   });

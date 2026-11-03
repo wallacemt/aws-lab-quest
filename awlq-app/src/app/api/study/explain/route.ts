@@ -296,6 +296,8 @@ Regras:
 }
 - Seja consistente com as alternativas corretas oficiais (${originalCorrectOptions.join(", ")}).
 - Se uma alternativa não existir, explique como "nao aplicavel".
+- Use crases (\`código\`) para código, identificadores, nomes de serviços técnicos e expressões como \`${"${...}"}\`; nunca use HTML.
+- Quando houver referências aplicáveis, termine a explicação com uma linha exatamente "Referências AWS:" seguida das URLs completas da documentação oficial da AWS relevante. Se não houver referência aplicável, omita essa linha.
 `;
 
     const text = await callAI(prompt, "QUESTION_EXPLAIN");

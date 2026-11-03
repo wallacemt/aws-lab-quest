@@ -60,3 +60,36 @@ export function isCorrectAnswer(params: {
 
   return normalizedExpected.every((option, index) => option === selected[index]);
 }
+
+export type AnswerOutcome = "correct" | "partial" | "wrong" | "unanswered";
+
+export function getAnswerOutcome(params: {
+  questionType: "single" | "multi";
+  selectedOption?: unknown;
+  selectedOptions?: unknown;
+  correctOption?: unknown;
+  correctOptions?: unknown;
+}): AnswerOutcome {
+  const selectedArray = normalizeOptionArray(params.selectedOptions);
+  const selected = selectedArray.length > 0
+    ? selectedArray
+    : isOptionKey(params.selectedOption) ? [params.selectedOption] : [];
+  if (selected.length === 0 || (params.selectedOption === "-" && selectedArray.length === 0)) {
+    return "unanswered";
+  }
+
+  if (isCorrectAnswer(params)) {
+    return "correct";
+  }
+
+  if (params.questionType === "multi") {
+    const expected = normalizeOptionArray(params.correctOptions);
+    const fallbackCorrect = isOptionKey(params.correctOption) ? params.correctOption : "A";
+    const normalizedExpected = expected.length > 0 ? expected : [fallbackCorrect];
+    if (selected.some((option) => normalizedExpected.includes(option))) {
+      return "partial";
+    }
+  }
+
+  return "wrong";
+}

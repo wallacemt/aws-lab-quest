@@ -100,6 +100,7 @@ export type SimuladoContextType = {
   goToQuestion: (index: number) => Promise<void>;
   toggleMarkForReview: (questionId: string) => void;
   confirmAnswer: (questionId: string) => void;
+  confirmAnswerAndReview: (questionId: string) => Promise<void>;
   setConfidenceForQuestion: (questionId: string, confidence: AnswerConfidence) => void;
   handleForceExit: () => void;
   handleReset: () => void;

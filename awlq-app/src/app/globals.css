@@ -17,6 +17,11 @@
   --pixel-primary: #e06700;
   --pixel-accent: #008f52;
   --pixel-muted: #e0d7c6;
+  --pixel-danger: #b42318;
+  --pixel-on-danger: #ffffff;
+  --pixel-origin-user: var(--pixel-accent);
+  --pixel-origin-auto: var(--pixel-primary);
+  --flashcard-face-max-h: min(56dvh, 34rem);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -70,6 +75,8 @@ html {
   --color-muted: var(--pixel-muted);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-pixel);
+  --font-reading: var(--font-body);
+  --color-pixel-danger: var(--pixel-danger);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -119,6 +126,8 @@ html {
   --pixel-primary: #ff7a00;
   --pixel-accent: #19e26d;
   --pixel-muted: #101834;
+  --pixel-danger: #ff8a80;
+  --pixel-on-danger: #000000;
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
@@ -148,6 +157,18 @@ html {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+@keyframes pixel-caret-blink {
+  to { visibility: hidden; }
+}
+
+.pixel-caret {
+  animation: pixel-caret-blink 1s steps(2, start) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pixel-caret { animation: none; }
 }
 
 body {

@@ -13,8 +13,11 @@ import { SimuladoResultOverview } from "@/features/study/components/simulado/Sim
 import { ReportQuestionModal } from "@/features/study/components/ReportQuestionModal";
 import { SimuladoPreSubmitModal } from "@/features/study/components/simulado/SimuladoPreSubmitModal";
 import { useSimuladoContext } from "@/features/study/context/SimuladoContext";
+import { resolvePrimaryAction } from "@/features/study/components/simulado/primary-action";
 import { isAnswerCorrect, normalizeAnswerValue } from "@/features/study/services";
-import { buildTopicPerformance, filterSimuladoReviewQuestions, getAverageQuestionTime } from "@/features/utils/funcs/simulado-utils";
+import { buildTopicPerformance, getAverageQuestionTime } from "@/features/utils/funcs/simulado-utils";
+import { fromLiveSimulado } from "@/features/study/review/adapters";
+import { filterReviewItems } from "@/features/study/review/review-filters";
 import { GAP_TOP_N } from "@/types/questions";
 
 export function SimuladoExamFlow() {
@@ -64,7 +67,7 @@ export function SimuladoExamFlow() {
     setShowPreSubmitSummary,
     goToQuestion,
     toggleMarkForReview,
-    confirmAnswer,
+    confirmAnswerAndReview,
     setConfidenceForQuestion,
     handleForceExit,
     handleReset,
@@ -94,7 +97,9 @@ export function SimuladoExamFlow() {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const topicPerformance = useMemo(() => buildTopicPerformance(questions, answers), [questions, answers]);
   const averageQuestionTime = useMemo(() => getAverageQuestionTime(questions, timeSpentByQuestion), [questions, timeSpentByQuestion]);
-  const filteredQuestions = useMemo(() => filterSimuladoReviewQuestions(questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, { result: resultFilter, topic: topicFilter, time: timeFilter, markedOnly, confidence: confidenceFilter }), [answers, questions, resultFilter, timeFilter, timeSpentByQuestion, topicFilter, markedForReview, confidenceByQuestion, markedOnly, confidenceFilter]);
+  const reviewItems = useMemo(() => fromLiveSimulado({ questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, explanationsByQuestion: reviewByQuestion }).items, [questions, answers, timeSpentByQuestion, markedForReview, confidenceByQuestion, reviewByQuestion]);
+  const filteredReviewItems = useMemo(() => filterReviewItems(reviewItems, { outcome: resultFilter, topic: topicFilter, time: timeFilter, markedOnly, confidence: confidenceFilter }), [reviewItems, resultFilter, topicFilter, timeFilter, markedOnly, confidenceFilter]);
+  const filteredQuestions = filteredReviewItems.map((item) => questions[item.index]);
   const correctCount = useMemo(() => questions.filter((question) => isAnswerCorrect({ questionType: question.questionType, answer: answers[question.id], correctOption: question.correctOption, correctOptions: question.correctOptions })).length, [answers, questions]);
   const timerModeColors = session?.timerMode === "COUNTUP_FREE"
     ? { card: "border-blue-500 bg-blue-900/10", label: "text-blue-300", box: "border-blue-400 text-blue-300" }
@@ -169,7 +174,7 @@ export function SimuladoExamFlow() {
     !confidenceByQuestion[currentQuestion.id];
 
   function openConfidencePromptIfNeeded() {
-    if (needsConfidencePrompt) setConfidencePromptOpen(true);
+    if (!reviewEachAnswer && needsConfidencePrompt) setConfidencePromptOpen(true);
   }
 
   function advance(action: () => void) {
@@ -445,7 +450,7 @@ export function SimuladoExamFlow() {
                         <PixelButton
                           variant="ghost"
                           onClick={() => void goToQuestion(currentIndex - 1)}
-                          disabled={reviewEachAnswer || currentIndex === 0}
+                          disabled={currentIndex === 0}
                         >
                           ← Anterior
                         </PixelButton>
@@ -461,17 +466,30 @@ export function SimuladoExamFlow() {
                         >
                           <PixelButton
                             onClick={() => {
-                              if (reviewEachAnswer && !submitted && currentQuestion) {
-                                confirmAnswer(currentQuestion.id);
-                                void goToQuestion(currentIndex);
+                              const action = resolvePrimaryAction({
+                                reviewEachAnswer,
+                                submitted,
+                                confirmed: Boolean(currentQuestion && confirmedAnswers.has(currentQuestion.id)),
+                                isLast: currentIndex === questions.length - 1,
+                              });
+                              if (action === "confirm" && currentQuestion) {
+                                void confirmAnswerAndReview(currentQuestion.id);
+                                return;
+                              }
+                              if (action === "show-summary") {
+                                setShowPreSubmitSummary(true);
+                                return;
+                              }
+                              if (action === "submit") {
+                                setShowPreSubmitSummary(true);
                                 return;
                               }
                               advance(() => void goToQuestion(currentIndex + 1));
                             }}
                             onMouseEnter={openConfidencePromptIfNeeded}
-                            disabled={reviewEachAnswer ? (!normalizeAnswerValue(answers[currentQuestion.id]).length || (submitted && currentIndex === questions.length - 1)) : currentIndex === questions.length - 1}
+                            disabled={reviewEachAnswer ? (!confirmedAnswers.has(currentQuestion.id) && !normalizeAnswerValue(answers[currentQuestion.id]).length) : currentIndex === questions.length - 1}
                           >
-                            {reviewEachAnswer && !submitted && !confirmedAnswers.has(currentQuestion.id) ? "Conferir resposta" : "Proxima →"}
+                            {reviewEachAnswer && !submitted && !confirmedAnswers.has(currentQuestion.id) ? "Conferir resposta" : currentIndex === questions.length - 1 ? "Enviar simulado" : "Proxima →"}
                           </PixelButton>
                         </ConfidenceGate>
                       </div>

@@ -14,7 +14,6 @@ import {
   CalendarCheck,
   Trophy,
 } from "lucide-react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface GameCardProps {
@@ -99,32 +98,18 @@ export default function GameCard({ id, title, description, cta, handleClick, hig
         <h3 className="font-mono text-2xl font-bold text-pixel-text mb-2 uppercase tracking-wide">{title}</h3>
 
         <p className="text-pixel-subtext text-sm md:text-base flex-1 mb-6 leading-relaxed">{description}</p>
-        {id === "simulado" ? (
-          <Link
-            href={id}
-            target="_blank"
-            className="mt-auto cursor-pointer flex items-center justify-between pt-4 border-t-2 border-pixel-border/10"
-          >
-            <span className="font-mono font-bold text-primary group-hover:text-pixel-text transition-colors uppercase tracking-widest text-sm md:text-base">
-              {cta}
-            </span>
-            <div className="w-8 h-8 rounded-full bg-pixel-muted flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-              <Play className="w-4 h-4 ml-0.5 fill-current" />
-            </div>
-          </Link>
-        ) : (
-          <div
-            className="mt-auto cursor-pointer flex items-center justify-between pt-4 border-t-2 border-pixel-border/10"
-            onClick={handleClick}
-          >
-            <span className="font-mono font-bold text-primary group-hover:text-pixel-text transition-colors uppercase tracking-widest text-sm md:text-base">
-              {cta}
-            </span>
-            <div className="w-8 h-8 rounded-full bg-pixel-muted flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-              <Play className="w-4 h-4 ml-0.5 fill-current" />
-            </div>
+
+        <div
+          className="mt-auto cursor-pointer flex items-center justify-between pt-4 border-t-2 border-pixel-border/10"
+          onClick={handleClick}
+        >
+          <span className="font-mono font-bold text-primary group-hover:text-pixel-text transition-colors uppercase tracking-widest text-sm md:text-base">
+            {cta}
+          </span>
+          <div className="w-8 h-8 rounded-full bg-pixel-muted flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+            <Play className="w-4 h-4 ml-0.5 fill-current" />
           </div>
-        )}
+        </div>
       </div>
     </button>
   );

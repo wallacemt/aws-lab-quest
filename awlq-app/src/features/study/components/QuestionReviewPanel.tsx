@@ -3,7 +3,7 @@
 import { PixelCard } from "@/components/ui/pixel-card";
 import { QuestionOption } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { StatementContent } from "@/features/study/components/StatementContent";
+import { RichText } from "@/components/rich-text/RichText";
 
 export type QuestionReviewOption = {
   option: QuestionOption;
@@ -69,8 +69,8 @@ export function QuestionReviewPanel({
 
       {questionStatement && (
         <div className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] px-3 py-3">
-          <div className="max-w-prose break-words font-[var(--font-body)] text-base leading-relaxed">
-            <StatementContent text={questionStatement} />
+          <div className="min-w-0 max-w-prose [overflow-wrap:anywhere] font-[var(--font-body)] text-base leading-relaxed">
+            <RichText text={questionStatement} showReferences />
           </div>
         </div>
       )}
@@ -87,8 +87,8 @@ export function QuestionReviewPanel({
       {summary && (
         <div className="border border-[var(--pixel-border)] bg-black/15 px-3 py-2">
           <p className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Resumo da revisao</p>
-          <div className="mt-1 max-w-prose break-words font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
-            <StatementContent text={summary} />
+          <div className="mt-1 min-w-0 max-w-prose [overflow-wrap:anywhere] font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">
+            <RichText text={summary} showReferences />
           </div>
         </div>
       )}
@@ -109,9 +109,9 @@ export function QuestionReviewPanel({
             )}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="min-w-0 max-w-prose break-words font-[var(--font-body)] text-sm leading-relaxed">
+              <p className="min-w-0 min-w-0 max-w-prose [overflow-wrap:anywhere] font-[var(--font-body)] text-sm leading-relaxed">
                 <span className="mr-2 font-mono text-xs text-[var(--pixel-subtext)]">{item.option})</span>
-                {item.text}
+                <RichText inline text={item.text} />
               </p>
               <div className="flex flex-wrap gap-1">
                 <span
@@ -133,8 +133,8 @@ export function QuestionReviewPanel({
             </div>
 
             {showExplanations && item.explanation && (
-              <p className="max-w-prose break-words font-[var(--font-body)] text-sm leading-relaxed text-gray-400">
-                {item.explanation}
+              <p className="min-w-0 max-w-prose [overflow-wrap:anywhere] font-[var(--font-body)] text-sm leading-relaxed text-gray-400">
+                <RichText text={item.explanation} showReferences />
               </p>
             )}
             {!showExplanations && (

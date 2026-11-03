@@ -9,6 +9,7 @@ import { QuestHistoryItem, StudyHistoryItem } from "@/features/study/services";
 import { getTaskXpByDifficulty } from "@/lib/levels";
 import { normalizeOptionText } from "@/lib/study-option-text";
 import { isCorrectAnswer, normalizeQuestionType } from "@/lib/study-answer-utils";
+import { resolveSessionKind } from "@/features/study/review/types";
 import { QuestionOptionMapping, Task } from "@/lib/types";
 
 type StudyAnswerSnapshot = {
@@ -29,18 +30,6 @@ type StudySessionItem = Omit<StudyHistoryItem, "answersSnapshot"> & { answersSna
 export type ActiveTab = "LAB" | "KC" | "SPRINT" | "SIMULADO" | "TRILHAS" | "ARENA" | "QUIZ_DIARIO";
 
 export const ACTIVE_TABS: ActiveTab[] = ["LAB", "KC", "SPRINT", "SIMULADO", "TRILHAS", "ARENA", "QUIZ_DIARIO"];
-
-// ponytail: Sprint shares StudySessionType.KC with regular Knowledge Checks (DEF-003) —
-// this title prefix is how the sprint route (src/app/api/retention/sprint/route.ts)
-// tags its own sessions, reused here to split the two into separate tabs.
-const SPRINT_TITLE_PREFIX = "Sprint ";
-
-// Boss battle victories also share StudySessionType.KC (see /api/arena/battle/route.ts) —
-// same title-prefix trick as Sprint, so wins get their own Arena tab instead of showing under KC.
-const ARENA_TITLE_PREFIX = "Boss Battle: ";
-
-// Daily Quiz also shares StudySessionType.KC (see /api/daily-quiz/route.ts) — same trick.
-const DAILY_QUIZ_TITLE_PREFIX = "Quiz Diário — ";
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: "Facil",
@@ -151,38 +140,32 @@ export function HistoryTabs({
     () =>
       filteredStudyHistory.filter(
         (i) =>
-          i.sessionType === "KC" &&
-          !i.title.startsWith(SPRINT_TITLE_PREFIX) &&
-          !i.title.startsWith(ARENA_TITLE_PREFIX) &&
-          !i.title.startsWith(DAILY_QUIZ_TITLE_PREFIX),
+          resolveSessionKind(i.sessionType, i.title) === "KC",
       ),
     [filteredStudyHistory],
   );
   const filteredSprint = useMemo(
-    () => filteredStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(SPRINT_TITLE_PREFIX)),
+    () => filteredStudyHistory.filter((i) => resolveSessionKind(i.sessionType, i.title) === "SPRINT"),
     [filteredStudyHistory],
   );
   const filteredArena = useMemo(
-    () => filteredStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(ARENA_TITLE_PREFIX)),
+    () => filteredStudyHistory.filter((i) => resolveSessionKind(i.sessionType, i.title) === "ARENA"),
     [filteredStudyHistory],
   );
   const filteredDailyQuiz = useMemo(
-    () => filteredStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(DAILY_QUIZ_TITLE_PREFIX)),
+    () => filteredStudyHistory.filter((i) => resolveSessionKind(i.sessionType, i.title) === "QUIZ_DIARIO"),
     [filteredStudyHistory],
   );
   const filteredSimulado = useMemo(() => filteredStudyHistory.filter((i) => i.sessionType === "SIMULADO"), [filteredStudyHistory]);
 
   const kcCount = normalizedStudyHistory.filter(
     (i) =>
-      i.sessionType === "KC" &&
-      !i.title.startsWith(SPRINT_TITLE_PREFIX) &&
-      !i.title.startsWith(ARENA_TITLE_PREFIX) &&
-      !i.title.startsWith(DAILY_QUIZ_TITLE_PREFIX),
+      resolveSessionKind(i.sessionType, i.title) === "KC",
   ).length;
-  const sprintCount = normalizedStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(SPRINT_TITLE_PREFIX)).length;
-  const arenaCount = normalizedStudyHistory.filter((i) => i.sessionType === "KC" && i.title.startsWith(ARENA_TITLE_PREFIX)).length;
+  const sprintCount = normalizedStudyHistory.filter((i) => resolveSessionKind(i.sessionType, i.title) === "SPRINT").length;
+  const arenaCount = normalizedStudyHistory.filter((i) => resolveSessionKind(i.sessionType, i.title) === "ARENA").length;
   const dailyQuizCount = normalizedStudyHistory.filter(
-    (i) => i.sessionType === "KC" && i.title.startsWith(DAILY_QUIZ_TITLE_PREFIX),
+    (i) => resolveSessionKind(i.sessionType, i.title) === "QUIZ_DIARIO",
   ).length;
   const simuladoCount = normalizedStudyHistory.filter((i) => i.sessionType === "SIMULADO").length;
 

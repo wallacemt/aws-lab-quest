@@ -23,7 +23,7 @@ generated
 graphify-out
 # production
 /build
-
+.impeccable
 # misc
 .DS_Store
 *.pem
@@ -43,4 +43,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.env
+.envawlq-app/.impeccable/hook.cache.json
