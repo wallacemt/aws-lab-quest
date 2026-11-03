@@ -47,6 +47,22 @@ describe("formatStatement", () => {
     ]);
   });
 
+  it("preserves long markdown URLs as prose and keeps their closing parenthesis", () => {
+    const statement = "Consulte [políticas de escalonamento dinâmico](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scaling-target-tracking.html) para mais detalhes.";
+
+    expect(formatStatement(statement)).toEqual([{ type: "prose", text: statement }]);
+    expect(formatStatement(statement)[0].text).toContain("target-tracking.html) para mais detalhes.");
+  });
+
+  it("continues to detect an isolated long token as a blob", () => {
+    const token = "a1b2c3d4".repeat(12);
+
+    expect(formatStatement(`Token: ${token}`)).toEqual([
+      { type: "prose", text: "Token: " },
+      { type: "blob", text: token },
+    ]);
+  });
+
   it("formats a long CLI error as monospaced text", () => {
     const error = `A client error (UnauthorizedOperation) occurred when calling the RunInstances operation: ${"x".repeat(120)}`;
     expect(formatStatement(error)).toEqual([{ type: "code", language: "text", text: error }]);
@@ -61,6 +77,19 @@ describe("formatStatement", () => {
       { type: "prose", text: "Mensagem de falha codificada: " },
       { type: "blob", text: blob },
       { type: "prose", text: question },
+    ]);
+  });
+
+  it("preserves context and follow-up around an AWS error and request token", () => {
+    const token = "R".repeat(100);
+    const statement = `O comando abaixo lista objetos no bucket.\n$ aws s3api list-objects-v2 --bucket exemplo\nAn error occurred (AccessDenied) when calling the ListObjectsV2 operation: RequestId: ${token}\nO que esse erro indica?`;
+
+    expect(formatStatement(statement)).toEqual([
+      { type: "prose", text: "O comando abaixo lista objetos no bucket.\n" },
+      { type: "code", language: "text", text: "$ aws s3api list-objects-v2 --bucket exemplo" },
+      { type: "prose", text: "An error occurred (AccessDenied) when calling the ListObjectsV2 operation: RequestId: " },
+      { type: "blob", text: token },
+      { type: "prose", text: "\nO que esse erro indica?" },
     ]);
   });
 
