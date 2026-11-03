@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 type OnlineCountResponse = {
   onlineCount?: number;
@@ -12,6 +13,10 @@ async function postHeartbeat() {
     method: "POST",
     credentials: "include",
   });
+}
+
+async function postGuestHeartbeat() {
+  await fetch("/api/online/guest-heartbeat", { method: "POST", credentials: "include" });
 }
 
 async function fetchOnlineCount(): Promise<number> {
@@ -31,16 +36,18 @@ async function fetchOnlineCount(): Promise<number> {
 
 export function useOnlineUsers() {
   const [onlineCount, setOnlineCount] = useState(0);
+  const { isAuthenticated, isPending } = useAuth();
+  const heartbeat = isAuthenticated ? postHeartbeat : postGuestHeartbeat;
 
   const refresh = useCallback(async () => {
     try {
-      await postHeartbeat();
+      if (!isPending) await heartbeat();
       const count = await fetchOnlineCount();
       setOnlineCount(count);
     } catch {
       // ignore transient errors
     }
-  }, []);
+  }, [heartbeat, isPending]);
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -48,7 +55,7 @@ export function useOnlineUsers() {
     }, 0);
 
     const heartbeatInterval = window.setInterval(() => {
-      void postHeartbeat();
+      if (!isPending) void heartbeat();
     }, 60 * 1000);
 
     const refreshInterval = window.setInterval(() => {
@@ -67,7 +74,7 @@ export function useOnlineUsers() {
       window.clearInterval(refreshInterval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [refresh]);
+  }, [heartbeat, isPending, refresh]);
 
   return {
     onlineCount,

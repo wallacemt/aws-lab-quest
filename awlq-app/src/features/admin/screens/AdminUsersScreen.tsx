@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { listAdminUsers } from "@/features/admin/services/admin-api";
 import { AdminUserEditModal } from "@/features/admin/components/AdminUserEditModal";
 import { AdminUserListItem, CertificationOption, PaginatedResult } from "@/features/admin/types";
+import { PixelCard } from "@/components/ui/pixel-card";
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -31,6 +32,29 @@ export function AdminUsersScreen() {
   const [autoApprove, setAutoApprove] = useState<boolean | null>(null);
   const [autoApproveLoading, setAutoApproveLoading] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUserListItem | null>(null);
+  const [guests, setGuests] = useState<{ guestSessionId: string; displayName: string; lastSeen: string }[]>([]);
+  // Captured alongside each guest fetch so render can stay pure (no Date.now() in JSX).
+  const [guestsLoadedAt, setGuestsLoadedAt] = useState(() => Date.now());
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadGuests = async () => {
+      try {
+        const response = await fetch("/api/admin/guests", { cache: "no-store", credentials: "include" });
+        if (!response.ok) return;
+        const payload = (await response.json()) as { guests?: typeof guests };
+        if (!cancelled) {
+          setGuests(payload.guests ?? []);
+          setGuestsLoadedAt(Date.now());
+        }
+      } catch {
+        // Guest tracking is best effort.
+      }
+    };
+    void loadGuests();
+    const interval = window.setInterval(() => void loadGuests(), 25_000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, []);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -159,6 +183,25 @@ export function AdminUsersScreen() {
           )}
         </div>
       </header>
+
+      <PixelCard className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-mono text-xs uppercase text-[var(--pixel-primary)]">Convidados online agora</h2>
+          <span className="font-mono text-[10px] text-[var(--pixel-subtext)]">{guests.length}</span>
+        </div>
+        {guests.length ? (
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {guests.map((guest) => {
+              const seconds = Math.max(0, Math.floor((guestsLoadedAt - new Date(guest.lastSeen).getTime()) / 1000));
+              const age = seconds < 60 ? `visto há ${seconds}s` : `visto há ${Math.floor(seconds / 60)}min`;
+              return <li key={guest.guestSessionId} className="border border-[var(--pixel-border)] bg-[var(--pixel-bg)] p-3">
+                <p className="font-[var(--font-body)] text-sm text-[var(--pixel-text)]">{guest.displayName} <span className="font-mono text-[10px] text-[var(--pixel-primary)]">guest</span></p>
+                <p className="font-mono text-[10px] text-[var(--pixel-subtext)]">{age}</p>
+              </li>;
+            })}
+          </ul>
+        ) : <p className="font-[var(--font-body)] text-xs text-[var(--pixel-subtext)]">Nenhum convidado online.</p>}
+      </PixelCard>
 
       {/* Filters */}
       <section className="border border-[#1e293b] bg-[#111827] p-4">
