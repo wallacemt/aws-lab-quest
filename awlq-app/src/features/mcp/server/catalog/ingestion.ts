@@ -13,6 +13,11 @@ const sourceCreateSchema = z.object({ displayName: z.string().min(1), url: z.str
 const sourceUpdateSchema = z.object({ id: z.string().min(1), active: z.boolean() }).strict();
 const bulkDeleteSchema = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) }).strict();
 const noParamsSchema = z.object({}).strict();
+const ingestPdfUrlSchema = z.object({
+  url: z.string().url(),
+  certificationCode: z.string().min(1),
+  uploadType: z.enum(["simulate_pdf", "simulado_generation"]).optional(),
+}).strict();
 
 async function checkIngestionSourceHost(input: Record<string, unknown>): Promise<string | null> {
   const hostname = new URL(String(input.url)).hostname.toLowerCase();
@@ -30,6 +35,7 @@ export const INGESTION_TOOLS: AdminToolDef[] = [
   { name: "ingestion_job_cancel", title: "Cancelar trabalho de ingestão", description: "Cancela um trabalho de ingestão em andamento.", domain: "ingestion", tier: "write", method: "PATCH", path: "uploads/jobs/[jobId]", inputSchema: jobIdSchema, pathParams: ["jobId"], buildBody: () => ({ action: "cancel" }), handler: async () => (await import("@/app/api/admin/uploads/jobs/[jobId]/route")).PATCH as never },
   { name: "ingestion_source_create", title: "Criar fonte de ingestão", description: "Registra uma fonte de ingestão cuja URL esteja na allowlist configurada.", domain: "ingestion", tier: "write", method: "POST", path: "ingestion-sources", inputSchema: sourceCreateSchema, buildBody: (input) => input, preflight: checkIngestionSourceHost, handler: async () => (await import("@/app/api/admin/ingestion-sources/route")).POST as never },
   { name: "ingestion_source_update", title: "Atualizar fonte de ingestão", description: "Ativa ou desativa uma fonte de ingestão.", domain: "ingestion", tier: "write", method: "PATCH", path: "ingestion-sources", inputSchema: sourceUpdateSchema, buildBody: (input) => input, handler: async () => (await import("@/app/api/admin/ingestion-sources/route")).PATCH as never },
+  { name: "pdf_ingest_url", title: "Ingerir PDF por URL", description: "Baixa um PDF de uma URL na allowlist e inicia a ingestão de questões.", domain: "ingestion", tier: "write", method: "POST", path: "pdf/ingest-url", inputSchema: ingestPdfUrlSchema, buildBody: (input) => input, handler: async () => (await import("@/app/api/admin/pdf/ingest-url/route")).POST as never },
   { name: "uploads_delete", title: "Excluir upload", description: "Exclui um arquivo enviado.", domain: "ingestion", tier: "danger", method: "DELETE", path: "uploads/[fileId]", inputSchema: fileIdSchema, pathParams: ["fileId"], handler: async () => (await import("@/app/api/admin/uploads/[fileId]/route")).DELETE as never },
   { name: "uploads_bulk_delete", title: "Excluir uploads em lote", description: "Exclui até 200 arquivos enviados pelos IDs informados.", domain: "ingestion", tier: "danger", method: "DELETE", path: "uploads", inputSchema: bulkDeleteSchema, buildBody: (input) => input, handler: async () => (await import("@/app/api/admin/uploads/route")).DELETE as never },
 ];
