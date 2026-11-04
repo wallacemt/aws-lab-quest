@@ -40,12 +40,15 @@ export async function revokeToken(tokenId: string, revokedByUserId: string): Pro
 }
 export class TokenNotFoundError extends Error {}
 
-export async function verifyBearer(authorizationHeader: string | null): Promise<McpPrincipal | null> {
+export async function verifyBearer(authorizationHeader: string | null): Promise<{ principal: McpPrincipal; expiresAt: Date } | null> {
   const match = authorizationHeader?.match(/^Bearer\s+(awlq_mcp_[A-Za-z0-9_-]+)$/i);
   if (!match) return null;
   const token = await prisma.mcpToken.findUnique({ where: { tokenHash: hashToken(match[1]) }, include: { user: { select: { id: true, email: true, role: true, active: true } } } });
   if (!token || token.revokedAt || token.expiresAt <= new Date() || !token.user.active || token.user.role !== "admin") return null;
-  return { userId: token.user.id, email: token.user.email, scopes: token.scopes, tokenId: token.id };
+  return {
+    principal: { userId: token.user.id, email: token.user.email, scopes: token.scopes, tokenId: token.id },
+    expiresAt: token.expiresAt,
+  };
 }
 
 export async function touchLastUsed(tokenId: string, ip: string | null): Promise<void> {

@@ -37,7 +37,7 @@ describe("MCP token service", () => {
   it("AC-11: verifies active admin and denies inactive or non-admin owners", async () => {
     const secret = "awlq_mcp_" + "A".repeat(43);
     findUnique.mockResolvedValue({ id: "t1", revokedAt: null, expiresAt: new Date(Date.now() + 10000), user: { id: "u1", email: "a@b.c", role: "admin", active: true }, scopes: ["users:read"] });
-    expect(await verifyBearer(`Bearer ${secret}`)).toEqual({ userId: "u1", email: "a@b.c", scopes: ["users:read"], tokenId: "t1" });
+    expect(await verifyBearer(`Bearer ${secret}`)).toEqual({ principal: { userId: "u1", email: "a@b.c", scopes: ["users:read"], tokenId: "t1" }, expiresAt: expect.any(Date) });
     expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { tokenHash: createHash("sha256").update(secret).digest("hex") } }));
     findUnique.mockResolvedValueOnce({ id: "t1", revokedAt: null, expiresAt: new Date(Date.now() + 10000), user: { id: "u1", email: "a@b.c", role: "user", active: true }, scopes: [] });
     expect(await verifyBearer(`Bearer ${secret}`)).toBeNull();
