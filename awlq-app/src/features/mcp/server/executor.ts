@@ -69,7 +69,7 @@ export async function executeTool(tool: AdminToolDef, input: unknown, principal:
     const queryString = query.size ? `?${query}` : "";
     const bodyInput = Object.fromEntries(Object.entries(args).filter(([key]) => !tool.pathParams?.some((p) => String(p) === key) && !tool.queryParams?.some((p) => String(p) === key)));
     const body = tool.buildBody ? tool.buildBody(args as never) : bodyInput;
-    const hasBody = tool.method !== "GET" && tool.method !== "DELETE" && (tool.buildBody !== undefined || Object.keys(bodyInput).length > 0);
+    const hasBody = tool.method !== "GET" && (tool.buildBody !== undefined || Object.keys(bodyInput).length > 0);
     const headers = new Headers();
     if (hasBody) headers.set("content-type", "application/json");
     for (const name of ["x-real-ip", "x-forwarded-for", "user-agent"]) {
