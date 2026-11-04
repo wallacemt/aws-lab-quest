@@ -8,7 +8,10 @@ type Props = { params: Promise<{ packId: string }> };
 async function getPack(packId: string) {
   return prisma.simuladoPack.findUnique({
     where: { id: packId },
-    include: { certificationPreset: { select: { name: true, code: true } }, _count: { select: { questions: true } } },
+    include: {
+      certificationPreset: { select: { name: true, code: true, examMinutes: true } },
+      _count: { select: { questions: true } },
+    },
   });
 }
 
@@ -37,5 +40,6 @@ export default async function ShareSimuladoPage({ params }: Props) {
   }
   const certification = pack.certificationPreset?.name ?? pack.certificationPreset?.code ?? "AWS";
   const difficulty = getSimuladoDifficultyLabel(pack.difficultyScore);
-  return <main className="grid min-h-screen place-items-center bg-[var(--pixel-bg)] p-4"><article className="w-full max-w-3xl overflow-hidden border-4 border-[var(--pixel-primary)] bg-[var(--pixel-card)] shadow-[8px_8px_0_0_#000]">{pack.artworkUrl && <img src={pack.artworkUrl} alt={`Arte do simulado ${pack.name}`} className="h-64 w-full object-cover" />}<div className="space-y-4 p-6"><p className="font-mono text-xs uppercase text-[var(--pixel-accent)]">Simulado AWS Lab Quest</p><h1 className="font-[var(--font-body)] text-2xl text-[var(--pixel-text)]">{pack.name}</h1><p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Certificação: {certification}</p><div className="flex flex-wrap gap-3 font-mono text-xs uppercase"><span className="border-2 border-[var(--pixel-border)] px-3 py-2">{difficulty}</span><span className="border-2 border-[var(--pixel-border)] px-3 py-2">{pack._count.questions} questões</span></div><Link href={`/simulado?packId=${encodeURIComponent(pack.id)}`} className="inline-block border-2 border-[var(--pixel-primary)] bg-[var(--pixel-primary)] px-4 py-3 font-mono text-xs uppercase text-black">Abrir simulado</Link></div></article></main>;
+  const configUrl = `/simulado/configurar?packId=${encodeURIComponent(pack.id)}&packName=${encodeURIComponent(pack.name)}&examMinutes=${pack.certificationPreset?.examMinutes ?? 90}`;
+  return <main className="grid min-h-screen place-items-center bg-[var(--pixel-bg)] p-4"><article className="w-full max-w-3xl overflow-hidden border-4 border-[var(--pixel-primary)] bg-[var(--pixel-card)] shadow-[8px_8px_0_0_#000]">{pack.artworkUrl && <img src={pack.artworkUrl} alt={`Arte do simulado ${pack.name}`} className="h-64 w-full object-cover" />}<div className="space-y-4 p-6"><p className="font-mono text-xs uppercase text-[var(--pixel-accent)]">Simulado AWS Lab Quest</p><h1 className="font-[var(--font-body)] text-2xl text-[var(--pixel-text)]">{pack.name}</h1><p className="font-[var(--font-body)] text-sm text-[var(--pixel-subtext)]">Certificação: {certification}</p><div className="flex flex-wrap gap-3 font-mono text-xs uppercase"><span className="border-2 border-[var(--pixel-border)] px-3 py-2">{difficulty}</span><span className="border-2 border-[var(--pixel-border)] px-3 py-2">{pack._count.questions} questões</span></div><Link href={configUrl} className="inline-block border-2 border-[var(--pixel-primary)] bg-[var(--pixel-primary)] px-4 py-3 font-mono text-xs uppercase text-black">Fazer agora</Link></div></article></main>;
 }

@@ -122,6 +122,7 @@ export function SimuladoScreen() {
   const [currentPackId, setCurrentPackId] = useState<string | null>(null);
   const [currentPackName, setCurrentPackName] = useState<string | null>(null);
   const [expandedPackHistory, setExpandedPackHistory] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
 
   const confettiFiredRef = useRef(false);
   const prevRemainingRef = useRef(remainingSeconds);
@@ -525,6 +526,25 @@ export function SimuladoScreen() {
     router.push(
       `/simulado/configurar?packId=${encodeURIComponent(packId)}&packName=${encodeURIComponent(packName)}&examMinutes=${examMinutes}`,
     );
+  }
+
+  async function handleSharePack(packId: string): Promise<boolean> {
+    const url = `${window.location.origin}/share/simulado/${encodeURIComponent(packId)}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Simulado AWS Lab Quest", url });
+        setShareMessage("Link compartilhado!");
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareMessage("Link copiado!");
+      }
+      window.setTimeout(() => setShareMessage(null), 2500);
+      return true;
+    } catch {
+      setShareMessage("Não foi possível compartilhar o link.");
+      window.setTimeout(() => setShareMessage(null), 2500);
+      return false;
+    }
   }
 
   async function fetchReviewForQuestion(
@@ -1163,7 +1183,13 @@ export function SimuladoScreen() {
                       onRefresh={() => setPacksRefreshKey((k) => k + 1)}
                       onToggleHistory={(id) => setExpandedPackHistory(id)}
                       onStartPack={handleOpenPackConfig}
+                      onSharePack={handleSharePack}
                     />
+                    {shareMessage && (
+                      <p role="status" className="font-mono text-[10px] uppercase text-[var(--pixel-accent)]">
+                        {shareMessage}
+                      </p>
+                    )}
                   </div>
                 )}
 

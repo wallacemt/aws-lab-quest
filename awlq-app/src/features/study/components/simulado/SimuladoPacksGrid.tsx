@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { SkillBuilderBadge } from "@/components/SkillBuilderBadge";
 import Image from "next/image";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -51,6 +52,7 @@ type Props = {
   onRefresh: () => void;
   onToggleHistory: (id: string | null) => void;
   onStartPack: (packId: string, packName: string, examMinutes?: number) => void;
+  onSharePack: (packId: string) => Promise<boolean>;
 };
 
 function timeAgo(dateStr: string): string {
@@ -87,7 +89,9 @@ export function SimuladoPacksGrid({
   onRefresh,
   onToggleHistory,
   onStartPack,
+  onSharePack,
 }: Props) {
+  const [sharedPackId, setSharedPackId] = useState<string | null>(null);
   const search = packsSearch.trim().toLowerCase();
   const bySearch = search ? packs.filter((p) => p.name.toLowerCase().includes(search)) : packs;
   const byDifficulty = bySearch.filter((p) => {
@@ -104,6 +108,13 @@ export function SimuladoPacksGrid({
     if (packsSort === "score_desc") return (b.bestScore ?? -1) - (a.bestScore ?? -1);
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+
+  async function sharePack(packId: string) {
+    if (await onSharePack(packId)) {
+      setSharedPackId(packId);
+      window.setTimeout(() => setSharedPackId(null), 2500);
+    }
+  }
 
   const difficultyOptions: {
     value: DifficultyFilter;
@@ -346,6 +357,13 @@ export function SimuladoPacksGrid({
                           Revisar ↗
                         </a>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => void sharePack(pack.id)}
+                        className="border border-[var(--pixel-border)] px-2 py-1 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+                      >
+                        {sharedPackId === pack.id ? "Compartilhado" : "Compartilhar"}
+                      </button>
                       {pack.attempts > 1 && (
                         <button
                           type="button"
@@ -429,6 +447,13 @@ export function SimuladoPacksGrid({
                           Revisar ultima ↗
                         </a>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => void sharePack(pack.id)}
+                        className="border border-white/30 bg-black/40 px-3 py-1.5 font-mono text-[10px] uppercase text-white/70 backdrop-blur-sm hover:text-white"
+                      >
+                        {sharedPackId === pack.id ? "Compartilhado" : "Compartilhar"}
+                      </button>
                       {pack.attempts > 1 && (
                         <button
                           type="button"
@@ -504,6 +529,13 @@ export function SimuladoPacksGrid({
                         Revisar ultima ↗
                       </a>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => void sharePack(pack.id)}
+                      className="border border-[var(--pixel-border)] px-3 py-1.5 font-mono text-[10px] uppercase text-[var(--pixel-subtext)] hover:border-[var(--pixel-primary)] hover:text-[var(--pixel-primary)]"
+                    >
+                      {sharedPackId === pack.id ? "Compartilhado" : "Compartilhar"}
+                    </button>
                     {pack.attempts > 1 && (
                       <button
                         type="button"
