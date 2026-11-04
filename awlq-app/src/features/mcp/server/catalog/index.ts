@@ -2,9 +2,11 @@ import { METRICS_TOOLS } from "./metrics";
 import { INGESTION_TOOLS } from "./ingestion";
 import { QUESTIONS_TOOLS } from "./questions";
 import { USERS_TOOLS } from "./users";
+import { SIMULADOS_TOOLS } from "./simulados";
+import { GAMIFICATION_TOOLS } from "./gamification";
 import type { AdminToolDef } from "./types";
 
-export const ADMIN_TOOL_CATALOG: AdminToolDef[] = [...USERS_TOOLS, ...METRICS_TOOLS, ...QUESTIONS_TOOLS, ...INGESTION_TOOLS];
+export const ADMIN_TOOL_CATALOG: AdminToolDef[] = [...USERS_TOOLS, ...METRICS_TOOLS, ...QUESTIONS_TOOLS, ...INGESTION_TOOLS, ...SIMULADOS_TOOLS, ...GAMIFICATION_TOOLS];
 
 export function getToolsForScopes(scopes: string[]): AdminToolDef[] {
   return ADMIN_TOOL_CATALOG.filter((tool) => {
