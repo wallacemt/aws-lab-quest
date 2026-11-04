@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin-auth";
 import { bulkDeleteAdminUploadedFiles } from "@/lib/admin-ingestion";
@@ -142,7 +143,7 @@ export async function GET(request: NextRequest) {
   });
 }
 
-export async function DELETE(request: NextRequest) {
+export const DELETE = withAdminAudit("uploads", async (request: NextRequest) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -173,4 +174,4 @@ export async function DELETE(request: NextRequest) {
     const message = error instanceof Error ? error.message : "Falha ao remover uploads.";
     return NextResponse.json({ error: message }, { status: 422 });
   }
-}
+});

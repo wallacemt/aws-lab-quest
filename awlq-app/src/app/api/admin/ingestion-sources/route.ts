@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { isAllowedFeedUrl } from "@/lib/url-validation";
 
-export async function POST(req: NextRequest) {
+export const POST = withAdminAudit("ingestion-sources", async (req: NextRequest) => {
   try {
     const authResult = await requireAdmin(req);
     if (!authResult.ok) return authResult.response;
@@ -48,9 +49,9 @@ export async function POST(req: NextRequest) {
     console.error("POST /api/admin/ingestion-sources error:", error);
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
-}
+});
 
-export async function PATCH(req: NextRequest) {
+export const PATCH = withAdminAudit("ingestion-sources", async (req: NextRequest) => {
   try {
     const authResult = await requireAdmin(req);
     if (!authResult.ok) return authResult.response;
@@ -76,4 +77,4 @@ export async function PATCH(req: NextRequest) {
     console.error("PATCH /api/admin/ingestion-sources error:", error);
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
-}
+});

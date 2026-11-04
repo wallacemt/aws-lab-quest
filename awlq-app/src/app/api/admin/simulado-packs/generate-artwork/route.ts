@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { callAI, AiNotConfiguredError } from "@/lib/ai";
 import { fetchPollinationsImage, PIXEL_ART_STYLE_RULES } from "@/lib/pollinations";
@@ -37,7 +38,7 @@ async function generateImagePromptFromName(simuladoName: string): Promise<string
   return cleaned;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("simulado-packs/generate-artwork", async (request: NextRequest) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
@@ -67,4 +68,4 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : "Erro ao gerar arte do simulado.";
     return NextResponse.json({ error: message }, { status });
   }
-}
+});

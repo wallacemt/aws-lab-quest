@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { ensureSystemTemplates } from "@/lib/admin-email-templates";
 import { devAuditLog } from "@/lib/dev-audit";
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ templates });
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("email/templates", async (request: NextRequest) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -81,4 +82,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ template }, { status: 201 });
-}
+});

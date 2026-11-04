@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("behavioral-email/trigger", async (request: NextRequest) => {
   const authResult = await requireAdmin(request);
   if (!authResult.ok) return authResult.response;
 
@@ -14,4 +15,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

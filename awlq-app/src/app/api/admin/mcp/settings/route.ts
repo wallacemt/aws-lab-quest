@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireHumanAdmin } from "@/lib/admin-auth";
 import { getPdfUrlAllowlist, isMcpEnabled, setMcpEnabled, setPdfUrlAllowlist } from "@/features/mcp/server/settings-service";
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
   if (!check.ok) return check.response;
   return NextResponse.json(await settings());
 }
-export async function PATCH(request: NextRequest) {
+export const PATCH = withAdminAudit("mcp/settings", async (request: NextRequest) => {
   const check = await requireHumanAdmin(request);
   if (!check.ok) return check.response;
   let body: unknown;
@@ -27,4 +28,4 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Allowlist inválida." }, { status: 400 });
   }
   return NextResponse.json(await settings());
-}
+});

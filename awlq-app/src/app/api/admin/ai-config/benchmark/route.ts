@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { loadOpenRouterKey } from "@/lib/ai-config";
 
@@ -15,7 +16,7 @@ type BenchmarkOk = {
   preview: string;
 };
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("ai-config/benchmark", async (request: NextRequest) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
@@ -84,4 +85,4 @@ export async function POST(request: NextRequest) {
   } finally {
     clearTimeout(timeoutId);
   }
-}
+});

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { isAllowedArtworkUrl } from "@/lib/url-validation";
@@ -27,7 +28,7 @@ type CreateBossBody = {
   active?: boolean;
 };
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("arena/bosses", async (request: NextRequest) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -73,4 +74,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ boss }, { status: 201 });
-}
+});

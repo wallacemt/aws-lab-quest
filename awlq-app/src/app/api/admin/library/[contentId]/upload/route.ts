@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
@@ -35,7 +36,7 @@ type Params = Promise<{ contentId: string }>;
  *
  * Returns: { storagePath, storageBucket }
  */
-export async function POST(request: NextRequest, { params }: { params: Params }) {
+export const POST = withAdminAudit("library/[contentId]/upload", async (request: NextRequest, { params }: { params: Params }) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) return adminCheck.response;
 
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
   });
 
   return NextResponse.json({ storagePath, storageBucket: LIBRARY_BUCKET });
-}
+});
 
 function sanitizeFileName(fileName: string): string {
   return fileName

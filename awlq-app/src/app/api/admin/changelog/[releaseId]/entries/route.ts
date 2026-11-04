@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -14,7 +15,7 @@ type CreateEntryBody = {
  * DELETE /api/admin/changelog/[releaseId]/entries?entryId=... — delete an entry
  */
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export const POST = withAdminAudit("changelog/[releaseId]/entries", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -40,9 +41,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   return NextResponse.json({ entry }, { status: 201 });
-}
+});
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export const DELETE = withAdminAudit("changelog/[releaseId]/entries", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -55,4 +56,4 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
   await prisma.changelogEntry.delete({ where: { id: entryId } });
   return NextResponse.json({ ok: true });
-}
+});

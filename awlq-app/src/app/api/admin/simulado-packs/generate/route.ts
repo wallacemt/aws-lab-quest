@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -14,7 +15,7 @@ type GenerateBody = {
   certificationCode: string;
 };
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("simulado-packs/generate", async (request: NextRequest) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
   const adminSession = adminResult;
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
     packs: createdPacks,
     certification: certPreset.code,
   });
-}
+});
 
 export async function GET(request: NextRequest) {
   const adminResult = await requireAdmin(request);

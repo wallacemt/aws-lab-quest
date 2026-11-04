@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
@@ -52,7 +53,7 @@ function validateCreateBody(body: CreateAchievementBody): string | null {
   return validateTriggerParams(body.triggerType as TriggerType, body.triggerParams);
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("achievements", async (request: NextRequest) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -97,4 +98,4 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : "Erro ao criar conquista.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});

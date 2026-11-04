@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import {
   buildSha256,
@@ -24,7 +25,7 @@ function isSupportedFile(file: File): boolean {
   return file.type === "application/pdf" || file.type === "text/markdown" || file.type === "text/plain";
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("pdf/extract", async (request: NextRequest) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -153,4 +154,4 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Falha ao processar arquivo." }, { status: 422 });
   }
-}
+});

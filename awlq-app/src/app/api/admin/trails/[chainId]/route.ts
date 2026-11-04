@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -21,7 +22,7 @@ type UpdateChainBody = {
   certificationPresetId?: string | null;
 };
 
-export async function PUT(request: NextRequest, context: RouteContext) {
+export const PUT = withAdminAudit("trails/[chainId]", async (request: NextRequest, context: RouteContext) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -45,9 +46,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   });
 
   return NextResponse.json({ chain });
-}
+});
 
-export async function DELETE(request: NextRequest, context: RouteContext) {
+export const DELETE = withAdminAudit("trails/[chainId]", async (request: NextRequest, context: RouteContext) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -61,4 +62,4 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   await prisma.questChain.delete({ where: { id: chainId } });
 
   return NextResponse.json({ deleted: true });
-}
+});

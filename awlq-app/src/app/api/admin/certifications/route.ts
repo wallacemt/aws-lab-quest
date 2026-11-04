@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { invalidateCertificationsCache } from "@/lib/certification-service";
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
 const MAX_NAME_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 500;
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("certifications", async (request: NextRequest) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) return adminCheck.response;
 
@@ -72,4 +73,4 @@ export async function POST(request: NextRequest) {
     if (error && typeof error === "object" && "code" in error && error.code === "P2002") return NextResponse.json({ error: "Ja existe uma certificacao com esse codigo." }, { status: 409 });
     throw error;
   }
-}
+});

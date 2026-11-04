@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { z } from "zod";
 import { requireHumanAdmin } from "@/lib/admin-auth";
 import { isValidScope } from "@/features/mcp/scopes";
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   if (!check.ok) return check.response;
   return NextResponse.json({ tokens: await listTokensForOwner() });
 }
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("mcp/tokens", async (request: NextRequest) => {
   const check = await requireHumanAdmin(request);
   if (!check.ok) return check.response;
   let body: unknown;
@@ -30,4 +31,4 @@ export async function POST(request: NextRequest) {
     if (error instanceof InvalidTokenScopesError) return NextResponse.json({ error: error.message }, { status: 400 });
     throw error;
   }
-}
+});

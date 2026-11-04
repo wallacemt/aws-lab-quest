@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { getUserAchievementSummary } from "@/lib/achievements";
 import { requireAdmin } from "@/lib/admin-auth";
 import { devAuditLog } from "@/lib/dev-audit";
@@ -162,7 +163,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   });
 }
 
-export async function PATCH(request: NextRequest, context: RouteContext) {
+export const PATCH = withAdminAudit("users/[userId]", async (request: NextRequest, context: RouteContext) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -238,9 +239,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});
 
-export async function DELETE(request: NextRequest, context: RouteContext) {
+export const DELETE = withAdminAudit("users/[userId]", async (request: NextRequest, context: RouteContext) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -271,4 +272,4 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   devAuditLog("admin.users.delete.completed", { adminUserId: adminCheck.userId, userId });
 
   return NextResponse.json({ ok: true });
-}
+});

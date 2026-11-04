@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { AI_CONTEXTS, AiContext, loadAllAiConfigs, saveAiConfig, saveOpenRouterKey } from "@/lib/ai-config";
 
@@ -14,7 +15,7 @@ type KeyPatch = { type: "key"; apiKey: string };
 type ModelPatch = { type: "model"; context: AiContext; model: string };
 type PatchBody = KeyPatch | ModelPatch;
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withAdminAudit("ai-config", async (request: NextRequest) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
@@ -43,4 +44,4 @@ export async function PATCH(request: NextRequest) {
   }
 
   return NextResponse.json({ error: "type invalido" }, { status: 400 });
-}
+});

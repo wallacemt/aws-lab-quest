@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
@@ -62,7 +63,7 @@ function validateUpdateBody(body: UpdateAchievementBody): string | null {
   return null;
 }
 
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export const PATCH = withAdminAudit("achievements/[achievementId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -120,9 +121,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const message = err instanceof Error ? err.message : "Erro ao atualizar conquista.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export const DELETE = withAdminAudit("achievements/[achievementId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -138,4 +139,4 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   });
 
   return NextResponse.json({ achievement });
-}
+});

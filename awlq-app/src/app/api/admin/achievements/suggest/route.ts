@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { requestAiCandidates, aiSuggestionErrorResponse } from "@/lib/ai-suggestion";
@@ -64,7 +65,7 @@ function sanitizeCandidate(raw: RawCandidate): AchievementSuggestion | null {
   };
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("achievements/suggest", async (request: NextRequest) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -92,4 +93,4 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     return aiSuggestionErrorResponse(err);
   }
-}
+});

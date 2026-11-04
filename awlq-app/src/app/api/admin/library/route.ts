@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import type { LibraryContentType } from "@prisma/client";
@@ -52,7 +53,7 @@ type CreateBody = {
   published?: boolean;
 };
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("library", async (request: NextRequest) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) return adminCheck.response;
 
@@ -99,4 +100,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ content: item }, { status: 201 });
-}
+});

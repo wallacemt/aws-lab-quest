@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   return NextResponse.json({ job });
 }
 
-export async function PATCH(request: NextRequest, context: RouteContext) {
+export const PATCH = withAdminAudit("uploads/jobs/[jobId]", async (request: NextRequest, context: RouteContext) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -116,4 +117,4 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   });
 
   return NextResponse.json({ cancelled: true, job: cancelled });
-}
+});

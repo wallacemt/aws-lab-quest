@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
@@ -22,7 +23,7 @@ type UpdateStageBody = {
   unlockRule?: Record<string, unknown> | null;
 };
 
-export async function PUT(request: NextRequest, context: RouteContext) {
+export const PUT = withAdminAudit("trails/[chainId]/stages/[stageId]", async (request: NextRequest, context: RouteContext) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -66,9 +67,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     console.error("PUT /api/admin/trails/[chainId]/stages/[stageId] error:", error);
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
-}
+});
 
-export async function DELETE(request: NextRequest, context: RouteContext) {
+export const DELETE = withAdminAudit("trails/[chainId]/stages/[stageId]", async (request: NextRequest, context: RouteContext) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -85,4 +86,4 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   await prisma.questChainStage.delete({ where: { id: stageId } });
 
   return NextResponse.json({ deleted: true });
-}
+});
