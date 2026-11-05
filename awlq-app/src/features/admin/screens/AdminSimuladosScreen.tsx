@@ -329,17 +329,30 @@ export function AdminSimuladosScreen() {
     }
   }
 
-  async function handleDelete(packId: string) {
+  async function handleDelete(packId: string, deleteQuestions = false) {
     setDeleting(true);
     try {
       const res = await fetch(`/api/admin/simulado-packs/${packId}`, {
         method: "DELETE",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteQuestions }),
       });
-      const json = (await res.json()) as { deleted?: boolean; deactivated?: boolean };
+      const json = (await res.json()) as {
+        deleted?: boolean;
+        deactivated?: boolean;
+        deletedQuestions?: number;
+        preservedSharedQuestions?: number;
+      };
       if (!res.ok) throw new Error();
       if (json.deactivated) {
         setGlobalMessage("Pack tinha sessoes associadas — desativado em vez de excluido.");
+      } else if (deleteQuestions) {
+        setGlobalMessage(
+          `Pack excluido com ${json.deletedQuestions ?? 0} questoes exclusivas removidas${
+            json.preservedSharedQuestions ? `; ${json.preservedSharedQuestions} compartilhadas foram preservadas` : ""
+          }.`,
+        );
       } else {
         setGlobalMessage("Pack excluido.");
       }
@@ -1386,15 +1399,22 @@ export function AdminSimuladosScreen() {
           <div className="w-full max-w-sm border border-red-800 bg-[#0f172a] p-6 space-y-4">
             <h2 className="font-mono text-xs uppercase text-red-400">Confirmar exclusao</h2>
             <p className="text-xs text-[#cbd5e1]">
-              Se este pack tiver sessoes associadas, sera desativado em vez de excluido.
+              Escolha como deseja remover este pack. Questões compartilhadas com outros packs nunca serão removidas.
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => void handleDelete(confirmDeleteId)}
+                onClick={() => void handleDelete(confirmDeleteId, false)}
                 disabled={deleting}
                 className="flex-1 border border-red-700 py-2 text-xs uppercase text-red-400 hover:bg-red-900/20 disabled:opacity-40"
               >
-                {deleting ? "Excluindo..." : "Confirmar"}
+                {deleting ? "Excluindo..." : "Excluir pack"}
+              </button>
+              <button
+                onClick={() => void handleDelete(confirmDeleteId, true)}
+                disabled={deleting}
+                className="flex-1 border border-orange-700 py-2 text-xs uppercase text-orange-400 hover:bg-orange-900/20 disabled:opacity-40"
+              >
+                {deleting ? "Excluindo..." : "Excluir + questões"}
               </button>
               <button
                 onClick={() => setConfirmDeleteId(null)}

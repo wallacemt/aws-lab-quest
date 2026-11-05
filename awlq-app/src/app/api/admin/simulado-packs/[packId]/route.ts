@@ -181,11 +181,46 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!adminResult.ok) return adminResult.response;
 
   const { packId } = await params;
+  const body = (await request.json().catch(() => ({}))) as { deleteQuestions?: boolean };
   const pack = await prisma.simuladoPack.findUnique({
     where: { id: packId },
-    select: { id: true, artworkUrl: true, _count: { select: { sessions: true } } },
+    select: {
+      id: true,
+      artworkUrl: true,
+      _count: { select: { sessions: true } },
+      questions: { select: { questionId: true } },
+    },
   });
   if (!pack) return NextResponse.json({ error: "Pack nao encontrado" }, { status: 404 });
+
+  if (body.deleteQuestions === true) {
+    const questionIds = pack.questions.map(({ questionId }) => questionId);
+    const sharedQuestionLinks = questionIds.length
+      ? await prisma.simuladoPackQuestion.findMany({
+          where: { questionId: { in: questionIds }, packId: { not: packId } },
+          select: { questionId: true },
+        })
+      : [];
+    const sharedQuestionIds = new Set(sharedQuestionLinks.map(({ questionId }) => questionId));
+    const exclusiveQuestionIds = questionIds.filter((questionId) => !sharedQuestionIds.has(questionId));
+
+    await prisma.$transaction(async (tx) => {
+      if (exclusiveQuestionIds.length > 0) {
+        await tx.studyQuestion.deleteMany({ where: { id: { in: exclusiveQuestionIds } } });
+      }
+      await tx.simuladoPack.delete({ where: { id: packId } });
+    });
+
+    if (pack.artworkUrl && isSupabaseArtworkUrl(pack.artworkUrl)) {
+      await deleteArtworkFromSupabase(pack.artworkUrl).catch(() => undefined);
+    }
+
+    return NextResponse.json({
+      deleted: true,
+      deletedQuestions: exclusiveQuestionIds.length,
+      preservedSharedQuestions: sharedQuestionIds.size,
+    });
+  }
 
   if (pack._count.sessions > 0) {
     await prisma.simuladoPack.update({ where: { id: packId }, data: { active: false } });
