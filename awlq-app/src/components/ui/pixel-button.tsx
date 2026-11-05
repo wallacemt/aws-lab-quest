@@ -2,7 +2,7 @@
 
 import { ButtonHTMLAttributes, forwardRef } from "react";
 
-export type PixelButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "warning" | "info" | "default";
+export type PixelButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "warning" | "info" | "default" | "danger" | "danger-solid";
 
 type PixelButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: PixelButtonVariant;
@@ -23,6 +23,10 @@ const variantClassMap: Record<PixelButtonVariant, string> = {
     "bg-blue-500 text-white border-black shadow-[4px_4px_0_0_#000] hover:translate-y-[-1px] active:translate-y-[2px]",
   default:
     "bg-pixel-card text-pixel-text/90 border-black shadow-[4px_4px_0_0_#000] hover:translate-y-[-1px] active:translate-y-[2px]",
+  danger:
+    "bg-transparent text-[var(--pixel-danger)] border-[var(--pixel-danger)] shadow-[4px_4px_0_0_var(--pixel-danger)] hover:bg-[var(--pixel-danger)] hover:text-[var(--pixel-on-danger)] active:translate-y-[2px]",
+  "danger-solid":
+    "bg-[var(--pixel-danger)] text-[var(--pixel-on-danger)] border-[var(--pixel-danger)] shadow-[4px_4px_0_0_var(--pixel-shadow)] hover:translate-y-[-1px] active:translate-y-[2px]",
 };
 
 export const PixelButton = forwardRef<HTMLButtonElement, PixelButtonProps>(function PixelButton(
