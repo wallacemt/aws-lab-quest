@@ -15,6 +15,7 @@ interface McpSettingsCardProps {
 export function McpSettingsCard({ initial, onUpdate }: McpSettingsCardProps) {
   const [settings, setSettings] = useState<McpSettings>(initial);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingEnabled, setPendingEnabled] = useState(false);
 
   const handleToggle = async (enabled: boolean) => {
     if (enabled && !showConfirm) {
@@ -50,7 +51,6 @@ export function McpSettingsCard({ initial, onUpdate }: McpSettingsCardProps) {
             { value: "off", label: "DESLIGADO" },
             { value: "on", label: "LIGADO" },
           ]}
-          disabled={showConfirm}
         />
       </header>
 
@@ -59,7 +59,7 @@ export function McpSettingsCard({ initial, onUpdate }: McpSettingsCardProps) {
           <div className="flex items-center gap-2">
             <label className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Endpoint</label>
             <code className="flex-1 break-all bg-[var(--admin-inset)] px-2 py-1 font-code text-xs text-[var(--pixel-text)] border border-[var(--admin-control-border)]">{settings.endpointUrl}</code>
-            <PixelButton variant="ghost" size="sm" onClick={copyEndpoint} aria-label="Copiar endpoint">
+            <PixelButton variant="ghost" onClick={copyEndpoint} aria-label="Copiar endpoint">
               <Copy size={14} />
             </PixelButton>
           </div>

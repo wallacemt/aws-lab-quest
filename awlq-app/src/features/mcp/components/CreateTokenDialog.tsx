@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
 import { PixelButton } from "@/components/ui/pixel-button";
-import { PixelDialog, PixelDialogContent, PixelDialogHeader, PixelDialogTitle } from "@/components/ui/pixel-dialog";
+import { PixelDialog } from "@/components/ui/pixel-dialog";
 import { ScopePicker } from "@/features/mcp/components/ScopePicker";
-import { createMcpToken, type CreateTokenPayload, type CreateTokenResponse, TokenLimitExceededError, InvalidTokenScopesError } from "@/features/mcp/services/mcp-admin";
-import { MCP_SCOPES } from "@/features/mcp/scopes";
+import { createMcpToken, type CreateTokenPayload, type CreateTokenResponse } from "@/features/mcp/services/mcp-admin";
+import { MCP_SCOPES, type McpScope } from "@/features/mcp/scopes";
 
 interface CreateTokenDialogProps {
   open: boolean;
@@ -24,7 +23,7 @@ const EXPIRY_OPTIONS = [
 export function CreateTokenDialog({ open, onClose, onCreated }: CreateTokenDialogProps) {
   const [name, setName] = useState("");
   const [expiresInDays, setExpiresInDays] = useState<1 | 7 | 30 | 90>(30);
-  const [scopes, setScopes] = useState<string[]>([]);
+  const [scopes, setScopes] = useState<McpScope[]>([]);
   const [danger, setDanger] = useState(false);
   const [dangerConfirmName, setDangerConfirmName] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -55,19 +54,13 @@ export function CreateTokenDialog({ open, onClose, onCreated }: CreateTokenDialo
       const payload: CreateTokenPayload = {
         name: name.trim(),
         expiresInDays,
-        scopes: scopes as CreateTokenPayload["scopes"],
+        scopes,
       };
       const response = await createMcpToken(payload);
       onCreated(response);
       onClose();
     } catch (err) {
-      if (err instanceof TokenLimitExceededError) {
-        setError("Limite de 5 tokens ativos atingido. Revogue um token antes de criar outro.");
-      } else if (err instanceof InvalidTokenScopesError) {
-        setError(err.message);
-      } else {
-        setError(err instanceof Error ? err.message : "Falha ao criar token");
-      }
+      setError(err instanceof Error ? err.message : "Falha ao criar token");
     } finally {
       setSubmitting(false);
     }
@@ -83,16 +76,8 @@ export function CreateTokenDialog({ open, onClose, onCreated }: CreateTokenDialo
   };
 
   return (
-    <PixelDialog open={open} onOpenChange={onClose}>
-      <PixelDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <PixelDialogHeader>
-          <PixelDialogTitle className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-[var(--pixel-primary)]" />
-            Criar token MCP
-          </PixelDialogTitle>
-        </PixelDialogHeader>
-
-        <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-4">
+    <PixelDialog open={open} onOpenChange={onClose} title="Criar token MCP">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-3 bg-[var(--admin-inset)] border border-[var(--pixel-danger)] text-[var(--pixel-danger)] font-reading text-sm">
               {error}
@@ -155,7 +140,6 @@ export function CreateTokenDialog({ open, onClose, onCreated }: CreateTokenDialo
             </PixelButton>
           </div>
         </form>
-      </PixelDialogContent>
     </PixelDialog>
   );
 }

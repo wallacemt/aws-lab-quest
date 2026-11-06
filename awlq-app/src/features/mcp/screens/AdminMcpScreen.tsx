@@ -10,7 +10,7 @@ import { PdfAllowlistEditor } from "@/features/mcp/components/PdfAllowlistEditor
 import { TokenTable } from "@/features/mcp/components/TokenTable";
 import { CreateTokenDialog } from "@/features/mcp/components/CreateTokenDialog";
 import { TokenRevealDialog } from "@/features/mcp/components/TokenRevealDialog";
-import { getMcpSettings, updateMcpSettings, listMcpTokens, revokeMcpToken, type McpSettings, type TokenInfo } from "@/features/mcp/services/mcp-admin";
+import { getMcpSettings, updateMcpSettings, listMcpTokens, revokeMcpToken, type McpSettings, type TokenInfo, type CreateTokenResponse } from "@/features/mcp/services/mcp-admin";
 
 export function AdminMcpScreen() {
   const router = useRouter();
@@ -66,7 +66,7 @@ export function AdminMcpScreen() {
     router.push(`/admin/logs?actorType=agent&tokenId=${tokenId}`);
   };
 
-  const handleCreateToken = async (response: { token: TokenInfo; secret: string }) => {
+  const handleCreateToken = async (response: CreateTokenResponse) => {
     await loadData();
     setRevealData({ secret: response.secret, tokenName: response.token.name });
     setRevealDialogOpen(true);
@@ -115,7 +115,7 @@ export function AdminMcpScreen() {
 
       <div className="space-y-6">
         <McpSettingsCard initial={settings!} onUpdate={handleSettingsUpdate} />
-        <PdfAllowlistEditor initial={settings!.pdfUrlAllowlist} onUpdate={handleSettingsUpdate} />
+        <PdfAllowlistEditor initial={settings!.pdfUrlAllowlist} onUpdate={(pdfUrlAllowlist) => handleSettingsUpdate({ pdfUrlAllowlist })} />
         <TokenTable
           tokens={tokens}
           onRevoke={handleTokenRevoke}

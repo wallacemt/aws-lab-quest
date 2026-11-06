@@ -124,7 +124,7 @@ export function PdfAllowlistEditor({ initial, onUpdate }: PdfAllowlistEditorProp
             <li key={host} className="flex items-center gap-2 px-3 py-2 bg-[var(--admin-inset)] border border-[var(--admin-control-border)]">
               <code className="flex-1 font-code text-sm text-[var(--pixel-text)] break-all">{host}</code>
               {errors[host] && <span className="font-reading text-xs text-[var(--pixel-danger)]">{errors[host]}</span>}
-              <PixelButton variant="ghost" size="sm" onClick={() => handleRemove(host)} aria-label={`Remover ${host}`}>
+              <PixelButton variant="ghost" onClick={() => handleRemove(host)} aria-label={`Remover ${host}`}>
                 <Trash2 size={14} />
               </PixelButton>
             </li>

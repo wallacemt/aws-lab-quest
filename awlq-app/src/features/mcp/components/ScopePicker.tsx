@@ -3,7 +3,7 @@
 import { useMemo, useEffect } from "react";
 import { Skull, Shield } from "lucide-react";
 import { PixelCard } from "@/components/ui/pixel-card";
-import { MCP_SCOPES, type McpScope } from "@/features/mcp/scopes";
+import { MCP_SCOPES, type McpDomain, type McpScope } from "@/features/mcp/scopes";
 
 type ScopeState = "none" | "read" | "write";
 
@@ -16,7 +16,7 @@ interface ScopePickerProps {
   tokenName?: string;
 }
 
-const DOMAIN_ORDER: Array<McpScope["domain"]> = ["users", "questions", "ingestion", "simulados", "gamification", "content", "email", "ops", "metrics"];
+const DOMAIN_ORDER: McpDomain[] = ["users", "questions", "ingestion", "simulados", "gamification", "content", "email", "ops", "metrics"];
 
 export function ScopePicker({ value, onChange, danger, onDangerChange, confirmDangerName, tokenName }: ScopePickerProps) {
   const scopeSet = useMemo(() => new Set(value), [value]);

@@ -118,7 +118,6 @@ export function TokenTable({ tokens, onRevoke, onViewActions, onCreate }: TokenT
                         <>
                           <PixelButton
                             variant="ghost"
-                            size="sm"
                             onClick={() => onViewActions(token.id)}
                             aria-label={`Ver ações do token ${token.name}`}
                           >
@@ -126,7 +125,6 @@ export function TokenTable({ tokens, onRevoke, onViewActions, onCreate }: TokenT
                           </PixelButton>
                           <PixelButton
                             variant="danger"
-                            size="sm"
                             onClick={() => handleRevoke(token.id, token.name)}
                             disabled={revoking === token.id}
                             aria-label={`Revogar token ${token.name}`}

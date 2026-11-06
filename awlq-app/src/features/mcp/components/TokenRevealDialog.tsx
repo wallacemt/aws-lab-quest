@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Copy, Check, AlertTriangle } from "lucide-react";
 import { PixelButton } from "@/components/ui/pixel-button";
-import { PixelDialog, PixelDialogContent, PixelDialogHeader, PixelDialogTitle } from "@/components/ui/pixel-dialog";
+import { PixelDialog } from "@/components/ui/pixel-dialog";
 
 interface TokenRevealDialogProps {
   open: boolean;
@@ -39,16 +39,8 @@ export function TokenRevealDialog({ open, onClose, secret, tokenName, endpointUr
   };
 
   return (
-    <PixelDialog open={open} onOpenChange={handleClose}>
-      <PixelDialogContent className="max-w-xl">
-        <PixelDialogHeader>
-          <PixelDialogTitle className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-[var(--pixel-primary)]" />
-            Token criado com sucesso
-          </PixelDialogTitle>
-        </PixelDialogHeader>
-
-        <div className="p-4 md:p-6 space-y-6">
+    <PixelDialog open={open} onOpenChange={handleClose} title="Token criado com sucesso">
+        <div className="space-y-6">
           <div className="space-y-2 border-2 border-[var(--pixel-danger)] bg-[var(--admin-inset)] p-4 pixel-hazard">
             <p className="font-mono text-[10px] uppercase text-[var(--pixel-danger)] flex items-center gap-1">
               <AlertTriangle size={12} /> Segredo exibido apenas uma vez
@@ -69,7 +61,6 @@ export function TokenRevealDialog({ open, onClose, secret, tokenName, endpointUr
               <code className="block bg-[var(--admin-inset)] px-3 py-2 font-code text-xs text-[var(--pixel-text)] border border-[var(--admin-control-border)] break-all">{secret}</code>
               <PixelButton
                 variant="ghost"
-                size="sm"
                 className="absolute right-2 top-1/2 -translate-y-1/2"
                 onClick={handleCopy}
                 aria-label={copied ? "Copiado!" : "Copiar segredo"}
@@ -91,7 +82,6 @@ export function TokenRevealDialog({ open, onClose, secret, tokenName, endpointUr
               <code className="block font-code text-xs text-[var(--pixel-text)] break-all">{snippet}</code>
               <PixelButton
                 variant="ghost"
-                size="sm"
                 className="absolute right-2 top-2"
                 onClick={async () => { await navigator.clipboard.writeText(snippet); }}
                 aria-label="Copiar comando"
@@ -125,7 +115,6 @@ export function TokenRevealDialog({ open, onClose, secret, tokenName, endpointUr
             </PixelButton>
           </div>
         </div>
-      </PixelDialogContent>
     </PixelDialog>
   );
 }
