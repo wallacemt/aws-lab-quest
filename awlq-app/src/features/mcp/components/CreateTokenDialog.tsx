@@ -124,6 +124,7 @@ export function CreateTokenDialog({ open, onClose, onCreated }: CreateTokenDialo
               danger={danger}
               onDangerChange={setDanger}
               confirmDangerName={dangerConfirmName}
+              onConfirmDangerNameChange={setDangerConfirmName}
               tokenName={name}
             />
           </div>

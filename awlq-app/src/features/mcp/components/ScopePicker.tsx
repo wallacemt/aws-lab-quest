@@ -13,12 +13,13 @@ interface ScopePickerProps {
   danger: boolean;
   onDangerChange: (checked: boolean) => void;
   confirmDangerName?: string;
+  onConfirmDangerNameChange: (name: string) => void;
   tokenName?: string;
 }
 
 const DOMAIN_ORDER: McpDomain[] = ["users", "questions", "ingestion", "simulados", "gamification", "content", "email", "ops", "metrics"];
 
-export function ScopePicker({ value, onChange, danger, onDangerChange, confirmDangerName, tokenName }: ScopePickerProps) {
+export function ScopePicker({ value, onChange, danger, onDangerChange, confirmDangerName, onConfirmDangerNameChange, tokenName }: ScopePickerProps) {
   const scopeSet = useMemo(() => new Set(value), [value]);
 
   const domainState = useMemo((): Record<string, ScopeState> => {
@@ -73,7 +74,7 @@ export function ScopePicker({ value, onChange, danger, onDangerChange, confirmDa
                 {(["none", "read", "write"] as ScopeState[]).map((state) => (
                   <label
                     key={state}
-                    className={`relative cursor-pointer px-2 py-1.5 text-center font-mono text-[10px] uppercase transition-colors border-2 ${
+                    className={`relative cursor-pointer px-1 py-1.5 text-center font-mono text-[9px] uppercase leading-tight break-words transition-colors border-2 ${
                       current === state
                         ? "bg-[var(--pixel-primary)] text-[var(--pixel-bg)] border-[var(--pixel-primary)]"
                         : "bg-[var(--pixel-muted)] text-[var(--pixel-subtext)] border-transparent hover:border-[var(--admin-control-border)]"
@@ -121,7 +122,7 @@ export function ScopePicker({ value, onChange, danger, onDangerChange, confirmDa
               <input
                 type="text"
                 value={confirmDangerName ?? ""}
-                onChange={(e) => handleDangerChange(danger)} // mantém checked, valida no blur/submit
+                onChange={(e) => onConfirmDangerNameChange(e.target.value)}
                 placeholder={tokenName ?? "nome do token"}
                 className="w-full mt-1 h-10 border-2 border-[var(--admin-control-border)] bg-[var(--admin-inset)] px-2 font-reading text-sm text-[var(--pixel-text)] outline-none focus:border-[var(--pixel-danger)]"
               />
