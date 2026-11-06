@@ -70,8 +70,8 @@ export function ScopePicker({ value, onChange, danger, onDangerChange, confirmDa
           return (
             <PixelCard key={domain} className="p-3 space-y-2 border-[var(--pixel-border)] bg-[var(--pixel-card)]">
               <p className="font-mono text-[10px] uppercase text-[var(--pixel-primary)]">{label}</p>
-              <div className="grid grid-cols-3 gap-1">
-                {(["none", "read", "write"] as ScopeState[]).map((state) => (
+              <div className={`grid gap-1 ${domain === "metrics" ? "grid-cols-2" : "grid-cols-3"}`}>
+                {(domain === "metrics" ? (["none", "read"] as ScopeState[]) : (["none", "read", "write"] as ScopeState[])).map((state) => (
                   <label
                     key={state}
                     className={`relative cursor-pointer px-1 py-1.5 text-center font-mono text-[9px] uppercase leading-tight break-words transition-colors border-2 ${
