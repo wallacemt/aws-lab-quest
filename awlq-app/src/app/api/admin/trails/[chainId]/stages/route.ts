@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
@@ -41,7 +42,7 @@ type CreateStageBody = {
   unlockRule?: Record<string, unknown>;
 };
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export const POST = withAdminAudit("trails/[chainId]/stages", async (request: NextRequest, context: RouteContext) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -98,4 +99,4 @@ export async function POST(request: NextRequest, context: RouteContext) {
     console.error("POST /api/admin/trails/[chainId]/stages error:", error);
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
-}
+});

@@ -73,6 +73,7 @@ model User {
   lastMentorQuestion      String?
   lastMentorAnswer        String?
   libraryAccessLogs       LibraryAccessLog[]
+  mcpTokens               McpToken[]
 
   @@index([accessStatus, active])
   @@map("user")
@@ -1271,4 +1272,74 @@ model TrailStageExplain {
   createdAt DateTime        @default(now())
 
   @@index([stageId])
+}
+
+enum AuditActorType {
+  human
+  agent
+}
+
+enum AuditSource {
+  admin_ui
+  mcp
+}
+
+enum AuditStatus {
+  pending        // só agente W/D, antes de executar (Q-05)
+  ok
+  error          // handler >= 400 (exceto 401/403) ou exceção
+  denied         // 401/403 do handler, escopo insuficiente, preflight recusado
+  rate_limited
+}
+
+model McpToken {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  tokenHash       String   @unique   // sha256 hex
+  tokenPrefix     String              // "awlq_mcp_AbCd123"
+  scopes          String[]
+  expiresAt       DateTime            // <= createdAt + 90 dias
+  revokedAt       DateTime?
+  revokedByUserId String?
+  lastUsedAt      DateTime?
+  lastUsedIp      String?
+  createdAt       DateTime @default(now())
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditEvents AdminAuditEvent[]
+
+  @@index([userId, revokedAt])
+}
+
+model AdminAuditEvent {
+  id           String         @id @default(cuid())
+  requestId    String                          // uuid; correlaciona com X-AWLQ-Request-Id e logs
+  createdAt    DateTime       @default(now())
+  actorType    AuditActorType
+  source       AuditSource
+  actorUserId  String                          // admin humano, ou dono do token (sem FK: sobrevive à anonimização)
+  actorEmail   String                          // e-mail do admin no momento do evento (exibido só a admins humanos)
+  tokenId      String?                         // só agente
+  tool         String?                         // só agente, ex.: "users_approve"
+  domain       String                          // users | questions | ... | platform
+  action       String                          // routeKey canônico: "POST users/[userId]/approve"
+  path         String                          // path resolvido: "users/ck123/approve"
+  resourceId   String?
+  status       AuditStatus
+  httpStatus   Int?
+  durationMs   Int?
+  argsRedacted Json?
+  errorMessage String?                         // truncado a 500 chars
+  ip           String?
+  userAgent    String?
+
+  token McpToken? @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorType, createdAt])
+  @@index([domain, createdAt])
+  @@index([status, createdAt])
+  @@index([tokenId, createdAt])
+  @@index([actorUserId, createdAt])
 }

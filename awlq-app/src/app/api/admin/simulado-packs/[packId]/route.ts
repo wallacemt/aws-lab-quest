@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   });
 }
 
-export async function PATCH(request: NextRequest, { params }: Params) {
+export const PATCH = withAdminAudit("simulado-packs/[packId]", async (request: NextRequest, { params }: Params) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
@@ -174,9 +175,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   return NextResponse.json(updated);
-}
+});
 
-export async function DELETE(request: NextRequest, { params }: Params) {
+export const DELETE = withAdminAudit("simulado-packs/[packId]", async (request: NextRequest, { params }: Params) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
@@ -234,4 +235,4 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   return NextResponse.json({ deleted: true });
-}
+});

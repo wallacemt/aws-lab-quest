@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { parseQuestionJson } from "@/lib/question-import";
 import { prepareQuestionImport } from "@/lib/question-import-server";
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("questions/import-json", async (request: NextRequest) => {
   const admin = await requireAdmin(request);
   if (!admin.ok) return admin.response;
   let prepared;
@@ -24,4 +25,4 @@ export async function POST(request: NextRequest) {
   if (dryRun) return NextResponse.json({ dryRun: true, count: prepared.count, previewItems: prepared.previewItems });
   const ids = await prisma.$transaction(tx => prepared.create(tx), { timeout: 30000 });
   return NextResponse.json({ created: ids.length, ids }, { status: 201 });
-}
+});

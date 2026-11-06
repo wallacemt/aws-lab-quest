@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 
 /**
@@ -10,7 +11,7 @@ import { requireAdmin } from "@/lib/admin-auth";
  * directly in Next.js API routes due to the shared-redis dual-connection constraint.
  * Instead, we write a WorkerTrigger row which the trigger-poller picks up.
  */
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("changelog/sync", async (request: NextRequest) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -26,4 +27,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ ok: true, message: "Changelog sync enqueued." });
-}
+});

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { callAI, AiNotConfiguredError } from "@/lib/ai";
 import { fetchPollinationsImage } from "@/lib/pollinations";
@@ -39,7 +40,7 @@ async function generateImagePromptFromName(achievementName: string): Promise<str
   return cleaned;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("achievements/generate-artwork", async (request: NextRequest) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
@@ -69,4 +70,4 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : "Erro ao gerar arte da conquista.";
     return NextResponse.json({ error: message }, { status });
   }
-}
+});

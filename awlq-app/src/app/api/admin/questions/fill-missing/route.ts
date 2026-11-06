@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { callAI, AiNotConfiguredError } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
@@ -213,7 +214,7 @@ async function loadCandidates(take: number, excludedIds: string[]): Promise<Ques
   })) as QuestionCandidate[];
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("questions/fill-missing", async (request: NextRequest) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -476,7 +477,7 @@ export async function POST(request: NextRequest) {
     dryRun,
     details,
   });
-}
+});
 
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdmin(request);

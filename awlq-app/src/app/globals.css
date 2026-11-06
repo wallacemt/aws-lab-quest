@@ -375,3 +375,38 @@ html[data-arena-bg] .pixel-bg-adaptive {
 .animate-shimmer {
   animation: shimmer 1s infinite;
 }
+/* ILLUSTRATIVE — tokens novos do Dossier 002 */
+.admin-console {
+  --pixel-bg: #0b1220;
+  --pixel-card: #111827;
+  --pixel-muted: #1e293b;
+  --pixel-border: #475569;
+  --pixel-shadow: #000000;
+  --pixel-text: #e2e8f0;
+  --pixel-subtext: #94a3b8;
+  --pixel-primary: #f97316;
+  --pixel-accent: #22c55e;
+  --pixel-danger: #f87171;
+  --pixel-on-danger: #0b1220;
+
+  --admin-inset: #0b1220;
+  --admin-control-border: #64748b;
+  --admin-actor-human: #38bdf8;
+  --admin-actor-agent: #a78bfa;
+  --admin-on-agent: #0b1220;
+  --admin-status-ok: #86efac;
+  --admin-status-warn: #fbbf24;
+  --admin-status-error: var(--pixel-danger);
+  --admin-status-neutral: var(--pixel-subtext);
+}
+@theme inline {
+  --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+.pixel-hazard {
+  background-image: repeating-linear-gradient(-45deg, var(--pixel-danger) 0 4px, var(--admin-inset) 4px 8px);
+}
+/* trilho do agente: xadrez 4×4, legível em escala de cinza */
+.agent-rail {
+  background-image: conic-gradient(var(--admin-actor-agent) 25%, transparent 0 50%, var(--admin-actor-agent) 0 75%, transparent 0);
+  background-size: 8px 8px;
+}

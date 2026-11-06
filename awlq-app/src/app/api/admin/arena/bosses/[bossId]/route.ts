@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { isAllowedArtworkUrl } from "@/lib/url-validation";
@@ -27,7 +28,7 @@ type UpdateBossBody = Partial<{
   active: boolean;
 }>;
 
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export const PUT = withAdminAudit("arena/bosses/[bossId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -75,9 +76,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   });
 
   return NextResponse.json({ boss });
-}
+});
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export const DELETE = withAdminAudit("arena/bosses/[bossId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -86,4 +87,4 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   await deleteBossArtworkFromSupabase(boss.artworkUrl).catch(() => undefined);
 
   return NextResponse.json({ ok: true });
-}
+});

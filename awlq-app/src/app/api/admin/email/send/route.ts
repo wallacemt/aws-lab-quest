@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
@@ -16,7 +17,7 @@ type SendBody = {
   scheduledFor?: string;
 };
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("email/send", async (request: NextRequest) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -94,4 +95,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ queued: true, sent: 0, failed: 0, scheduledFor: scheduledFor?.toISOString() ?? null });
-}
+});

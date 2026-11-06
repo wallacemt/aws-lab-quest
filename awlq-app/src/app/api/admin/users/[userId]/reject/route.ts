@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
@@ -11,7 +12,7 @@ type Body = {
   reason?: string;
 };
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export const POST = withAdminAudit("users/[userId]/reject", async (request: NextRequest, context: RouteContext) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -42,4 +43,4 @@ export async function POST(request: NextRequest, context: RouteContext) {
   devAuditLog("admin.users.reject.completed", { adminUserId: adminCheck.userId, userId });
 
   return NextResponse.json({ ok: true });
-}
+});

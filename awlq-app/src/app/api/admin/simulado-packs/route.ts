@@ -1,4 +1,5 @@
 import { validateQuestionImport, MAX_IMPORT_BYTES, type ImportItem } from "@/lib/question-import";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { prepareQuestionImport } from "@/lib/question-import-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -83,7 +84,7 @@ type CreateBody = {
   difficultyScore?: number;
 };
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("simulado-packs", async (request: NextRequest) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
@@ -171,4 +172,4 @@ export async function POST(request: NextRequest) {
     }
     throw err;
   }
-}
+});

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { invalidateCertificationsCache } from "@/lib/certification-service";
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 const MAX_NAME_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 500;
 
-export async function PATCH(request: NextRequest, { params }: RouteContext) {
+export const PATCH = withAdminAudit("certifications/[certificationId]", async (request: NextRequest, { params }: RouteContext) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) return adminCheck.response;
 
@@ -149,4 +150,4 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   await invalidateCertificationsCache();
 
   return NextResponse.json({ certification });
-}
+});

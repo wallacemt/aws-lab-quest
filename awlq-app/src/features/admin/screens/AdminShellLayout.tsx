@@ -27,6 +27,8 @@ const ADMIN_MENU = [
   { href: "/admin/noticias", label: "Noticias" },
   { href: "/admin/changelog", label: "Changelog" },
   { href: "/admin/home-config", label: "Home Config" },
+  { href: "/admin/integracoes", label: "Integrações" },
+  { href: "/admin/logs", label: "Logs" },
 ];
 
 const BREADCRUMB_MAP: Record<string, string> = {
@@ -48,6 +50,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/admin/temas": "Temas da Comunidade",
   "/admin/noticias": "Noticias",
   "/admin/changelog": "Changelog",
+  "/admin/integracoes": "Integrações",
+  "/admin/logs": "Logs",
 };
 
 function useLiveClock(): string {

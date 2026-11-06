@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { devAuditLog } from "@/lib/dev-audit";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +8,7 @@ type RouteContext = {
   params: Promise<{ triggerId: string }>;
 };
 
-export async function DELETE(request: NextRequest, context: RouteContext) {
+export const DELETE = withAdminAudit("email/scheduled/[triggerId]", async (request: NextRequest, context: RouteContext) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -38,4 +39,4 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

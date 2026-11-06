@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ pending, defaultLimit: DEFAULT_LIMIT, maxLimit: MAX_LIMIT });
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("simulado-packs/migrate-artwork", async (request: NextRequest) => {
   const adminResult = await requireAdmin(request);
   if (!adminResult.ok) return adminResult.response;
 
@@ -103,4 +104,4 @@ export async function POST(request: NextRequest) {
     dryRun,
     results,
   });
-}
+});

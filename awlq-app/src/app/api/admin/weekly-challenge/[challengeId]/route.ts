@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 }
 
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export const PATCH = withAdminAudit("weekly-challenge/[challengeId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -102,4 +103,4 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   return NextResponse.json({ challenge });
-}
+});

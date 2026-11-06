@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
@@ -62,7 +63,7 @@ type UpdateBody = {
   published?: boolean;
 };
 
-export async function PUT(request: NextRequest, { params }: { params: Params }) {
+export const PUT = withAdminAudit("library/[contentId]", async (request: NextRequest, { params }: { params: Params }) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) return adminCheck.response;
 
@@ -112,9 +113,9 @@ export async function PUT(request: NextRequest, { params }: { params: Params }) 
   }
 
   return NextResponse.json({ content: item });
-}
+});
 
-export async function DELETE(request: NextRequest, { params }: { params: Params }) {
+export const DELETE = withAdminAudit("library/[contentId]", async (request: NextRequest, { params }: { params: Params }) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) return adminCheck.response;
 
@@ -141,4 +142,4 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
   }
 
   return NextResponse.json({ deleted: true });
-}
+});

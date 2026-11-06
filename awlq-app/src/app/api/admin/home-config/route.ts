@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { ALL_APP_MODES } from "@/features/utils/home-apps";
@@ -27,7 +28,7 @@ export async function GET() {
   }
 }
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withAdminAudit("home-config", async (request: NextRequest) => {
   const authResult = await requireAdmin(request);
   if (!authResult.ok) return authResult.response;
 
@@ -48,4 +49,4 @@ export async function PATCH(request: NextRequest) {
     console.error("PATCH /api/admin/home-config error:", error);
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
-}
+});

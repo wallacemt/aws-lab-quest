@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import {
   buildTemplateVariables,
@@ -13,7 +14,7 @@ type RouteContext = {
   params: Promise<{ userId: string }>;
 };
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export const POST = withAdminAudit("users/[userId]/approve", async (request: NextRequest, context: RouteContext) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) {
     return adminCheck.response;
@@ -77,4 +78,4 @@ export async function POST(request: NextRequest, context: RouteContext) {
   devAuditLog("admin.users.approve.completed", { adminUserId: adminCheck.userId, userId });
 
   return NextResponse.json({ ok: true });
-}
+});

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { hashPassword } from "better-auth/crypto";
 import { requireAdmin } from "@/lib/admin-auth";
 import { devAuditLog } from "@/lib/dev-audit";
@@ -8,7 +9,7 @@ type RouteContext = {
   params: Promise<{ userId: string }>;
 };
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export const POST = withAdminAudit("users/[userId]/set-password", async (request: NextRequest, context: RouteContext) => {
   const adminCheck = await requireAdmin(request);
   if (!adminCheck.ok) return adminCheck.response;
 
@@ -55,4 +56,4 @@ export async function POST(request: NextRequest, context: RouteContext) {
   devAuditLog("admin.users.set-password", { adminUserId: adminCheck.userId, userId });
 
   return NextResponse.json({ ok: true });
-}
+});

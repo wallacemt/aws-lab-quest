@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { isAllowedFeedUrl } from "@/lib/url-validation";
@@ -12,7 +13,7 @@ type UpdateSourceBody = Partial<{
   active: boolean;
 }>;
 
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export const PUT = withAdminAudit("news-sources/[sourceId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -39,9 +40,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   });
 
   return NextResponse.json({ source });
-}
+});
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export const DELETE = withAdminAudit("news-sources/[sourceId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -49,4 +50,4 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   await prisma.newsSource.delete({ where: { id: sourceId } });
 
   return NextResponse.json({ ok: true });
-}
+});

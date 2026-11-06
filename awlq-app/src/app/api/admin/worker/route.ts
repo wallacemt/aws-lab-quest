@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -141,7 +142,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withAdminAudit("worker", async (req: NextRequest) => {
   try {
     const authResult = await requireAdmin(req);
     if (!authResult.ok) return authResult.response;
@@ -179,4 +180,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

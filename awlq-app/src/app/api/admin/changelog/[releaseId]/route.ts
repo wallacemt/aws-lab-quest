@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -15,7 +16,7 @@ type UpdateReleaseBody = Partial<{
  * PUT /api/admin/changelog/[releaseId]
  * Toggles published, sets adminSummary, highlight, and bodyMarkdown.
  */
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export const PUT = withAdminAudit("changelog/[releaseId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -34,13 +35,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   });
 
   return NextResponse.json({ release });
-}
+});
 
 /**
  * DELETE /api/admin/changelog/[releaseId]
  * Permanently removes a release and its entries.
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export const DELETE = withAdminAudit("changelog/[releaseId]", async (request: NextRequest, { params }: RouteParams) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -49,4 +50,4 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   await prisma.changelogRelease.delete({ where: { id: releaseId } });
 
   return NextResponse.json({ deleted: true });
-}
+});

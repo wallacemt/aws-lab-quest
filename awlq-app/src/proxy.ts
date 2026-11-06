@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/reset-password", "/admin/login"];
 const PUBLIC_PREFIXES = [
   "/api/auth",
+  "/api/mcp",
   "/api/health",
   "/api/user/username/generate",
   "/_next",

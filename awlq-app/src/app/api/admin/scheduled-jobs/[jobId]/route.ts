@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -7,10 +8,9 @@ function isValidCron(pattern: string): boolean {
   return parts.length === 5;
 }
 
-export async function PATCH(
+export const PATCH = withAdminAudit("scheduled-jobs/[jobId]", async (
   request: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> }
-) {
+  { params }: { params: Promise<{ jobId: string }> }) => {
   try {
     const authResult = await requireAdmin(request);
     if (!authResult.ok) return authResult.response;
@@ -48,4 +48,4 @@ export async function PATCH(
     console.error("PATCH /api/admin/scheduled-jobs/[jobId] error:", error);
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
-}
+});

@@ -1,0 +1,20 @@
+import { z } from "zod";
+import type { AdminToolDef } from "./types";
+const id=z.string().min(1), empty=z.object({}).strict();
+const create=z.object({code:z.string(),name:z.string(),description:z.string().optional(),subject:z.string(),html:z.string(),text:z.string().optional(),active:z.boolean().optional()}).strict();
+const patch=z.object({templateId:id,name:z.string().optional(),description:z.string().optional(),subject:z.string().optional(),html:z.string().optional(),text:z.string().optional(),active:z.boolean().optional()}).strict();
+const trigger=z.object({triggerId:id}).strict();
+const send=z.object({templateId:id.optional(),subject:z.string().optional(),html:z.string().optional(),targetMode:z.enum(["all-users","single-user","specific-users"]).optional(),userId:id.optional(),userIds:z.array(id).optional(),scheduledFor:z.string().optional()}).strict();
+const behavioral=z.object({enabled:z.boolean()}).strict();
+export const EMAIL_TOOLS:AdminToolDef[]=[
+{name:"email_templates_list",title:"Listar modelos de email",description:"Lista templates.",domain:"email",tier:"read",method:"GET",path:"email/templates",inputSchema:empty,handler:async()=> (await import("@/app/api/admin/email/templates/route")).GET as never},
+{name:"email_scheduled_list",title:"Listar emails agendados",description:"Lista envios agendados.",domain:"email",tier:"read",method:"GET",path:"email/scheduled",inputSchema:empty,handler:async()=> (await import("@/app/api/admin/email/scheduled/route")).GET as never},
+{name:"behavioral_email_get",title:"Consultar email comportamental",description:"Consulta configuração e histórico.",domain:"email",tier:"read",method:"GET",path:"behavioral-email",inputSchema:empty,handler:async()=> (await import("@/app/api/admin/behavioral-email/route")).GET as never},
+{name:"email_template_create",title:"Criar template de email",description:"Cria template.",domain:"email",tier:"write",method:"POST",path:"email/templates",inputSchema:create,buildBody:i=>i,handler:async()=> (await import("@/app/api/admin/email/templates/route")).POST as never},
+{name:"email_template_update",title:"Atualizar template",description:"Atualiza template.",domain:"email",tier:"write",method:"PATCH",path:"email/templates/[templateId]",inputSchema:patch,pathParams:["templateId"],buildBody:({templateId:_id,...body})=>body,handler:async()=> (await import("@/app/api/admin/email/templates/[templateId]/route")).PATCH as never},
+{name:"email_scheduled_cancel",title:"Cancelar email agendado",description:"Cancela envio pendente.",domain:"email",tier:"write",method:"DELETE",path:"email/scheduled/[triggerId]",inputSchema:trigger,pathParams:["triggerId"],handler:async()=> (await import("@/app/api/admin/email/scheduled/[triggerId]/route")).DELETE as never},
+{name:"behavioral_email_update",title:"Atualizar email comportamental",description:"Ativa ou desativa o recurso.",domain:"email",tier:"write",method:"PATCH",path:"behavioral-email",inputSchema:behavioral,buildBody:i=>i,handler:async()=> (await import("@/app/api/admin/behavioral-email/route")).PATCH as never},
+{name:"email_template_delete",title:"Excluir template",description:"Exclui template customizado.",domain:"email",tier:"danger",method:"DELETE",path:"email/templates/[templateId]",inputSchema:z.object({templateId:id}).strict(),pathParams:["templateId"],handler:async()=> (await import("@/app/api/admin/email/templates/[templateId]/route")).DELETE as never},
+{name:"email_send",title:"Enviar email",description:"Enfileira email para os destinatários selecionados.",domain:"email",tier:"danger",method:"POST",path:"email/send",inputSchema:send,buildBody:i=>i,handler:async()=> (await import("@/app/api/admin/email/send/route")).POST as never},
+{name:"behavioral_email_trigger",title:"Acionar email comportamental",description:"Enfileira execução de emails comportamentais.",domain:"email",tier:"danger",method:"POST",path:"behavioral-email/trigger",inputSchema:empty,buildBody:i=>i,handler:async()=> (await import("@/app/api/admin/behavioral-email/trigger/route")).POST as never},
+];

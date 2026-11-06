@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAdminAudit } from "@/features/audit/server/with-admin-audit";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -6,7 +7,7 @@ interface TriggerBody {
   mode?: "open" | "close";
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAudit("weekly-challenge/trigger", async (request: NextRequest) => {
   const auth = await requireAdmin(request);
   if (!auth.ok) return auth.response;
 
@@ -26,4 +27,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});
