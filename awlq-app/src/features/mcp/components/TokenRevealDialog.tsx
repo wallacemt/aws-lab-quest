@@ -57,11 +57,11 @@ export function TokenRevealDialog({ open, onClose, secret, tokenName, endpointUr
 
           <div className="space-y-2">
             <label className="block font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">Segredo (copie agora)</label>
-            <div className="relative">
-              <code className="block bg-[var(--admin-inset)] px-3 py-2 font-code text-xs text-[var(--pixel-text)] border border-[var(--admin-control-border)] break-all">{secret}</code>
+            <div className="flex items-stretch gap-2">
+              <code className="min-w-0 flex-1 bg-[var(--admin-inset)] px-3 py-2 font-code text-xs text-[var(--pixel-text)] border border-[var(--admin-control-border)] break-all">{secret}</code>
               <PixelButton
                 variant="ghost"
-                className="absolute right-2 top-1/2 -translate-y-1/2"
+                className="shrink-0 self-center"
                 onClick={handleCopy}
                 aria-label={copied ? "Copiado!" : "Copiar segredo"}
               >
@@ -78,11 +78,11 @@ export function TokenRevealDialog({ open, onClose, secret, tokenName, endpointUr
             <p className="font-reading text-xs text-[var(--pixel-subtext)]">
               Execute no terminal onde roda o Claude Code:
             </p>
-            <div className="relative bg-[var(--admin-inset)] border border-[var(--admin-control-border)] p-3">
-              <code className="block font-code text-xs text-[var(--pixel-text)] break-all">{snippet}</code>
+            <div className="flex items-start gap-2 bg-[var(--admin-inset)] border border-[var(--admin-control-border)] p-3">
+              <code className="min-w-0 flex-1 font-code text-xs text-[var(--pixel-text)] break-all">{snippet}</code>
               <PixelButton
                 variant="ghost"
-                className="absolute right-2 top-2"
+                className="shrink-0"
                 onClick={async () => { await navigator.clipboard.writeText(snippet); }}
                 aria-label="Copiar comando"
               >

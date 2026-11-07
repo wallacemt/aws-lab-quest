@@ -104,13 +104,15 @@ export function TokenTable({ tokens, onRevoke, onViewActions, onCreate }: TokenT
                   <td className="px-3 py-2 font-code text-xs text-[var(--pixel-subtext)]">{formatDate(token.expiresAt)}</td>
                   <td className="px-3 py-2 font-code text-xs text-[var(--pixel-subtext)]">{formatDate(token.lastUsedAt)}</td>
                   <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
                     <ActorBadge
                       actorType={token.status === "active" ? "agent" : "human"}
                       compact
                     />
-                    <span className="ml-2 font-mono text-[10px] uppercase">
+                    <span className="font-mono text-[10px] uppercase">
                       {STATUS_CONFIG[token.status].label}
                     </span>
+                    </div>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">

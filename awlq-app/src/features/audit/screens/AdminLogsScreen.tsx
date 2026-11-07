@@ -56,7 +56,7 @@ export function AdminLogsScreen() {
   const navigateEvent = (event: AuditEventDTO) => setSelected(event);
   const period = filters.from && filters.to ? `${filters.from.slice(0, 10)} a ${filters.to.slice(0, 10)}` : "últimos 7 dias";
 
-  return <main className="admin-console min-h-full space-y-6 bg-[var(--pixel-bg)] p-4 text-[var(--pixel-text)] md:p-6">
+  return <main className="admin-console min-h-full space-y-6 p-4 text-[var(--pixel-text)] md:p-6">
     <header><p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-primary)]">LOGS</p><h1 className="mt-2 font-reading text-xl font-semibold">Auditoria administrativa</h1></header>
     <AuditFilters filters={filters} catalog={catalog} onChange={updateFilters} />
     {refreshing && <span className="font-mono text-[10px] uppercase text-[var(--pixel-subtext)]">CARREGANDO…</span>}

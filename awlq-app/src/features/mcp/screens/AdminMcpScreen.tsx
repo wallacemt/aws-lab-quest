@@ -79,7 +79,7 @@ export function AdminMcpScreen() {
 
   if (loading) {
     return (
-      <main className="admin-console min-h-full space-y-6 bg-[var(--pixel-bg)] p-4 text-[var(--pixel-text)] md:p-6">
+      <main className="admin-console min-h-full space-y-6 p-4 text-[var(--pixel-text)] md:p-6">
         <header>
           <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-primary)]">INTEGRAÇÕES</p>
           <h1 className="mt-2 font-reading text-xl font-semibold">MCP (Model Context Protocol)</h1>
@@ -93,7 +93,7 @@ export function AdminMcpScreen() {
 
   if (error && !settings) {
     return (
-      <main className="admin-console min-h-full space-y-6 bg-[var(--pixel-bg)] p-4 text-[var(--pixel-text)] md:p-6">
+      <main className="admin-console min-h-full space-y-6 p-4 text-[var(--pixel-text)] md:p-6">
         <header>
           <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-primary)]">INTEGRAÇÕES</p>
           <h1 className="mt-2 font-reading text-xl font-semibold">MCP (Model Context Protocol)</h1>
@@ -107,7 +107,7 @@ export function AdminMcpScreen() {
   }
 
   return (
-    <main className="admin-console min-h-full space-y-6 bg-[var(--pixel-bg)] p-4 text-[var(--pixel-text)] md:p-6">
+    <main className="admin-console min-h-full space-y-6 p-4 text-[var(--pixel-text)] md:p-6">
       <header>
         <p className="font-mono text-xs uppercase tracking-wide text-[var(--pixel-primary)]">INTEGRAÇÕES</p>
         <h1 className="mt-2 font-reading text-xl font-semibold">MCP (Model Context Protocol)</h1>
